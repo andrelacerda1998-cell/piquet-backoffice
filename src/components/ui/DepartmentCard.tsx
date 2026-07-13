@@ -1,14 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/formatters";
 import type { DepartmentHealth, DepartmentStatus } from "@/services/dashboardService";
 import {
-  Wrench, Headphones, Megaphone, Cpu, Euro, Users, LayoutDashboard,
+  Wrench, Headphones, Megaphone, Cpu, Euro, Users, LayoutDashboard, ArrowRight,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Wrench, Headphones, Megaphone, Cpu, Euro, Users,
+};
+
+// Página de cada departamento — o cartão da Visão executiva abre-a ao clicar.
+const DEPT_ROUTES: Record<string, string> = {
+  operacoes: "/servicos",
+  suporte: "/suporte",
+  marketing: "/marketing",
+  tecnologia: "/produto",
+  financeiro: "/financeiro",
+  gestao: "/relatorios",
 };
 
 const STATUS: Record<DepartmentStatus, { label: string; dot: string; text: string; bg: string }> = {
@@ -20,16 +31,24 @@ const STATUS: Record<DepartmentStatus, { label: string; dot: string; text: strin
 export function DepartmentCard({ dept }: { dept: DepartmentHealth }) {
   const Icon = iconMap[dept.icon] ?? LayoutDashboard;
   const status = STATUS[dept.status];
+  const href = DEPT_ROUTES[dept.id] ?? "/";
 
   return (
-    <div className="card p-4 hover:shadow-elevated transition-shadow">
+    <Link
+      href={href}
+      aria-label={`Abrir departamento ${dept.name}`}
+      className="card p-4 block group hover:shadow-elevated hover:border-piquet/40 transition-all"
+    >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700">
             <Icon className="h-5 w-5" />
           </span>
           <div>
-            <p className="font-semibold text-text-primary leading-tight">{dept.name}</p>
+            <p className="font-semibold text-text-primary leading-tight inline-flex items-center gap-1.5">
+              {dept.name}
+              <ArrowRight className="h-3.5 w-3.5 text-piquet-600 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+            </p>
             <p className="text-xs text-text-secondary">Lidera: {dept.lead}</p>
           </div>
         </div>
@@ -50,7 +69,7 @@ export function DepartmentCard({ dept }: { dept: DepartmentHealth }) {
           {dept.openTasks} {dept.openTasks === 1 ? "tarefa aberta" : "tarefas abertas"}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
 

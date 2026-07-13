@@ -39,6 +39,12 @@ export default function TeamPage() {
   const { data: baseTasks } = useAsyncData(() => getTeamTasks(), []);
   const [tab, setTab] = useState("conversas");
 
+  // Deep-link `?tab=tarefas|agenda|conversas` (vindo da Visão executiva, ex.: "Prazos em risco").
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && ["conversas", "tarefas", "agenda"].includes(t)) setTab(t);
+  }, []);
+
   if (loading && !baseMsgs) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 

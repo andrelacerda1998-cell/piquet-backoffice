@@ -80,7 +80,7 @@ export default function OverviewPage() {
           <div className="flex items-center gap-2">
             <MonthSelect />
             <Link href="/relatorios" className="btn-secondary text-sm"><FileText className="h-4 w-4" /> Relatórios</Link>
-            <Link href="/tecnicos" className="btn-secondary text-sm"><ListChecks className="h-4 w-4" /> Equipa</Link>
+            <Link href="/chat?tab=tarefas" className="btn-secondary text-sm"><ListChecks className="h-4 w-4" /> Equipa</Link>
           </div>
         </div>
 
@@ -140,7 +140,7 @@ export default function OverviewPage() {
                 <h2 className="font-semibold text-text-primary">Equipa e carga de trabalho</h2>
                 <p className="text-xs text-text-secondary">Tarefas em aberto por colaborador</p>
               </div>
-              <Link href="/tecnicos" className="text-sm text-piquet-600 font-medium hover:underline">Ver equipa →</Link>
+              <Link href="/chat?tab=tarefas" className="text-sm text-piquet-600 font-medium hover:underline">Ver tarefas →</Link>
             </div>
             <div className="space-y-3">
               {workload.map((w) => (
@@ -178,15 +178,16 @@ export default function OverviewPage() {
               ) : emRisco.map((t) => {
                 const d = daysUntil(t.due);
                 return (
-                  <div key={t.id} className="py-2.5">
-                    <p className="text-sm font-medium text-text-primary">{t.title}</p>
+                  <Link key={t.id} href="/chat?tab=tarefas" aria-label={`Abrir tarefa: ${t.title}`}
+                    className="block py-2.5 px-2 -mx-2 rounded-lg hover:bg-surface-muted transition-colors group">
+                    <p className="text-sm font-medium text-text-primary group-hover:text-piquet-700 transition-colors">{t.title}</p>
                     <div className="mt-0.5 flex items-center justify-between text-xs">
                       <span className="text-text-secondary">{t.assignee.split(" ")[0]} · {t.department}</span>
                       <span className={cn("font-medium", d < 0 ? "text-danger" : "text-warning")}>
                         {d < 0 ? `Atrasada ${Math.abs(d)}d` : d === 0 ? "Vence hoje" : `Vence em ${d}d`}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
