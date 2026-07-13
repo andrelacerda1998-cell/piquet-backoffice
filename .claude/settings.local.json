@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Bash(brew list *)",
+      "Bash(xcodebuild -version)",
+      "Bash([ -f \"$F\" ])",
+      "Bash('/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code' --install-extension Dart-Code.flutter --force)",
+      "Read(//Users/andrelacerda/.gem/**)",
+      "Bash(gem list *)",
+      "Bash(unset GEM_HOME)",
+      "Bash(gem install *)",
+      "Bash(~/.gem/ruby/2.6.0/bin/pod --version)",
+      "Bash(rm -f lib/screens/service_detail_screen.dart lib/widgets/service_card.dart)",
+      "Bash(rmdir lib/widgets)",
+      "Bash(perl -pi -e 's/piquet_2/Piquet/g' web/index.html)",
+      "Bash(perl -pi -e 's/piquet_2/Piquet/g' web/manifest.json)",
+      "Read(//tmp/**)",
+      "Bash(rm -f /tmp/piquet_emulator.png /tmp/piquet_emu.png /tmp/piquet_emu2.png /tmp/emulator_piquet.log *)",
+      "Bash(pkill -f \"node server.js\")",
+      "Bash(perl -pi -e 's/10\\\\.0\\\\.2\\\\.2:3000/10.0.2.2:3100/g' lib/services/api_config.dart)",
+      "Bash(rm -f db.json)",
+      "Bash(PORT=3100 node server.js)",
+      "Bash(echo \"backend PID: $!\")",
+      "Bash(curl -s http://localhost:3100/bookings)",
+      "Bash(rm -f /tmp/pf*.png /tmp/x1_state.png /tmp/y1_login.png 2>/dev/null; echo \"limpo\")",
+      "Bash(rm -f /tmp/nav*.png 2>/dev/null; echo \"limpo\")"
+    ]
+  }
+}

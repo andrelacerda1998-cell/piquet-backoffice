@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tokens de cor como variáveis RGB (space-separated) para suportar tema claro/escuro */
+:root {
+  --surface: 255 255 255; /* #FFFFFF */
+  --surface-muted: 250 247 242; /* #FAF7F2 */
+  --surface-subtle: 241 236 227; /* #F1ECE3 */
+  --surface-border: 236 230 221; /* #ECE6DD */
+  --surface-strong: 222 215 203; /* #DED7CB */
+
+  --text-primary: 28 26 23; /* #1C1A17 */
+  --text-secondary: 110 103 94; /* #6E675E */
+  --text-muted: 154 147 137; /* #9A9389 */
+
+  --success-light: 225 241 233; /* #E1F1E9 */
+  --warning-light: 251 239 214; /* #FBEFD6 */
+  --danger-light: 247 226 221; /* #F7E2DD */
+  --info-light: 226 238 241; /* #E2EEF1 */
+
+  --scrollbar-thumb: 222 215 203;
+}
+
+.dark {
+  --surface: 30 26 18; /* #1E1A12 */
+  --surface-muted: 20 17 9; /* #141109 */
+  --surface-subtle: 39 34 25; /* #272219 */
+  --surface-border: 61 54 42; /* #3D362A */
+  --surface-strong: 76 68 54; /* #4C4436 */
+
+  --text-primary: 236 231 222; /* #ECE7DE */
+  --text-secondary: 180 173 161; /* #B4ADA1 */
+  --text-muted: 140 132 119; /* #8C8477 */
+
+  --success-light: 22 45 36; /* verde escuro */
+  --warning-light: 58 45 20; /* âmbar escuro */
+  --danger-light: 58 29 24; /* terracota escuro */
+  --info-light: 23 44 49; /* teal escuro */
+
+  --scrollbar-thumb: 61 54 42;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply bg-surface-muted text-text-primary antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card bg-surface shadow-card border border-surface-border;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-piquet px-4 py-2 text-sm font-semibold text-ink transition hover:bg-piquet-500 focus:outline-none focus:ring-2 focus:ring-piquet focus:ring-offset-2 focus:ring-offset-surface-muted disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-piquet focus:ring-offset-2 focus:ring-offset-surface-muted;
+  }
+  .input-field {
+    @apply w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-piquet focus:outline-none focus:ring-1 focus:ring-piquet;
+  }
+}
+
+/* Scrollbar styling — tons quentes */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(var(--scrollbar-thumb));
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--surface-strong));
+}
