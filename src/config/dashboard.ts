@@ -108,7 +108,7 @@ export const NAV_PRIMARY: string[] = [
   "/marketing", "/suporte", "/qualidade", "/configuracao", "/chat",
 ];
 export const NAV_SECONDARY: string[] = [
-  "/alertas", "/despacho", "/servicos-personalizados", "/recrutamento", "/impostos-rh", "/definicoes",
+  "/alertas", "/servicos-personalizados", "/recrutamento", "/impostos-rh", "/definicoes",
 ];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
