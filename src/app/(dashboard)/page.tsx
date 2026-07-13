@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
 import { DepartmentCard } from "@/components/ui/DepartmentCard";
+import { MetricCard } from "@/components/ui/MetricCard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getOverviewMetrics, getDepartmentHealth } from "@/services/dashboardService";
@@ -63,8 +64,6 @@ export default function OverviewPage() {
     mk("Avaliação média", Star, aval, "rating", 0.004, 0.01),
   ] : [];
 
-  const workload = board?.workload ?? [];
-  const maxCarga = Math.max(1, ...workload.map((w) => w.open));
   const emRisco = (board?.tasks ?? []).filter((t) => t.status !== "concluida" && daysUntil(t.due) <= 3);
 
   return (
@@ -132,34 +131,25 @@ export default function OverviewPage() {
           </div>
         )}
 
-        {/* Equipa e carga de trabalho + Prazos em risco */}
+        {/* Desempenho operacional + Prazos em risco */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="card p-5 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-semibold text-text-primary">Equipa e carga de trabalho</h2>
-                <p className="text-xs text-text-secondary">Tarefas em aberto por colaborador</p>
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Desempenho operacional</p>
+              <Link href="/servicos" className="text-sm text-piquet-600 font-medium hover:underline">Ver operações →</Link>
+            </div>
+            {metrics && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard title="Serviços solicitados" metric={metrics.ordersReceived} />
+                <MetricCard title="Concluídos" metric={metrics.completedServices} />
+                <MetricCard title="Cancelados" metric={metrics.cancelledServices} />
+                <MetricCard title="Taxa de conversão" metric={metrics.conversionRate} format="percent" />
+                <MetricCard title="Ticket médio" metric={metrics.averageTicket} format="currency" />
+                <MetricCard title="Novos clientes" metric={metrics.newCustomers} />
+                <MetricCard title="Sem técnico" metric={metrics.ordersWithoutTechnician} />
+                <MetricCard title="Reclamações" metric={metrics.complaintCount} />
               </div>
-              <Link href="/chat?tab=tarefas" className="text-sm text-piquet-600 font-medium hover:underline">Ver tarefas →</Link>
-            </div>
-            <div className="space-y-3">
-              {workload.map((w) => (
-                <div key={w.name} className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-xs font-bold">
-                    {w.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-text-primary truncate">{w.name}</span>
-                      <span className="text-text-secondary">{w.open} {w.open === 1 ? "tarefa" : "tarefas"}</span>
-                    </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-surface-subtle overflow-hidden">
-                      <div className={cn("h-full rounded-full", w.open > 3 ? "bg-warning" : "bg-piquet")} style={{ width: `${(w.open / maxCarga) * 100}%` }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
 
           <div className="card p-5">
