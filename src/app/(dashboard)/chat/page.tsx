@@ -13,6 +13,7 @@ import {
   type ChatMessage, type TeamAgendaEvent, type TeamTask,
 } from "@/services/extrasService";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
+import { useTeamChatRealtime } from "@/hooks/useTeamChatRealtime";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
@@ -77,8 +78,18 @@ export default function TeamPage() {
 function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }) {
   const [active, setActive] = useState("geral");
   const [text, setText] = useState("");
-  const [localMsgs, setLocalMsgs] = useState<ChatMessage[]>([]); // otimista (sessão)
+  const [msgs, setMsgs] = useState<ChatMessage[]>(base);
+  const seeded = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Semeia com o fetch inicial (uma vez). A partir daí o estado é mantido
+  // localmente e alimentado pelo realtime + envios otimistas.
+  useEffect(() => {
+    if (!seeded.current && base.length) { setMsgs(base); seeded.current = true; }
+  }, [base]);
+
+  // Chat ao vivo: ouve inserts em team_messages e faz push instantâneo.
+  useTeamChatRealtime(setMsgs);
 
   const isDm = active.startsWith("dm:");
   const memberId = isDm ? active.slice(3) : null;
@@ -86,8 +97,8 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
   const activeChannel = TEAM_CHANNELS.find((c) => c.id === active);
 
   const messages = useMemo(
-    () => [...base, ...localMsgs].filter((m) => m.threadId === active),
-    [base, localMsgs, active]
+    () => msgs.filter((m) => m.threadId === active),
+    [msgs, active]
   );
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
@@ -95,13 +106,24 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
   const send = () => {
     const body = text.trim();
     if (!body) return;
-    const msg: Omit<ChatMessage, "id" | "own"> = {
+    const tempId = `tmp_${Date.now()}`;
+    const draft: Omit<ChatMessage, "id" | "own"> = {
       threadId: active, author: userName, initials: initialsOf(userName), text: body, time: nowHM(),
     };
-    // Otimista para UI imediata; persiste no backend (BD em produção, cache em demo).
-    setLocalMsgs((prev) => [...prev, { ...msg, id: `tmp_${Date.now()}`, own: true }]);
+    // Otimista para UI imediata.
+    setMsgs((prev) => [...prev, { ...draft, id: tempId, own: true }]);
     setText("");
-    sendTeamMessage(msg).catch(() => toast("Falha ao enviar mensagem.", "error"));
+    // Persiste no backend e troca o otimista pela mensagem real. O dedupe por
+    // id evita duplicar quando o realtime devolver a mesma mensagem.
+    sendTeamMessage(draft)
+      .then((real) => setMsgs((prev) => {
+        const rest = prev.filter((m) => m.id !== tempId);
+        return rest.some((m) => m.id === real.id) ? rest : [...rest, { ...real, own: true }];
+      }))
+      .catch(() => {
+        setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+        toast("Falha ao enviar mensagem.", "error");
+      });
   };
 
   const title = isDm ? member?.name : `#${activeChannel?.name}`;
