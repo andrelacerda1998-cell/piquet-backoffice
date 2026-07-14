@@ -296,9 +296,9 @@ export const TEAM_SEED_MESSAGES: ChatMessage[] = [
   { id: "m6", threadId: "suporte", author: "Sofia Antunes", initials: "SA", text: "SLA em 94% esta semana 👏", time: "10:20" },
   { id: "m7", threadId: "marketing", author: "Beatriz Lemos", initials: "BL", text: "Campanha VERAO25 com ROAS 3,2× — a escalar orçamento.", time: "11:00" },
   { id: "m8", threadId: "direcao", author: "João Costa", initials: "JC", text: "Reunião de fecho mensal amanhã às 16h.", time: "16:30" },
-  { id: "d1", threadId: "dm:u3", author: "Maria Santos", initials: "MS", text: "Consegues aprovar o reforço de técnicos para Cascais?", time: "09:10" },
-  { id: "d2", threadId: "dm:u4", author: "Pedro Oliveira", initials: "PO", text: "Fecho do mês pronto para revisão quando puderes.", time: "08:30" },
-  { id: "d3", threadId: "dm:u6", author: "Carlos Mendes", initials: "CM", text: "Proposta de orçamento para julho no canal de marketing.", time: "11:05" },
+  { id: "d1", threadId: "dm:u1-u3", author: "Maria Santos", initials: "MS", text: "Consegues aprovar o reforço de técnicos para Cascais?", time: "09:10" },
+  { id: "d2", threadId: "dm:u1-u4", author: "Pedro Oliveira", initials: "PO", text: "Fecho do mês pronto para revisão quando puderes.", time: "08:30" },
+  { id: "d3", threadId: "dm:u1-u6", author: "Carlos Mendes", initials: "CM", text: "Proposta de orçamento para julho no canal de marketing.", time: "11:05" },
 ];
 
 /** Agenda da equipa interna — reuniões e blocos, por colaborador. */

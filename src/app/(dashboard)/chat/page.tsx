@@ -91,9 +91,14 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
   // Chat ao vivo: ouve inserts em team_messages e faz push instantâneo.
   useTeamChatRealtime(setMsgs);
 
+  // Id do próprio na lista de membros (para o thread canónico das DMs).
+  const myMemberId = TEAM_MEMBERS.find((m) => m.name === userName)?.id ?? "me";
+  // Thread de DM canónico: par de ids ordenado — igual visto de qualquer lado.
+  const dmThread = (otherId: string) => `dm:${[myMemberId, otherId].sort().join("-")}`;
+
   const isDm = active.startsWith("dm:");
-  const memberId = isDm ? active.slice(3) : null;
-  const member = TEAM_MEMBERS.find((m) => m.id === memberId);
+  const dmOtherId = isDm ? (active.slice(3).split("-").find((id) => id !== myMemberId) ?? active.slice(3)) : null;
+  const member = TEAM_MEMBERS.find((m) => m.id === dmOtherId);
   const activeChannel = TEAM_CHANNELS.find((c) => c.id === active);
 
   const messages = useMemo(
@@ -147,7 +152,7 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
         <div>
           <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Mensagens diretas</p>
           {TEAM_MEMBERS.filter((m) => m.name !== userName).map((m) => {
-            const id = `dm:${m.id}`;
+            const id = dmThread(m.id);
             return (
               <button key={m.id} onClick={() => setActive(id)}
                 className={cn("w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
