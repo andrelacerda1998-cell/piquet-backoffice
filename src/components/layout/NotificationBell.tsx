@@ -2,10 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, LifeBuoy, Info } from "lucide-react";
+import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar } from "lucide-react";
 import { useNotificationStore, toast } from "@/stores";
 import { getSupportTickets } from "@/services/supportService";
+import { useLiveNotifications } from "@/hooks/useLiveNotifications";
+import type { AppNotification } from "@/stores";
 import { cn } from "@/lib/utils";
+
+const KIND_ICON: Record<AppNotification["kind"], typeof Info> = {
+  ticket: LifeBuoy,
+  chat: MessageSquare,
+  tarefa: ListChecks,
+  reuniao: Calendar,
+  sistema: Info,
+};
+const KIND_TONE: Record<AppNotification["kind"], string> = {
+  ticket: "bg-info-light text-info",
+  chat: "bg-piquet/15 text-piquet-700",
+  tarefa: "bg-success-light text-success",
+  reuniao: "bg-warning-light text-warning",
+  sistema: "bg-surface-subtle text-text-muted",
+};
 
 // Intervalo de polling à lista de tickets (mock ou backend real via api.ts).
 const POLL_MS = 45000;
@@ -23,6 +40,7 @@ function timeAgo(iso: string) {
 export function NotificationBell() {
   const router = useRouter();
   const { notifications, addNotification, markRead, markAllRead } = useNotificationStore();
+  useLiveNotifications(); // notificações ao vivo (chat, dev board, agenda)
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const unread = notifications.filter((n) => !n.read).length;
@@ -103,7 +121,7 @@ export function NotificationBell() {
               <p className="px-3 py-6 text-sm text-text-muted text-center">Sem notificações</p>
             )}
             {notifications.map((n) => {
-              const Icon = n.kind === "ticket" ? LifeBuoy : Info;
+              const Icon = KIND_ICON[n.kind] ?? Info;
               return (
                 <button
                   key={n.id}
@@ -117,7 +135,7 @@ export function NotificationBell() {
                     !n.read && "bg-piquet/5"
                   )}
                 >
-                  <span className={cn("mt-0.5 flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center", n.kind === "ticket" ? "bg-info-light text-info" : "bg-surface-subtle text-text-muted")}>
+                  <span className={cn("mt-0.5 flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center", KIND_TONE[n.kind] ?? KIND_TONE.sistema)}>
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">

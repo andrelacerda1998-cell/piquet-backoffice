@@ -14,7 +14,7 @@ const WRITABLE: Record<string, string> = {
 };
 
 /** PUT /api/dev-tasks/:id — atualiza estado/secção/posição/campos. */
-export const PUT = withStaff(async (req, { params }) => {
+export const PUT = withStaff(async (req, { params, staff }) => {
   const body = (await req.json()) as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
   for (const [key, col] of Object.entries(WRITABLE)) {
@@ -22,6 +22,7 @@ export const PUT = withStaff(async (req, { params }) => {
   }
   if (Object.keys(patch).length === 0) return apiErr("Nada para atualizar.", 400);
   patch.updated_at = new Date().toISOString();
+  patch.updated_by = staff.userId; // quem alterou — para as notificações não notificarem o próprio
 
   const { data, error } = await supabaseAdmin()
     .from("dev_tasks")
