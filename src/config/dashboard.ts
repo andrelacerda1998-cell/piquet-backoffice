@@ -84,6 +84,7 @@ export const NAV_ITEMS = [
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
+  { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
   { href: "/servicos-personalizados", label: "Pedidos personalizados", icon: "Wand2" },
@@ -108,7 +109,7 @@ export const NAV_PRIMARY: string[] = [
   "/marketing", "/suporte", "/qualidade", "/configuracao", "/chat",
 ];
 export const NAV_SECONDARY: string[] = [
-  "/alertas", "/servicos-personalizados", "/recrutamento", "/impostos-rh", "/definicoes",
+  "/desenvolvimento", "/alertas", "/servicos-personalizados", "/recrutamento", "/impostos-rh", "/definicoes",
 ];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 

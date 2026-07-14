@@ -24,6 +24,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/tecnicos": ["view_technicians"],
   "/categorias-zonas": ["view_dashboard"],
   "/chat": ["view_dashboard"],
+  "/desenvolvimento": ["view_dashboard"],
   "/tarefas": ["view_dashboard"],
   "/objetivos": ["view_dashboard"],
   "/servicos-personalizados": ["view_services"],
