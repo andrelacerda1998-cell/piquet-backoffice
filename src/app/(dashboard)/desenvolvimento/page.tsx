@@ -15,7 +15,7 @@ import {
   DEV_SECTIONS, DEV_COLUMNS,
   type DevTask, type DevSection, type DevStatus, type DevPriority,
 } from "@/services/devService";
-import { Plus, Trash2, GripVertical, User } from "lucide-react";
+import { Plus, Trash2, GripVertical, User, Pencil } from "lucide-react";
 
 const ASSIGNEES = ["Rodrigo Pacheco", "André Lacerda"];
 const COLUMN_TONE: Record<DevStatus, string> = {
@@ -96,6 +96,7 @@ function Board({ section, tasks, setTasks }: {
   const [modalOpen, setModalOpen] = useState(false);
   const [addStatus, setAddStatus] = useState<DevStatus>("todo");
   const [editing, setEditing] = useState<DevTask | null>(null);
+  const [viewing, setViewing] = useState<DevTask | null>(null);
   const [form, setForm] = useState<TaskForm>(EMPTY_FORM);
 
   const byColumn = (status: DevStatus) =>
@@ -124,6 +125,7 @@ function Board({ section, tasks, setTasks }: {
     setForm({ title: task.title, description: task.description ?? "", priority: task.priority, assignee: task.assignee ?? ASSIGNEES[0] });
     setModalOpen(true);
   };
+  const openView = (task: DevTask) => setViewing(task);
 
   const submit = () => {
     if (!form.title.trim()) { toast("Indica o título da tarefa.", "error"); return; }
@@ -201,7 +203,7 @@ function Board({ section, tasks, setTasks }: {
                   >
                     <div className="flex items-start gap-2">
                       <GripVertical className="h-4 w-4 text-text-muted/60 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0" onClick={() => openEdit(task)}>
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openView(task)} title="Ver tarefa">
                         <p className="text-sm font-medium leading-snug">{task.title}</p>
                         {task.description && (
                           <p className="text-xs text-text-secondary mt-1 line-clamp-2">{task.description}</p>
@@ -215,13 +217,22 @@ function Board({ section, tasks, setTasks }: {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => remove(task)}
-                        className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all shrink-0"
-                        title="Apagar"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openEdit(task)}
+                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-piquet-600 transition-all"
+                          title="Editar"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => remove(task)}
+                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"
+                          title="Apagar"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -261,6 +272,45 @@ function Board({ section, tasks, setTasks }: {
             </Field>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal de visualização (leitura rápida) */}
+      <Modal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.title ?? ""}
+        subtitle={viewing ? `${DEV_SECTIONS.find((s) => s.id === viewing.section)?.label} · ${DEV_COLUMNS.find((c) => c.id === viewing.status)?.label}` : undefined}
+        footer={<>
+          <button onClick={() => setViewing(null)} className="btn-secondary text-sm">Fechar</button>
+          <button
+            onClick={() => { const t = viewing; setViewing(null); if (t) openEdit(t); }}
+            className="btn-primary text-sm inline-flex items-center gap-1.5"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </button>
+        </>}
+      >
+        {viewing && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <PriorityBadge priority={viewing.priority} />
+              {viewing.assignee && (
+                <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <User className="h-3.5 w-3.5" />{viewing.assignee}
+                </span>
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted mb-1">Descrição</p>
+              <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+                {viewing.description?.trim() || "Sem descrição."}
+              </p>
+            </div>
+            {viewing.createdByName && (
+              <p className="text-xs text-text-muted">Criada por {viewing.createdByName}</p>
+            )}
+          </div>
+        )}
       </Modal>
     </>
   );
