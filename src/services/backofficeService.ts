@@ -83,21 +83,31 @@ function lastMonthLabels(n: number): string[] {
   return out;
 }
 
-export async function getAppGrowth(): Promise<AppGrowth> {
-  return apiGet("/product/growth", () => {
-    const labels = lastMonthLabels(13);
-    // Downloads acumulados (terminam no total atual, crescendo mês a mês).
-    const dlCliente = monthlySeries(18420, { key: "app:dl:cliente", monthlyGrowth: 0.09, volatility: 0.02 });
-    const dlProf = monthlySeries(5240, { key: "app:dl:prof", monthlyGrowth: 0.11, volatility: 0.03 });
-    // Novos registos por mês (fluxo mensal, não acumulado).
-    const regCli = monthlySeries(410, { key: "app:reg:cliente", monthlyGrowth: 0.06, volatility: 0.08 });
-    const regTec = monthlySeries(58, { key: "app:reg:tecnico", monthlyGrowth: 0.05, volatility: 0.1 });
+// Série demo — usada em modo mock E como fallback enquanto a tabela
+// `app_metrics` (ingestão das lojas) estiver vazia em produção.
+function demoGrowth(): AppGrowth {
+  const labels = lastMonthLabels(13);
+  // Downloads acumulados (terminam no total atual, crescendo mês a mês).
+  const dlCliente = monthlySeries(18420, { key: "app:dl:cliente", monthlyGrowth: 0.09, volatility: 0.02 });
+  const dlProf = monthlySeries(5240, { key: "app:dl:prof", monthlyGrowth: 0.11, volatility: 0.03 });
+  // Novos registos por mês (fluxo mensal, não acumulado).
+  const regCli = monthlySeries(410, { key: "app:reg:cliente", monthlyGrowth: 0.06, volatility: 0.08 });
+  const regTec = monthlySeries(58, { key: "app:reg:tecnico", monthlyGrowth: 0.05, volatility: 0.1 });
 
-    return {
-      downloads: labels.map((name, i) => ({ name, Cliente: Math.round(dlCliente[i]), Profissional: Math.round(dlProf[i]) })),
-      registrations: labels.map((name, i) => ({ name, Clientes: Math.round(regCli[i]), Técnicos: Math.round(regTec[i]) })),
-    } as AppGrowth;
-  }).then((r) => r.data);
+  return {
+    downloads: labels.map((name, i) => ({ name, Cliente: Math.round(dlCliente[i]), Profissional: Math.round(dlProf[i]) })),
+    registrations: labels.map((name, i) => ({ name, Clientes: Math.round(regCli[i]), Técnicos: Math.round(regTec[i]) })),
+  } as AppGrowth;
+}
+
+export async function getAppGrowth(): Promise<AppGrowth> {
+  const live = await apiGet("/product/growth", demoGrowth).then((r) => r.data);
+  // Em produção os registos já vêm reais; os downloads só depois de as chaves
+  // das lojas serem configuradas — até lá, mantém a série demo nos gráficos.
+  if (!live.downloads?.length) {
+    return { ...live, downloads: demoGrowth().downloads };
+  }
+  return live;
 }
 
 export interface Bug {

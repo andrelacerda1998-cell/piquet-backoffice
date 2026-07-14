@@ -68,6 +68,8 @@ const LIVE_EXACT = new Set<string>([
   // Fase 1 — Serviços/Reservas
   "/services",
   "/dashboard/recent-services",
+  // Produto — evolução de downloads (lojas) e registos reais
+  "/product/growth",
   // Fase 2 — Clientes
   "/customers",
   "/customers/metrics",
