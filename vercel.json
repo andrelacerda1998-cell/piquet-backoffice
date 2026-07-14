@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/app-metrics",
       "schedule": "10 6 * * *"
+    },
+    {
+      "path": "/api/cron/ad-metrics",
+      "schedule": "20 6 * * *"
     }
   ]
 }
