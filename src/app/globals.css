@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Animação de entrada dos toasts — pop com ligeiro overshoot, a descair do sino */
+@keyframes toast-pop {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.94); }
+  60% { opacity: 1; transform: translateY(0) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-pop {
+  animation: toast-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-pop { animation: none; }
+}
+
 /* Tokens de cor como variáveis RGB (space-separated) para suportar tema claro/escuro */
 :root {
   --surface: 255 255 255; /* #FFFFFF */

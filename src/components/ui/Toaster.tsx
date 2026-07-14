@@ -22,14 +22,14 @@ export function Toaster() {
   if (!toasts.length) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2 w-full max-w-sm">
+    <div className="fixed top-20 right-4 z-[70] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm">
       {toasts.map((t) => {
         const Icon = ICON[t.type];
         return (
           <div
             key={t.id}
             className={cn(
-              "flex items-start gap-3 rounded-xl border bg-surface shadow-elevated px-4 py-3 animate-in",
+              "flex items-start gap-3 rounded-xl border bg-surface shadow-elevated px-4 py-3 animate-toast-pop",
               TONE[t.type]
             )}
             role="status"
