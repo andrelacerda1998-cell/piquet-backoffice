@@ -1,24 +1,20 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
-import { StatusBadge, PriorityBadge } from "@/components/ui/StatusBadge";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { SupportTicketDrawer, type SupportTicket } from "@/components/ui/SupportTicketDrawer";
-import { ProSupportPanel } from "@/components/ui/ProSupportPanel";
-import { useAsyncData, usePagination } from "@/hooks/useDashboard";
-import { getProductMetrics, getSupportTickets } from "@/services/supportService";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { SupportInbox } from "@/components/ui/SupportInbox";
+import { useAsyncData } from "@/hooks/useDashboard";
 import { getComplaints, type Complaint } from "@/services/extrasService";
 import { getMediationCases, getInternalFaq, type MediationCase } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { buildMetricValue } from "@/lib/calculations";
-import { buildMetricFromSeries } from "@/lib/trends";
-import { formatDate, formatDateTime } from "@/lib/formatters";
-import { useAuthStore, useDataStore, toast } from "@/stores";
+import { formatDate } from "@/lib/formatters";
+import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Scale, BookOpen } from "lucide-react";
+import { Scale, BookOpen } from "lucide-react";
 
 const MED_TONE: Record<MediationCase["status"], string> = {
   aberto: "bg-danger-light text-danger",
@@ -31,50 +27,11 @@ const MED_LABEL: Record<MediationCase["status"], string> = {
 };
 
 export default function SuportePage() {
-  const { page, setPage, pageSize } = usePagination();
   const [tab, setTab] = useState("tickets");
-  const user = useAuthStore((s) => s.user);
-  const { data: metrics } = useAsyncData(() => getProductMetrics(), []);
-  const { data: tickets, loading: ticketsLoading } = useAsyncData(() => getSupportTickets(page, pageSize), [page, pageSize]);
   const { data: complaintsData } = useAsyncData(() => getComplaints(), []);
   const { data: mediation } = useAsyncData(() => getMediationCases(), []);
   const { data: faq } = useAsyncData(() => getInternalFaq(), []);
   const [complaints, setComplaints] = usePersistentList<Complaint>("reclamacoes", complaintsData);
-
-  // Overlay persistido: respostas e mudanças de estado sobrevivem ao refresh.
-  const { ticketReplies, ticketStatus, addTicketReply, setTicketStatus } = useDataStore();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [proUnread, setProUnread] = useState(0);
-
-  const localTickets: SupportTicket[] = useMemo(() => {
-    const base = (tickets?.data ?? []) as unknown as SupportTicket[];
-    return base.map((t) => ({
-      ...t,
-      status: ticketStatus[t.id] ?? t.status,
-      messages: [...t.messages, ...(ticketReplies[t.id] ?? [])],
-    }));
-  }, [tickets, ticketReplies, ticketStatus]);
-
-  const selected = localTickets.find((t) => t.id === selectedId) ?? null;
-
-  // Deep-link `?ticket=<id>` (vindo de uma notificação) abre a conversa direto.
-  useEffect(() => {
-    const tid = new URLSearchParams(window.location.search).get("ticket");
-    if (tid) { setTab("tickets"); setSelectedId(tid); }
-  }, []);
-
-  const handleReply = (body: string) => {
-    if (!selectedId || !selected) return;
-    addTicketReply(selectedId, { id: `msg_${Date.now()}`, author: "agente", authorName: user?.name ?? "Suporte Piquet", body, at: new Date().toISOString() });
-    if (selected.status === "novo" || selected.status === "em_analise") setTicketStatus(selectedId, "em_resolucao");
-    toast("Resposta enviada ao cliente", "success");
-  };
-
-  const handleResolve = () => {
-    if (!selectedId) return;
-    setTicketStatus(selectedId, "resolvido");
-    toast("Ticket marcado como resolvido", "success");
-  };
 
   const resolveComplaint = (id: string) => {
     setComplaints((prev) => prev.map((c) => (c.id === id ? { ...c, status: "resolvida" } : c)));
@@ -84,24 +41,10 @@ export default function SuportePage() {
   const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
 
   const TABS: TabDef[] = [
-    { id: "tickets", label: "Tickets", count: localTickets.filter((t) => t.status !== "resolvido").length },
-    { id: "tecnicos", label: "Técnicos (app)", count: proUnread },
+    { id: "tickets", label: "Tickets" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
     { id: "mediacao", label: "Mediação de conflitos", count: (mediation ?? []).filter((m) => m.status === "aberto" || m.status === "em_mediacao").length },
     { id: "faq", label: "FAQ interna" },
-  ];
-
-  const ticketColumns: Column<SupportTicket>[] = [
-    { key: "id", label: "Ticket" },
-    { key: "userType", label: "Tipo", render: (r) => r.userType },
-    { key: "userName", label: "Utilizador" },
-    { key: "subject", label: "Assunto" },
-    { key: "category", label: "Categoria" },
-    { key: "priority", label: "Prioridade", render: (r) => <PriorityBadge priority={r.priority} /> },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "messages", label: "Mensagens", render: (r) => <span className="inline-flex items-center gap-1 text-text-secondary"><MessageSquare className="h-3.5 w-3.5" />{r.messages?.length ?? 0}</span> },
-    { key: "openedAt", label: "Abertura", render: (r) => formatDateTime(r.openedAt) },
-    { key: "acao", label: "", render: (r) => <button onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }} className="btn-secondary text-xs py-1">Ver / responder</button> },
   ];
 
   const complaintColumns: Column<Complaint>[] = [
@@ -138,55 +81,12 @@ export default function SuportePage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Suporte</h1>
-          <p className="text-text-secondary mt-1">Tickets, reclamações e mediação de conflitos</p>
+          <p className="text-text-secondary mt-1">Caixa de entrada de tickets, reclamações e mediação de conflitos</p>
         </div>
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "tickets" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard title="Tickets abertos" metric={buildMetricValue(localTickets.filter((t) => t.status !== "resolvido").length, (metrics?.supportTickets ?? 0) * 1.05, true)} />
-              <MetricCard title="Por responder" metric={buildMetricValue(localTickets.filter((t) => t.status === "novo").length, 0, true)} />
-              <MetricCard title="Tempo resolução" metric={buildMetricFromSeries(metrics?.avgResolutionTime ?? 0, { key: "sup:tempo", monthlyGrowth: -0.03, invertTrend: true })} />
-              <MetricCard title="Resolvidos" metric={buildMetricValue(localTickets.filter((t) => t.status === "resolvido").length, 0)} />
-            </div>
-            <SubTabs
-              tabs={[
-                { id: "abertas", label: "Abertas", count: localTickets.filter((t) => t.status === "novo").length },
-                { id: "aguardar", label: "A aguardar", count: localTickets.filter((t) => t.status === "em_analise" || t.status === "em_resolucao").length },
-                { id: "resolvidas", label: "Resolvidas", count: localTickets.filter((t) => t.status === "resolvido").length },
-                { id: "todas", label: "Todas", count: localTickets.length },
-              ]}
-            >
-              {(sub) => {
-                const filtered = localTickets.filter((t) => {
-                  const s = t.status;
-                  if (sub === "abertas") return s === "novo";
-                  if (sub === "aguardar") return s === "em_analise" || s === "em_resolucao";
-                  if (sub === "resolvidas") return s === "resolvido";
-                  return true;
-                });
-                return (
-                  <>
-                    <DataTable columns={ticketColumns} data={filtered} keyField="id" loading={ticketsLoading} onRowClick={(r) => setSelectedId(r.id)} emptyMessage="Sem tickets neste estado" />
-                    {sub === "todas" && tickets && <Pagination page={page} totalPages={tickets.totalPages} total={tickets.total} pageSize={pageSize} onPageChange={setPage} />}
-                  </>
-                );
-              }}
-            </SubTabs>
-          </div>
-        )}
-
-        {tab === "tecnicos" && (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary inline-flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-piquet-600" />
-              Conversas abertas pelos técnicos no chat de suporte da app Profissionais — a resposta chega ao telemóvel deles em segundos.
-            </div>
-            <ProSupportPanel onUnreadChange={setProUnread} />
-          </div>
-        )}
+        {tab === "tickets" && <SupportInbox />}
 
         {tab === "reclamacoes" && (
           <div className="space-y-4">
@@ -224,10 +124,6 @@ export default function SuportePage() {
               </div>
             ))}
           </div>
-        )}
-
-        {selected && (
-          <SupportTicketDrawer ticket={selected} onClose={() => setSelectedId(null)} onReply={handleReply} onResolve={handleResolve} />
         )}
       </div>
     </RouteGuard>
