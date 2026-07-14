@@ -105,6 +105,8 @@ const LIVE_EXACT = new Set<string>([
   "/team/agenda",
   "/team/meetings",
   "/team/tasks",
+  // Quadro de desenvolvimento (Kanban site + app)
+  "/dev-tasks",
   // Fase 6 — Impostos (tax_obligations)
   "/tax/obligations",
   "/tax/summary",
@@ -124,6 +126,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/tax\/obligations\/[^/]+\/pay$/.test(path)) return true; // marcar obrigação paga
   if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return true; // mudar estado de tarefa
+  if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
   return false;
 }
 
