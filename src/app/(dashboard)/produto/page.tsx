@@ -6,7 +6,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusBadge, PriorityBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, LineChartComponent } from "@/components/charts/Charts";
+import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
@@ -56,6 +56,16 @@ export default function ProdutoPage() {
   const dlLast = last(dl), dlPrev = prev(dl);
   const regLast = last(reg), regPrev = prev(reg);
 
+  // Downloads totais (as duas apps somadas) e crescimento mês-a-mês.
+  const dlTotalLast = (dlLast?.Cliente ?? 0) + (dlLast?.Profissional ?? 0);
+  const dlTotalPrev = (dlPrev?.Cliente ?? 0) + (dlPrev?.Profissional ?? 0);
+  // Novos downloads por mês (diferença dos acumulados) — o crescimento mensal.
+  const dlMonthly = dl.map((d, i) => ({
+    name: d.name,
+    Cliente: i === 0 ? 0 : Math.max(0, (d.Cliente ?? 0) - (dl[i - 1].Cliente ?? 0)),
+    Profissional: i === 0 ? 0 : Math.max(0, (d.Profissional ?? 0) - (dl[i - 1].Profissional ?? 0)),
+  })).slice(1);
+
   const TABS: TabDef[] = [
     { id: "apps", label: "Apps" },
     { id: "bugs", label: "Bugs", count: (bugs ?? []).filter((b) => b.status !== "resolvido").length },
@@ -98,13 +108,23 @@ export default function ProdutoPage() {
 
         {tab === "apps" && (
           <div className="space-y-6">
-            {/* Evolução: downloads e registos */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard title="Downloads App Cliente" metric={buildMetricValue(dlLast?.Cliente ?? 0, dlPrev?.Cliente ?? 0, false, undefined, "Instalações acumuladas")} />
-              <MetricCard title="Downloads App Profissional" metric={buildMetricValue(dlLast?.Profissional ?? 0, dlPrev?.Profissional ?? 0, false, undefined, "Instalações acumuladas")} />
+            {/* Downloads totais por app + crescimento mensal */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <MetricCard title="Downloads totais" metric={buildMetricValue(dlTotalLast, dlTotalPrev, false, undefined, "As duas apps somadas — crescimento vs mês anterior")} />
+              <MetricCard title="App Cliente" metric={buildMetricValue(dlLast?.Cliente ?? 0, dlPrev?.Cliente ?? 0, false, undefined, "Instalações acumuladas")} />
+              <MetricCard title="App Profissional" metric={buildMetricValue(dlLast?.Profissional ?? 0, dlPrev?.Profissional ?? 0, false, undefined, "Instalações acumuladas")} />
               <MetricCard title="Novos clientes (mês)" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
               <MetricCard title="Novos técnicos (mês)" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
             </div>
+            <ChartCard title="Crescimento mensal de downloads" subtitle="Novas instalações em cada mês, por app">
+              <BarChartComponent
+                data={dlMonthly}
+                bars={[
+                  { key: "Cliente", color: "#FAB347", name: "App Cliente" },
+                  { key: "Profissional", color: "#1C1A17", name: "App Profissional" },
+                ]}
+              />
+            </ChartCard>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard title="Downloads acumulados por app" subtitle="Instalações totais ao longo dos últimos 12 meses">
                 <LineChartComponent
