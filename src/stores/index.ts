@@ -172,13 +172,15 @@ export const useUiStore = create<UiState>()(
 
 export interface AppNotification {
   id: string;
-  kind: "ticket" | "sistema";
+  kind: "ticket" | "sistema" | "chat" | "tarefa" | "reuniao";
   title: string;
   body: string;
   at: string;
   read: boolean;
   href?: string;
   ticketId?: string;
+  /** Chave para evitar duplicados (ex.: `msg:<id>`). Genérica; ticketId ainda funciona. */
+  dedupeKey?: string;
 }
 
 interface NotificationState {
@@ -195,8 +197,9 @@ export const useNotificationStore = create<NotificationState>()(
       notifications: [],
       addNotification: (n) =>
         set((s) => {
-          // Dedupe por ticketId — não notifica o mesmo ticket duas vezes.
-          if (n.ticketId && s.notifications.some((x) => x.ticketId === n.ticketId)) return s;
+          // Dedupe por dedupeKey (ou ticketId) — não notifica o mesmo evento duas vezes.
+          const key = n.dedupeKey ?? n.ticketId;
+          if (key && s.notifications.some((x) => (x.dedupeKey ?? x.ticketId) === key)) return s;
           return {
             notifications: [
               { ...n, id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, at: new Date().toISOString(), read: false },
