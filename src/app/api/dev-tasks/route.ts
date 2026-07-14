@@ -1,34 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../_lib/handler";
-
-export interface DevRow {
-  id: string;
-  section: string;
-  status: string;
-  title: string;
-  description: string | null;
-  priority: string;
-  assignee: string | null;
-  created_by: string | null;
-  created_by_name: string | null;
-  position: number;
-  created_at: string;
-}
-
-export function toDevTask(r: DevRow) {
-  return {
-    id: r.id,
-    section: r.section,
-    status: r.status,
-    title: r.title,
-    description: r.description ?? undefined,
-    priority: r.priority,
-    assignee: r.assignee ?? undefined,
-    createdByName: r.created_by_name ?? undefined,
-    position: r.position,
-    createdAt: r.created_at,
-  };
-}
+import { toDevTask, type DevRow } from "../_lib/devTasks";
 
 /** GET /api/dev-tasks — todas as tarefas de desenvolvimento (site + app). */
 export const GET = withStaff(async () => {

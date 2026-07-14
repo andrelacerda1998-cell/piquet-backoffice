@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
-import { toDevTask, type DevRow } from "../route";
+import { toDevTask, type DevRow } from "../../_lib/devTasks";
 
 // Patch camelCase (frontend) → coluna. Só campos permitidos são escritos.
 const WRITABLE: Record<string, string> = {
