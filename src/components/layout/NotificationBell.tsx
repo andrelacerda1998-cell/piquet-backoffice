@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar } from "lucide-react";
 import { useNotificationStore, toast } from "@/stores";
-import { getSupportTickets } from "@/services/supportService";
+import { getInboxTickets, CHANNEL_LABEL } from "@/services/supportInboxService";
 import { useLiveNotifications } from "@/hooks/useLiveNotifications";
 import type { AppNotification } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -52,20 +52,17 @@ export function NotificationBell() {
     let alive = true;
     const poll = async () => {
       try {
-        const res = await getSupportTickets(1, 50);
+        const tickets = await getInboxTickets();
         if (!alive) return;
-        const novos = (res.data as Array<{ id: string; userType: string; subject: string; status: string; openedAt: string }>)
-          .filter((t) => t.status === "novo")
-          .sort((a, b) => (a.openedAt < b.openedAt ? 1 : -1))
-          .slice(0, 8);
-        const known = new Set(useNotificationStore.getState().notifications.map((n) => n.ticketId));
-        const fresh = novos.filter((t) => !known.has(t.id));
+        const novos = tickets.filter((t) => t.status === "novo").slice(0, 8);
+        const known = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
+        const fresh = novos.filter((t) => !known.has(`inbox:${t.id}`));
         fresh.forEach((t) => addNotification({
           kind: "ticket",
-          title: "Novo ticket de suporte",
-          body: `${t.userType === "cliente" ? "Cliente" : "Técnico"} reportou "${t.subject}".`,
+          title: `Novo ticket · ${CHANNEL_LABEL[t.channel]}`,
+          body: `${t.requesterName}: ${t.subject}`,
           href: `/suporte?ticket=${t.id}`,
-          ticketId: t.id,
+          dedupeKey: `inbox:${t.id}`,
         }));
         // Só faz toast quando surge algo depois do arranque (não spammar no 1.º load).
         if (!firstRun.current && fresh.length > 0) {
