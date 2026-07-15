@@ -294,3 +294,44 @@ export async function getInvoices(): Promise<Invoice[]> {
     return data;
   }).then((r) => r.data);
 }
+
+/* ==================== PAGAMENTOS DA APP (Payshop Online Payments) ==================== */
+
+export interface AppPaymentsData {
+  kpis: {
+    chargedCents: number;   // cobrado (CONFIRMATION)
+    chargedCount: number;
+    heldCents: number;      // cativado (DEFERRED, pendente de confirmação)
+    heldCount: number;
+    refused: number;
+    refundedCents: number;
+    avgTicketCents: number;
+    successRate: number;
+  };
+  monthly: Array<{ name: string; cativado: number; cobrado: number }>;
+  byService: Array<{ name: string; count: number; volume: number }>;
+  transactions: Array<{
+    id: string; order: string; customer: string; amount: number;
+    status: string; type: string; service: string; created: string | null;
+  }>;
+}
+
+/** Pagamentos reais processados na app (POP/Paylands). Demo: amostra pequena. */
+export async function getAppPayments(): Promise<AppPaymentsData> {
+  return apiGet("/finance/app-payments", () => ({
+    kpis: { chargedCents: 264300, chargedCount: 82, heldCents: 148050, heldCount: 36, refused: 21, refundedCents: 18600, avgTicketCents: 3495, successRate: 84.9 },
+    monthly: [
+      { name: "2026-04", cativado: 320.5, cobrado: 660.0 }, { name: "2026-05", cativado: 410.2, cobrado: 830.0 },
+      { name: "2026-06", cativado: 355.4, cobrado: 750.0 }, { name: "2026-07", cativado: 394.4, cobrado: 403.0 },
+    ],
+    byService: [
+      { name: "SIBS", count: 74, volume: 2610.3 },
+      { name: "CREDORAX", count: 39, volume: 1320.2 },
+      { name: "PAYSHOP", count: 5, volume: 193.0 },
+    ],
+    transactions: [
+      { id: "demo_1", order: "ord_demo1", customer: "PROD_SERVER_1-0001", amount: 45.9, status: "SUCCESS", type: "PURCHASE", service: "SIBS", created: "2026-07-05T10:12:00" },
+      { id: "demo_2", order: "ord_demo2", customer: "PROD_SERVER_1-0002", amount: 89.0, status: "REFUSED", type: "PURCHASE", service: "CREDORAX", created: "2026-07-04T16:40:00" },
+    ],
+  } as AppPaymentsData)).then((r) => r.data);
+}

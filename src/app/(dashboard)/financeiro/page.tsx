@@ -14,8 +14,11 @@ import {
   getFinanceSummary, getFinanceByService, getDailyRevenue,
   getRevenueByTechnician, getRevenueVsCosts, getCashFlowForecast,
   getFixedVsVariableCosts, getPendingPayments, getRefundsOverTime, getOperationalResult,
-  getTechnicianPayouts, processTechnicianPayout, getInvoices, type TechnicianPayout, type Invoice,
+  getTechnicianPayouts, processTechnicianPayout, getInvoices, getAppPayments,
+  type TechnicianPayout, type Invoice, type AppPaymentsData,
 } from "@/services/financeService";
+
+type AppTx = AppPaymentsData["transactions"][number];
 import { getRevenueByCategory } from "@/services/dashboardService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -32,6 +35,7 @@ const TABS: TabDef[] = [
   { id: "receita", label: "Receita" },
   { id: "custos", label: "Custos" },
   { id: "faturas", label: "Faturação" },
+  { id: "app-pagamentos", label: "Pagamentos da app" },
   { id: "pagamentos", label: "Pagamentos a técnicos" },
   { id: "reembolsos", label: "Reembolsos" },
   { id: "tesouraria", label: "Tesouraria" },
@@ -66,6 +70,7 @@ export default function FinancePage() {
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: payouts, refetch: refetchPayouts } = useAsyncData(() => getTechnicianPayouts(), []);
   const { data: invoicesData } = useAsyncData(() => getInvoices(), []);
+  const { data: appPay } = useAsyncData(() => getAppPayments(), []);
 
   const [showInvoice, setShowInvoice] = useState(false);
   const [invForm, setInvForm] = useState({ entity: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "2026-07-31" });
@@ -323,6 +328,61 @@ export default function FinancePage() {
           )}
 
           {/* -------------------------------- TESOURARIA -------------------------------- */}
+          {tab === "app-pagamentos" && appPay && (
+            <div className="space-y-6">
+              <p className="text-sm text-text-secondary">
+                Pagamentos processados na app via Payshop Online Payments (MB Way/Multibanco via SIBS, cartões via Credorax, referências Payshop). Sincronizado diariamente.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <MetricCard title="Cobrado" metric={buildMetricValue(appPay.kpis.chargedCents / 100, appPay.kpis.chargedCents / 100, false, undefined, "Pagamentos confirmados (serviço concluído)")} format="currency" />
+                <MetricCard title="Cativado (pendente)" metric={buildMetricValue(appPay.kpis.heldCents / 100, appPay.kpis.heldCents / 100, false, undefined, "Pré-autorizações à espera de confirmação")} format="currency" />
+                <MetricCard title="Ticket médio" metric={buildMetricValue(appPay.kpis.avgTicketCents / 100, appPay.kpis.avgTicketCents / 100)} format="currency" />
+                <MetricCard title="Taxa de sucesso" metric={buildMetricValue(appPay.kpis.successRate, appPay.kpis.successRate)} format="percent" />
+                <MetricCard title="Recusados" metric={buildMetricValue(appPay.kpis.refused, appPay.kpis.refused, true)} />
+                <MetricCard title="Reembolsado" metric={buildMetricValue(appPay.kpis.refundedCents / 100, appPay.kpis.refundedCents / 100, true)} format="currency" />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ChartCard title="Volume mensal" subtitle="Cativado vs cobrado, por mês (€)">
+                  <BarChartComponent
+                    data={appPay.monthly.map((m) => ({ name: m.name.slice(2), cativado: m.cativado, cobrado: m.cobrado }))}
+                    bars={[
+                      { key: "cobrado", color: "#FAB347", name: "Cobrado" },
+                      { key: "cativado", color: "#3B82F6", name: "Cativado" },
+                    ]}
+                    currency
+                  />
+                </ChartCard>
+                <ChartCard title="Por método de pagamento" subtitle="Volume por serviço (€)">
+                  <DonutChartComponent data={appPay.byService.map((s) => ({ name: s.name, value: Math.round(s.volume) }))} centerLabel="Volume" currency />
+                </ChartCard>
+              </div>
+              <div>
+                <h2 className="font-semibold mb-3">Transações recentes</h2>
+                <DataTable
+                  columns={[
+                    { key: "created", label: "Data", render: (r: AppTx) => r.created ? formatDate(r.created) : "—" },
+                    { key: "customer", label: "Cliente (ext)", render: (r: AppTx) => <span className="font-mono text-xs">{r.customer || "—"}</span> },
+                    { key: "service", label: "Método" },
+                    { key: "type", label: "Tipo", render: (r: AppTx) => ({
+                      DEFERRED: "Cativação", CONFIRMATION: "Cobrança", CANCELLATION: "Cancelamento",
+                      REFUND: "Reembolso", PURCHASE: "Compra",
+                    } as Record<string, string>)[r.type] ?? r.type },
+                    { key: "amount", label: "Valor", render: (r: AppTx) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
+                    { key: "status", label: "Estado", render: (r: AppTx) => (
+                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                        r.status === "SUCCESS" ? "bg-success-light text-success" : r.status === "REFUSED" ? "bg-danger-light text-danger" : "bg-warning-light text-warning")}>
+                        {r.status === "SUCCESS" ? "Sucesso" : r.status === "REFUSED" ? "Recusado" : r.status}
+                      </span>
+                    ) },
+                  ]}
+                  data={appPay.transactions}
+                  keyField="id"
+                  emptyMessage="Sem transações — a primeira sincronização acontece no próximo ciclo do cron"
+                />
+              </div>
+            </div>
+          )}
+
           {tab === "reembolsos" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

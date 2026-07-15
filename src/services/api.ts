@@ -114,6 +114,8 @@ const LIVE_EXACT = new Set<string>([
   "/tax/summary",
   // Fase 7 — Pagamentos a técnicos
   "/finance/payouts",
+  // Pagamentos da app (Payshop Online Payments / Paylands)
+  "/finance/app-payments",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
