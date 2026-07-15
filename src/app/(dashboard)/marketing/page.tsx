@@ -21,6 +21,31 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send } from "lucide-react";
 import type { MarketingCampaign } from "@/types";
 
+/**
+ * Classificação de uma campanha pelo retorno (ROAS = receita ÷ investimento).
+ *
+ * Regra honesta: sem conversões medidas (nem receita nem clientes atribuídos)
+ * NÃO classificamos como "Má" — não há como julgar. Campanhas de notoriedade
+ * ou sem tracking de conversões ficam "Sem dados" até haver o que medir.
+ */
+type CampaignRating = "excelente" | "bom" | "media" | "ma" | "sem_dados";
+
+function rateCampaign(c: MarketingCampaign): CampaignRating {
+  if (!c.piquetRevenue && !c.customers) return "sem_dados";
+  if (c.roas >= 3) return "excelente";   // devolve 3× ou mais do investido
+  if (c.roas >= 1.5) return "bom";       // lucrativa com margem confortável
+  if (c.roas >= 1) return "media";       // paga-se a si própria
+  return "ma";                            // gasta mais do que devolve
+}
+
+const RATING: Record<CampaignRating, { label: string; tone: string; hint: string }> = {
+  excelente: { label: "Excelente", tone: "bg-success-light text-success", hint: "ROAS ≥ 3× — escalar" },
+  bom: { label: "Bom", tone: "bg-piquet/15 text-piquet-700", hint: "ROAS 1,5×–3× — manter" },
+  media: { label: "Média", tone: "bg-warning-light text-warning", hint: "ROAS 1×–1,5× — otimizar" },
+  ma: { label: "Má", tone: "bg-danger-light text-danger", hint: "ROAS < 1× — dá prejuízo" },
+  sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
+};
+
 const LEAD_TONE: Record<Lead["stage"], string> = {
   novo: "bg-info-light text-info",
   contactado: "bg-warning-light text-warning",
@@ -62,6 +87,10 @@ export default function MarketingPage() {
     { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac) },
     { key: "piquetRevenue", label: "Receita Piquet", render: (r) => formatCurrency(r.piquetRevenue) },
     { key: "roas", label: "ROAS", render: (r) => `${r.roas.toFixed(2)}x` },
+    { key: "rating", label: "Classificação", render: (r) => {
+      const c = RATING[rateCampaign(r)];
+      return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
+    } },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} /> },
   ];
 
@@ -172,7 +201,19 @@ export default function MarketingPage() {
         )}
 
         {tab === "campanhas" && (
-          <DataTable columns={campaignColumns} data={campaigns ?? []} keyField="id" />
+          <div className="space-y-3">
+            {/* Legenda dos critérios de classificação (baseados no ROAS). */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+              <span className="font-medium">Classificação por retorno (ROAS):</span>
+              {(["excelente", "bom", "media", "ma", "sem_dados"] as CampaignRating[]).map((k) => (
+                <span key={k} className="inline-flex items-center gap-1.5">
+                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full font-medium", RATING[k].tone)}>{RATING[k].label}</span>
+                  <span className="text-text-muted">{RATING[k].hint}</span>
+                </span>
+              ))}
+            </div>
+            <DataTable columns={campaignColumns} data={campaigns ?? []} keyField="id" />
+          </div>
         )}
 
         {tab === "push" && <PushTab />}
