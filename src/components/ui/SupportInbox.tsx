@@ -34,6 +34,15 @@ function initials(name: string) {
   return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 }
 
+/** Link `mailto:` pré-preenchido — para responder a tickets de email a partir
+ *  do cliente de email (enquanto a integração de email não existe, fase 2). */
+function mailtoHref(t: InboxTicket) {
+  const subject = `Re: ${t.subject} [${t.id}]`;
+  const original = t.messages.map((m) => `> ${m.authorName}: ${m.body}`).join("\n");
+  const body = `Olá ${t.requesterName.split(" ")[0]},\n\n\n\n— Suporte Piquet\n\n---- mensagem original ----\n${original}`;
+  return `mailto:${t.requesterEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 export function SupportInbox() {
   const userName = useAuthStore((s) => s.user?.name ?? "Suporte Piquet");
   const { data, loading, error, refetch } = useAsyncData(() => getInboxTickets(), []);
@@ -228,13 +237,24 @@ export function SupportInbox() {
               </div>
             ) : (
               <div className="p-3 border-t border-surface-border">
-                <div className="flex items-end gap-2">
-                  <textarea value={reply} onChange={(e) => setReply(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    rows={2} placeholder={`Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
-                    className="input-field text-sm resize-none flex-1" />
-                  <button onClick={send} disabled={!reply.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
-                </div>
+                {selected.channel === "email" ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span className="text-xs text-text-muted inline-flex items-center gap-1.5 flex-1">
+                      <Mail className="h-3.5 w-3.5 shrink-0" /> Este pedido chegou por email — responde a partir do teu cliente de email.
+                    </span>
+                    <a href={mailtoHref(selected)} className="btn-primary text-sm inline-flex items-center justify-center gap-1.5 shrink-0">
+                      <Mail className="h-4 w-4" /> Responder por email
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex items-end gap-2">
+                    <textarea value={reply} onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                      rows={2} placeholder={`Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
+                      className="input-field text-sm resize-none flex-1" />
+                    <button onClick={send} disabled={!reply.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mt-2">
                   {selected.status !== "resolvido" && (
                     <button onClick={() => changeStatus("resolvido")} className="btn-secondary text-xs py-1">Marcar resolvido</button>
