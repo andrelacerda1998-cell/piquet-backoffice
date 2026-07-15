@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -92,7 +92,7 @@ function Board({ section, tasks, setTasks }: {
   setTasks: React.Dispatch<React.SetStateAction<DevTask[]>>;
 }) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<DevStatus | null>(null);
+  const [dragOver, setDragOver] = useState<{ status: DevStatus; index: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [addStatus, setAddStatus] = useState<DevStatus>("todo");
   const [editing, setEditing] = useState<DevTask | null>(null);
@@ -104,16 +104,20 @@ function Board({ section, tasks, setTasks }: {
       .filter((t) => t.section === section && t.status === status)
       .sort((a, b) => a.position - b.position);
 
-  /** Move a tarefa para (status) inserindo antes de beforeId (ou no fim). */
-  const move = (taskId: string, toStatus: DevStatus, beforeId?: string) => {
+  /** Move a tarefa para (status) na posição `visibleIndex` (índice na lista visível
+   *  da coluna, tal como aparece no ecrã, incluindo a própria tarefa arrastada). */
+  const moveToIndex = (taskId: string, toStatus: DevStatus, visibleIndex: number) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
-    const col = tasks
-      .filter((t) => t.id !== taskId && t.section === section && t.status === toStatus)
+    const visible = tasks
+      .filter((t) => t.section === section && t.status === toStatus)
       .sort((a, b) => a.position - b.position);
-    let index = beforeId ? col.findIndex((t) => t.id === beforeId) : col.length;
-    if (index < 0) index = col.length;
-    const position = positionAt(col, index);
+    const draggedIdx = visible.findIndex((t) => t.id === taskId);
+    const col = visible.filter((t) => t.id !== taskId); // vizinhos, sem a arrastada
+    let idx = visibleIndex;
+    if (draggedIdx !== -1 && draggedIdx < visibleIndex) idx -= 1; // remover a arrastada acima desloca o índice
+    idx = Math.max(0, Math.min(idx, col.length));
+    const position = positionAt(col, idx);
     if (task.status === toStatus && task.position === position) return;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: toStatus, position } : t)));
     updateDevTask(taskId, { status: toStatus, position }).catch(() => toast("Falha ao mover tarefa.", "error"));
@@ -164,13 +168,13 @@ function Board({ section, tasks, setTasks }: {
           return (
             <div
               key={col.id}
-              onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.id); }}
-              onDragLeave={() => setDragOverCol((c) => (c === col.id ? null : c))}
-              onDrop={() => { if (draggedId) move(draggedId, col.id); setDraggedId(null); setDragOverCol(null); }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver({ status: col.id, index: 0 }); }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver((c) => (c?.status === col.id ? null : c)); }}
+              onDrop={(e) => { e.preventDefault(); if (draggedId && dragOver?.status === col.id) moveToIndex(draggedId, col.id, dragOver.index); setDraggedId(null); setDragOver(null); }}
               className={cn(
                 "rounded-xl border bg-surface-muted/40 p-3 min-h-[200px] transition-colors",
                 COLUMN_TONE[col.id],
-                dragOverCol === col.id && "bg-piquet/5 border-piquet/40"
+                dragOver?.status === col.id && "bg-piquet/5 border-piquet/40"
               )}
             >
               <div className="flex items-center justify-between mb-3 px-1">
@@ -185,57 +189,69 @@ function Board({ section, tasks, setTasks }: {
               </div>
 
               <div className="space-y-2">
-                {items.length === 0 && (
+                {items.length === 0 && !(draggedId && dragOver?.status === col.id) && (
                   <p className="text-xs text-text-muted text-center py-6">Sem tarefas. Arrasta para aqui ou usa +.</p>
                 )}
-                {items.map((task) => (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={() => setDraggedId(task.id)}
-                    onDragEnd={() => { setDraggedId(null); setDragOverCol(null); }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.stopPropagation(); if (draggedId && draggedId !== task.id) move(draggedId, col.id, task.id); setDraggedId(null); setDragOverCol(null); }}
-                    className={cn(
-                      "group card p-3 cursor-grab active:cursor-grabbing border border-surface-border hover:border-piquet/40 transition-all",
-                      draggedId === task.id && "opacity-40"
+                {items.map((task, index) => (
+                  <Fragment key={task.id}>
+                    {draggedId && dragOver?.status === col.id && dragOver.index === index && (
+                      <div className="rounded-lg border-2 border-dashed border-piquet/60 bg-piquet/10 h-12" />
                     )}
-                  >
-                    <div className="flex items-start gap-2">
-                      <GripVertical className="h-4 w-4 text-text-muted/60 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openView(task)} title="Ver tarefa">
-                        <p className="text-sm font-medium leading-snug">{task.title}</p>
-                        {task.description && (
-                          <p className="text-xs text-text-secondary mt-1 line-clamp-2">{task.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <PriorityBadge priority={task.priority} />
-                          {task.assignee && (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-text-muted">
-                              <User className="h-3 w-3" />{task.assignee.split(" ")[0]}
-                            </span>
+                    <div
+                      draggable
+                      onDragStart={() => setDraggedId(task.id)}
+                      onDragEnd={() => { setDraggedId(null); setDragOver(null); }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        const after = e.clientY > r.top + r.height / 2;
+                        setDragOver({ status: col.id, index: index + (after ? 1 : 0) });
+                      }}
+                      className={cn(
+                        "group card p-3 cursor-grab active:cursor-grabbing border border-surface-border hover:border-piquet/40 transition-all",
+                        draggedId === task.id && "opacity-40"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <GripVertical className="h-4 w-4 text-text-muted/60 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openView(task)} title="Ver tarefa">
+                          <p className="text-sm font-medium leading-snug">{task.title}</p>
+                          {task.description && (
+                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">{task.description}</p>
                           )}
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <PriorityBadge priority={task.priority} />
+                            {task.assignee && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-text-muted">
+                                <User className="h-3 w-3" />{task.assignee.split(" ")[0]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => openEdit(task)}
+                            className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-piquet-600 transition-all"
+                            title="Editar"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => remove(task)}
+                            className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"
+                            title="Apagar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => openEdit(task)}
-                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-piquet-600 transition-all"
-                          title="Editar"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => remove(task)}
-                          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all"
-                          title="Apagar"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
                     </div>
-                  </div>
+                  </Fragment>
                 ))}
+                {draggedId && dragOver?.status === col.id && dragOver.index === items.length && (
+                  <div className="rounded-lg border-2 border-dashed border-piquet/60 bg-piquet/10 h-12" />
+                )}
               </div>
             </div>
           );
