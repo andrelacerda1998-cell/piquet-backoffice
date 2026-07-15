@@ -47,9 +47,23 @@ export const GET = withStaff(async () => {
     byMonth.set(key, m);
   }
 
-  let cumCliente = 0;
-  let cumPro = 0;
-  const downloads = (metricRows?.length ? months : []).map(({ key, label }) => {
+  // Base: downloads ANTERIORES à janela de 13 meses. Sem isto, o acumulado
+  // reiniciaria a cada mês que passa e o "total" encolheria — tem de ser o
+  // total real desde sempre, não só o da janela mostrada no gráfico.
+  const { data: olderRows, error: oErr } = await admin
+    .from("app_metrics")
+    .select("app, downloads")
+    .lt("date", since);
+  if (oErr) throw new Error(oErr.message);
+  const base = { cliente: 0, profissional: 0 };
+  for (const r of olderRows ?? []) {
+    base[r.app as "cliente" | "profissional"] += r.downloads ?? 0;
+  }
+
+  let cumCliente = base.cliente;
+  let cumPro = base.profissional;
+  const hasAny = Boolean(metricRows?.length || olderRows?.length);
+  const downloads = (hasAny ? months : []).map(({ key, label }) => {
     const m = byMonth.get(key) ?? { cliente: 0, profissional: 0 };
     cumCliente += m.cliente;
     cumPro += m.profissional;
