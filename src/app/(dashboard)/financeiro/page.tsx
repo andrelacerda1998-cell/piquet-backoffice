@@ -15,20 +15,18 @@ import {
   getRevenueByTechnician, getRevenueVsCosts, getCashFlowForecast,
   getFixedVsVariableCosts, getPendingPayments, getRefundsOverTime, getOperationalResult,
   getTechnicianPayouts, processTechnicianPayout, getInvoices, getAppPayments,
-  type TechnicianPayout, type Invoice, type AppPaymentsData,
+  type TechnicianPayout, type Invoice, type AppPayment, type PaymentState,
 } from "@/services/financeService";
-
-type AppTx = AppPaymentsData["transactions"][number];
 import { getRevenueByCategory } from "@/services/dashboardService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast, useDataStore } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { SEED_REFUNDS, type Refund } from "@/services/backofficeService";
 import { TODAY, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt } from "lucide-react";
 
 const TABS: TabDef[] = [
   { id: "resumo", label: "Resumo" },
@@ -45,6 +43,15 @@ function invoiceStatus(inv: Invoice): Invoice["status"] {
   if (inv.status === "paga") return "paga";
   return new Date(inv.dueDate) < TODAY ? "vencida" : "pendente";
 }
+/** Estado final de um pagamento da app (ciclo de vida do pagamento diferido). */
+const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
+  pago: { label: "Pago", tone: "bg-success-light text-success" },
+  cativado: { label: "Cativado", tone: "bg-info-light text-info" },
+  cancelado: { label: "Cancelado", tone: "bg-surface-subtle text-text-secondary" },
+  reembolsado: { label: "Reembolsado", tone: "bg-warning-light text-warning" },
+  recusado: { label: "Recusado", tone: "bg-danger-light text-danger" },
+};
+
 const INV_TONE: Record<Invoice["status"], string> = {
   paga: "bg-success-light text-success",
   pendente: "bg-warning-light text-warning",
@@ -330,59 +337,90 @@ export default function FinancePage() {
           {/* -------------------------------- TESOURARIA -------------------------------- */}
           {tab === "app-pagamentos" && appPay && (
             <div className="space-y-6">
-              <p className="text-sm text-text-secondary">
-                Pagamentos processados na app via Payshop Online Payments (MB Way/Multibanco via SIBS, cartões via Credorax, referências Payshop). Sincronizado diariamente.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <MetricCard title="Cobrado" metric={buildMetricValue(appPay.kpis.chargedCents / 100, appPay.kpis.chargedCents / 100, false, undefined, "Pagamentos confirmados (serviço concluído)")} format="currency" />
-                <MetricCard title="Cativado (pendente)" metric={buildMetricValue(appPay.kpis.heldCents / 100, appPay.kpis.heldCents / 100, false, undefined, "Pré-autorizações à espera de confirmação")} format="currency" />
-                <MetricCard title="Ticket médio" metric={buildMetricValue(appPay.kpis.avgTicketCents / 100, appPay.kpis.avgTicketCents / 100)} format="currency" />
-                <MetricCard title="Taxa de sucesso" metric={buildMetricValue(appPay.kpis.successRate, appPay.kpis.successRate)} format="percent" />
-                <MetricCard title="Recusados" metric={buildMetricValue(appPay.kpis.refused, appPay.kpis.refused, true)} />
-                <MetricCard title="Reembolsado" metric={buildMetricValue(appPay.kpis.refundedCents / 100, appPay.kpis.refundedCents / 100, true)} format="currency" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-sm text-text-secondary max-w-2xl">
+                  Pagamentos processados na app via Payshop Online Payments. Cada pagamento é
+                  cativado na reserva e cobrado quando o serviço se confirma.
+                </p>
+                <span className="inline-flex items-center gap-1.5 text-xs text-text-muted shrink-0">
+                  <RefreshCw className="h-3.5 w-3.5" /> Sincroniza diariamente às 06:30
+                </span>
               </div>
+
+              {/* Destaque: os dois números que interessam */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="card p-5 border-l-4 border-l-success">
+                  <div className="flex items-center gap-2 text-text-secondary">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <span className="text-sm font-medium">Cobrado</span>
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(appPay.kpis.pagoCents / 100)}</p>
+                  <p className="mt-1 text-xs text-text-muted">{appPay.kpis.pagoCount} pagamentos confirmados — dinheiro efetivamente recebido</p>
+                </div>
+                <div className="card p-5 border-l-4 border-l-info">
+                  <div className="flex items-center gap-2 text-text-secondary">
+                    <Clock className="h-4 w-4 text-info" />
+                    <span className="text-sm font-medium">Cativado</span>
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(appPay.kpis.cativadoCents / 100)}</p>
+                  <p className="mt-1 text-xs text-text-muted">{appPay.kpis.cativadoCount} pré-autorizações à espera de confirmação</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard title="Ticket médio" metric={buildMetricValue(appPay.kpis.avgTicketCents / 100, appPay.kpis.avgTicketCents / 100)} format="currency" />
+                <MetricCard title="Taxa de sucesso" metric={buildMetricValue(appPay.kpis.successRate, appPay.kpis.successRate, false, undefined, "Pagamentos que avançaram (cobrados ou cativados) do total de tentativas")} format="percent" />
+                <MetricCard title="Cancelados" metric={buildMetricValue(appPay.kpis.canceladoCount, appPay.kpis.canceladoCount, true, undefined, "Cativações libertadas — a reserva não avançou")} />
+                <MetricCard title="Recusados" metric={buildMetricValue(appPay.kpis.recusadoCount, appPay.kpis.recusadoCount, true)} />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ChartCard title="Volume mensal" subtitle="Cativado vs cobrado, por mês (€)">
+                <ChartCard title="Volume mensal" subtitle="Cobrado vs cativado, por mês (€)">
                   <BarChartComponent
-                    data={appPay.monthly.map((m) => ({ name: m.name.slice(2), cativado: m.cativado, cobrado: m.cobrado }))}
+                    data={appPay.monthly.map((m) => ({ name: m.name.slice(2), cobrado: m.cobrado, cativado: m.cativado }))}
                     bars={[
-                      { key: "cobrado", color: "#FAB347", name: "Cobrado" },
+                      { key: "cobrado", color: "#16A34A", name: "Cobrado" },
                       { key: "cativado", color: "#3B82F6", name: "Cativado" },
                     ]}
                     currency
                   />
                 </ChartCard>
-                <ChartCard title="Por método de pagamento" subtitle="Volume por serviço (€)">
-                  <DonutChartComponent data={appPay.byService.map((s) => ({ name: s.name, value: Math.round(s.volume) }))} centerLabel="Volume" currency />
+                <ChartCard title="Por método de pagamento" subtitle="Volume por método (€)">
+                  <DonutChartComponent data={appPay.byMethod.map((m) => ({ name: m.name, value: Math.round(m.volume) }))} centerLabel="Volume" currency />
                 </ChartCard>
               </div>
+
               <div>
-                <h2 className="font-semibold mb-3">Transações recentes</h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-semibold">Pagamentos</h2>
+                  <span className="text-xs text-text-muted">Um por reserva — o estado reflete o que aconteceu no fim</span>
+                </div>
                 <DataTable
                   columns={[
-                    { key: "created", label: "Data", render: (r: AppTx) => r.created ? formatDate(r.created) : "—" },
-                    { key: "customer", label: "Cliente (ext)", render: (r: AppTx) => <span className="font-mono text-xs">{r.customer || "—"}</span> },
-                    { key: "service", label: "Método" },
-                    { key: "type", label: "Tipo", render: (r: AppTx) => ({
-                      DEFERRED: "Cativação", CONFIRMATION: "Cobrança", CANCELLATION: "Cancelamento",
-                      REFUND: "Reembolso", PURCHASE: "Compra",
-                    } as Record<string, string>)[r.type] ?? r.type },
-                    { key: "amount", label: "Valor", render: (r: AppTx) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
-                    { key: "status", label: "Estado", render: (r: AppTx) => (
-                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                        r.status === "SUCCESS" ? "bg-success-light text-success" : r.status === "REFUSED" ? "bg-danger-light text-danger" : "bg-warning-light text-warning")}>
-                        {r.status === "SUCCESS" ? "Sucesso" : r.status === "REFUSED" ? "Recusado" : r.status}
-                      </span>
+                    { key: "created", label: "Data", render: (r: AppPayment) => r.created ? formatDateTime(r.created) : "—" },
+                    { key: "customer", label: "Cliente", render: (r: AppPayment) => <span className="font-mono text-xs">{r.customer || "—"}</span> },
+                    { key: "method", label: "Método", render: (r: AppPayment) => {
+                      const Icon = r.methodKind === "mbway" ? Smartphone : r.methodKind === "referencia" ? Receipt : CreditCard;
+                      return <span className="inline-flex items-center gap-1.5"><Icon className="h-3.5 w-3.5 text-text-muted" />{r.method}</span>;
+                    } },
+                    { key: "amount", label: "Valor", sortable: true, render: (r: AppPayment) => (
+                      <span className="font-semibold">{formatCurrency(r.amount)}</span>
                     ) },
+                    { key: "refunded", label: "Reembolsado", render: (r: AppPayment) => r.refunded > 0
+                      ? <span className="text-danger">−{formatCurrency(r.refunded)}</span>
+                      : <span className="text-text-muted">—</span> },
+                    { key: "state", label: "Estado", render: (r: AppPayment) => {
+                      const s = PAY_STATE[r.state];
+                      return <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{s.label}</span>;
+                    } },
                   ]}
-                  data={appPay.transactions}
+                  data={appPay.payments}
                   keyField="id"
-                  emptyMessage="Sem transações — a primeira sincronização acontece no próximo ciclo do cron"
+                  emptyMessage="Sem pagamentos — a primeira sincronização acontece no próximo ciclo"
                 />
               </div>
             </div>
           )}
-
           {tab === "reembolsos" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

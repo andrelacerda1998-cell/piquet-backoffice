@@ -32,6 +32,8 @@ export interface PopTransaction {
   status: string;
   type: string;
   service: string;
+  /** Marca do cartão (VISA/MASTERCARD). Vazio em MB Way/referências. */
+  sourceType: string;
   created: string | null;
   updatedAt: string | null;
 }
@@ -39,7 +41,7 @@ export interface PopTransaction {
 interface RawTx {
   transactionUUID?: string; orderUUID?: string; customerExtId?: string;
   amount?: number; status?: string; type?: string; serviceUUID?: string;
-  created?: string; updated_at?: string;
+  sourceType?: string | null; created?: string; updated_at?: string;
 }
 
 /** Formata Date para o formato YYYYMMDDHHmm que a API exige. */
@@ -58,10 +60,29 @@ export function mapPopTransaction(r: RawTx): PopTransaction {
     status: r.status ?? "",
     type: r.type ?? "",
     service: SERVICE_NAMES[r.serviceUUID ?? ""] ?? (r.serviceUUID ?? ""),
+    sourceType: r.sourceType ?? "",
     // A API devolve "YYYY-MM-DD HH:mm:ss" (hora de Lisboa) — ISO-ficar simples.
     created: r.created ? r.created.replace(" ", "T") : null,
     updatedAt: r.updated_at ? r.updated_at.replace(" ", "T") : null,
   };
+}
+
+/**
+ * Método de pagamento legível, a partir do serviço + marca do cartão.
+ *
+ * Como distinguir (confirmado nos dados reais): o Credorax processa os cartões
+ * e traz `sourceType` (VISA/MASTERCARD); a SIBS processa MB Way e não traz
+ * `sourceType`; o Payshop são referências pagas em agente.
+ */
+export function paymentMethodOf(service: string, sourceType: string): { kind: "cartao" | "mbway" | "referencia" | "outro"; label: string } {
+  const brand = (sourceType || "").toUpperCase();
+  if (brand === "VISA") return { kind: "cartao", label: "Visa" };
+  if (brand === "MASTERCARD") return { kind: "cartao", label: "Mastercard" };
+  if (brand) return { kind: "cartao", label: sourceType };
+  if (service === "SIBS") return { kind: "mbway", label: "MB Way" };
+  if (service === "PAYSHOP") return { kind: "referencia", label: "Referência Payshop" };
+  if (service === "CREDORAX") return { kind: "cartao", label: "Cartão" };
+  return { kind: "outro", label: service || "—" };
 }
 
 /**
@@ -85,4 +106,22 @@ export async function fetchPopTransactions(start: string, end: string): Promise<
     offset = json.next_offset;
   }
   return out;
+}
+
+export type PaymentState = "pago" | "cativado" | "cancelado" | "reembolsado" | "recusado";
+
+/**
+ * Estado final de um pagamento, a partir das suas transações.
+ *
+ * A app usa pagamentos diferidos: cada pagamento gera várias transações
+ * (cativação → confirmação/cancelamento/reembolso). O que aconteceu por último
+ * no ciclo de vida manda — daí a ordem de precedência.
+ */
+export function derivePaymentState(txs: Array<{ type: string; status: string }>): PaymentState {
+  const okOf = (t: string) => txs.some((x) => x.status === "SUCCESS" && x.type === t);
+  if (okOf("REFUND") || okOf("REVERSAL")) return "reembolsado";
+  if (okOf("CANCELLATION")) return "cancelado";
+  if (okOf("CONFIRMATION") || okOf("PURCHASE") || okOf("CAPTURE") || okOf("PAYMENT")) return "pago";
+  if (okOf("DEFERRED") || okOf("AUTHORIZATION")) return "cativado";
+  return "recusado";
 }

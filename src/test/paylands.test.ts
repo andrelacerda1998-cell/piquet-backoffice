@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // `server-only` rebenta fora de RSC — no-op nos testes.
 vi.mock("server-only", () => ({}));
 
-import { mapPopTransaction, paylandsDate } from "@/app/api/_lib/paylands";
+import { mapPopTransaction, paylandsDate, paymentMethodOf, derivePaymentState } from "@/app/api/_lib/paylands";
 
 describe("mapPopTransaction (Payshop Online Payments / Paylands)", () => {
   it("mapeia uma transação real da API", () => {
@@ -36,5 +36,47 @@ describe("paylandsDate", () => {
   it("formata em YYYYMMDDHHmm (UTC)", () => {
     expect(paylandsDate(new Date("2026-07-15T09:05:00Z"))).toBe("202607150905");
     expect(paylandsDate(new Date("2026-01-02T00:00:00Z"))).toBe("202601020000");
+  });
+});
+
+describe("paymentMethodOf (distinguir MB Way de cartão)", () => {
+  it("Credorax com sourceType → cartão da marca certa", () => {
+    expect(paymentMethodOf("CREDORAX", "VISA")).toEqual({ kind: "cartao", label: "Visa" });
+    expect(paymentMethodOf("CREDORAX", "MASTERCARD")).toEqual({ kind: "cartao", label: "Mastercard" });
+  });
+
+  it("SIBS sem sourceType → MB Way", () => {
+    expect(paymentMethodOf("SIBS", "")).toEqual({ kind: "mbway", label: "MB Way" });
+  });
+
+  it("Payshop → referência; Credorax sem marca → cartão genérico", () => {
+    expect(paymentMethodOf("PAYSHOP", "").kind).toBe("referencia");
+    expect(paymentMethodOf("CREDORAX", "")).toEqual({ kind: "cartao", label: "Cartão" });
+  });
+});
+
+describe("derivePaymentState (ciclo de vida do pagamento diferido)", () => {
+  const ok = (type: string) => ({ type, status: "SUCCESS" });
+
+  it("cativação sozinha → cativado", () => {
+    expect(derivePaymentState([ok("DEFERRED")])).toBe("cativado");
+  });
+
+  it("cativação + confirmação → pago", () => {
+    expect(derivePaymentState([ok("DEFERRED"), ok("CONFIRMATION")])).toBe("pago");
+  });
+
+  it("cativação + cancelamento → cancelado (não fica 'cativado')", () => {
+    expect(derivePaymentState([ok("DEFERRED"), ok("CANCELLATION")])).toBe("cancelado");
+  });
+
+  it("reembolso ganha a tudo o resto", () => {
+    expect(derivePaymentState([ok("DEFERRED"), ok("CONFIRMATION"), ok("REFUND")])).toBe("reembolsado");
+  });
+
+  it("só tentativas recusadas → recusado", () => {
+    expect(derivePaymentState([{ type: "DEFERRED", status: "REFUSED" }])).toBe("recusado");
+    // uma cativação recusada não conta como cativado
+    expect(derivePaymentState([{ type: "DEFERRED", status: "REFUSED" }, { type: "DEFERRED", status: "REFUSED" }])).toBe("recusado");
   });
 });

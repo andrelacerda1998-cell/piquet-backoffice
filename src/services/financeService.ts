@@ -297,41 +297,54 @@ export async function getInvoices(): Promise<Invoice[]> {
 
 /* ==================== PAGAMENTOS DA APP (Payshop Online Payments) ==================== */
 
-export interface AppPaymentsData {
-  kpis: {
-    chargedCents: number;   // cobrado (CONFIRMATION)
-    chargedCount: number;
-    heldCents: number;      // cativado (DEFERRED, pendente de confirmação)
-    heldCount: number;
-    refused: number;
-    refundedCents: number;
-    avgTicketCents: number;
-    successRate: number;
-  };
-  monthly: Array<{ name: string; cativado: number; cobrado: number }>;
-  byService: Array<{ name: string; count: number; volume: number }>;
-  transactions: Array<{
-    id: string; order: string; customer: string; amount: number;
-    status: string; type: string; service: string; created: string | null;
-  }>;
+export type PaymentState = "pago" | "cativado" | "cancelado" | "reembolsado" | "recusado";
+
+export interface AppPayment {
+  id: string;
+  customer: string;
+  amount: number;
+  refunded: number;
+  state: PaymentState;
+  method: string;          // "Visa" | "Mastercard" | "MB Way" | "Referência Payshop"
+  methodKind: "cartao" | "mbway" | "referencia" | "outro";
+  created: string | null;
+  attempts: number;
 }
 
-/** Pagamentos reais processados na app (POP/Paylands). Demo: amostra pequena. */
+export interface AppPaymentsData {
+  kpis: {
+    pagoCents: number; pagoCount: number;
+    cativadoCents: number; cativadoCount: number;
+    canceladoCount: number; recusadoCount: number;
+    reembolsadoCents: number; avgTicketCents: number; successRate: number;
+  };
+  monthly: Array<{ name: string; cobrado: number; cativado: number }>;
+  byMethod: Array<{ name: string; count: number; volume: number }>;
+  payments: AppPayment[];
+}
+
+/** Pagamentos reais da app (POP/Paylands), agregados por encomenda. */
 export async function getAppPayments(): Promise<AppPaymentsData> {
   return apiGet("/finance/app-payments", () => ({
-    kpis: { chargedCents: 264300, chargedCount: 82, heldCents: 148050, heldCount: 36, refused: 21, refundedCents: 18600, avgTicketCents: 3495, successRate: 84.9 },
+    kpis: {
+      pagoCents: 264300, pagoCount: 82, cativadoCents: 148050, cativadoCount: 36,
+      canceladoCount: 24, recusadoCount: 21, reembolsadoCents: 18600,
+      avgTicketCents: 3495, successRate: 72.4,
+    },
     monthly: [
-      { name: "2026-04", cativado: 320.5, cobrado: 660.0 }, { name: "2026-05", cativado: 410.2, cobrado: 830.0 },
-      { name: "2026-06", cativado: 355.4, cobrado: 750.0 }, { name: "2026-07", cativado: 394.4, cobrado: 403.0 },
+      { name: "2026-04", cobrado: 660.0, cativado: 320.5 }, { name: "2026-05", cobrado: 830.0, cativado: 410.2 },
+      { name: "2026-06", cobrado: 750.0, cativado: 355.4 }, { name: "2026-07", cobrado: 403.0, cativado: 394.4 },
     ],
-    byService: [
-      { name: "SIBS", count: 74, volume: 2610.3 },
-      { name: "CREDORAX", count: 39, volume: 1320.2 },
-      { name: "PAYSHOP", count: 5, volume: 193.0 },
+    byMethod: [
+      { name: "MB Way", count: 74, volume: 2610.3 },
+      { name: "Visa", count: 31, volume: 1120.2 },
+      { name: "Mastercard", count: 8, volume: 200.0 },
+      { name: "Referência Payshop", count: 5, volume: 193.0 },
     ],
-    transactions: [
-      { id: "demo_1", order: "ord_demo1", customer: "PROD_SERVER_1-0001", amount: 45.9, status: "SUCCESS", type: "PURCHASE", service: "SIBS", created: "2026-07-05T10:12:00" },
-      { id: "demo_2", order: "ord_demo2", customer: "PROD_SERVER_1-0002", amount: 89.0, status: "REFUSED", type: "PURCHASE", service: "CREDORAX", created: "2026-07-04T16:40:00" },
+    payments: [
+      { id: "demo_1", customer: "PROD_SERVER_1-0001", amount: 45.9, refunded: 0, state: "pago", method: "MB Way", methodKind: "mbway", created: "2026-07-05T10:12:00", attempts: 2 },
+      { id: "demo_2", customer: "PROD_SERVER_1-0002", amount: 89.0, refunded: 0, state: "cancelado", method: "Visa", methodKind: "cartao", created: "2026-07-04T16:40:00", attempts: 2 },
+      { id: "demo_3", customer: "PROD_SERVER_1-0003", amount: 32.5, refunded: 0, state: "cativado", method: "MB Way", methodKind: "mbway", created: "2026-07-03T09:02:00", attempts: 1 },
     ],
   } as AppPaymentsData)).then((r) => r.data);
 }

@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       const rows = txs.map((t) => ({
         transaction_uuid: t.transactionUuid, order_uuid: t.orderUuid,
         customer_ext_id: t.customerExtId, amount_cents: t.amountCents,
-        status: t.status, type: t.type, service: t.service,
+        status: t.status, type: t.type, service: t.service, source_type: t.sourceType,
         created: t.created, updated_at: t.updatedAt,
       }));
       const { error } = await supabaseAdmin()

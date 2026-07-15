@@ -29,3 +29,8 @@ alter table public.pop_transactions enable row level security;
 drop policy if exists "pop_transactions_read" on public.pop_transactions;
 create policy "pop_transactions_read" on public.pop_transactions
   for select to authenticated using (true);
+
+-- Marca do cartão (distingue cartão de MB Way) + índice por encomenda.
+alter table public.pop_transactions
+  add column if not exists source_type text not null default '';
+create index if not exists pop_transactions_order_idx on public.pop_transactions (order_uuid);
