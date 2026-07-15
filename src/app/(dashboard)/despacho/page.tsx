@@ -10,6 +10,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDuration } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MapPin, Star, Radio, Zap, Radius } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function DispatchPage() {
   const { data, loading, error, refetch } = useAsyncData(() => getDispatchBoard(), []);
@@ -26,7 +27,7 @@ export default function DispatchPage() {
             <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
           </span>
           <div>
-            <h1 className="text-2xl font-bold">Despacho ao vivo</h1>
+            <h1 className="text-2xl font-bold">Despacho ao vivo <DemoBadge endpoint="/dispatch" /></h1>
             <p className="text-text-secondary mt-0.5">Pedidos por atribuir e técnicos disponíveis em tempo real</p>
           </div>
         </div>

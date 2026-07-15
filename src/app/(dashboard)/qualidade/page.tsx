@@ -15,6 +15,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { Technician } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 type Complaint = QualityData["complaints"][number];
 
@@ -71,7 +72,7 @@ export default function QualityPage() {
     <RouteGuard route="/qualidade">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Qualidade</h1>
+          <h1 className="text-2xl font-bold">Qualidade <DemoBadge endpoint="/quality" /></h1>
           <p className="text-text-secondary mt-1">Avaliações, reclamações e indicadores de confiança</p>
         </div>
 

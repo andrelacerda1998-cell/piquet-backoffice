@@ -6,6 +6,7 @@ import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
 import { DepartmentCard } from "@/components/ui/DepartmentCard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getOverviewMetrics, getDepartmentHealth } from "@/services/dashboardService";
@@ -86,7 +87,10 @@ export default function OverviewPage() {
         {/* 6 KPIs de topo, com comparação */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Indicadores</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Indicadores</p>
+              <DemoBadge endpoint="/dashboard/overview" />
+            </div>
             <div className="inline-flex rounded-lg border border-surface-border bg-surface p-0.5 text-xs">
               {([["mes", "vs mês anterior"], ["ano", "vs ano anterior"]] as const).map(([id, lbl]) => (
                 <button key={id} onClick={() => setCmp(id)}
@@ -124,7 +128,10 @@ export default function OverviewPage() {
         {/* Departamentos */}
         {departments && departments.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Departamentos</p>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Departamentos</p>
+              <DemoBadge endpoint="/dashboard/departments" />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {departments.map((d) => <DepartmentCard key={d.id} dept={d} />)}
             </div>
@@ -135,7 +142,10 @@ export default function OverviewPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Desempenho operacional</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Desempenho operacional</p>
+                <DemoBadge endpoint="/dashboard/overview" />
+              </div>
               <Link href="/servicos" className="text-sm text-piquet-600 font-medium hover:underline">Ver operações →</Link>
             </div>
             {metrics && (
@@ -155,7 +165,7 @@ export default function OverviewPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-text-primary">Prazos em risco</h2>
+                <h2 className="font-semibold text-text-primary">Prazos em risco <DemoBadge endpoint="/tasks" /></h2>
                 <p className="text-xs text-text-secondary">Tarefas em atraso ou a vencer</p>
               </div>
               <span className={cn("inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full text-xs font-bold", emRisco.length ? "bg-danger-light text-danger" : "bg-success-light text-success")}>

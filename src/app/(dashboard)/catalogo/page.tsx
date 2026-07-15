@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import {
   Plus, Siren, Droplet, Zap, Wind, KeyRound, Hammer, Sparkles, Sofa, Wrench,
 } from "lucide-react";
@@ -80,7 +81,7 @@ function CatalogoContent() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Catálogo</h1>
+            <h1 className="text-2xl font-bold">Catálogo <DemoBadge endpoint="/catalog" /></h1>
             <p className="text-text-secondary mt-1">{types.length} tipos de serviço em {data?.categories.length ?? 0} categorias</p>
           </div>
           <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo tipo</button>

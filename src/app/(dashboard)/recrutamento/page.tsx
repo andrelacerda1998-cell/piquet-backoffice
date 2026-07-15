@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Check, X, Plus, Clock } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const AGENDA_DAYS = ["2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09"];
 const DAY_LABEL: Record<string, string> = { "2026-07-03": "Sex 03", "2026-07-04": "Sáb 04", "2026-07-05": "Dom 05", "2026-07-06": "Seg 06", "2026-07-07": "Ter 07", "2026-07-08": "Qua 08", "2026-07-09": "Qui 09" };
@@ -127,7 +128,7 @@ export default function RecruitmentPage() {
     <RouteGuard route="/recrutamento">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Recrutamento</h1>
+          <h1 className="text-2xl font-bold">Recrutamento <DemoBadge endpoint="/recruitment" /></h1>
           <p className="text-text-secondary mt-1">Candidaturas de técnicos (KYC) e vagas internas</p>
         </div>
 

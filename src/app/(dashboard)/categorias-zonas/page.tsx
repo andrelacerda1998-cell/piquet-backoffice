@@ -6,6 +6,7 @@ import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/C
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getCategoryZoneMetrics } from "@/services/marketingService";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function CategoriesZonesPage() {
   const filters = useFilters();
@@ -45,7 +46,7 @@ export default function CategoriesZonesPage() {
     <RouteGuard route="/categorias-zonas">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Categorias e zonas</h1>
+          <h1 className="text-2xl font-bold">Categorias e zonas <DemoBadge endpoint="/categories-zones/metrics" /></h1>
           <p className="text-text-secondary mt-1">Análise por categoria, serviço e localização</p>
         </div>
 

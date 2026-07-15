@@ -9,6 +9,7 @@ import { getTasksBoard, type TeamTask } from "@/services/extrasService";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const COLUMNS: { id: TeamTask["status"]; label: string }[] = [
   { id: "aberta", label: "Aberta" },
@@ -36,7 +37,7 @@ export default function TasksPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Tarefas e equipa</h1>
+            <h1 className="text-2xl font-bold">Tarefas e equipa <DemoBadge endpoint="/tasks" /></h1>
             <p className="text-text-secondary mt-1">Quadro de tarefas e carga de trabalho</p>
           </div>
           <button className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova tarefa</button>

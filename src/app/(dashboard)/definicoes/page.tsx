@@ -6,6 +6,7 @@ import { getSettings, updateSettings, updateTaxConfig, updateGoal } from "@/serv
 import { LoadingState } from "@/components/ui/States";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import type { DashboardSettings } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const TABS: TabDef[] = [
   { id: "geral", label: "Geral" },
@@ -45,7 +46,7 @@ export default function SettingsPage() {
       <PermissionGate permission="manage_settings">
         <div className="space-y-6 max-w-3xl">
           <div>
-            <h1 className="text-2xl font-bold">Definições</h1>
+            <h1 className="text-2xl font-bold">Definições <DemoBadge endpoint="/settings" /></h1>
             <p className="text-text-secondary mt-1">Configuração de taxas, metas e preferências</p>
           </div>
 

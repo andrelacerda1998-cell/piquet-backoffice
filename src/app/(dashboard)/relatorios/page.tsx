@@ -9,6 +9,7 @@ import { getReports, type GeneratedReport } from "@/services/extrasService";
 import { formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { FileText, Download, FileDown } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const TABS = [
   { id: "mensal", label: "Relatório mensal completo" },
@@ -35,7 +36,7 @@ export default function ReportsPage() {
     <RouteGuard route="/relatorios">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Relatórios</h1>
+          <h1 className="text-2xl font-bold">Relatórios <DemoBadge endpoint="/reports" /></h1>
           <p className="text-text-secondary mt-1">Gera e exporta relatórios de gestão</p>
         </div>
 

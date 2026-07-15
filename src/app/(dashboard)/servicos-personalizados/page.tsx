@@ -13,6 +13,7 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { X, Star, Clock, MapPin, Wand2, Send } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const STATUS: Record<CustomRequestStatus, { label: string; tone: string }> = {
   novo: { label: "Novo", tone: "bg-info-light text-info" },
@@ -87,7 +88,7 @@ export default function CustomRequestsPage() {
     <RouteGuard route="/servicos-personalizados">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Pedidos personalizados</h1>
+          <h1 className="text-2xl font-bold">Pedidos personalizados <DemoBadge endpoint="/custom-requests" /></h1>
           <p className="text-text-secondary mt-1">Serviços complexos: a Piquet estima as horas e envia 3 opções de técnicos (preço fixo + avaliações) para o cliente escolher.</p>
         </div>
 

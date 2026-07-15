@@ -7,6 +7,7 @@ import { getAnnualGoals, type AnnualGoal } from "@/services/extrasService";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { TrendingUp, Target } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 function fmt(v: number, unit: AnnualGoal["unit"]) {
   if (unit === "currency") return formatCurrency(v);
@@ -26,7 +27,7 @@ export default function GoalsPage() {
     <RouteGuard route="/objetivos">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Objetivos do ano — 2026</h1>
+          <h1 className="text-2xl font-bold">Objetivos do ano — 2026 <DemoBadge endpoint="/annual-goals" /></h1>
           <p className="text-text-secondary mt-1">
             Progresso, projeção de fim de ano e o que falta para atingir cada meta · <span className="font-medium text-text-primary">{onTrack}/{data?.length ?? 0}</span> no bom caminho
           </p>

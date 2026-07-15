@@ -11,6 +11,7 @@ import { getAlerts, updateAlertStatus, getAlertCounts } from "@/services/support
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDateTime } from "@/lib/formatters";
 import type { DashboardAlert } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function AlertsPage() {
   const { page, setPage, pageSize } = usePagination();
@@ -47,7 +48,7 @@ export default function AlertsPage() {
     <RouteGuard route="/alertas">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Alertas</h1>
+          <h1 className="text-2xl font-bold">Alertas <DemoBadge endpoint="/alerts" /></h1>
           <p className="text-text-secondary mt-1">Sistema central de alertas operacionais, financeiros e fiscais</p>
         </div>
 

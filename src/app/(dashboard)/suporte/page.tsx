@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Scale, BookOpen } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const MED_TONE: Record<MediationCase["status"], string> = {
   aberto: "bg-danger-light text-danger",
@@ -80,7 +81,7 @@ export default function SuportePage() {
     <RouteGuard route="/suporte">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Suporte</h1>
+          <h1 className="text-2xl font-bold">Suporte <DemoBadge endpoint="/complaints" /></h1>
           <p className="text-text-secondary mt-1">Caixa de entrada de tickets, reclamações e mediação de conflitos</p>
         </div>
 

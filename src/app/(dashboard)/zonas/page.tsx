@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 type ManagedZone = ZoneRow & { active: boolean };
 
@@ -80,7 +81,7 @@ function ZonasContent() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Zonas de operação</h1>
+            <h1 className="text-2xl font-bold">Zonas de operação <DemoBadge endpoint="/zones" /></h1>
             <p className="text-text-secondary mt-1">Cobertura e desempenho por zona geográfica</p>
           </div>
           <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova zona</button>

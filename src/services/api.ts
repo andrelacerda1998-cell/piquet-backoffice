@@ -43,6 +43,29 @@ export function clearAuthToken(): void {
   if (typeof window !== "undefined") window.localStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * Token a enviar no pedido ATUAL.
+ *
+ * Com Supabase Auth, lê a sessão viva em vez da cópia em `localStorage`: o
+ * supabase-js renova o access_token em segundo plano (dura ~1h), por isso uma
+ * cópia guardada no login fica velha e o backend passa a responder 401 a meio
+ * do trabalho. `getSession()` devolve sempre um token válido, renovando-o se
+ * já tiver expirado. A cópia continua a ser escrita para o modo REST simples.
+ */
+async function currentToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const { SUPABASE_AUTH_ENABLED, supabaseBrowser } = await import("@/lib/supabase/client");
+    if (!SUPABASE_AUTH_ENABLED) return getAuthToken();
+    const { data } = await supabaseBrowser().auth.getSession();
+    const token = data.session?.access_token ?? null;
+    if (token) setAuthToken(token);
+    return token;
+  } catch {
+    return getAuthToken(); // Supabase indisponível → tenta a cópia.
+  }
+}
+
 /* ------------------------------- Núcleo --------------------------------- */
 
 async function mockResponse<T>(data: T): Promise<ApiResponse<T>> {
@@ -122,6 +145,15 @@ const LIVE_DENY = new Set<string>([
   "/services/operational-metrics",
   "/technicians/pending", // KYC/documentos ainda não modelados
 ]);
+/**
+ * `true` quando o que se vê neste endpoint são dados de demonstração — ou
+ * porque não há backend configurado, ou porque o endpoint ainda não foi
+ * migrado. Usado pelo selo `<DemoBadge>` para marcar os números fictícios.
+ */
+export function isDemoEndpoint(endpoint: string): boolean {
+  return !USE_REAL_API || !isLiveEndpoint(endpoint);
+}
+
 export function isLiveEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (LIVE_DENY.has(path)) return false;
@@ -143,7 +175,7 @@ async function request<T>(endpoint: string, options: RequestOptions<T>): Promise
   }
 
   // Modo produção: pedido HTTP real via núcleo partilhado.
-  const token = getAuthToken();
+  const token = await currentToken();
   const json = await httpRequest<unknown>(API_URL, endpoint, {
     method,
     body,
