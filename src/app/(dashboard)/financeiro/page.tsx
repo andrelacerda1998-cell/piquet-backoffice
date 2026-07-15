@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
@@ -309,7 +310,7 @@ export default function FinancePage() {
                 <MetricCard title="Pagas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "paga").length, 1)} />
               </div>
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Faturas a pagar</h2>
+                <h2 className="font-semibold">Faturas a pagar <DemoBadge endpoint="/finance/invoices" /></h2>
                 <button onClick={() => setShowInvoice(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
               </div>
               <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas registadas" />
@@ -423,6 +424,7 @@ export default function FinancePage() {
           )}
           {tab === "reembolsos" && (
             <div className="space-y-4">
+              <DemoBadge endpoint="/finance/refunds" />
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <MetricCard title="Pendentes" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").length, 2, true)} />
                 <MetricCard title="Valor pendente" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").reduce((s, r) => s + r.amount, 0), 150, true)} format="currency" />
