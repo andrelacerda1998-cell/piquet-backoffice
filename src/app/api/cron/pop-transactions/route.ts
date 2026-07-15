@@ -23,8 +23,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, skipped: "PAYLANDS_API_KEY não configurada" });
   }
 
-  const end = paylandsDate(new Date());
-  const start = paylandsDate(new Date(Date.now() - 7 * 86_400_000));
+  // Janela por defeito: últimos 7 dias. Para backfill histórico, aceita
+  // ?start=YYYYMMDDHHmm&end=YYYYMMDDHHmm (máx. 3 meses — limite da API).
+  const url = new URL(req.url);
+  const qsStart = url.searchParams.get("start");
+  const qsEnd = url.searchParams.get("end");
+  const valid = (s: string | null): s is string => Boolean(s && /^\d{12}$/.test(s));
+  const end = valid(qsEnd) ? qsEnd : paylandsDate(new Date());
+  const start = valid(qsStart) ? qsStart : paylandsDate(new Date(Date.now() - 7 * 86_400_000));
 
   try {
     const txs = await fetchPopTransactions(start, end);
