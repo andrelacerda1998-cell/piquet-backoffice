@@ -104,19 +104,15 @@ function Board({ section, tasks, setTasks }: {
       .filter((t) => t.section === section && t.status === status)
       .sort((a, b) => a.position - b.position);
 
-  /** Move a tarefa para (status) na posição `visibleIndex` (índice na lista visível
-   *  da coluna, tal como aparece no ecrã, incluindo a própria tarefa arrastada). */
-  const moveToIndex = (taskId: string, toStatus: DevStatus, visibleIndex: number) => {
+  /** Move a tarefa para (status) na posição `index` — índice entre os cartões da
+   *  coluna de destino, já SEM a própria tarefa (a lista renderizada exclui-a). */
+  const moveToIndex = (taskId: string, toStatus: DevStatus, index: number) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
-    const visible = tasks
-      .filter((t) => t.section === section && t.status === toStatus)
+    const col = tasks
+      .filter((t) => t.id !== taskId && t.section === section && t.status === toStatus)
       .sort((a, b) => a.position - b.position);
-    const draggedIdx = visible.findIndex((t) => t.id === taskId);
-    const col = visible.filter((t) => t.id !== taskId); // vizinhos, sem a arrastada
-    let idx = visibleIndex;
-    if (draggedIdx !== -1 && draggedIdx < visibleIndex) idx -= 1; // remover a arrastada acima desloca o índice
-    idx = Math.max(0, Math.min(idx, col.length));
+    const idx = Math.max(0, Math.min(index, col.length));
     const position = positionAt(col, idx);
     if (task.status === toStatus && task.position === position) return;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: toStatus, position } : t)));
@@ -165,10 +161,26 @@ function Board({ section, tasks, setTasks }: {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {DEV_COLUMNS.map((col) => {
           const items = byColumn(col.id);
+          // Durante o arrasto, a própria tarefa é escondida da lista (só o placeholder
+          // marca o destino) — evita ver "duas posições".
+          const renderItems = draggedId ? items.filter((t) => t.id !== draggedId) : items;
           return (
             <div
               key={col.id}
-              onDragOver={(e) => { e.preventDefault(); setDragOver({ status: col.id, index: 0 }); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!draggedId) return;
+                const src = tasks.find((t) => t.id === draggedId)?.status;
+                if (src && src !== col.id) { setDragOver({ status: col.id, index: 0 }); return; } // entre colunas → topo
+                // mesma coluna: índice contínuo pelo Y do cursor vs. o meio de cada cartão (sem saltos nos gaps)
+                const cards = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-task-card]"));
+                let idx = cards.length;
+                for (let i = 0; i < cards.length; i++) {
+                  const r = cards[i].getBoundingClientRect();
+                  if (e.clientY < r.top + r.height / 2) { idx = i; break; }
+                }
+                setDragOver({ status: col.id, index: idx });
+              }}
               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver((c) => (c?.status === col.id ? null : c)); }}
               onDrop={(e) => { e.preventDefault(); if (draggedId && dragOver?.status === col.id) moveToIndex(draggedId, col.id, dragOver.index); setDraggedId(null); setDragOver(null); }}
               className={cn(
@@ -189,33 +201,20 @@ function Board({ section, tasks, setTasks }: {
               </div>
 
               <div className="space-y-2">
-                {items.length === 0 && !(draggedId && dragOver?.status === col.id) && (
+                {renderItems.length === 0 && !(draggedId && dragOver?.status === col.id) && (
                   <p className="text-xs text-text-muted text-center py-6">Sem tarefas. Arrasta para aqui ou usa +.</p>
                 )}
-                {items.map((task, index) => (
+                {renderItems.map((task, index) => (
                   <Fragment key={task.id}>
                     {draggedId && dragOver?.status === col.id && dragOver.index === index && (
                       <div className="rounded-lg border-2 border-dashed border-piquet/60 bg-piquet/10 h-12" />
                     )}
                     <div
+                      data-task-card
                       draggable
                       onDragStart={() => setDraggedId(task.id)}
                       onDragEnd={() => { setDraggedId(null); setDragOver(null); }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const src = tasks.find((t) => t.id === draggedId)?.status;
-                        // Entre colunas → sempre no topo (reordena-se depois na coluna).
-                        if (src && src !== col.id) { setDragOver({ status: col.id, index: 0 }); return; }
-                        // Mesma coluna → posição precisa (metade de cima/baixo do cartão).
-                        const r = e.currentTarget.getBoundingClientRect();
-                        const after = e.clientY > r.top + r.height / 2;
-                        setDragOver({ status: col.id, index: index + (after ? 1 : 0) });
-                      }}
-                      className={cn(
-                        "group card p-3 cursor-grab active:cursor-grabbing border border-surface-border hover:border-piquet/40 transition-all",
-                        draggedId === task.id && "opacity-40"
-                      )}
+                      className="group card p-3 cursor-grab active:cursor-grabbing border border-surface-border hover:border-piquet/40 transition-all"
                     >
                       <div className="flex items-start gap-2">
                         <GripVertical className="h-4 w-4 text-text-muted/60 shrink-0 mt-0.5" />
@@ -253,7 +252,7 @@ function Board({ section, tasks, setTasks }: {
                     </div>
                   </Fragment>
                 ))}
-                {draggedId && dragOver?.status === col.id && dragOver.index === items.length && (
+                {draggedId && dragOver?.status === col.id && dragOver.index === renderItems.length && (
                   <div className="rounded-lg border-2 border-dashed border-piquet/60 bg-piquet/10 h-12" />
                 )}
               </div>
