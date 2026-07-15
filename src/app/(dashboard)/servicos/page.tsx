@@ -24,6 +24,7 @@ import { Plus } from "lucide-react";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/formatters";
 import type { ServiceRequest, ServiceStatus } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 // Grupos de estado do fluxo operacional (mapeados nos ServiceStatus existentes).
 const STATUS_GROUPS: { id: string; label: string; statuses?: ServiceStatus[] }[] = [
@@ -109,7 +110,7 @@ export default function ServicesPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Operações</h1>
+            <h1 className="text-2xl font-bold">Operações <DemoBadge endpoint="/services" /></h1>
             <p className="text-text-secondary mt-1">Serviços, agendamentos, estados e incidentes</p>
           </div>
           <div className="flex items-center gap-2">

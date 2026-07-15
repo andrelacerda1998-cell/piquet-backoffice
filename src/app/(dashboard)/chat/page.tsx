@@ -18,6 +18,7 @@ import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
 import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const EVENT_TONE: Record<TeamAgendaEvent["type"], string> = {
   reuniao: "bg-piquet/15 text-piquet-700 border-piquet/30",
@@ -59,7 +60,7 @@ export default function TeamPage() {
     <RouteGuard route="/chat">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Equipa</h1>
+          <h1 className="text-2xl font-bold">Equipa <DemoBadge endpoint="/team/messages" /></h1>
           <p className="text-text-secondary mt-1">Conversas internas e agenda dos colaboradores</p>
         </div>
 

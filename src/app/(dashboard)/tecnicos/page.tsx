@@ -18,6 +18,7 @@ import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import type { Technician } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function TechniciansPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
@@ -107,7 +108,7 @@ export default function TechniciansPage() {
     <RouteGuard route="/tecnicos">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Técnicos</h1>
+          <h1 className="text-2xl font-bold">Técnicos <DemoBadge endpoint="/technicians" /></h1>
           <p className="text-text-secondary mt-1">{metrics?.registered ?? 382} técnicos registados</p>
         </div>
 

@@ -14,6 +14,7 @@ import { buildMetricFromSeries } from "@/lib/trends";
 import { formatDateTime } from "@/lib/formatters";
 import { useAuthStore, useDataStore, toast } from "@/stores";
 import { MessageSquare } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function SupportPage() {
   const { page, setPage, pageSize } = usePagination();
@@ -90,7 +91,7 @@ export default function SupportPage() {
     <RouteGuard route="/produto-suporte">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Produto e suporte</h1>
+          <h1 className="text-2xl font-bold">Produto e suporte <DemoBadge endpoint="/product/metrics" /></h1>
           <p className="text-text-secondary mt-1">Métricas de produto, erros e tickets</p>
         </div>
 

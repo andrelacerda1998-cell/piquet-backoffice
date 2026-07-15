@@ -146,12 +146,44 @@ const LIVE_DENY = new Set<string>([
   "/technicians/pending", // KYC/documentos ainda não modelados
 ]);
 /**
- * `true` quando o que se vê neste endpoint são dados de demonstração — ou
- * porque não há backend configurado, ou porque o endpoint ainda não foi
- * migrado. Usado pelo selo `<DemoBadge>` para marcar os números fictícios.
+ * Endpoints cujos números descrevem MESMO o negócio.
+ *
+ * Atenção: isto NÃO é o mesmo que `isLiveEndpoint`. Um endpoint pode estar
+ * ligado ao Supabase e ainda assim devolver ficção — as tabelas `services`
+ * (2500), `customers` (752), `technicians` (382), `employees`,
+ * `tax_obligations`, `technician_payouts` e `team_*` foram todas escritas de
+ * uma vez pelo script de seed (created_at idêntico) e não descrevem nada de
+ * real. "Vem da base de dados" ≠ "é verdade".
+ *
+ * Só entram aqui tabelas alimentadas por APIs externas ou por uso humano:
+ * `app_metrics` (downloads das lojas), `ad_metrics`/`campaigns` (Meta Ads),
+ * `pop_transactions` (Payshop) e `dev_tasks` (escrito pela equipa).
+ *
+ * Nota sobre `/finance/app-payments`: os dados são reais (API do Payshop) mas
+ * o tráfego é quase todo de teste (65 de 68 encomendas abaixo de 10 €). É um
+ * problema distinto do selo — ver a nota na aba "Pagamentos da app".
+ */
+const REAL_DATA = new Set<string>([
+  "/marketing/campaigns",
+  "/marketing/metrics",
+  "/marketing/channels",
+  "/marketing/creatives",
+  "/finance/app-payments",
+  "/dev-tasks",
+  "/product/growth", // Só a série de downloads; os registos vêm do seed.
+]);
+
+/**
+ * `true` quando o número mostrado é fictício. Usado pelo selo `<DemoBadge>`.
+ * Por defeito assume-se demo: um endpoint só conta como real depois de se
+ * confirmar a origem dos dados, e não por estar ligado a uma rota.
  */
 export function isDemoEndpoint(endpoint: string): boolean {
-  return !USE_REAL_API || !isLiveEndpoint(endpoint);
+  if (!USE_REAL_API) return true;
+  const path = endpoint.split("?")[0];
+  if (REAL_DATA.has(path)) return false;
+  if (/^\/dev-tasks\/[^/]+$/.test(path)) return false;
+  return true;
 }
 
 export function isLiveEndpoint(endpoint: string): boolean {

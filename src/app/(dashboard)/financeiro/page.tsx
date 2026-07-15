@@ -186,6 +186,7 @@ export default function FinancePage() {
           {/* ---------------------------------- RESUMO ---------------------------------- */}
           {tab === "resumo" && (
             <div className="space-y-6">
+              <DemoBadge endpoint="/finance/summary" />
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue * 0.92)} format="currency" />
@@ -217,6 +218,7 @@ export default function FinancePage() {
           {/* ---------------------------------- RECEITA --------------------------------- */}
           {tab === "receita" && (
             <div className="space-y-6">
+              <DemoBadge endpoint="/finance/by-service" />
               <SubTabs
                 tabs={[
                   { id: "evolucao", label: "Evolução diária" },
@@ -262,6 +264,7 @@ export default function FinancePage() {
           {/* ---------------------------------- CUSTOS ---------------------------------- */}
           {tab === "custos" && (
             <div className="space-y-6">
+              <DemoBadge endpoint="/finance/operational-result" />
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricCard title="Custos operacionais" metric={buildMetricValue(summary.operatingCosts, summary.operatingCosts * 0.98, true)} format="currency" />
@@ -320,6 +323,7 @@ export default function FinancePage() {
           {/* -------------------------------- PAGAMENTOS -------------------------------- */}
           {tab === "pagamentos" && (
             <div className="space-y-6">
+              <DemoBadge endpoint="/finance/payouts" />
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricCard title="Devido a técnicos" metric={buildMetricValue(summary.technicianOwed, summary.technicianOwed * 0.93)} format="currency" />
@@ -457,6 +461,7 @@ export default function FinancePage() {
 
           {tab === "tesouraria" && (
             <div className="space-y-6">
+              <DemoBadge endpoint="/finance/summary" />
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance * 0.98)} format="currency" />

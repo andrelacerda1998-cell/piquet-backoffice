@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercent, formatChangePercent } from "@/lib/formatters";
 import type { MetricValue } from "@/types";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { DemoBadge } from "./DemoBadge";
 
 interface MetricCardProps {
   title: string;
@@ -12,9 +13,15 @@ interface MetricCardProps {
   format?: "currency" | "number" | "percent";
   className?: string;
   loading?: boolean;
+  /**
+   * Endpoint de origem. Só é preciso quando cartões reais e fictícios convivem
+   * na mesma grelha e o selo ao nível da secção seria ambíguo (ex.: no Produto,
+   * os downloads são reais mas os registos vêm do seed).
+   */
+  demoEndpoint?: string;
 }
 
-export function MetricCard({ title, metric, format = "number", className, loading }: MetricCardProps) {
+export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint }: MetricCardProps) {
   if (loading) {
     return (
       <div className={cn("card p-4 animate-pulse", className)}>
@@ -35,7 +42,10 @@ export function MetricCard({ title, metric, format = "number", className, loadin
   return (
     <div className={cn("card p-4 hover:shadow-elevated transition-shadow", className)}>
       <div className="flex items-start justify-between mb-1">
-        <p className="text-sm text-text-secondary font-medium">{title}</p>
+        <p className="text-sm text-text-secondary font-medium">
+          {title}
+          {demoEndpoint && <DemoBadge endpoint={demoEndpoint} className="ml-1.5 align-middle" />}
+        </p>
         {metric.tooltip && (
           <span title={metric.tooltip} className="text-text-muted cursor-help">
             <Info className="h-3.5 w-3.5" />

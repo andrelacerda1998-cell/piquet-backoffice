@@ -18,6 +18,7 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import type { Customer } from "@/types";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function CustomersPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
@@ -107,7 +108,7 @@ export default function CustomersPage() {
     <RouteGuard route="/clientes">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Clientes</h1>
+          <h1 className="text-2xl font-bold">Clientes <DemoBadge endpoint="/customers" /></h1>
           <p className="text-text-secondary mt-1">{metrics?.registered ?? 752} clientes registados</p>
         </div>
 

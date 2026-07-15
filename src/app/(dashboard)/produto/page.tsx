@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusBadge, PriorityBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -113,8 +114,9 @@ export default function ProdutoPage() {
               <MetricCard title="Downloads totais" metric={buildMetricValue(dlTotalLast, dlTotalPrev, false, undefined, "As duas apps somadas — crescimento vs mês anterior")} />
               <MetricCard title="App Cliente" metric={buildMetricValue(dlLast?.Cliente ?? 0, dlPrev?.Cliente ?? 0, false, undefined, "Instalações acumuladas")} />
               <MetricCard title="App Profissional" metric={buildMetricValue(dlLast?.Profissional ?? 0, dlPrev?.Profissional ?? 0, false, undefined, "Instalações acumuladas")} />
-              <MetricCard title="Novos clientes (mês)" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
-              <MetricCard title="Novos técnicos (mês)" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
+              {/* Downloads (acima) vêm das lojas; estes registos vêm do seed. */}
+              <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
+              <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
             </div>
             <ChartCard title="Crescimento mensal de downloads" subtitle="Novas instalações em cada mês, por app">
               <BarChartComponent
@@ -181,6 +183,7 @@ export default function ProdutoPage() {
             </div>
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <DemoBadge endpoint="/product/metrics" className="col-span-full" />
                 <MetricCard title="DAU" metric={buildMetricValue(metrics.dau, metrics.dau * 0.95)} />
                 <MetricCard title="MAU" metric={buildMetricValue(metrics.mau, metrics.mau * 0.92)} />
                 <MetricCard title="Novos registos" metric={buildMetricValue(metrics.newRegistrations, metrics.newRegistrations * 0.88)} />

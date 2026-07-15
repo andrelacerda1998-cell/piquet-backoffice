@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { isLiveEndpoint } from "@/services/api";
 
 describe("isLiveEndpoint — allowlist da migração incremental", () => {
@@ -70,5 +70,47 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/marketing/funnel")).toBe(false); // sintético
     expect(isLiveEndpoint("/employees/simulate")).toBe(false); // cálculo puro, sem BD
     expect(isLiveEndpoint("/dashboard/overview")).toBe(false);
+  });
+});
+
+describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", () => {
+  // `isDemoEndpoint` só distingue quando há backend configurado; sem ele, é
+  // tudo demo. Daí carregar o módulo de novo com a env definida.
+  async function load() {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://exemplo.test/api");
+    return import("@/services/api");
+  }
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("trata como REAIS só os endpoints alimentados por APIs externas ou uso humano", async () => {
+    const { isDemoEndpoint } = await load();
+    expect(isDemoEndpoint("/marketing/campaigns")).toBe(false); // Meta Ads
+    expect(isDemoEndpoint("/marketing/metrics")).toBe(false);
+    expect(isDemoEndpoint("/finance/app-payments")).toBe(false); // Payshop
+    expect(isDemoEndpoint("/product/growth")).toBe(false); // downloads das lojas
+    expect(isDemoEndpoint("/dev-tasks")).toBe(false); // escrito pela equipa
+    expect(isDemoEndpoint("/dev-tasks/task_1")).toBe(false);
+  });
+
+  it("trata como DEMO o que vem da BD mas foi escrito pelo seed", async () => {
+    const { isDemoEndpoint, isLiveEndpoint } = await load();
+    // Estes vão ao backend real E MESMO ASSIM são ficção: as tabelas foram
+    // preenchidas de uma vez pelo seed. É a distinção que o selo existe para
+    // fazer — se alguém migrar um endpoint e assumir que passa a ser verdade,
+    // este teste falha e explica porquê.
+    for (const ep of ["/services", "/customers", "/technicians", "/employees",
+                      "/finance/summary", "/tax/obligations", "/finance/payouts",
+                      "/team/messages", "/team/tasks"]) {
+      expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
+      expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
+    }
+  });
+
+  it("trata como demo tudo o que não foi confirmado como real", async () => {
+    const { isDemoEndpoint } = await load();
+    expect(isDemoEndpoint("/dashboard/overview")).toBe(true); // o GMV calibrado
+    expect(isDemoEndpoint("/quality")).toBe(true);
+    expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });

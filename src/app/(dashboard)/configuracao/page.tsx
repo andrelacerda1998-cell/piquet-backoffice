@@ -18,6 +18,7 @@ import { Plus, ShieldCheck, FileCheck2 } from "lucide-react";
 import CatalogPage from "../catalogo/page";
 import PricingPage from "../precos/page";
 import ZonesPage from "../zonas/page";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const TABS: TabDef[] = [
   { id: "catalogo", label: "Catálogo" },
@@ -36,7 +37,7 @@ export default function ConfiguracaoPage() {
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Configurações</h1>
+          <h1 className="text-2xl font-bold">Configurações <DemoBadge endpoint="/settings" /></h1>
           <p className="text-text-secondary mt-1">Catálogo, preços, zonas, taxas, documentos e administradores</p>
         </div>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />

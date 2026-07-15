@@ -18,6 +18,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import type { Employee, TaxObligation, ContractType } from "@/types";
 import { X, Plus, Calculator } from "lucide-react";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 
 type Tab = "fiscal" | "colaboradores" | "simulador" | "orcamento";
 
@@ -120,7 +121,7 @@ export default function TaxHRPage() {
     <RouteGuard route="/impostos-rh">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Impostos e Recursos Humanos</h1>
+          <h1 className="text-2xl font-bold">Impostos e Recursos Humanos <DemoBadge endpoint="/tax/obligations" /></h1>
           <p className="text-text-secondary mt-1">Gestão fiscal e equipa interna — valores estimados</p>
         </div>
 
