@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
@@ -59,11 +60,11 @@ export function SupportInbox() {
     if (data) { setTickets(data); if (!seeded.current) { seeded.current = true; } }
   }, [data]);
 
-  // Deep-link `?ticket=<id>` (vindo de uma notificação).
+  // Deep-link `?ticket=<id>` (vindo de uma notificação) — reativo à mudança do URL.
+  const ticketParam = useSearchParams().get("ticket");
   useEffect(() => {
-    const tid = new URLSearchParams(window.location.search).get("ticket");
-    if (tid) setSelectedId(tid);
-  }, []);
+    if (ticketParam) setSelectedId(ticketParam);
+  }, [ticketParam]);
 
   const counts = useMemo(() => ({
     abertos: tickets.filter((t) => isOpen(t.status)).length,

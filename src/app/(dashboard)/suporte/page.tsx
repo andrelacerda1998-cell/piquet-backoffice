@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -86,7 +86,11 @@ export default function SuportePage() {
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "tickets" && <SupportInbox />}
+        {tab === "tickets" && (
+          <Suspense fallback={<div className="text-sm text-text-muted py-8 text-center">A carregar caixa de entrada…</div>}>
+            <SupportInbox />
+          </Suspense>
+        )}
 
         {tab === "reclamacoes" && (
           <div className="space-y-4">
