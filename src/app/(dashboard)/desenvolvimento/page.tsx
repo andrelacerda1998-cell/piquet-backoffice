@@ -204,6 +204,10 @@ function Board({ section, tasks, setTasks }: {
                       onDragOver={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        const src = tasks.find((t) => t.id === draggedId)?.status;
+                        // Entre colunas → sempre no topo (reordena-se depois na coluna).
+                        if (src && src !== col.id) { setDragOver({ status: col.id, index: 0 }); return; }
+                        // Mesma coluna → posição precisa (metade de cima/baixo do cartão).
                         const r = e.currentTarget.getBoundingClientRect();
                         const after = e.clientY > r.top + r.height / 2;
                         setDragOver({ status: col.id, index: index + (after ? 1 : 0) });
