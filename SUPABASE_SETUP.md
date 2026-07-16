@@ -10,10 +10,16 @@ vão às Route Handlers reais — **módulo a módulo**.
 ## O que precisas de fazer (uma vez)
 
 1. **Criar o projeto Supabase** em https://supabase.com (plano free chega para começar).
-2. **Correr as migrações** — no painel do Supabase → *SQL Editor* → executa por ordem:
-   [`0001_init.sql`](supabase/migrations/0001_init.sql) (`staff, categories, customers, technicians, services` + vistas `*_enriched` + RLS)
-   [`0002_employees_tax_campaigns.sql`](supabase/migrations/0002_employees_tax_campaigns.sql) (`employees, tax_obligations, campaigns` + RLS)
-   e [`0003_team.sql`](supabase/migrations/0003_team.sql) (`team_messages, team_meetings` + RLS).
+2. **Correr as migrações** — no painel do Supabase → *SQL Editor* → executa **todos** os
+   ficheiros de [`supabase/migrations/`](supabase/migrations/) **por ordem alfabética**
+   (o nome começa por um timestamp, por isso ordem alfabética = ordem cronológica).
+   Os primeiros criam a base: `20260713103045_init.sql` (`staff, categories, customers,
+   technicians, services` + vistas `*_enriched` + RLS), `..._employees_tax_campaigns.sql`
+   (`employees, tax_obligations, campaigns`) e `..._team.sql` (`team_messages, team_meetings`).
+
+   > **Convenção:** cada nova migração usa o nome `AAAAMMDDHHMMSS_descricao.sql` (timestamp
+   > à frente). Assim duas pessoas nunca colidem no mesmo número ao trabalhar em paralelo.
+   > Podes gerar o timestamp com `date -u +%Y%m%d%H%M%S`.
 3. **Copiar as chaves** — *Project Settings → API* — para `.env.local` (ver `.env.example`):
    ```
    SUPABASE_URL=https://xxxx.supabase.co
