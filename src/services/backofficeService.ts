@@ -1,6 +1,14 @@
-import { apiGet } from "./api";
+import { apiGet, USE_REAL_API } from "./api";
 import { monthlySeries } from "@/lib/trends";
 import { TODAY } from "@/lib/today";
+
+/**
+ * Política "zero em vez de ficção": em produção, as listas de negócio semeadas
+ * (campanhas push, códigos, reembolsos, administradores) começam vazias — são
+ * entidades inventadas, não configuração. `demoList` deixa-as intactas no modo
+ * demo puro, que existe precisamente para as mostrar.
+ */
+const demoList = <T>(items: T[]): T[] => (USE_REAL_API ? [] : items);
 
 /**
  * Dados mock dos departamentos novos do backoffice (Produto, Suporte alargado,
@@ -101,13 +109,10 @@ function demoGrowth(): AppGrowth {
 }
 
 export async function getAppGrowth(): Promise<AppGrowth> {
-  const live = await apiGet("/product/growth", demoGrowth).then((r) => r.data);
-  // Em produção os registos já vêm reais; os downloads só depois de as chaves
-  // das lojas serem configuradas — até lá, mantém a série demo nos gráficos.
-  if (!live.downloads?.length) {
-    return { ...live, downloads: demoGrowth().downloads };
-  }
-  return live;
+  // Sem fallback para a série demo em produção: se a ingestão das lojas
+  // falhar, o gráfico fica vazio — que é a verdade — em vez de mostrar
+  // 18 mil downloads inventados ao lado de números reais.
+  return apiGet("/product/growth", demoGrowth).then((r) => r.data);
 }
 
 export interface Bug {
@@ -191,11 +196,11 @@ export interface PushCampaign {
   conversions: number;
 }
 
-export const SEED_PUSH: PushCampaign[] = [
+export const SEED_PUSH: PushCampaign[] = demoList([
   { id: "push_1", title: "☀️ Verão sem avarias", message: "AC pronto para o calor? Manutenção com 15% desconto esta semana.", segment: "Clientes com serviços concluídos", status: "enviada", sentAt: "2026-07-01T10:00:00", delivered: 428, deliveryRate: 96.2, openRate: 41.5, conversions: 37 },
   { id: "push_2", title: "Sentimos a tua falta 👋", message: "Volta à Piquet — 10€ de desconto no próximo serviço com o código VOLTEI10.", segment: "Clientes inativos (60d)", status: "enviada", sentAt: "2026-06-24T18:30:00", delivered: 189, deliveryRate: 93.8, openRate: 28.0, conversions: 12 },
   { id: "push_3", title: "Fim de semana em Cascais", message: "Técnicos disponíveis no teu bairro este fim de semana. Marca já!", segment: "Clientes de Cascais", status: "agendada", scheduledFor: "2026-07-11T09:00:00", delivered: 0, deliveryRate: 0, openRate: 0, conversions: 0 },
-];
+]);
 
 export interface DiscountCode {
   id: string;
@@ -211,12 +216,12 @@ export interface DiscountCode {
   revenue: number;
 }
 
-export const SEED_CODES: DiscountCode[] = [
+export const SEED_CODES: DiscountCode[] = demoList([
   { id: "dc_1", code: "VERAO25", kind: "percentagem", value: 15, usageLimit: 500, used: 212, validUntil: "2026-08-31", categories: "AVAC, Limpeza", cities: "Todas", active: true, revenue: 9840 },
   { id: "dc_2", code: "VOLTEI10", kind: "valor_fixo", value: 10, usageLimit: 300, used: 64, validUntil: "2026-07-31", categories: "Todas", cities: "Todas", active: true, revenue: 3120 },
   { id: "dc_3", code: "BEMVINDO5", kind: "valor_fixo", value: 5, usageLimit: 1000, used: 431, validUntil: "2026-12-31", categories: "Todas", cities: "Todas", active: true, revenue: 15680 },
   { id: "dc_4", code: "PRIMAVERA", kind: "percentagem", value: 20, usageLimit: 200, used: 200, validUntil: "2026-05-31", categories: "Limpeza", cities: "Lisboa", active: false, revenue: 6212 },
-];
+]);
 
 /* ----------------------------- Financeiro ------------------------------ */
 
@@ -231,12 +236,12 @@ export interface Refund {
   requestedAt: string;
 }
 
-export const SEED_REFUNDS: Refund[] = [
+export const SEED_REFUNDS: Refund[] = demoList([
   { id: "ref_1", serviceId: "srv_0287", customerName: "Carla Neves", amount: 65, reason: "Serviço cancelado pelo técnico", method: "MB Way", status: "pendente", requestedAt: "2026-07-05" },
   { id: "ref_2", serviceId: "srv_0264", customerName: "Bruno Faria", amount: 120, reason: "Serviço não concluído — reclamação aceite", method: "Cartão", status: "pendente", requestedAt: "2026-07-04" },
   { id: "ref_3", serviceId: "srv_0240", customerName: "Marta Lopes", amount: 45, reason: "Cobrança duplicada", method: "Cartão", status: "concluido", requestedAt: "2026-07-01" },
   { id: "ref_4", serviceId: "srv_0221", customerName: "Hugo Reis", amount: 89.9, reason: "Cancelamento dentro do prazo", method: "MB Way", status: "concluido", requestedAt: "2026-06-28" },
-];
+]);
 
 /* ------------------------------- Suporte ------------------------------- */
 
@@ -284,14 +289,14 @@ export interface Admin {
   lastAccess: string;
 }
 
-export const SEED_ADMINS: Admin[] = [
+export const SEED_ADMINS: Admin[] = demoList([
   { id: "adm_1", name: "André Lacerda", email: "andre@piquet.pt", role: "Super Admin", status: "ativo", lastAccess: "2026-07-06T12:10:00" },
   { id: "adm_2", name: "Rodrigo Pacheco", email: "rodrigo@piquet.pt", role: "Super Admin", status: "ativo", lastAccess: "2026-07-06T09:32:00" },
   { id: "adm_3", name: "Maria Santos", email: "maria@piquet.pt", role: "Operações", status: "ativo", lastAccess: "2026-07-05T18:04:00" },
   { id: "adm_4", name: "Pedro Oliveira", email: "pedro@piquet.pt", role: "Financeiro", status: "ativo", lastAccess: "2026-07-06T08:15:00" },
   { id: "adm_5", name: "Inês Rodrigues", email: "ines@piquet.pt", role: "Suporte", status: "ativo", lastAccess: "2026-07-06T11:50:00" },
   { id: "adm_6", name: "Carlos Mendes", email: "carlos@piquet.pt", role: "Marketing", status: "suspenso", lastAccess: "2026-06-20T10:00:00" },
-];
+]);
 
 export interface ActivityEntry {
   id: string;

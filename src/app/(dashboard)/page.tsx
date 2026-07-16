@@ -46,7 +46,9 @@ export default function OverviewPage() {
   if (loading && !metrics) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
-  const colaboradores = (departments ?? []).reduce((a, d) => a + d.people, 0) || 12;
+  // Sem fallback inventado: se os departamentos vierem vazios (dados zerados
+  // por falta de integração), o número honesto é 0.
+  const colaboradores = (departments ?? []).reduce((a, d) => a + d.people, 0);
   const gmv = metrics?.totalServiceValue.value ?? 0;
   const comissao = metrics?.piquetRevenue.value ?? 0;
   const ativos = metrics?.activeTechnicians.value ?? 0;
@@ -59,7 +61,7 @@ export default function OverviewPage() {
   const kpis: Kpi[] = metrics ? [
     mk("GMV do mês", Euro, gmv, "currency", 0.035),
     mk("Comissão Piquet", Percent, comissao, "currency", 0.03),
-    mk("Runway", TrendingUp, 12, "months", 0.015, 0.02),
+    mk("Runway", TrendingUp, 0, "months", 0.015, 0.02), // 0 até haver tesouraria real
     mk("Colaboradores", Users, colaboradores, "number", 0.02, 0.02),
     mk("Técnicos ativos", HardHat, ativos, "number", 0.04),
     mk("Avaliação média", Star, aval, "rating", 0.004, 0.01),

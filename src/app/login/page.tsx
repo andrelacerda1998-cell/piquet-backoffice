@@ -49,10 +49,10 @@ export default function LoginPage() {
             rapidez e a confiança da Piquet.
           </p>
 
-          <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
-            <Stat value="750+" label="clientes registados" />
-            <Stat value="380+" label="técnicos certificados" />
-            <Stat value="4,8★" label="avaliação média" />
+          {/* Sem estatísticas inventadas no ecrã público: os únicos números
+              verificáveis hoje são os downloads das lojas. */}
+          <div className="mt-10 grid grid-cols-1 gap-6 max-w-md">
+            <Stat value="6.400+" label="downloads nas lojas (App Store + Google Play)" />
           </div>
         </div>
 

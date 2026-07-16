@@ -91,6 +91,10 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     expect(isDemoEndpoint("/product/growth")).toBe(false); // downloads das lojas
     expect(isDemoEndpoint("/dev-tasks")).toBe(false); // escrito pela equipa
     expect(isDemoEndpoint("/dev-tasks/task_1")).toBe(false);
+    // Equipa: seed apagado da BD a 2026-07-16 — só resta conteúdo humano.
+    expect(isDemoEndpoint("/team/messages")).toBe(false);
+    expect(isDemoEndpoint("/team/tasks")).toBe(false);
+    expect(isDemoEndpoint("/team/tasks/tt1/status")).toBe(false);
   });
 
   it("trata como DEMO o que vem da BD mas foi escrito pelo seed", async () => {
@@ -100,11 +104,34 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // fazer — se alguém migrar um endpoint e assumir que passa a ser verdade,
     // este teste falha e explica porquê.
     for (const ep of ["/services", "/customers", "/technicians", "/employees",
-                      "/finance/summary", "/tax/obligations", "/finance/payouts",
-                      "/team/messages", "/team/tasks"]) {
+                      "/finance/summary", "/tax/obligations", "/finance/payouts"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
     }
+  });
+
+  it("deepZero: números a 0, listas vazias, rótulos intactos", async () => {
+    const { deepZero } = await load();
+    expect(deepZero(83417.45)).toBe(0);
+    expect(deepZero([1, 2, 3])).toEqual([]);
+    expect(deepZero({ gmv: 83417, label: "GMV", ativo: true, series: [{ v: 1 }], nested: { n: 7 } }))
+      .toEqual({ gmv: 0, label: "GMV", ativo: true, series: [], nested: { n: 0 } });
+    expect(deepZero(null)).toBeNull();
+  });
+
+  it("zero em vez de ficção: GET a endpoint demo devolve o mock zerado", async () => {
+    const { apiGet } = await load();
+    // /quality é demo e não-migrado → corre o fetcher mock e zera o resultado.
+    const res = await apiGet("/quality", () => ({ nps: 62, complaints: [{ id: "c1" }], meta: "Qualidade" }));
+    expect(res.data).toEqual({ nps: 0, complaints: [], meta: "Qualidade" });
+  });
+
+  it("sem backend configurado, o modo demo continua a mostrar os mocks", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    const { apiGet } = await import("@/services/api");
+    const res = await apiGet("/quality", () => ({ nps: 62 }));
+    expect(res.data).toEqual({ nps: 62 });
   });
 
   it("trata como demo tudo o que não foi confirmado como real", async () => {

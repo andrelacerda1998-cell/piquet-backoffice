@@ -90,29 +90,15 @@ export const GET = withStaff(async () => {
     return { name: label, Cliente: cumCliente, Profissional: cumPro };
   });
 
-  // ---------- Registos reais por mês (clientes + técnicos) ----------
-  const [cust, tech] = await Promise.all([
-    admin.from("customers").select("registered_at").gte("registered_at", since),
-    admin.from("technicians").select("registered_at").gte("registered_at", since),
-  ]);
-  if (cust.error) throw new Error(cust.error.message);
-  if (tech.error) throw new Error(tech.error.message);
-
-  const countByMonth = (rows: Array<{ registered_at: string }>) => {
-    const map = new Map<string, number>();
-    for (const r of rows) {
-      const key = String(r.registered_at).slice(0, 7);
-      map.set(key, (map.get(key) ?? 0) + 1);
-    }
-    return map;
-  };
-  const custByMonth = countByMonth((cust.data ?? []) as Array<{ registered_at: string }>);
-  const techByMonth = countByMonth((tech.data ?? []) as Array<{ registered_at: string }>);
-
-  const registrations = months.map(({ key, label }) => ({
+  // ---------- Registos por mês: a zero até haver fonte real ----------
+  // As tabelas `customers`/`technicians` são seed (escritas de uma vez em
+  // 2026-07-08), por isso contar registos nelas produzia números fictícios ao
+  // lado dos downloads reais. Política "zero em vez de ficção": devolvemos 0
+  // até os registos da app verdadeira serem sincronizados para cá.
+  const registrations = months.map(({ label }) => ({
     name: label,
-    Clientes: custByMonth.get(key) ?? 0,
-    "Técnicos": techByMonth.get(key) ?? 0,
+    Clientes: 0,
+    "Técnicos": 0,
   }));
 
   return apiOk({ downloads, registrations });

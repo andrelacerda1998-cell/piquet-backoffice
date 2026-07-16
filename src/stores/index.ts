@@ -280,7 +280,19 @@ export const useDataStore = create<DataOverridesState>()(
         return { lists: next };
       }),
     }),
-    { name: "piquet-data" }
+    {
+      name: "piquet-data",
+      // v2 (política "zero em vez de ficção"): descarta o que estava guardado.
+      // Tudo neste store era contexto fictício — listas semeadas dos mocks,
+      // respostas a tickets falsos, faturas de teste. Sem o bump, os browsers
+      // que já tinham as listas persistidas continuavam a mostrá-las mesmo
+      // depois de os seeds passarem a vazio.
+      version: 2,
+      migrate: (persisted, version) =>
+        version < 2
+          ? { ticketReplies: {}, ticketStatus: {}, extraInvoices: [], invoicePaid: {}, lists: {} }
+          : (persisted as DataOverridesState),
+    }
   )
 );
 

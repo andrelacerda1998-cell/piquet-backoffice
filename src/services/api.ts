@@ -170,7 +170,13 @@ const REAL_DATA = new Set<string>([
   "/marketing/creatives",
   "/finance/app-payments",
   "/dev-tasks",
-  "/product/growth", // Só a série de downloads; os registos vêm do seed.
+  "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
+  // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
+  // o que resta foi escrito por pessoas, como o dev-tasks.
+  "/team/messages",
+  "/team/tasks",
+  "/team/agenda",
+  "/team/meetings",
 ]);
 
 /**
@@ -183,7 +189,33 @@ export function isDemoEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (REAL_DATA.has(path)) return false;
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return false;
+  if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return false;
   return true;
+}
+
+/**
+ * Política "zero em vez de ficção" (pedida pelo André a 2026-07-16): em
+ * produção, qualquer valor que não venha de uma integração real mostra 0 e
+ * qualquer lista fictícia mostra-se vazia. Um dashboard a zeros diz a verdade
+ * ("ainda não medimos isto"); um dashboard com GMV inventado mente.
+ *
+ * - números → 0
+ * - arrays → [] (esvaziar remove as ENTIDADES falsas — clientes com nome,
+ *   serviços, reclamações — que zerar campo a campo manteria à vista)
+ * - strings/booleans/null → ficam (são rótulos e flags, não medidas)
+ *
+ * Só atua com backend configurado; o modo demo puro (sem env) continua a
+ * mostrar os mocks completos, que é o propósito dele.
+ */
+export function deepZero<T>(value: T): T {
+  if (typeof value === "number") return 0 as T;
+  if (Array.isArray(value)) return [] as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = deepZero(v);
+    return out as T;
+  }
+  return value;
 }
 
 export function isLiveEndpoint(endpoint: string): boolean {
@@ -201,9 +233,15 @@ export function isLiveEndpoint(endpoint: string): boolean {
 async function request<T>(endpoint: string, options: RequestOptions<T>): Promise<ApiResponse<T>> {
   const { method = "GET", body, params, fetcher } = options;
 
+  // Zero em vez de ficção: só leituras — as escritas devolvem o que o chamador
+  // criou (zerá-las partiria o feedback otimista dos formulários). E só com
+  // backend configurado: o modo demo puro existe para mostrar os mocks.
+  const zeroed = (v: T): T =>
+    method === "GET" && USE_REAL_API && isDemoEndpoint(endpoint) ? deepZero(v) : v;
+
   // Modo demo, OU endpoint ainda não migrado → usa os dados mock locais.
   if (!USE_REAL_API || !isLiveEndpoint(endpoint)) {
-    return mockResponse(await fetcher());
+    return mockResponse(zeroed(await fetcher()));
   }
 
   // Modo produção: pedido HTTP real via núcleo partilhado.
@@ -217,11 +255,14 @@ async function request<T>(endpoint: string, options: RequestOptions<T>): Promise
     onUnauthorized: clearAuthToken,
   });
 
-  // Aceita tanto `{ data, success, meta }` como um payload cru.
+  // Aceita tanto `{ data, success, meta }` como um payload cru. Endpoints
+  // ligados ao backend mas alimentados pelo seed (services, customers, …)
+  // também são zerados — vir da base de dados não os torna verdadeiros.
   if (json && typeof json === "object" && "data" in json) {
-    return json as ApiResponse<T>;
+    const resp = json as ApiResponse<T>;
+    return { ...resp, data: zeroed(resp.data) };
   }
-  return { data: json as T, success: true, meta: { cached: false, timestamp: new Date().toISOString() } };
+  return { data: zeroed(json as T), success: true, meta: { cached: false, timestamp: new Date().toISOString() } };
 }
 
 /* ------------------------------- Verbos --------------------------------- */
