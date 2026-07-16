@@ -19,7 +19,7 @@ export function embedName(x: { name?: string | null } | Array<{ name?: string | 
   return obj?.name ?? null;
 }
 
-// Linhas cruas com os nomes de coluna do schema (0001_init.sql).
+// Linhas cruas com os nomes de coluna do schema (20260713103045_init.sql).
 export interface ServiceRow {
   id: string;
   customer_id: string | null;

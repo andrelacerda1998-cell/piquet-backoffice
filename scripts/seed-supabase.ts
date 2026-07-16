@@ -1,7 +1,7 @@
 /**
  * Seed do Supabase a partir dos dados mock.
  *
- * Uso (depois de criar o projeto Supabase e correr a migração 0001_init.sql):
+ * Uso (depois de criar o projeto Supabase e correr as migrações de supabase/migrations/):
  *   1. Preencher .env.local com SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.
  *   2. npm run seed
  *
