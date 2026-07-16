@@ -126,6 +126,7 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/metrics",
   "/marketing/channels",
   "/marketing/creatives",
+  "/marketing/leads",
   // Fase 5 — Equipa (chat, agenda e tarefas)
   "/team/messages",
   "/team/agenda",
@@ -169,6 +170,7 @@ const REAL_DATA = new Set<string>([
   "/marketing/metrics",
   "/marketing/channels",
   "/marketing/creatives",
+  "/marketing/leads", // Formulário da landing → POST /api/leads → tabela leads.
   "/finance/app-payments",
   "/dev-tasks",
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.

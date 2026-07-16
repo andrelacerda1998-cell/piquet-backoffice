@@ -10,6 +10,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getOverviewMetrics, getDepartmentHealth } from "@/services/dashboardService";
+import { getAppPayments } from "@/services/financeService";
 import { getTasksBoard } from "@/services/extrasService";
 import { seriesComparison } from "@/lib/trends";
 import { MonthSelect } from "@/components/ui/MonthSelect";
@@ -27,6 +28,9 @@ interface Kpi {
   prevYear: number;
   fmt: KpiFmt;
   higherIsBetter?: boolean;
+  /** true = valor de integração real (sem selo); false = zerado à espera de fonte. */
+  real?: boolean;
+  tooltip?: string;
 }
 
 function fmtKpi(v: number, fmt: KpiFmt) {
@@ -42,6 +46,7 @@ export default function OverviewPage() {
   const { data: metrics, loading, error, refetch } = useAsyncData(() => getOverviewMetrics(filters), [filters]);
   const { data: departments } = useAsyncData(() => getDepartmentHealth(), []);
   const { data: board } = useAsyncData(() => getTasksBoard(), []);
+  const { data: appPay } = useAsyncData(() => getAppPayments(), []);
 
   if (loading && !metrics) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -49,18 +54,31 @@ export default function OverviewPage() {
   // Sem fallback inventado: se os departamentos vierem vazios (dados zerados
   // por falta de integração), o número honesto é 0.
   const colaboradores = (departments ?? []).reduce((a, d) => a + d.people, 0);
-  const gmv = metrics?.totalServiceValue.value ?? 0;
-  const comissao = metrics?.piquetRevenue.value ?? 0;
   const ativos = metrics?.activeTechnicians.value ?? 0;
   const aval = metrics?.averageRating.value ?? 0;
+
+  // GMV REAL = total efetivamente cobrado nos pagamentos da app (Payshop).
+  // Definição do André (2026-07-16): "os valores cobrados são o GMV do negócio".
+  // Comparações com meses reais da mesma série — nada é fabricado.
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const now = new Date();
+  const cobradoDe = (key: string) => appPay?.monthly.find((m) => m.name === key)?.cobrado ?? 0;
+  const gmv = cobradoDe(monthKey(now));
+  const gmvPrevMes = cobradoDe(monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
+  const gmvPrevAno = cobradoDe(monthKey(new Date(now.getFullYear() - 1, now.getMonth(), 1)));
+  // Comissão fixa da Piquet: 25% do valor do serviço (o técnico fica com 75%).
+  const COMISSAO = 0.25;
+
   // Mês/ano anterior derivados de séries mensais coerentes (não multiplicadores fixos).
   const mk = (label: string, Icon: Kpi["Icon"], current: number, fmt: KpiFmt, growth: number, vol = 0.05): Kpi => {
     const c = seriesComparison(current, { key: `overview:${label}`, monthlyGrowth: growth, volatility: vol });
     return { label, Icon, current, prevMonth: c.prevMonth, prevYear: c.prevYear, fmt };
   };
   const kpis: Kpi[] = metrics ? [
-    mk("GMV do mês", Euro, gmv, "currency", 0.035),
-    mk("Comissão Piquet", Percent, comissao, "currency", 0.03),
+    { label: "GMV do mês", Icon: Euro, current: gmv, prevMonth: gmvPrevMes, prevYear: gmvPrevAno, fmt: "currency", real: true,
+      tooltip: "Total cobrado nos pagamentos da app (Payshop) no mês corrente." },
+    { label: "Comissão Piquet", Icon: Percent, current: gmv * COMISSAO, prevMonth: gmvPrevMes * COMISSAO, prevYear: gmvPrevAno * COMISSAO, fmt: "currency", real: true,
+      tooltip: "25% do GMV — margem fixa em todos os serviços." },
     mk("Runway", TrendingUp, 0, "months", 0.015, 0.02), // 0 até haver tesouraria real
     mk("Colaboradores", Users, colaboradores, "number", 0.02, 0.02),
     mk("Técnicos ativos", HardHat, ativos, "number", 0.04),
@@ -89,10 +107,7 @@ export default function OverviewPage() {
         {/* 6 KPIs de topo, com comparação */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Indicadores</p>
-              <DemoBadge endpoint="/dashboard/overview" />
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Indicadores</p>
             <div className="inline-flex rounded-lg border border-surface-border bg-surface p-0.5 text-xs">
               {([["mes", "vs mês anterior"], ["ano", "vs ano anterior"]] as const).map(([id, lbl]) => (
                 <button key={id} onClick={() => setCmp(id)}
@@ -110,10 +125,11 @@ export default function OverviewPage() {
               const good = k.higherIsBetter === false ? !up : up;
               const DeltaIcon = Math.abs(delta) < 0.05 ? Minus : up ? TrendingUp : TrendingDown;
               return (
-                <div key={k.label} className="card p-4">
+                <div key={k.label} className="card p-4" title={k.tooltip}>
                   <div className="flex items-center gap-2 text-text-secondary">
                     <k.Icon className="h-4 w-4 text-piquet-600" />
                     <span className="text-xs font-medium">{k.label}</span>
+                    {!k.real && <DemoBadge endpoint="/dashboard/overview" />}
                   </div>
                   <p className="mt-2 text-2xl font-bold text-text-primary">{fmtKpi(k.current, k.fmt)}</p>
                   <div className={cn("mt-1.5 inline-flex items-center gap-1 text-xs font-medium", Math.abs(delta) < 0.05 ? "text-text-muted" : good ? "text-success" : "text-danger")}>

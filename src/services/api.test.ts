@@ -118,9 +118,9 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // (Aconteceu com /product/ratings: mostrou avaliações inventadas como
     // reais até este teste existir.)
     for (const ep of ["/marketing/campaigns", "/marketing/metrics", "/marketing/channels",
-                      "/marketing/creatives", "/finance/app-payments", "/product/growth",
-                      "/product/ratings", "/dev-tasks", "/team/messages", "/team/tasks",
-                      "/team/agenda", "/team/meetings"]) {
+                      "/marketing/creatives", "/marketing/leads", "/finance/app-payments",
+                      "/product/growth", "/product/ratings", "/dev-tasks", "/team/messages",
+                      "/team/tasks", "/team/agenda", "/team/meetings"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }
