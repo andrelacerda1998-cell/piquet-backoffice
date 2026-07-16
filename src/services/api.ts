@@ -93,6 +93,7 @@ const LIVE_EXACT = new Set<string>([
   "/dashboard/recent-services",
   // Produto — evolução de downloads (lojas) e registos reais
   "/product/growth",
+  "/product/ratings",
   // Fase 2 — Clientes
   "/customers",
   "/customers/metrics",
@@ -171,6 +172,7 @@ const REAL_DATA = new Set<string>([
   "/finance/app-payments",
   "/dev-tasks",
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
+  "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
   // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
   // o que resta foi escrito por pessoas, como o dev-tasks.
   "/team/messages",

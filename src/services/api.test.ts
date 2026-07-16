@@ -89,6 +89,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     expect(isDemoEndpoint("/marketing/metrics")).toBe(false);
     expect(isDemoEndpoint("/finance/app-payments")).toBe(false); // Payshop
     expect(isDemoEndpoint("/product/growth")).toBe(false); // downloads das lojas
+    expect(isDemoEndpoint("/product/ratings")).toBe(false); // avaliações nas lojas
     expect(isDemoEndpoint("/dev-tasks")).toBe(false); // escrito pela equipa
     expect(isDemoEndpoint("/dev-tasks/task_1")).toBe(false);
     // Equipa: seed apagado da BD a 2026-07-16 — só resta conteúdo humano.
@@ -107,6 +108,21 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/finance/summary", "/tax/obligations", "/finance/payouts"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
+    }
+  });
+
+  it("todo o endpoint REAL tem de estar migrado — senão o mock passa por real", async () => {
+    const { isDemoEndpoint, isLiveEndpoint } = await load();
+    // Invariante: REAL_DATA ⊆ LIVE_EXACT. Um endpoint marcado real mas não
+    // migrado corre o fetcher mock SEM selo e SEM zeragem — mentira perfeita.
+    // (Aconteceu com /product/ratings: mostrou avaliações inventadas como
+    // reais até este teste existir.)
+    for (const ep of ["/marketing/campaigns", "/marketing/metrics", "/marketing/channels",
+                      "/marketing/creatives", "/finance/app-payments", "/product/growth",
+                      "/product/ratings", "/dev-tasks", "/team/messages", "/team/tasks",
+                      "/team/agenda", "/team/meetings"]) {
+      expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
+      expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }
   });
 

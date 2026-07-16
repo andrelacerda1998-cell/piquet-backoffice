@@ -11,8 +11,8 @@ import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/c
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getIntegrations, getAppGrowth,
-  type Bug, type SystemLog, type Integration,
+  getAppsStatus, getBugs, getSystemLogs, getIntegrations, getAppGrowth, getStoreRatings,
+  type Bug, type SystemLog, type Integration, type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDateTime } from "@/lib/formatters";
@@ -39,6 +39,30 @@ const BUG_STATUS_LABEL: Record<Bug["status"], string> = {
   ativo: "Ativo", em_correcao: "Em correção", resolvido: "Resolvido",
 };
 
+function RatingCard({ app, store, info }: { app: string; store: string; info: StoreRatingInfo | null }) {
+  return (
+    <div className="card p-4">
+      <p className="text-sm text-text-secondary font-medium">{app}</p>
+      <p className="text-[11px] text-text-muted mb-2">{store}</p>
+      {info ? (
+        <>
+          <p className="text-2xl font-bold text-text-primary inline-flex items-center gap-1.5">
+            {info.rating.toFixed(1)}
+            <Star className="h-5 w-5 fill-piquet-500 text-piquet-500" />
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            {info.count !== null
+              ? `${info.count} ${info.count === 1 ? "avaliação" : "avaliações"}`
+              : "média oficial da consola"}
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-text-muted mt-1">Sem avaliações públicas</p>
+      )}
+    </div>
+  );
+}
+
 export default function ProdutoPage() {
   const [tab, setTab] = useState("apps");
   const { data: metrics } = useAsyncData(() => getProductMetrics(), []);
@@ -48,6 +72,7 @@ export default function ProdutoPage() {
   const { data: integrations } = useAsyncData(() => getIntegrations(), []);
   const { data: errors } = useAsyncData(() => getAppErrors(1, 10), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
+  const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
 
   // Totais e variação mês-a-mês derivados das séries de crescimento.
   const dl = growth?.downloads ?? [];
@@ -118,6 +143,19 @@ export default function ProdutoPage() {
               <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
               <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
             </div>
+
+            {/* Avaliações reais nas lojas (iTunes lookup + Google Play). */}
+            {ratings && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Avaliações nas lojas</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <RatingCard app="App Cliente" store="App Store" info={ratings.cliente.appStore} />
+                  <RatingCard app="App Cliente" store="Google Play" info={ratings.cliente.googlePlay} />
+                  <RatingCard app="App Profissional" store="App Store" info={ratings.profissional.appStore} />
+                  <RatingCard app="App Profissional" store="Google Play" info={ratings.profissional.googlePlay} />
+                </div>
+              </div>
+            )}
             <ChartCard title="Crescimento mensal de downloads" subtitle="Novas instalações em cada mês, por app">
               <BarChartComponent
                 data={dlMonthly}
@@ -148,6 +186,7 @@ export default function ProdutoPage() {
               </ChartCard>
             </div>
 
+            <DemoBadge endpoint="/product/apps" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(apps ?? []).map((a) => (
                 <div key={a.app} className="card p-5 space-y-4">

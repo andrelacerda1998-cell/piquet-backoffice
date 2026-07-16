@@ -108,6 +108,36 @@ function demoGrowth(): AppGrowth {
   } as AppGrowth;
 }
 
+/* ---------------------- Avaliações das apps nas lojas ---------------------- */
+
+export interface StoreRatingInfo {
+  rating: number;
+  count: number | null;
+  source: "loja" | "csv";
+}
+export interface AppStoreRatings {
+  appStore: StoreRatingInfo | null;
+  googlePlay: StoreRatingInfo | null;
+}
+export interface StoreRatings {
+  cliente: AppStoreRatings;
+  profissional: AppStoreRatings;
+}
+
+export async function getStoreRatings(): Promise<StoreRatings> {
+  return apiGet<StoreRatings>("/product/ratings", () => ({
+    // Mock só para o modo demo puro; em produção a rota é REAL_DATA.
+    cliente: {
+      appStore: { rating: 4.6, count: 210, source: "loja" },
+      googlePlay: { rating: 4.4, count: 512, source: "loja" },
+    },
+    profissional: {
+      appStore: { rating: 4.3, count: 64, source: "loja" },
+      googlePlay: { rating: 4.1, count: 143, source: "loja" },
+    },
+  })).then((r) => r.data);
+}
+
 export async function getAppGrowth(): Promise<AppGrowth> {
   // Sem fallback para a série demo em produção: se a ingestão das lojas
   // falhar, o gráfico fica vazio — que é a verdade — em vez de mostrar

@@ -95,3 +95,34 @@ export async function fetchAppleDownloads(date: string): Promise<{ cliente: numb
 
   return { cliente: skuCliente ? sum(skuCliente) : 0, profissional: skuPro ? sum(skuPro) : 0 };
 }
+
+/* --------------------------- Avaliações na loja --------------------------- */
+
+/** IDs públicos das apps na App Store (não são segredos — estão no URL da loja). */
+const APPLE_APP_IDS = { cliente: "6745871587", profissional: "6745837081" } as const;
+
+export interface StoreRating {
+  rating: number;
+  /** null quando a fonte não expõe a contagem (ex.: CSV do Play Console). */
+  count: number | null;
+  /** De onde veio: "loja" = o que os utilizadores veem; "csv" = média oficial. */
+  source: "loja" | "csv";
+}
+
+/**
+ * Avaliação atual na App Store portuguesa, via API pública de lookup do
+ * iTunes (sem autenticação). Devolve null se a app não tiver avaliações.
+ */
+export async function fetchAppleRating(app: keyof typeof APPLE_APP_IDS): Promise<StoreRating | null> {
+  const res = await fetch(`https://itunes.apple.com/lookup?id=${APPLE_APP_IDS[app]}&country=pt`, {
+    next: { revalidate: 3600 },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    resultCount: number;
+    results: Array<{ averageUserRating?: number; userRatingCount?: number }>;
+  };
+  const r = json.results?.[0];
+  if (!json.resultCount || typeof r?.averageUserRating !== "number") return null;
+  return { rating: r.averageUserRating, count: r.userRatingCount ?? 0, source: "loja" };
+}
