@@ -263,7 +263,7 @@ export async function getReports(): Promise<GeneratedReport[]> {
 /* ============================ CHAT DA EQUIPA ============================ */
 
 export interface ChatChannel { id: string; name: string; unread: number }
-export interface ChatMessage { id: string; threadId: string; author: string; initials: string; text: string; time: string; own?: boolean }
+export interface ChatMessage { id: string; threadId: string; author: string; initials: string; text: string; time: string; own?: boolean; imageUrl?: string }
 
 /** Colaboradores internos (equipa do backoffice) — para mensagens diretas e agenda. */
 export interface TeamMember { id: string; name: string; role: string; department: string; initials: string }

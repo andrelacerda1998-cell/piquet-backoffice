@@ -14,10 +14,11 @@ import {
 } from "@/services/extrasService";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { useTeamChatRealtime } from "@/hooks/useTeamChatRealtime";
+import { uploadChatImage } from "@/lib/uploadChatImage";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle } from "lucide-react";
+import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X } from "lucide-react";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const EVENT_TONE: Record<TeamAgendaEvent["type"], string> = {
@@ -82,6 +83,8 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
   const [msgs, setMsgs] = useState<ChatMessage[]>(base);
   const seeded = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   // Semeia com o fetch inicial (uma vez). A partir daí o estado é mantido
   // localmente e alimentado pelo realtime + envios otimistas.
@@ -130,6 +133,25 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
         setMsgs((prev) => prev.filter((m) => m.id !== tempId));
         toast("Falha ao enviar mensagem.", "error");
       });
+  };
+
+  const sendImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const tempId = `tmp_${Date.now()}`;
+    const base = { threadId: active, author: userName, initials: initialsOf(userName), time: nowHM() };
+    // Otimista com preview local enquanto o upload decorre.
+    setMsgs((prev) => [...prev, { ...base, id: tempId, text: "", imageUrl: URL.createObjectURL(file), own: true }]);
+    try {
+      const imageUrl = await uploadChatImage(file, "team");
+      const real = await sendTeamMessage({ ...base, text: "", imageUrl });
+      setMsgs((prev) => {
+        const rest = prev.filter((m) => m.id !== tempId);
+        return rest.some((m) => m.id === real.id) ? rest : [...rest, { ...real, own: true }];
+      });
+    } catch (e) {
+      setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+      toast(e instanceof Error ? e.message : "Falha ao enviar imagem.", "error");
+    }
   };
 
   const title = isDm ? member?.name : `#${activeChannel?.name}`;
@@ -185,7 +207,18 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
                   <span className="font-medium text-text-secondary">{m.author}</span>
                   <span>{m.time}</span>
                 </div>
-                <div className={cn("inline-block rounded-2xl px-3 py-2 text-sm text-text-primary", m.own ? "bg-piquet/15" : "bg-surface-subtle")}>{m.text}</div>
+                <div className={cn("inline-block rounded-2xl text-sm text-text-primary", m.own ? "bg-piquet/15" : "bg-surface-subtle", m.imageUrl && !m.text ? "p-1" : "px-3 py-2")}>
+                  {m.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.imageUrl}
+                      alt="Imagem anexada"
+                      onClick={() => setLightbox(m.imageUrl!)}
+                      className={cn("max-w-[220px] max-h-[240px] w-auto rounded-lg object-cover cursor-zoom-in", m.text && "mb-1.5")}
+                    />
+                  )}
+                  {m.text && <span className="whitespace-pre-wrap">{m.text}</span>}
+                </div>
               </div>
             </div>
           ))}
@@ -193,15 +226,38 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
         </div>
         <div className="flex items-center gap-2 p-3 border-t border-surface-border">
           <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
+          />
+          <button onClick={() => fileRef.current?.click()} className="p-2 rounded-lg text-text-muted hover:text-piquet-600 hover:bg-surface-muted transition-colors shrink-0" title="Anexar imagem">
+            <ImagePlus className="h-5 w-5" />
+          </button>
+          <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+            onPaste={(e) => {
+              const img = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
+              const f = img?.getAsFile();
+              if (f) { e.preventDefault(); sendImage(f); }
+            }}
             className="input-field"
             placeholder={isDm ? `Mensagem para ${member?.name}` : `Mensagem para #${activeChannel?.name}`}
           />
-          <button onClick={send} disabled={!text.trim()} className="btn-primary py-2 disabled:opacity-40"><Send className="h-4 w-4" /></button>
+          <button onClick={send} disabled={!text.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
         </div>
       </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+          <button className="absolute top-4 right-4 text-white/80 hover:text-white" onClick={() => setLightbox(null)} aria-label="Fechar"><X className="h-6 w-6" /></button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="Imagem em tamanho grande" className="max-w-full max-h-full rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }
