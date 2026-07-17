@@ -604,6 +604,7 @@ export async function getScripts(): Promise<MessageScript[]> {
 
 export interface TechProposal {
   id: string;
+  technicianId?: string;
   technicianName: string;
   rating: number;
   reviewsCount: number;
@@ -645,6 +646,7 @@ function makeProposals(seed: number, hours: number, category: string): TechPropo
     const hourly = 22 + ((seed + i) % 4) * 6; // 22–40€/h
     return {
       id: `prop_${seed}_${i}`,
+      technicianId: t?.id,
       technicianName: t?.name ?? `Técnico ${i + 1}`,
       rating: t?.averageRating ?? 4.6,
       reviewsCount: (t?.servicesCompleted ?? 40) % 120 + 12,
@@ -668,7 +670,10 @@ export async function getCustomRequests(): Promise<CustomRequest[]> {
     ];
     return base.map((b, i) => ({
       ...b,
-      proposals: b.estimatedHours ? makeProposals(i + 1, b.estimatedHours, b.category) : [],
+      // Só os já enviados/agendados trazem propostas; novos e em análise começam
+      // vazios, para a equipa escolher os 3 técnicos à mão.
+      proposals: (b.status === "opcoes_enviadas" || b.status === "agendado") && b.estimatedHours
+        ? makeProposals(i + 1, b.estimatedHours, b.category) : [],
     }));
   }).then((r) => r.data);
 }
