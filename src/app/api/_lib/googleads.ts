@@ -80,7 +80,9 @@ export async function fetchGoogleAdsInsights(since: string, until: string): Prom
     headers["login-customer-id"] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, "");
   }
 
-  const res = await fetch(`https://googleads.googleapis.com/v18/customers/${customer}/googleAds:search`, {
+  // v21 = versão atual em 2026-07 (a v18 já foi desligada — devolvia 404 em
+  // HTML; as versões desta API reformam-se ao fim de ~1 ano).
+  const res = await fetch(`https://googleads.googleapis.com/v21/customers/${customer}/googleAds:search`, {
     method: "POST",
     headers,
     body: JSON.stringify({ query, pageSize: 10000 }),
