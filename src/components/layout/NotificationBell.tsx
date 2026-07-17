@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar } from "lucide-react";
 import { useNotificationStore, toast } from "@/stores";
 import { getInboxTickets, CHANNEL_LABEL } from "@/services/supportInboxService";
+import { getCustomRequests } from "@/services/extrasService";
 import { useLiveNotifications } from "@/hooks/useLiveNotifications";
 import type { AppNotification } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,24 @@ export function NotificationBell() {
         if (!firstRun.current && fresh.length > 0) {
           toast(`${fresh.length} novo(s) ticket(s) de suporte`, "info");
         }
+
+        // Pedidos personalizados novos (à espera de estimativa + escolha de técnicos).
+        const reqs = await getCustomRequests();
+        if (!alive) return;
+        const novosReq = reqs.filter((r) => r.status === "novo");
+        const knownReq = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
+        const freshReq = novosReq.filter((r) => !knownReq.has(`custreq:${r.id}`));
+        freshReq.forEach((r) => addNotification({
+          kind: "ticket",
+          title: "Novo pedido personalizado",
+          body: `${r.customerName} · ${r.category} (${r.city})`,
+          href: "/servicos-personalizados",
+          dedupeKey: `custreq:${r.id}`,
+        }));
+        if (!firstRun.current && freshReq.length > 0) {
+          toast(`${freshReq.length} novo(s) pedido(s) personalizado(s)`, "info");
+        }
+
         firstRun.current = false;
       } catch {
         /* offline / erro — tenta no próximo ciclo */
