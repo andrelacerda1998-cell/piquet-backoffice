@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // `server-only` rebenta fora de RSC — no-op nos testes.
 vi.mock("server-only", () => ({}));
 
-import { mapPopTransaction, paylandsDate, paymentMethodOf, derivePaymentState } from "@/app/api/_lib/paylands";
+import { mapPopTransaction, paylandsDate, paymentMethodOf, derivePaymentState, isTestAmount } from "@/app/api/_lib/paylands";
 
 describe("mapPopTransaction (Payshop Online Payments / Paylands)", () => {
   it("mapeia uma transação real da API", () => {
@@ -78,5 +78,18 @@ describe("derivePaymentState (ciclo de vida do pagamento diferido)", () => {
     expect(derivePaymentState([{ type: "DEFERRED", status: "REFUSED" }])).toBe("recusado");
     // uma cativação recusada não conta como cativado
     expect(derivePaymentState([{ type: "DEFERRED", status: "REFUSED" }, { type: "DEFERRED", status: "REFUSED" }])).toBe("recusado");
+  });
+});
+
+describe("isTestAmount — pagamentos de teste fora do GMV", () => {
+  it("marca como teste os valores do programador (<10 €) e só esses", () => {
+    // Regra confirmada pelo André (2026-07-17): os 2–3 € na app são testes;
+    // nenhum serviço real custa menos de 10 €.
+    expect(isTestAmount(230)).toBe(true);   // 2,30 € — teste típico
+    expect(isTestAmount(652)).toBe(true);   // 6,52 € — o maior teste observado
+    expect(isTestAmount(999)).toBe(true);
+    expect(isTestAmount(1000)).toBe(false); // 10,00 € — fronteira: real
+    expect(isTestAmount(1706)).toBe(false); // 17,06 € — pagamento real de julho
+    expect(isTestAmount(492918)).toBe(false);
   });
 });

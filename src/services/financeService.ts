@@ -309,6 +309,8 @@ export interface AppPayment {
   methodKind: "cartao" | "mbway" | "referencia" | "outro";
   created: string | null;
   attempts: number;
+  /** Pagamento de teste do programador (<10 €) — fora dos KPIs e do GMV. */
+  isTest?: boolean;
 }
 
 export interface AppPaymentsData {
@@ -317,6 +319,8 @@ export interface AppPaymentsData {
     cativadoCents: number; cativadoCount: number;
     canceladoCount: number; recusadoCount: number;
     reembolsadoCents: number; avgTicketCents: number; successRate: number;
+    /** Nº de pagamentos de teste excluídos dos totais. */
+    testCount?: number;
   };
   monthly: Array<{ name: string; cobrado: number; cativado: number }>;
   byMethod: Array<{ name: string; count: number; volume: number }>;

@@ -346,9 +346,12 @@ export default function FinancePage() {
                 <p className="text-sm text-text-secondary max-w-2xl">
                   Pagamentos processados na app via Payshop Online Payments. Cada pagamento é
                   cativado na reserva e cobrado quando o serviço se confirma.
+                  {(appPay.kpis.testCount ?? 0) > 0 && (
+                    <span className="text-text-muted"> {appPay.kpis.testCount} pagamentos de teste ({"<"}10 €) estão excluídos dos totais e do GMV.</span>
+                  )}
                 </p>
                 <span className="inline-flex items-center gap-1.5 text-xs text-text-muted shrink-0">
-                  <RefreshCw className="h-3.5 w-3.5" /> Sincroniza diariamente às 06:30
+                  <RefreshCw className="h-3.5 w-3.5" /> Diário às 06:30 + webhook em tempo real
                 </span>
               </div>
 
@@ -416,7 +419,17 @@ export default function FinancePage() {
                       : <span className="text-text-muted">—</span> },
                     { key: "state", label: "Estado", render: (r: AppPayment) => {
                       const s = PAY_STATE[r.state];
-                      return <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{s.label}</span>;
+                      return (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{s.label}</span>
+                          {r.isTest && (
+                            <span title="Pagamento de teste do programador (<10 €) — fora dos totais e do GMV."
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
+                              Teste
+                            </span>
+                          )}
+                        </span>
+                      );
                     } },
                   ]}
                   data={appPay.payments}

@@ -108,6 +108,35 @@ function demoGrowth(): AppGrowth {
   } as AppGrowth;
 }
 
+/* ---------------------- Saúde das integrações (cron_runs) ---------------------- */
+
+export interface IntegrationJob {
+  id: string;
+  name: string;
+  schedule: string;
+  providers: string[];
+  lastRunAt: string | null;
+  lastRunOk: boolean | null;
+  lastDetail: string;
+  lastUpserted: number;
+  lastOkAt: string | null;
+  consecutiveFailures: number;
+}
+export interface IntegrationsStatus {
+  jobs: IntegrationJob[];
+  configured: Record<string, boolean>;
+}
+
+export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {
+  return apiGet<IntegrationsStatus>("/product/integrations-status", () => ({
+    // Mock mínimo para o modo demo puro; em produção a rota é REAL_DATA.
+    jobs: [
+      { id: "app-metrics", name: "Downloads das lojas", schedule: "diário 06:10 UTC", providers: ["App Store", "Google Play"], lastRunAt: "2026-07-16T06:10:00Z", lastRunOk: true, lastDetail: "ok", lastUpserted: 4, lastOkAt: "2026-07-16T06:10:00Z", consecutiveFailures: 0 },
+    ],
+    configured: { "App Store": true, "Google Play": true, "Meta Ads": true, "Google Ads": false, Paylands: true },
+  })).then((r) => r.data);
+}
+
 /* ---------------------- Avaliações das apps nas lojas ---------------------- */
 
 export interface StoreRatingInfo {

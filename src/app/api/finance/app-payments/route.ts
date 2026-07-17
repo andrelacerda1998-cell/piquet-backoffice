@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { paymentMethodOf, derivePaymentState, type PaymentState } from "../../_lib/paylands";
+import { paymentMethodOf, derivePaymentState, isTestAmount, type PaymentState } from "../../_lib/paylands";
 import { apiOk, withStaff } from "../../_lib/handler";
 
 /**
@@ -59,19 +59,26 @@ export const GET = withStaff(async () => {
       methodKind: method.kind,
       created,
       attempts: txs.length,
+      isTest: isTestAmount(main.amount_cents),
     };
   }).sort((a, b) => (b.created ?? "").localeCompare(a.created ?? ""));
 
-  const sumOf = (st: PaymentState) => payments.filter((p) => p.state === st).reduce((s, p) => s + p.amountCents, 0);
-  const cntOf = (st: PaymentState) => payments.filter((p) => p.state === st).length;
+  // KPIs, série mensal e métodos contam SÓ pagamentos reais; os de teste
+  // (confirmados pelo André como tráfego do programador) ficam visíveis na
+  // lista, marcados, mas fora de qualquer total — incluindo o GMV.
+  const real = payments.filter((p) => !p.isTest);
+  const testCount = payments.length - real.length;
+
+  const sumOf = (st: PaymentState) => real.filter((p) => p.state === st).reduce((s, p) => s + p.amountCents, 0);
+  const cntOf = (st: PaymentState) => real.filter((p) => p.state === st).length;
 
   const pagoCents = sumOf("pago");
   const cativadoCents = sumOf("cativado");
   const moving = cntOf("pago") + cntOf("cativado");
 
-  // Volume mensal: cobrado vs cativado.
+  // Volume mensal: cobrado vs cativado (só pagamentos reais — o cobrado é o GMV).
   const byMonth = new Map<string, { cobrado: number; cativado: number }>();
-  for (const p of payments) {
+  for (const p of real) {
     if (p.state !== "pago" && p.state !== "cativado") continue;
     const key = (p.created ?? "").slice(0, 7);
     if (!key) continue;
@@ -80,9 +87,9 @@ export const GET = withStaff(async () => {
     byMonth.set(key, m);
   }
 
-  // Repartição por método (só pagamentos onde houve dinheiro a mexer).
+  // Repartição por método (só pagamentos reais onde houve dinheiro a mexer).
   const byMethod = new Map<string, { count: number; volume: number }>();
-  for (const p of payments) {
+  for (const p of real) {
     if (p.state === "recusado") continue;
     const m = byMethod.get(p.method) ?? { count: 0, volume: 0 };
     m.count++; m.volume += p.amountCents;
@@ -97,9 +104,10 @@ export const GET = withStaff(async () => {
       cativadoCount: cntOf("cativado"),
       canceladoCount: cntOf("cancelado"),
       recusadoCount: cntOf("recusado"),
-      reembolsadoCents: payments.reduce((s, p) => s + p.refundedCents, 0),
+      reembolsadoCents: real.reduce((s, p) => s + p.refundedCents, 0),
       avgTicketCents: moving ? Math.round((pagoCents + cativadoCents) / moving) : 0,
-      successRate: payments.length ? (moving / payments.length) * 100 : 0,
+      successRate: real.length ? (moving / real.length) * 100 : 0,
+      testCount,
     },
     monthly: [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([name, v]) => ({ name, cobrado: v.cobrado / 100, cativado: v.cativado / 100 })),
@@ -108,6 +116,7 @@ export const GET = withStaff(async () => {
       id: p.id, customer: p.customer, amount: p.amountCents / 100,
       refunded: p.refundedCents / 100, state: p.state, method: p.method,
       methodKind: p.methodKind, created: p.created, attempts: p.attempts,
+      isTest: p.isTest,
     })),
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { appleConfigured, fetchAppleDownloads } from "../../_lib/appstore";
 import { googleConfigured, fetchPlayInstalls } from "../../_lib/googleplay";
+import { logCronRun } from "../../_lib/cronlog";
 
 /**
  * Cron diário (vercel.json → 06:10 UTC): ingere os downloads das lojas para
@@ -96,6 +97,13 @@ export async function GET(req: Request) {
   } else {
     skipped.push("google: env vars não configuradas (GOOGLE_SA_EMAIL/SA_PRIVATE_KEY/PLAY_BUCKET)");
   }
+
+  await logCronRun(
+    "app-metrics",
+    errors.length === 0,
+    [...errors, ...skipped].join(" | ") || "ok",
+    upserted.length,
+  );
 
   return NextResponse.json({
     ok: errors.length === 0,

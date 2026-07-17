@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
-import { paylandsConfigured, fetchPopTransactions, paylandsDate } from "../../_lib/paylands";
+import { SUPABASE_ENABLED } from "@/lib/supabase/server";
+import { paylandsConfigured, paylandsDate } from "../../_lib/paylands";
+import { syncPopTransactions } from "../../_lib/popSync";
+import { logCronRun } from "../../_lib/cronlog";
 
 /**
  * Cron diário (vercel.json → 06:30 UTC): sincroniza as transações do Payshop
@@ -33,24 +35,12 @@ export async function GET(req: Request) {
   const start = valid(qsStart) ? qsStart : paylandsDate(new Date(Date.now() - 7 * 86_400_000));
 
   try {
-    const txs = await fetchPopTransactions(start, end);
-    if (txs.length) {
-      const rows = txs.map((t) => ({
-        transaction_uuid: t.transactionUuid, order_uuid: t.orderUuid,
-        customer_ext_id: t.customerExtId, amount_cents: t.amountCents,
-        status: t.status, type: t.type, service: t.service, source_type: t.sourceType,
-        created: t.created, updated_at: t.updatedAt,
-      }));
-      const { error } = await supabaseAdmin()
-        .from("pop_transactions")
-        .upsert(rows, { onConflict: "transaction_uuid" });
-      if (error) throw new Error(error.message);
-    }
-    return NextResponse.json({ ok: true, window: `${start}→${end}`, upserted: txs.length });
+    const upserted = await syncPopTransactions(start, end);
+    await logCronRun("pop-transactions", true, `janela ${start}→${end}`, upserted);
+    return NextResponse.json({ ok: true, window: `${start}→${end}`, upserted });
   } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 500 },
-    );
+    const msg = e instanceof Error ? e.message : String(e);
+    await logCronRun("pop-transactions", false, msg);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

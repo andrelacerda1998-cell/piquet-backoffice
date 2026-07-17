@@ -108,6 +108,18 @@ export async function fetchPopTransactions(start: string, end: string): Promise<
   return out;
 }
 
+/**
+ * Pagamentos de TESTE: o André confirmou (2026-07-17) que os valores de ~2–3 €
+ * na app são testes do programador, não reservas reais — nenhum serviço Piquet
+ * custa menos de 10 €. Estes pagamentos ficam visíveis na lista (marcados),
+ * mas fora dos KPIs e do GMV.
+ */
+export const TEST_PAYMENT_MAX_CENTS = 1000;
+
+export function isTestAmount(amountCents: number): boolean {
+  return amountCents < TEST_PAYMENT_MAX_CENTS;
+}
+
 export type PaymentState = "pago" | "cativado" | "cancelado" | "reembolsado" | "recusado";
 
 /**

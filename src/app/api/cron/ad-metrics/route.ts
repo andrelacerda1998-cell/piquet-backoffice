@@ -3,6 +3,7 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { metaConfigured, fetchMetaInsights, type AdRow } from "../../_lib/metaads";
 import { googleAdsConfigured, fetchGoogleAdsInsights } from "../../_lib/googleads";
 import { aggregateCampaigns } from "../../_lib/adAggregation";
+import { logCronRun } from "../../_lib/cronlog";
 
 /**
  * Cron diário (vercel.json → 06:20 UTC): ingere o desempenho de campanhas de
@@ -84,6 +85,13 @@ export async function GET(req: Request) {
   } catch (e) {
     errors.push(`aggregate→campaigns: ${e instanceof Error ? e.message : String(e)}`);
   }
+
+  await logCronRun(
+    "ad-metrics",
+    errors.length === 0,
+    [...errors, ...skipped].join(" | ") || "ok",
+    upsertedCount,
+  );
 
   return NextResponse.json({ ok: errors.length === 0, upsertedCount, campaignsWritten, skipped, errors });
 }
