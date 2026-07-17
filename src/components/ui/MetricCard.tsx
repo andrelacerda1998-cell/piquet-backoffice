@@ -53,17 +53,23 @@ export function MetricCard({ title, metric, format = "number", className, loadin
         )}
       </div>
       <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-baseline gap-1">
-          <TrendIndicator value={metric.changePercent} trend={metric.trend} />
-          <span className="text-[10px] text-text-muted">vs mês ant.</span>
-        </span>
-        {metric.goal !== undefined && (
-          <span className="text-xs text-text-muted">
-            Meta: {format === "currency" ? formatCurrency(metric.goal) : formatNumber(metric.goal)}
-          </span>
-        )}
-      </div>
+      {/* Um zero sem história não tem tendência: esconder a seta em vez de
+          mostrar um "+0,0%" fabricado (assinatura dos dados zerados). */}
+      {(metric.value !== 0 || metric.changePercent !== 0 || metric.goal !== undefined) && (
+        <div className="flex items-center justify-between">
+          {(metric.value !== 0 || metric.changePercent !== 0) ? (
+            <span className="inline-flex items-baseline gap-1">
+              <TrendIndicator value={metric.changePercent} trend={metric.trend} />
+              <span className="text-[10px] text-text-muted">vs mês ant.</span>
+            </span>
+          ) : <span />}
+          {metric.goal !== undefined && (
+            <span className="text-xs text-text-muted">
+              Meta: {format === "currency" ? formatCurrency(metric.goal) : formatNumber(metric.goal)}
+            </span>
+          )}
+        </div>
+      )}
       {sparkData.length > 0 && (
         <div className="mt-3 h-10">
           <ResponsiveContainer width="100%" height="100%">

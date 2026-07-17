@@ -75,42 +75,37 @@ export const SERVICE_STATUS_LABELS: Record<string, string> = {
 export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
-  { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
+  { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
-  { href: "/suporte", label: "Suporte", icon: "Headphones" },
-  { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
-  { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
+  { href: "/objetivos", label: "Objetivos do ano", icon: "Target" },
+  { href: "/servicos-personalizados", label: "Pedidos personalizados", icon: "Wand2" },
+  { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
+  // Em preparação — fora do menu (sem integração de dados reais ainda), mas
+  // acessíveis por URL e por ⌘K. Voltam ao menu quando a fonte acender.
+  { href: "/suporte", label: "Suporte", icon: "Headphones" },
+  { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
-  { href: "/servicos-personalizados", label: "Pedidos personalizados", icon: "Wand2" },
   { href: "/recrutamento", label: "Recrutamento", icon: "UserPlus" },
   { href: "/impostos-rh", label: "Impostos e RH", icon: "Landmark" },
-  { href: "/definicoes", label: "Definições", icon: "Settings" },
-  // Acessíveis por URL, fora da navegação principal:
-  { href: "/produto-suporte", label: "Produto e suporte (antigo)", icon: "Headphones" },
-  { href: "/catalogo", label: "Catálogo", icon: "BookOpen" },
-  { href: "/precos", label: "Preços", icon: "Tag" },
-  { href: "/zonas", label: "Zonas", icon: "Map" },
-  { href: "/objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
-  { href: "/categorias-zonas", label: "Categorias e zonas", icon: "MapPin" },
   { href: "/relatorios", label: "Relatórios", icon: "FileText" },
 ] as const;
 
-// Estrutura de empresa: 10 departamentos sempre visíveis (+ Equipa, pedido do
-// André) e o ocasional no "Mais" recolhível — tudo continua acessível por ⌘K.
+// Simplificação 2026-07-17: o menu mostra só o que é real ou operacional hoje.
+// Objetivos e Pedidos personalizados ficam visíveis por decisão do André.
+// O resto ("Em preparação", acima) sai da vista até ter dados reais — nada é
+// apagado: URL direto e ⌘K continuam a funcionar.
 export const NAV_PRIMARY: string[] = [
-  "/", "/servicos", "/tecnicos", "/clientes", "/financeiro", "/produto",
-  "/marketing", "/suporte", "/qualidade", "/configuracao", "/chat",
+  "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
+  "/marketing", "/chat", "/desenvolvimento", "/objetivos", "/servicos-personalizados",
 ];
-export const NAV_SECONDARY: string[] = [
-  "/desenvolvimento", "/alertas", "/servicos-personalizados", "/recrutamento", "/impostos-rh", "/definicoes",
-];
+export const NAV_SECONDARY: string[] = ["/configuracao"];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
 export const MARKETING_CHANNELS = [

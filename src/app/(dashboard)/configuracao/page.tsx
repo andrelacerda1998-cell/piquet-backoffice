@@ -15,9 +15,9 @@ import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Plus, ShieldCheck, FileCheck2 } from "lucide-react";
-import CatalogPage from "../catalogo/page";
-import PricingPage from "../precos/page";
-import ZonesPage from "../zonas/page";
+import CatalogPage from "./_tabs/catalogo";
+import PricingPage from "./_tabs/precos";
+import ZonesPage from "./_tabs/zonas";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const TABS: TabDef[] = [

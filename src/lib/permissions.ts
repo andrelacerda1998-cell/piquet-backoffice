@@ -22,7 +22,6 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/impostos-rh": ["view_finance", "view_employees"],
   "/clientes": ["view_customers"],
   "/tecnicos": ["view_technicians"],
-  "/categorias-zonas": ["view_dashboard"],
   "/chat": ["view_dashboard"],
   "/desenvolvimento": ["view_dashboard"],
   "/tarefas": ["view_dashboard"],
@@ -31,17 +30,12 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/recrutamento": ["view_employees", "view_technicians"],
   "/despacho": ["view_services"],
   "/configuracao": ["view_services"],
-  "/catalogo": ["view_services"],
-  "/precos": ["view_services", "view_finance"],
-  "/zonas": ["view_dashboard"],
   "/qualidade": ["view_support"],
   "/relatorios": ["export_data"],
   "/marketing": ["view_marketing"],
   "/produto": ["view_dashboard"],
   "/suporte": ["view_support"],
-  "/produto-suporte": ["view_support"],
   "/alertas": ["view_alerts"],
-  "/definicoes": ["manage_settings"],
 };
 
 export function hasPermission(role: UserRole, permission: Permission): boolean {

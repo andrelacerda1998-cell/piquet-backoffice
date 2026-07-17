@@ -132,11 +132,15 @@ export default function OverviewPage() {
                     {!k.real && <DemoBadge endpoint="/dashboard/overview" />}
                   </div>
                   <p className="mt-2 text-2xl font-bold text-text-primary">{fmtKpi(k.current, k.fmt)}</p>
-                  <div className={cn("mt-1.5 inline-flex items-center gap-1 text-xs font-medium", Math.abs(delta) < 0.05 ? "text-text-muted" : good ? "text-success" : "text-danger")}>
-                    <DeltaIcon className="h-3.5 w-3.5" />
-                    {up ? "+" : ""}{delta.toFixed(1)}%
-                    <span className="text-text-muted font-normal">· {fmtKpi(prev, k.fmt)}</span>
-                  </div>
+                  {/* Comparações só nos KPIs reais — num zero sem fonte, a
+                      seta seria uma tendência fabricada. */}
+                  {k.real && (
+                    <div className={cn("mt-1.5 inline-flex items-center gap-1 text-xs font-medium", Math.abs(delta) < 0.05 ? "text-text-muted" : good ? "text-success" : "text-danger")}>
+                      <DeltaIcon className="h-3.5 w-3.5" />
+                      {up ? "+" : ""}{delta.toFixed(1)}%
+                      <span className="text-text-muted font-normal">· {fmtKpi(prev, k.fmt)}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
