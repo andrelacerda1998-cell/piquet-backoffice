@@ -12,6 +12,7 @@ interface MsgRow {
   author_id: string | null;
   author_name: string;
   text: string;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -69,6 +70,7 @@ export function useTeamChatRealtime(
               text: r.text,
               time: hm(r.created_at),
               own: myId != null && r.author_id === myId,
+              imageUrl: r.image_url ?? undefined,
             };
             // Dedupe por id: ignora se já a temos (ex.: veio também do POST).
             setMsgs((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));

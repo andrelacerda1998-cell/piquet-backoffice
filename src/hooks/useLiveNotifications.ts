@@ -54,11 +54,12 @@ export function useLiveNotifications() {
         .channel("live-notifications")
         // --- Chat da equipa: nova mensagem ---
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "team_messages" }, (p) => {
-          const r = p.new as { id: string; thread_id: string; author_id: string | null; author_name: string; text: string };
+          const r = p.new as { id: string; thread_id: string; author_id: string | null; author_name: string; text: string; image_url: string | null };
           if (r.author_id === myId) return;
+          const preview = r.text?.trim() || (r.image_url ? "📷 Imagem" : "");
           notify(
-            { kind: "chat", title: `Nova mensagem de ${r.author_name}`, body: `${threadLabel(r.thread_id)}: ${trim(r.text)}`, href: "/chat", dedupeKey: `msg:${r.id}` },
-            `💬 ${r.author_name}: ${trim(r.text, 50)}`
+            { kind: "chat", title: `Nova mensagem de ${r.author_name}`, body: `${threadLabel(r.thread_id)}: ${trim(preview)}`, href: "/chat", dedupeKey: `msg:${r.id}` },
+            `💬 ${r.author_name}: ${trim(preview, 50)}`
           );
         })
         // --- Dev board: tarefa criada ---
