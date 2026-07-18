@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 import { mockData, PIQUET_COMMISSION } from "@/mocks/data";
 import {
   applyFiltersToServices, getDateRangeFromPreset, getPreviousPeriodRange,
@@ -299,6 +299,23 @@ export async function getServiceById(id: string) {
     if (!service) throw new Error("Serviço não encontrado");
     return service;
   }).then((r) => r.data);
+}
+
+export interface CompletedServiceInput {
+  customerName?: string;
+  technicianName: string;
+  categoryId?: string;
+  serviceName: string;
+  city?: string;
+  amountPaid: number;
+  rating?: number;
+  completedAt?: string;
+  hasComplaint?: boolean;
+}
+
+/** Regista um serviço CONCLUÍDO à mão (histórico). Devolve o id criado. */
+export async function createCompletedService(input: CompletedServiceInput): Promise<{ id: string }> {
+  return apiPost<{ id: string }>("/services", input, () => ({ id: `srv_${Date.now()}` })).then((r) => r.data);
 }
 
 export type DepartmentStatus = "saudavel" | "atraso" | "risco";

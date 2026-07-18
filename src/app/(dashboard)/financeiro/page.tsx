@@ -30,14 +30,14 @@ import { cn } from "@/lib/utils";
 import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt } from "lucide-react";
 
 const TABS: TabDef[] = [
+  // Consolidado (2026-07-17): 8 → 5 abas. Pagamentos da app primeiro (é o
+  // único real). Tesouraria fundida no Resumo; Faturação e Reembolsos passaram
+  // a sub-abas de "Custos e faturas".
+  { id: "app-pagamentos", label: "Pagamentos da app" },
   { id: "resumo", label: "Resumo" },
   { id: "receita", label: "Receita" },
-  { id: "custos", label: "Custos" },
-  { id: "faturas", label: "Faturação" },
-  { id: "app-pagamentos", label: "Pagamentos da app" },
+  { id: "custos", label: "Custos e faturas" },
   { id: "pagamentos", label: "Pagamentos a técnicos" },
-  { id: "reembolsos", label: "Reembolsos" },
-  { id: "tesouraria", label: "Tesouraria" },
 ];
 
 function invoiceStatus(inv: Invoice): Invoice["status"] {
@@ -63,7 +63,7 @@ export default function FinancePage() {
   const filters = useFilters();
   const { page, setPage, pageSize, sortField, sortDirection, handleSort } = usePagination();
   const [cashFlowScenario, setCashFlowScenario] = useState<"conservador" | "base" | "otimista">("base");
-  const [tab, setTab] = useState("resumo");
+  const [tab, setTab] = useState("app-pagamentos");
 
   const { data: summary, loading, error, refetch } = useAsyncData(() => getFinanceSummary(filters), [filters]);
   const { data: byService } = useAsyncData(() => getFinanceByService(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined), [filters, page, pageSize, sortField, sortDirection]);
@@ -212,6 +212,46 @@ export default function FinancePage() {
                   <AreaChartComponent data={(opResult ?? []).map((d) => ({ name: d.name, value: d.value }))} currency />
                 </ChartCard>
               </div>
+
+              {/* Tesouraria (fundida no Resumo) */}
+              <div className="pt-2">
+                <h2 className="font-semibold mb-3">Tesouraria</h2>
+                {summary && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance * 0.98)} format="currency" />
+                    <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance, summary.projectedBalance * 0.95)} format="currency" />
+                    <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate * 1.05, true)} format="currency" />
+                    <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, (summary.runwayMonths ?? 0) * 0.95)} />
+                  </div>
+                )}
+                <div className="mt-4">
+                  <ChartCard
+                    title="Previsão de tesouraria — 90 dias"
+                    subtitle="Valores estimados"
+                    action={
+                      <div className="flex gap-1">
+                        {(["conservador", "base", "otimista"] as const).map((s) => (
+                          <button key={s} onClick={() => setCashFlowScenario(s)}
+                            className={`text-xs px-2 py-1 rounded ${cashFlowScenario === s ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary"}`}>
+                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    }
+                  >
+                    {cashFlow && (
+                      <>
+                        {cashFlow.negativePeriods.length > 0 && (
+                          <div className="mb-3 p-2 bg-danger-light text-danger text-sm rounded-lg">
+                            ⚠️ Saldo previsto negativo em {cashFlow.negativePeriods.length} período(s)
+                          </div>
+                        )}
+                        <CashFlowChart data={cashFlow.projectedBalance} />
+                      </>
+                    )}
+                  </ChartCard>
+                </div>
+              </div>
             </div>
           )}
 
@@ -276,6 +316,7 @@ export default function FinancePage() {
               <SubTabs
                 tabs={[
                   { id: "estrutura", label: "Estrutura" },
+                  { id: "faturas", label: "Faturas a pagar" },
                   { id: "pendentes", label: "Pagamentos pendentes" },
                   { id: "reembolsos", label: "Reembolsos" },
                 ]}
@@ -287,36 +328,60 @@ export default function FinancePage() {
                         <DonutChartComponent data={fixedVsVariable ?? []} currency centerLabel="Custos" />
                       </ChartCard>
                     )}
+                    {sub === "faturas" && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <MetricCard title="Total pendente" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) !== "paga").reduce((a, i) => a + i.amount, 0), 2000, true)} format="currency" />
+                          <MetricCard title="Vencidas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "vencida").length, 0, true)} />
+                          <MetricCard title="A vencer" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "pendente").length, 3, true)} />
+                          <MetricCard title="Pagas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "paga").length, 1)} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <h2 className="font-semibold">Faturas a pagar <DemoBadge endpoint="/finance/invoices" /></h2>
+                          <button onClick={() => setShowInvoice(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
+                        </div>
+                        <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas registadas" />
+                      </div>
+                    )}
                     {sub === "pendentes" && (
                       <ChartCard title="Pagamentos pendentes">
                         <BarChartComponent data={pendingPayments ?? []} currency />
                       </ChartCard>
                     )}
                     {sub === "reembolsos" && (
-                      <ChartCard title="Reembolsos ao longo do tempo">
-                        <LineChartComponent data={(refunds ?? []).map((d) => ({ name: d.name, value: d.value }))} currency />
-                      </ChartCard>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <MetricCard title="Pendentes" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").length, 2, true)} />
+                          <MetricCard title="Valor pendente" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").reduce((s, r) => s + r.amount, 0), 150, true)} format="currency" />
+                          <MetricCard title="Concluídos" metric={buildMetricValue(refundList.filter((r) => r.status === "concluido").length, 1)} />
+                        </div>
+                        <DataTable
+                          columns={[
+                            { key: "serviceId", label: "Serviço", render: (r: Refund) => <span className="font-mono text-xs">{r.serviceId}</span> },
+                            { key: "customerName", label: "Cliente", render: (r: Refund) => <span className="font-medium">{r.customerName}</span> },
+                            { key: "amount", label: "Valor", render: (r: Refund) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
+                            { key: "reason", label: "Motivo" },
+                            { key: "method", label: "Método" },
+                            { key: "requestedAt", label: "Pedido em", render: (r: Refund) => formatDate(r.requestedAt) },
+                            { key: "status", label: "Estado", render: (r: Refund) => (
+                              <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                                r.status === "concluido" ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
+                                {r.status === "concluido" ? "Concluído" : "Pendente"}
+                              </span>
+                            ) },
+                            { key: "acao", label: "", render: (r: Refund) => r.status === "pendente"
+                              ? <button onClick={() => completeRefund(r.id)} className="btn-primary text-xs py-1">Marcar reembolsado</button>
+                              : <span className="text-text-muted text-xs">—</span> },
+                          ]}
+                          data={refundList}
+                          keyField="id"
+                          emptyMessage="Sem reembolsos"
+                        />
+                      </div>
                     )}
                   </>
                 )}
               </SubTabs>
-            </div>
-          )}
-
-          {/* -------------------------------- FATURAÇÃO --------------------------------- */}
-          {tab === "faturas" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Total pendente" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) !== "paga").reduce((a, i) => a + i.amount, 0), 2000, true)} format="currency" />
-                <MetricCard title="Vencidas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "vencida").length, 0, true)} />
-                <MetricCard title="A vencer" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "pendente").length, 3, true)} />
-                <MetricCard title="Pagas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "paga").length, 1)} />
-              </div>
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Faturas a pagar <DemoBadge endpoint="/finance/invoices" /></h2>
-                <button onClick={() => setShowInvoice(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
-              </div>
-              <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas registadas" />
             </div>
           )}
 
@@ -437,80 +502,6 @@ export default function FinancePage() {
                   emptyMessage="Sem pagamentos — a primeira sincronização acontece no próximo ciclo"
                 />
               </div>
-            </div>
-          )}
-          {tab === "reembolsos" && (
-            <div className="space-y-4">
-              <DemoBadge endpoint="/finance/refunds" />
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <MetricCard title="Pendentes" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").length, 2, true)} />
-                <MetricCard title="Valor pendente" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").reduce((s, r) => s + r.amount, 0), 150, true)} format="currency" />
-                <MetricCard title="Concluídos" metric={buildMetricValue(refundList.filter((r) => r.status === "concluido").length, 1)} />
-              </div>
-              <DataTable
-                columns={[
-                  { key: "serviceId", label: "Serviço", render: (r: Refund) => <span className="font-mono text-xs">{r.serviceId}</span> },
-                  { key: "customerName", label: "Cliente", render: (r: Refund) => <span className="font-medium">{r.customerName}</span> },
-                  { key: "amount", label: "Valor", render: (r: Refund) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
-                  { key: "reason", label: "Motivo" },
-                  { key: "method", label: "Método" },
-                  { key: "requestedAt", label: "Pedido em", render: (r: Refund) => formatDate(r.requestedAt) },
-                  { key: "status", label: "Estado", render: (r: Refund) => (
-                    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                      r.status === "concluido" ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
-                      {r.status === "concluido" ? "Concluído" : "Pendente"}
-                    </span>
-                  ) },
-                  { key: "acao", label: "", render: (r: Refund) => r.status === "pendente"
-                    ? <button onClick={() => completeRefund(r.id)} className="btn-primary text-xs py-1">Marcar reembolsado</button>
-                    : <span className="text-text-muted text-xs">—</span> },
-                ]}
-                data={refundList}
-                keyField="id"
-                emptyMessage="Sem reembolsos"
-              />
-            </div>
-          )}
-
-          {tab === "tesouraria" && (
-            <div className="space-y-6">
-              <DemoBadge endpoint="/finance/summary" />
-              {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance * 0.98)} format="currency" />
-                  <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance, summary.projectedBalance * 0.95)} format="currency" />
-                  <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate * 1.05, true)} format="currency" />
-                  <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, (summary.runwayMonths ?? 0) * 0.95)} />
-                </div>
-              )}
-              <ChartCard
-                title="Previsão de tesouraria — 90 dias"
-                subtitle="Valores estimados"
-                action={
-                  <div className="flex gap-1">
-                    {(["conservador", "base", "otimista"] as const).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setCashFlowScenario(s)}
-                        className={`text-xs px-2 py-1 rounded ${cashFlowScenario === s ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary"}`}
-                      >
-                        {s.charAt(0).toUpperCase() + s.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                }
-              >
-                {cashFlow && (
-                  <>
-                    {cashFlow.negativePeriods.length > 0 && (
-                      <div className="mb-3 p-2 bg-danger-light text-danger text-sm rounded-lg">
-                        ⚠️ Saldo previsto negativo em {cashFlow.negativePeriods.length} período(s)
-                      </div>
-                    )}
-                    <CashFlowChart data={cashFlow.projectedBalance} />
-                  </>
-                )}
-              </ChartCard>
             </div>
           )}
         </div>

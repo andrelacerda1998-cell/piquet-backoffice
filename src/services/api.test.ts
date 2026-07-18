@@ -101,10 +101,10 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
   it("trata como DEMO o que vem da BD mas foi escrito pelo seed", async () => {
     const { isDemoEndpoint, isLiveEndpoint } = await load();
     // Estes vão ao backend real E MESMO ASSIM são ficção: as tabelas foram
-    // preenchidas de uma vez pelo seed. É a distinção que o selo existe para
-    // fazer — se alguém migrar um endpoint e assumir que passa a ser verdade,
-    // este teste falha e explica porquê.
-    for (const ep of ["/services", "/customers", "/technicians", "/employees",
+    // preenchidas de uma vez pelo seed. (/services saiu desta lista a
+    // 2026-07-17: o seed foi apagado e a tabela só tem serviços concluídos
+    // registados à mão — dados reais.)
+    for (const ep of ["/customers", "/technicians", "/employees",
                       "/finance/summary", "/tax/obligations", "/finance/payouts"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
@@ -117,10 +117,10 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // migrado corre o fetcher mock SEM selo e SEM zeragem — mentira perfeita.
     // (Aconteceu com /product/ratings: mostrou avaliações inventadas como
     // reais até este teste existir.)
-    for (const ep of ["/marketing/campaigns", "/marketing/metrics", "/marketing/channels",
-                      "/marketing/creatives", "/marketing/leads", "/finance/app-payments",
-                      "/product/growth", "/product/ratings", "/product/integrations-status",
-                      "/dev-tasks", "/team/messages",
+    for (const ep of ["/services", "/goals", "/marketing/campaigns", "/marketing/metrics",
+                      "/marketing/channels", "/marketing/creatives", "/marketing/leads",
+                      "/finance/app-payments", "/product/growth", "/product/ratings",
+                      "/product/integrations-status", "/dev-tasks", "/team/messages",
                       "/team/tasks", "/team/agenda", "/team/meetings"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);

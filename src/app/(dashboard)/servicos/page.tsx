@@ -12,7 +12,7 @@ import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { AppBookingsPanel } from "@/components/ui/AppBookingsPanel";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { getServices, getStatusDistribution, getMainFunnel } from "@/services/dashboardService";
+import { getServices, getStatusDistribution, getMainFunnel, createCompletedService } from "@/services/dashboardService";
 import { getOperationalMetrics } from "@/services/supportService";
 import { getIncidents, incidentTypeLabel, type Incident } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -44,11 +44,14 @@ export default function ServicesPage() {
   const [selectedService, setSelectedService] = useState<ServiceRequest | null>(null);
   const [tab, setTab] = useState("pedidos");
   const [showCreate, setShowCreate] = useState(false);
+  const todayStr = new Date().toISOString().slice(0, 10);
   const emptyForm = {
-    customer: "", category: DEFAULT_SETTINGS.categories[0].name, service: "",
-    city: DEFAULT_SETTINGS.locations[0].name, technician: "", scheduledAt: "", value: 80, urgency: "normal",
+    customer: "", categoryId: DEFAULT_SETTINGS.categories[0].id, service: "",
+    city: DEFAULT_SETTINGS.locations[0].name, technician: "", completedAt: todayStr,
+    amountPaid: 80, rating: "5", hasComplaint: false,
   };
   const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
 
   const [statusGroup, setStatusGroup] = useState("todos");
   const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
@@ -61,12 +64,32 @@ export default function ServicesPage() {
     { id: "desempenho", label: "Desempenho (SLA)" },
   ];
 
-  const createService = () => {
-    if (!form.customer.trim() || !form.service.trim()) { toast("Indica o cliente e o serviço.", "error"); return; }
-    setShowCreate(false);
-    toast(`Serviço "${form.service}" criado para ${form.customer}${form.technician ? ` · técnico ${form.technician}` : " · a procurar técnico"}.`);
-    setForm(emptyForm);
-    refetch();
+  const createService = async () => {
+    if (!form.service.trim()) { toast("Indica o tipo de serviço.", "error"); return; }
+    if (!form.technician.trim()) { toast("Indica o técnico que executou.", "error"); return; }
+    if (!(form.amountPaid >= 0)) { toast("Indica um valor pago válido.", "error"); return; }
+    setSaving(true);
+    try {
+      await createCompletedService({
+        customerName: form.customer.trim() || undefined,
+        technicianName: form.technician.trim(),
+        categoryId: form.categoryId,
+        serviceName: form.service.trim(),
+        city: form.city,
+        amountPaid: Number(form.amountPaid),
+        rating: Number(form.rating),
+        completedAt: form.completedAt,
+        hasComplaint: form.hasComplaint,
+      });
+      setShowCreate(false);
+      toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(Number(form.amountPaid))}.`);
+      setForm(emptyForm);
+      refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível registar.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const { data, loading, error, refetch } = useAsyncData(
@@ -110,12 +133,12 @@ export default function ServicesPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Operações <DemoBadge endpoint="/services" /></h1>
+            <h1 className="text-2xl font-bold">Operações</h1>
             <p className="text-text-secondary mt-1">Serviços, agendamentos, estados e incidentes</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
-              <Plus className="h-4 w-4" /> Novo serviço
+              <Plus className="h-4 w-4" /> Registar serviço concluído
             </button>
             <ExportButton onExport={handleExport} />
           </div>
@@ -187,6 +210,7 @@ export default function ServicesPage() {
 
         {tab === "desempenho" && opMetrics && (
           <div className="space-y-6">
+            <DemoBadge endpoint="/services/operational-metrics" />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <MetricCard title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, 32, true)} />
               <MetricCard title="Tempo encontrar técnico" metric={buildMetricValue(opMetrics.avgTechnicianFindTime, 100, true)} />
@@ -210,54 +234,64 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {/* Modal — criar serviço */}
+        {/* Modal — registar serviço concluído */}
         <Modal
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          title="Novo serviço"
-          subtitle="Cria um pedido de serviço em nome de um cliente"
+          title="Registar serviço concluído"
+          subtitle="Um trabalho já feito (ex.: marcação por telefone). Regista quem, o quê e quanto foi pago."
           size="lg"
           footer={
             <>
               <button onClick={() => setShowCreate(false)} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={createService} className="btn-primary text-sm">Criar serviço</button>
+              <button onClick={createService} disabled={saving} className="btn-primary text-sm disabled:opacity-60">
+                {saving ? "A registar…" : "Registar serviço"}
+              </button>
             </>
           }
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Cliente">
+            <Field label="Técnico que executou">
+              <input value={form.technician} onChange={(e) => setForm({ ...form, technician: e.target.value })} placeholder="Nome do técnico" className="input-field" />
+            </Field>
+            <Field label="Cliente (opcional)">
               <input value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} placeholder="Nome do cliente" className="input-field" />
+            </Field>
+            <Field label="Categoria">
+              <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="input-field">
+                {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Tipo de serviço">
+              <input value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })} placeholder="Ex.: Desentupimento" className="input-field" />
             </Field>
             <Field label="Localização">
               <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-field">
                 {DEFAULT_SETTINGS.locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
               </select>
             </Field>
-            <Field label="Categoria">
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input-field">
-                {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            <Field label="Data de conclusão">
+              <input type="date" value={form.completedAt} onChange={(e) => setForm({ ...form, completedAt: e.target.value })} className="input-field" />
+            </Field>
+            <Field label="Valor pago (€)" hint="A Piquet fica com 25% · o técnico com 75%">
+              <input type="number" min={0} value={form.amountPaid} onChange={(e) => setForm({ ...form, amountPaid: Number(e.target.value) })} className="input-field" />
+            </Field>
+            <Field label="Avaliação do técnico">
+              <select value={form.rating} onChange={(e) => setForm({ ...form, rating: e.target.value })} className="input-field">
+                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}{"☆".repeat(5 - n)} · {n}</option>)}
               </select>
             </Field>
-            <Field label="Serviço">
-              <input value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })} placeholder="Ex.: Desentupimento" className="input-field" />
-            </Field>
-            <Field label="Técnico (opcional)" hint="Deixa vazio para auto-despacho">
-              <input value={form.technician} onChange={(e) => setForm({ ...form, technician: e.target.value })} placeholder="Atribuir técnico" className="input-field" />
-            </Field>
-            <Field label="Agendamento">
-              <input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} className="input-field" />
-            </Field>
-            <Field label="Valor estimado (€)">
-              <input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: Number(e.target.value) })} className="input-field" />
-            </Field>
-            <Field label="Urgência">
-              <select value={form.urgency} onChange={(e) => setForm({ ...form, urgency: e.target.value })} className="input-field">
-                <option value="normal">Normal</option>
-                <option value="urgente">Urgente</option>
-                <option value="emergencia">Emergência</option>
-              </select>
-            </Field>
+            <label className="sm:col-span-2 flex items-center gap-2 text-sm text-text-secondary">
+              <input type="checkbox" checked={form.hasComplaint} onChange={(e) => setForm({ ...form, hasComplaint: e.target.checked })} className="rounded border-surface-border" />
+              Houve reclamação neste serviço
+            </label>
           </div>
+          {form.amountPaid > 0 && (
+            <div className="mt-4 flex items-center gap-4 text-xs bg-surface-subtle rounded-lg px-3 py-2 text-text-secondary">
+              <span>Receita Piquet: <b className="text-text-primary">{formatCurrency(Number(form.amountPaid) * 0.25)}</b></span>
+              <span>Valor do técnico: <b className="text-text-primary">{formatCurrency(Number(form.amountPaid) * 0.75)}</b></span>
+            </div>
+          )}
         </Modal>
 
         {/* Service detail drawer (com separadores) */}

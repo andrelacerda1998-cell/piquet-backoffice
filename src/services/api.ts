@@ -169,6 +169,9 @@ const LIVE_DENY = new Set<string>([
  * problema distinto do selo — ver a nota na aba "Pagamentos da app".
  */
 const REAL_DATA = new Set<string>([
+  // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
+  // registados à mão (POST /api/services) — dados reais do staff.
+  "/services",
   "/marketing/campaigns",
   "/marketing/metrics",
   "/marketing/channels",
