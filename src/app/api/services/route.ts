@@ -86,7 +86,7 @@ export const GET = withStaff(async (req) => {
 export const POST = withStaff(async (req) => {
   const b = (await req.json()) as {
     customerName?: string; technicianName?: string; categoryId?: string;
-    serviceName?: string; city?: string; amountPaid?: number;
+    serviceName?: string; city?: string; amountPaid?: number; technicianValue?: number;
     rating?: number; completedAt?: string; hasComplaint?: boolean;
   };
 
@@ -96,9 +96,17 @@ export const POST = withStaff(async (req) => {
   if (!(amount >= 0)) return apiErr("Indica um valor pago válido.", 400);
 
   const completedIso = b.completedAt ? new Date(b.completedAt).toISOString() : new Date().toISOString();
-  // O técnico fica com 75%. `piquet_revenue` é uma coluna GERADA
-  // (total − technician_value) — não se insere.
-  const technicianValue = amount * (1 - COMMISSION);
+  // Comissão: por defeito o técnico fica com 75%; se vier `technicianValue`
+  // (comissão personalizada), usa-se esse — a Piquet fica com o restante.
+  // `piquet_revenue` é coluna GERADA (total − technician_value) — não se insere.
+  let technicianValue = amount * (1 - COMMISSION);
+  if (b.technicianValue != null) {
+    const tv = Number(b.technicianValue);
+    if (!(tv >= 0 && tv <= amount)) {
+      return apiErr("O valor do técnico tem de estar entre 0 e o valor pago.", 400);
+    }
+    technicianValue = tv;
+  }
   // IVA contido no valor pago (23%).
   const vat = amount - amount / (1 + DEFAULT_TAX_CONFIG.vatRate);
   const rating = b.rating != null ? Math.min(5, Math.max(1, Number(b.rating))) : null;

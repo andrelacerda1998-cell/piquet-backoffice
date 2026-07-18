@@ -308,6 +308,8 @@ export interface CompletedServiceInput {
   serviceName: string;
   city?: string;
   amountPaid: number;
+  /** Valor do técnico (comissão personalizada). Omitir → 75% por defeito. */
+  technicianValue?: number;
   rating?: number;
   completedAt?: string;
   hasComplaint?: boolean;

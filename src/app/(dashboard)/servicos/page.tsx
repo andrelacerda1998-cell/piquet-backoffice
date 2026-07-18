@@ -48,10 +48,16 @@ export default function ServicesPage() {
   const emptyForm = {
     customer: "", categoryId: DEFAULT_SETTINGS.categories[0].id, service: "",
     city: DEFAULT_SETTINGS.locations[0].name, technician: "", completedAt: todayStr,
-    amountPaid: 80, rating: "5", hasComplaint: false,
+    amountPaid: "", commissionMode: "normal" as "normal" | "custom", technicianValue: "",
+    rating: "5", hasComplaint: false,
   };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  // Valores tolerantes a vírgula (PT) para a pré-visualização e a submissão.
+  const parseAmount = (s: string) => Number((s || "").replace(",", ".").trim());
+  const amountNum = parseAmount(form.amountPaid);
+  const techNum = form.commissionMode === "custom" ? parseAmount(form.technicianValue) : amountNum * 0.75;
+  const piquetNum = Math.max(0, amountNum - techNum);
 
   const [statusGroup, setStatusGroup] = useState("todos");
   const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
@@ -67,7 +73,10 @@ export default function ServicesPage() {
   const createService = async () => {
     if (!form.service.trim()) { toast("Indica o tipo de serviço.", "error"); return; }
     if (!form.technician.trim()) { toast("Indica o técnico que executou.", "error"); return; }
-    if (!(form.amountPaid >= 0)) { toast("Indica um valor pago válido.", "error"); return; }
+    if (!(amountNum > 0)) { toast("Indica um valor pago válido.", "error"); return; }
+    if (form.commissionMode === "custom" && !(techNum >= 0 && techNum <= amountNum)) {
+      toast("O valor do técnico tem de estar entre 0 e o valor pago.", "error"); return;
+    }
     setSaving(true);
     try {
       await createCompletedService({
@@ -76,13 +85,14 @@ export default function ServicesPage() {
         categoryId: form.categoryId,
         serviceName: form.service.trim(),
         city: form.city,
-        amountPaid: Number(form.amountPaid),
+        amountPaid: amountNum,
+        technicianValue: form.commissionMode === "custom" ? techNum : undefined,
         rating: Number(form.rating),
         completedAt: form.completedAt,
         hasComplaint: form.hasComplaint,
       });
       setShowCreate(false);
-      toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(Number(form.amountPaid))}.`);
+      toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(amountNum)}.`);
       setForm(emptyForm);
       refetch();
     } catch (e) {
@@ -273,23 +283,42 @@ export default function ServicesPage() {
             <Field label="Data de conclusão">
               <input type="date" value={form.completedAt} onChange={(e) => setForm({ ...form, completedAt: e.target.value })} className="input-field" />
             </Field>
-            <Field label="Valor pago (€)" hint="A Piquet fica com 25% · o técnico com 75%">
-              <input type="number" min={0} value={form.amountPaid} onChange={(e) => setForm({ ...form, amountPaid: Number(e.target.value) })} className="input-field" />
+            <Field label="Valor pago pelo cliente (€)">
+              <input inputMode="decimal" value={form.amountPaid} onChange={(e) => setForm({ ...form, amountPaid: e.target.value })} placeholder="Ex.: 104,55" className="input-field" />
             </Field>
             <Field label="Avaliação do técnico">
               <select value={form.rating} onChange={(e) => setForm({ ...form, rating: e.target.value })} className="input-field">
                 {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}{"☆".repeat(5 - n)} · {n}</option>)}
               </select>
             </Field>
+            <div className="sm:col-span-2">
+              <Field label="Comissão da Piquet">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setForm({ ...form, commissionMode: "normal" })}
+                    className={cn("px-3 py-1.5 rounded-lg text-sm border", form.commissionMode === "normal" ? "border-piquet bg-piquet/10 text-piquet-700 font-medium" : "border-surface-border text-text-secondary")}>
+                    Normal (25%)
+                  </button>
+                  <button type="button" onClick={() => setForm({ ...form, commissionMode: "custom" })}
+                    className={cn("px-3 py-1.5 rounded-lg text-sm border", form.commissionMode === "custom" ? "border-piquet bg-piquet/10 text-piquet-700 font-medium" : "border-surface-border text-text-secondary")}>
+                    Personalizada
+                  </button>
+                </div>
+              </Field>
+            </div>
+            {form.commissionMode === "custom" && (
+              <Field label="Valor que o técnico recebe (€)" hint="A Piquet fica com o restante">
+                <input inputMode="decimal" value={form.technicianValue} onChange={(e) => setForm({ ...form, technicianValue: e.target.value })} placeholder="Ex.: 60,00" className="input-field" />
+              </Field>
+            )}
             <label className="sm:col-span-2 flex items-center gap-2 text-sm text-text-secondary">
               <input type="checkbox" checked={form.hasComplaint} onChange={(e) => setForm({ ...form, hasComplaint: e.target.checked })} className="rounded border-surface-border" />
               Houve reclamação neste serviço
             </label>
           </div>
-          {form.amountPaid > 0 && (
+          {amountNum > 0 && (
             <div className="mt-4 flex items-center gap-4 text-xs bg-surface-subtle rounded-lg px-3 py-2 text-text-secondary">
-              <span>Receita Piquet: <b className="text-text-primary">{formatCurrency(Number(form.amountPaid) * 0.25)}</b></span>
-              <span>Valor do técnico: <b className="text-text-primary">{formatCurrency(Number(form.amountPaid) * 0.75)}</b></span>
+              <span>Receita Piquet: <b className="text-text-primary">{formatCurrency(piquetNum)}</b>{amountNum > 0 && <span className="text-text-muted"> ({Math.round((piquetNum / amountNum) * 100)}%)</span>}</span>
+              <span>Valor do técnico: <b className="text-text-primary">{formatCurrency(techNum)}</b></span>
             </div>
           )}
         </Modal>
