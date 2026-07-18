@@ -12,7 +12,7 @@ import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { AppBookingsPanel } from "@/components/ui/AppBookingsPanel";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { getServices, getStatusDistribution, getMainFunnel, createCompletedService } from "@/services/dashboardService";
+import { getServices, getStatusDistribution, getMainFunnel, createCompletedService, updateCompletedService } from "@/services/dashboardService";
 import { getOperationalMetrics } from "@/services/supportService";
 import { getIncidents, incidentTypeLabel, type Incident } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -53,6 +53,29 @@ export default function ServicesPage() {
   };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  // null = registar novo; id = editar serviço existente.
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const openEditService = (s: ServiceRequest) => {
+    const custom = s.totalCustomerValue > 0 && Math.abs(s.technicianValue - s.totalCustomerValue * 0.75) > 0.01;
+    setForm({
+      customer: s.customerName ?? "",
+      categoryId: s.categoryId || DEFAULT_SETTINGS.categories[0].id,
+      service: s.serviceName,
+      city: s.city || DEFAULT_SETTINGS.locations[0].name,
+      technician: s.technicianName ?? "",
+      completedAt: (s.completedAt ?? s.requestedAt ?? "").slice(0, 10) || todayStr,
+      amountPaid: String(s.totalCustomerValue).replace(".", ","),
+      commissionMode: custom ? "custom" : "normal",
+      technicianValue: custom ? String(s.technicianValue).replace(".", ",") : "",
+      rating: String(s.rating ?? 5),
+      hasComplaint: s.hasComplaint,
+    });
+    setEditingId(s.id);
+    setSelectedService(null);
+    setShowCreate(true);
+  };
+  const openNewService = () => { setForm(emptyForm); setEditingId(null); setShowCreate(true); };
   // Valores tolerantes a vírgula (PT) para a pré-visualização e a submissão.
   const parseAmount = (s: string) => Number((s || "").replace(",", ".").trim());
   const amountNum = parseAmount(form.amountPaid);
@@ -79,21 +102,37 @@ export default function ServicesPage() {
     }
     setSaving(true);
     try {
-      await createCompletedService({
-        customerName: form.customer.trim() || undefined,
+      // technicianValue vai SEMPRE (a Piquet fica com o resto): em modo normal
+      // é 75%, e ao editar de custom→normal isto recompõe a comissão certa.
+      const common = {
         technicianName: form.technician.trim(),
         categoryId: form.categoryId,
         serviceName: form.service.trim(),
         city: form.city,
-        amountPaid: amountNum,
-        technicianValue: form.commissionMode === "custom" ? techNum : undefined,
+        technicianValue: techNum,
         rating: Number(form.rating),
         completedAt: form.completedAt,
         hasComplaint: form.hasComplaint,
-      });
+      };
+      if (editingId) {
+        await updateCompletedService(editingId, {
+          ...common,
+          customerName: form.customer.trim(),
+          totalCustomerValue: amountNum,
+          currentTotal: amountNum,
+        });
+        toast(`Serviço atualizado · ${formatCurrency(amountNum)}.`);
+      } else {
+        await createCompletedService({
+          ...common,
+          customerName: form.customer.trim() || undefined,
+          amountPaid: amountNum,
+        });
+        toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(amountNum)}.`);
+      }
       setShowCreate(false);
-      toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(amountNum)}.`);
       setForm(emptyForm);
+      setEditingId(null);
       refetch();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível registar.", "error");
@@ -147,7 +186,7 @@ export default function ServicesPage() {
             <p className="text-text-secondary mt-1">Serviços, agendamentos, estados e incidentes</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
+            <button onClick={openNewService} className="btn-primary text-sm">
               <Plus className="h-4 w-4" /> Registar serviço concluído
             </button>
             <ExportButton onExport={handleExport} />
@@ -244,18 +283,18 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {/* Modal — registar serviço concluído */}
+        {/* Modal — registar / editar serviço concluído */}
         <Modal
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          title="Registar serviço concluído"
-          subtitle="Um trabalho já feito (ex.: marcação por telefone). Regista quem, o quê e quanto foi pago."
+          title={editingId ? "Editar serviço concluído" : "Registar serviço concluído"}
+          subtitle={editingId ? "Corrige os dados deste serviço registado." : "Um trabalho já feito (ex.: marcação por telefone). Regista quem, o quê e quanto foi pago."}
           size="lg"
           footer={
             <>
               <button onClick={() => setShowCreate(false)} className="btn-secondary text-sm">Cancelar</button>
               <button onClick={createService} disabled={saving} className="btn-primary text-sm disabled:opacity-60">
-                {saving ? "A registar…" : "Registar serviço"}
+                {saving ? (editingId ? "A guardar…" : "A registar…") : (editingId ? "Guardar alterações" : "Registar serviço")}
               </button>
             </>
           }
@@ -325,7 +364,7 @@ export default function ServicesPage() {
 
         {/* Service detail drawer (com separadores) */}
         {selectedService && (
-          <ServiceDetailDrawer service={selectedService} onClose={() => setSelectedService(null)} />
+          <ServiceDetailDrawer service={selectedService} onClose={() => setSelectedService(null)} onEdit={openEditService} />
         )}
       </div>
     </RouteGuard>

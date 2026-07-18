@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./api";
+import { apiGet, apiPost, apiPut } from "./api";
 import { mockData, PIQUET_COMMISSION } from "@/mocks/data";
 import {
   applyFiltersToServices, getDateRangeFromPreset, getPreviousPeriodRange,
@@ -318,6 +318,26 @@ export interface CompletedServiceInput {
 /** Regista um serviço CONCLUÍDO à mão (histórico). Devolve o id criado. */
 export async function createCompletedService(input: CompletedServiceInput): Promise<{ id: string }> {
   return apiPost<{ id: string }>("/services", input, () => ({ id: `srv_${Date.now()}` })).then((r) => r.data);
+}
+
+export interface ServiceEditInput {
+  customerName?: string;
+  technicianName?: string;
+  categoryId?: string;
+  serviceName?: string;
+  city?: string;
+  totalCustomerValue?: number;
+  technicianValue?: number;
+  rating?: number;
+  completedAt?: string;
+  hasComplaint?: boolean;
+  /** Total atual, para a rota validar técnico ≤ total sem outra query. */
+  currentTotal?: number;
+}
+
+/** Edita um serviço concluído (mesmos campos do registo manual). */
+export async function updateCompletedService(id: string, patch: ServiceEditInput): Promise<void> {
+  await apiPut(`/services/${id}`, patch, () => null);
 }
 
 export type DepartmentStatus = "saudavel" | "atraso" | "risco";

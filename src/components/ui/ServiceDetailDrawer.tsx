@@ -8,7 +8,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { toast } from "@/stores";
 import type { ServiceRequest } from "@/types";
-import { X, Image as ImageIcon, Star, MessageSquare, ArrowRight, CalendarClock, Ban, Undo2 } from "lucide-react";
+import { X, Image as ImageIcon, Star, MessageSquare, ArrowRight, CalendarClock, Ban, Undo2, Pencil } from "lucide-react";
 
 const TABS = [
   { id: "resumo", label: "Resumo" },
@@ -25,7 +25,7 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequest; onClose: () => void }) {
+export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: ServiceRequest; onClose: () => void; onEdit?: (s: ServiceRequest) => void }) {
   const [tab, setTab] = useState<TabId>("resumo");
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
 
@@ -42,7 +42,14 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
             </div>
             <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
           </div>
-          <div className="mt-3"><StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} /></div>
+          <div className="mt-3 flex items-center gap-2">
+            <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
+            {onEdit && (service.status === "concluido" || service.source === "manual") && (
+              <button onClick={() => onEdit(service)} className="btn-secondary text-xs py-1">
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </button>
+            )}
+          </div>
 
           {/* Ações de gestão */}
           {!["concluido", "cancelado_cliente", "cancelado_tecnico", "reembolsado"].includes(service.status) && (
