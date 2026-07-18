@@ -142,6 +142,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/payouts",
   // Pagamentos da app (Payshop Online Payments / Paylands)
   "/finance/app-payments",
+  // Objetivos do ano (métrica real + snapshots diários)
+  "/goals",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -177,6 +179,7 @@ const REAL_DATA = new Set<string>([
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
   "/product/integrations-status", // Saúde real das pipelines (cron_runs).
+  "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
   // o que resta foi escrito por pessoas, como o dev-tasks.
   "/team/messages",
@@ -233,6 +236,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return true; // mudar estado de tarefa
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
+  if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
   return false;
 }
 

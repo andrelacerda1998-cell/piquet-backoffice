@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/pop-transactions",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/metric-snapshots",
+      "schedule": "40 6 * * *"
     }
   ]
 }

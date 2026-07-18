@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
@@ -427,24 +427,51 @@ export async function getCustomServices(): Promise<CustomServiceRequest[]> {
 export interface AnnualGoal {
   id: string;
   label: string;
+  metric: string;
+  metricLabel: string;
   unit: "currency" | "number" | "percentage";
   target: number;
   current: number;
   projection: number;
+  /** Evolução diária deste ano (snapshots de `metric_snapshots`). */
+  series: Array<{ date: string; value: number }>;
 }
 
-export async function getAnnualGoals(): Promise<AnnualGoal[]> {
-  return apiGet("/annual-goals", () => {
-    const data: AnnualGoal[] = [
-      { id: "g1", label: "Receita da Piquet", unit: "currency", target: 850000, current: 512000, projection: 910000 },
-      { id: "g2", label: "Serviços concluídos", unit: "number", target: 5400, current: 3120, projection: 5300 },
-      { id: "g3", label: "Novos clientes", unit: "number", target: 1440, current: 902, projection: 1520 },
-      { id: "g4", label: "Taxa de conversão", unit: "percentage", target: 68, current: 47.6, projection: 61 },
-      { id: "g5", label: "Avaliação média", unit: "number", target: 4.5, current: 4.6, projection: 4.6 },
-      { id: "g6", label: "Técnicos ativos", unit: "number", target: 180, current: 208, projection: 240 },
-    ];
-    return data;
-  }).then((r) => r.data);
+export interface MetricOption {
+  key: string;
+  label: string;
+  unit: "currency" | "number" | "percentage";
+  real: boolean;
+}
+
+export interface GoalsData {
+  goals: AnnualGoal[];
+  metrics: MetricOption[];
+}
+
+/** Objetivos do ano com métrica real associada + catálogo de métricas. */
+export async function getGoals(): Promise<GoalsData> {
+  return apiGet<GoalsData>("/goals", () => ({
+    goals: [],
+    // Mock só para o modo demo puro; em produção a rota é REAL_DATA.
+    metrics: [
+      { key: "gmv_mes", label: "GMV do mês", unit: "currency", real: true },
+      { key: "comissao_mes", label: "Comissão Piquet (mês)", unit: "currency", real: true },
+      { key: "downloads_total", label: "Downloads totais", unit: "number", real: true },
+    ],
+  })).then((r) => r.data);
+}
+
+export async function createGoal(input: { label?: string; metric: string; target: number }): Promise<{ id: string }> {
+  return apiPost<{ id: string }>("/goals", input, () => ({ id: `goal_${Date.now()}` })).then((r) => r.data);
+}
+
+export async function updateGoal(id: string, patch: { label?: string; metric?: string; target?: number }): Promise<void> {
+  await apiPut(`/goals/${id}`, patch, () => null);
+}
+
+export async function deleteGoal(id: string): Promise<void> {
+  await apiDelete(`/goals/${id}`, () => null);
 }
 
 /* ============================ TAREFAS & EQUIPA ============================ */
