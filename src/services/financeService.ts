@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices, paginateArray, sortArray } from "@/lib/filters";
 import {
@@ -351,4 +351,62 @@ export async function getAppPayments(): Promise<AppPaymentsData> {
       { id: "demo_3", customer: "PROD_SERVER_1-0003", amount: 32.5, refunded: 0, state: "cativado", method: "MB Way", methodKind: "mbway", created: "2026-07-03T09:02:00", attempts: 1 },
     ],
   } as AppPaymentsData)).then((r) => r.data);
+}
+
+/* ==================== FATURAS DE CUSTOS (empresa) ==================== */
+
+export type CompanyInvoiceStatus = "pendente" | "parcial" | "pago";
+
+export interface CompanyInvoice {
+  id: string;
+  vendor: string;
+  description: string;
+  amount: number;
+  amountPaid: number;
+  outstanding: number;
+  issueDate: string | null;
+  dueDate: string | null;
+  status: CompanyInvoiceStatus;
+  overdue: boolean;
+  source: "manual" | "outlook";
+  emailSubject: string | null;
+  emailFrom: string | null;
+  attachmentName: string | null;
+  attachmentUrl: string | null;
+  createdAt: string;
+}
+
+export interface CompanyInvoicesData {
+  invoices: CompanyInvoice[];
+  kpis: {
+    totalOutstanding: number;
+    pendingCount: number;
+    partialCount: number;
+    overdueCount: number;
+    paidThisMonth: number;
+  };
+}
+
+/** Faturas de custos reais da empresa (manuais + Outlook), com estados. */
+export async function getCompanyInvoices(): Promise<CompanyInvoicesData> {
+  return apiGet<CompanyInvoicesData>("/finance/company-invoices", () => ({
+    invoices: [],
+    kpis: { totalOutstanding: 0, pendingCount: 0, partialCount: 0, overdueCount: 0, paidThisMonth: 0 },
+  })).then((r) => r.data);
+}
+
+export async function createCompanyInvoice(input: {
+  vendor: string; description?: string; amount: number; issueDate?: string; dueDate?: string;
+}): Promise<{ id: string }> {
+  return apiPost<{ id: string }>("/finance/company-invoices", input, () => ({ id: `inv_${Date.now()}` })).then((r) => r.data);
+}
+
+export async function updateCompanyInvoice(id: string, patch: {
+  amountPaid?: number; markPaid?: boolean; vendor?: string; description?: string; amount?: number; dueDate?: string;
+}): Promise<void> {
+  await apiPut(`/finance/company-invoices/${id}`, patch, () => null);
+}
+
+export async function deleteCompanyInvoice(id: string): Promise<void> {
+  await apiDelete(`/finance/company-invoices/${id}`, () => null);
 }

@@ -144,6 +144,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/app-payments",
   // Objetivos do ano (métrica real + snapshots diários)
   "/goals",
+  // Faturas de custos da empresa (manuais + Outlook)
+  "/finance/company-invoices",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -183,6 +185,7 @@ const REAL_DATA = new Set<string>([
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
   "/product/integrations-status", // Saúde real das pipelines (cron_runs).
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
+  "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
   // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
   // o que resta foi escrito por pessoas, como o dev-tasks.
   "/team/messages",
@@ -240,6 +243,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return true; // mudar estado de tarefa
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
   if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
+  if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
   return false;
 }
 

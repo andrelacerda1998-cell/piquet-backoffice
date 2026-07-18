@@ -117,7 +117,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // migrado corre o fetcher mock SEM selo e SEM zeragem — mentira perfeita.
     // (Aconteceu com /product/ratings: mostrou avaliações inventadas como
     // reais até este teste existir.)
-    for (const ep of ["/services", "/goals", "/marketing/campaigns", "/marketing/metrics",
+    for (const ep of ["/services", "/goals", "/finance/company-invoices",
+                      "/marketing/campaigns", "/marketing/metrics",
                       "/marketing/channels", "/marketing/creatives", "/marketing/leads",
                       "/finance/app-payments", "/product/growth", "/product/ratings",
                       "/product/integrations-status", "/dev-tasks", "/team/messages",

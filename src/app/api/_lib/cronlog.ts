@@ -11,7 +11,7 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
  */
 
 /** Nomes canónicos dos jobs (usados também pelo painel de integrações). */
-export type CronJob = "app-metrics" | "ad-metrics" | "pop-transactions" | "pop-webhook" | "metric-snapshots";
+export type CronJob = "app-metrics" | "ad-metrics" | "pop-transactions" | "pop-webhook" | "metric-snapshots" | "outlook-invoice";
 
 /**
  * Regista o resultado de uma execução. Best-effort de propósito: um falhanço

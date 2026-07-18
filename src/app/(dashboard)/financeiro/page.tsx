@@ -15,17 +15,18 @@ import {
   getFinanceSummary, getFinanceByService, getDailyRevenue,
   getRevenueByTechnician, getRevenueVsCosts, getCashFlowForecast,
   getFixedVsVariableCosts, getPendingPayments, getRefundsOverTime, getOperationalResult,
-  getTechnicianPayouts, processTechnicianPayout, getInvoices, getAppPayments,
-  type TechnicianPayout, type Invoice, type AppPayment, type PaymentState,
+  getTechnicianPayouts, processTechnicianPayout, getAppPayments,
+  getCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, deleteCompanyInvoice,
+  type TechnicianPayout, type AppPayment, type PaymentState, type CompanyInvoice,
 } from "@/services/financeService";
 import { getRevenueByCategory } from "@/services/dashboardService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
-import { toast, useDataStore } from "@/stores";
+import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { SEED_REFUNDS, type Refund } from "@/services/backofficeService";
-import { TODAY, todayISO } from "@/lib/today";
+import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
 import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt } from "lucide-react";
 
@@ -40,10 +41,6 @@ const TABS: TabDef[] = [
   { id: "pagamentos", label: "Pagamentos a técnicos" },
 ];
 
-function invoiceStatus(inv: Invoice): Invoice["status"] {
-  if (inv.status === "paga") return "paga";
-  return new Date(inv.dueDate) < TODAY ? "vencida" : "pendente";
-}
 /** Estado final de um pagamento da app (ciclo de vida do pagamento diferido). */
 const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
   pago: { label: "Pago", tone: "bg-success-light text-success" },
@@ -53,11 +50,6 @@ const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
   recusado: { label: "Recusado", tone: "bg-danger-light text-danger" },
 };
 
-const INV_TONE: Record<Invoice["status"], string> = {
-  paga: "bg-success-light text-success",
-  pendente: "bg-warning-light text-warning",
-  vencida: "bg-danger-light text-danger",
-};
 
 export default function FinancePage() {
   const filters = useFilters();
@@ -77,14 +69,12 @@ export default function FinancePage() {
   const { data: refunds } = useAsyncData(() => getRefundsOverTime(), []);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: payouts, refetch: refetchPayouts } = useAsyncData(() => getTechnicianPayouts(), []);
-  const { data: invoicesData } = useAsyncData(() => getInvoices(), []);
+  const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay } = useAsyncData(() => getAppPayments(), []);
 
   const [showInvoice, setShowInvoice] = useState(false);
-  const [invForm, setInvForm] = useState({ entity: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "2026-07-31" });
+  const [invForm, setInvForm] = useState({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
 
-  // Overlay persistido: faturas criadas e marcações de "paga" sobrevivem ao refresh.
-  const { extraInvoices, invoicePaid, addInvoice, markInvoicePaid: persistPaid } = useDataStore();
   // Reembolsos (persistidos) — marcar concluído sobrevive ao refresh.
   const [refundList, setRefundList] = usePersistentList<Refund>("reembolsos", SEED_REFUNDS);
   const completeRefund = (id: string) => {
@@ -93,50 +83,78 @@ export default function FinancePage() {
     toast(`Reembolso de ${formatCurrency(r?.amount ?? 0)} a ${r?.customerName} concluído.`);
   };
 
-  const invoices: Invoice[] = useMemo(() => {
-    const merged = [...(extraInvoices as Invoice[]), ...(invoicesData ?? [])];
-    return merged.map((i) => (invoicePaid[i.id] ? { ...i, status: "paga" as const } : i));
-  }, [invoicesData, extraInvoices, invoicePaid]);
+  const invoices = companyInv?.invoices ?? [];
+  const invKpis = companyInv?.kpis;
 
-  const markInvoicePaid = (id: string) => {
-    persistPaid(id);
-    toast("Fatura marcada como paga.");
+  const markInvoicePaid = async (inv: CompanyInvoice) => {
+    try { await updateCompanyInvoice(inv.id, { markPaid: true }); toast("Fatura marcada como paga."); refetchInvoices(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
-  const createInvoice = () => {
-    if (!invForm.entity.trim() || !invForm.amount) { toast("Indica a entidade e o valor.", "error"); return; }
-    const yr = new Date(invForm.issueDate).getFullYear();
-    const inv: Invoice = {
-      id: `inv_${Date.now()}`,
-      number: `FT ${yr}/${String(invoices.length + 143).padStart(4, "0")}`,
-      entity: invForm.entity.trim(),
-      description: invForm.description.trim() || "—",
-      amount: Number(invForm.amount),
-      issueDate: invForm.issueDate,
-      dueDate: invForm.dueDate,
-      status: "pendente",
-    };
-    addInvoice(inv);
-    setShowInvoice(false);
-    setInvForm({ entity: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "2026-07-31" });
-    toast(`Fatura ${inv.number} adicionada (vence ${inv.dueDate}).`);
+  const registerPartial = async (inv: CompanyInvoice) => {
+    const val = window.prompt(`Valor já pago desta fatura (total ${formatCurrency(inv.amount)}):`, String(inv.amountPaid || ""));
+    if (val === null) return;
+    const paid = Number(val.replace(",", "."));
+    if (!(paid >= 0)) { toast("Valor inválido.", "error"); return; }
+    try { await updateCompanyInvoice(inv.id, { amountPaid: paid }); toast("Pagamento registado."); refetchInvoices(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+  const removeInvoice = async (inv: CompanyInvoice) => {
+    try { await deleteCompanyInvoice(inv.id); toast("Fatura removida."); refetchInvoices(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+  const createInvoice = async () => {
+    if (!invForm.vendor.trim() || !(invForm.amount > 0)) { toast("Indica o fornecedor e o valor.", "error"); return; }
+    try {
+      await createCompanyInvoice({
+        vendor: invForm.vendor.trim(), description: invForm.description.trim(),
+        amount: Number(invForm.amount), issueDate: invForm.issueDate, dueDate: invForm.dueDate || undefined,
+      });
+      setShowInvoice(false);
+      setInvForm({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
+      toast("Fatura registada.");
+      refetchInvoices();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível registar.", "error");
+    }
   };
 
-  const invoiceColumns: Column<Invoice>[] = [
-    { key: "number", label: "Nº", render: (r) => <span className="font-mono text-xs">{r.number}</span> },
-    { key: "entity", label: "Entidade", sortable: true, render: (r) => <div><p className="font-medium">{r.entity}</p><p className="text-xs text-text-muted">{r.description}</p></div> },
-    { key: "amount", label: "Valor", sortable: true, render: (r) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
-    { key: "issueDate", label: "Emissão", render: (r) => formatDate(r.issueDate) },
-    { key: "dueDate", label: "Vencimento", sortable: true, render: (r) => {
-      const st = invoiceStatus(r);
-      return <span className={cn(st === "vencida" && "text-danger font-medium")}>{formatDate(r.dueDate)}</span>;
-    } },
-    { key: "status", label: "Estado", render: (r) => {
-      const st = invoiceStatus(r);
-      return <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", INV_TONE[st])}>{st}</span>;
-    } },
-    { key: "actions", label: "", render: (r) => invoiceStatus(r) !== "paga"
-      ? <button onClick={() => markInvoicePaid(r.id)} className="text-xs text-success hover:underline">Marcar paga</button>
+  const invStatusTone: Record<CompanyInvoice["status"], string> = {
+    pendente: "bg-warning-light text-warning",
+    parcial: "bg-info-light text-info",
+    pago: "bg-success-light text-success",
+  };
+  const invoiceColumns: Column<CompanyInvoice>[] = [
+    { key: "vendor", label: "Fornecedor", sortable: true, render: (r) => (
+      <div>
+        <p className="font-medium flex items-center gap-1.5">
+          {r.vendor}
+          {r.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">Outlook</span>}
+        </p>
+        <p className="text-xs text-text-muted">{r.description || "—"}</p>
+      </div>
+    ) },
+    { key: "amount", label: "Valor", sortable: true, render: (r) => (
+      <div>
+        <span className="font-semibold">{formatCurrency(r.amount)}</span>
+        {r.status === "parcial" && <p className="text-[11px] text-text-muted">Pago {formatCurrency(r.amountPaid)} · falta {formatCurrency(r.outstanding)}</p>}
+      </div>
+    ) },
+    { key: "dueDate", label: "Vencimento", sortable: true, render: (r) => r.dueDate
+      ? <span className={cn(r.overdue && "text-danger font-medium")}>{formatDate(r.dueDate)}{r.overdue && " ⚠️"}</span>
+      : <span className="text-text-muted">—</span> },
+    { key: "status", label: "Estado", render: (r) => (
+      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", invStatusTone[r.status])}>{r.status}</span>
+    ) },
+    { key: "anexo", label: "Anexo", render: (r) => r.attachmentUrl
+      ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">{r.attachmentName || "abrir"}</a>
       : <span className="text-text-muted text-xs">—</span> },
+    { key: "actions", label: "", render: (r) => (
+      <div className="flex items-center gap-2 justify-end">
+        {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
+        {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
+        <button onClick={() => removeInvoice(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      </div>
+    ) },
   ];
 
   const payoutColumns: Column<TechnicianPayout>[] = [
@@ -331,16 +349,20 @@ export default function FinancePage() {
                     {sub === "faturas" && (
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <MetricCard title="Total pendente" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) !== "paga").reduce((a, i) => a + i.amount, 0), 2000, true)} format="currency" />
-                          <MetricCard title="Vencidas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "vencida").length, 0, true)} />
-                          <MetricCard title="A vencer" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "pendente").length, 3, true)} />
-                          <MetricCard title="Pagas" metric={buildMetricValue(invoices.filter((i) => invoiceStatus(i) === "paga").length, 1)} />
+                          {/* previous = current: sem comparação fabricada (são contagens atuais). */}
+                          <MetricCard title="Por pagar (total)" metric={buildMetricValue(invKpis?.totalOutstanding ?? 0, invKpis?.totalOutstanding ?? 0)} format="currency" />
+                          <MetricCard title="Pendentes" metric={buildMetricValue(invKpis?.pendingCount ?? 0, invKpis?.pendingCount ?? 0)} />
+                          <MetricCard title="Parciais" metric={buildMetricValue(invKpis?.partialCount ?? 0, invKpis?.partialCount ?? 0)} />
+                          <MetricCard title="Vencidas" metric={buildMetricValue(invKpis?.overdueCount ?? 0, invKpis?.overdueCount ?? 0)} />
                         </div>
                         <div className="flex items-center justify-between">
-                          <h2 className="font-semibold">Faturas a pagar <DemoBadge endpoint="/finance/invoices" /></h2>
+                          <div>
+                            <h2 className="font-semibold">Faturas a pagar</h2>
+                            <p className="text-xs text-text-secondary">Manuais e recebidas por email (Outlook) · estados Pendente / Parcial / Pago</p>
+                          </div>
                           <button onClick={() => setShowInvoice(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
                         </div>
-                        <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas registadas" />
+                        <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)." />
                       </div>
                     )}
                     {sub === "pendentes" && (
@@ -519,8 +541,8 @@ export default function FinancePage() {
           }
         >
           <div className="space-y-4">
-            <Field label="Entidade / fornecedor">
-              <input value={invForm.entity} onChange={(e) => setInvForm({ ...invForm, entity: e.target.value })} placeholder="Ex.: EDP Comercial" className="input-field" />
+            <Field label="Fornecedor">
+              <input value={invForm.vendor} onChange={(e) => setInvForm({ ...invForm, vendor: e.target.value })} placeholder="Ex.: EDP Comercial" className="input-field" />
             </Field>
             <Field label="Descrição">
               <input value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} placeholder="Ex.: Eletricidade — escritório" className="input-field" />
