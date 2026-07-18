@@ -53,14 +53,15 @@ function yearBounds(now: Date) {
   return { start: start.toISOString() };
 }
 
-/** Total COBRADO (pagamentos reais, sem testes) desde `sinceIso`. */
-async function cobradoDesde(sinceIso: string): Promise<number> {
+/** Total COBRADO no Payshop (pagamentos reais, sem testes) num intervalo. */
+async function cobradoBetween(startIso: string, endIso?: string): Promise<number> {
   const admin = supabaseAdmin();
-  const { data, error } = await admin
+  let q = admin
     .from("pop_transactions")
     .select("order_uuid, amount_cents, status, type, created")
-    .gte("created", sinceIso)
-    .limit(10000);
+    .gte("created", startIso);
+  if (endIso) q = q.lt("created", endIso);
+  const { data, error } = await q.limit(10000);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Array<{ order_uuid: string; amount_cents: number; status: string; type: string }>;
 
@@ -77,6 +78,39 @@ async function cobradoDesde(sinceIso: string): Promise<number> {
     cents += amount;
   }
   return cents / 100;
+}
+
+/**
+ * Volume e comissão dos serviços CONCLUÍDOS num intervalo (registados à mão em
+ * Operações). `gmv` = valor pago pelos clientes; `piquet` = receita da Piquet
+ * (respeita a comissão personalizada de cada serviço).
+ */
+async function servicesBetween(startIso: string, endIso?: string): Promise<{ gmv: number; piquet: number }> {
+  const admin = supabaseAdmin();
+  let q = admin
+    .from("services")
+    .select("total_customer_value, piquet_revenue")
+    .eq("status", "concluido")
+    .gte("completed_at", startIso);
+  if (endIso) q = q.lt("completed_at", endIso);
+  const { data, error } = await q.limit(10000);
+  if (error) throw new Error(error.message);
+  let gmv = 0, piquet = 0;
+  for (const r of (data ?? []) as Array<{ total_customer_value: number; piquet_revenue: number }>) {
+    gmv += Number(r.total_customer_value) || 0;
+    piquet += Number(r.piquet_revenue) || 0;
+  }
+  return { gmv, piquet };
+}
+
+/**
+ * GMV e comissão REAIS de um intervalo = Payshop cobrado + serviços concluídos.
+ * O GMV do negócio soma os dois canais (app e off-app); a comissão respeita os
+ * 25% do Payshop e a comissão (normal ou personalizada) de cada serviço.
+ */
+export async function gmvForPeriod(startIso: string, endIso?: string): Promise<{ gmv: number; commission: number }> {
+  const [cobrado, svc] = await Promise.all([cobradoBetween(startIso, endIso), servicesBetween(startIso, endIso)]);
+  return { gmv: cobrado + svc.gmv, commission: cobrado * COMMISSION + svc.piquet };
 }
 
 /**
@@ -129,13 +163,13 @@ export async function computeMetric(key: string): Promise<number> {
   const now = new Date();
   switch (key) {
     case "gmv_mes":
-      return cobradoDesde(monthBounds(now).start);
+      return (await gmvForPeriod(monthBounds(now).start)).gmv;
     case "gmv_ano":
-      return cobradoDesde(yearBounds(now).start);
+      return (await gmvForPeriod(yearBounds(now).start)).gmv;
     case "comissao_mes":
-      return (await cobradoDesde(monthBounds(now).start)) * COMMISSION;
+      return (await gmvForPeriod(monthBounds(now).start)).commission;
     case "comissao_ano":
-      return (await cobradoDesde(yearBounds(now).start)) * COMMISSION;
+      return (await gmvForPeriod(yearBounds(now).start)).commission;
     case "downloads_total":
       return downloadsTotal();
     case "downloads_mes":

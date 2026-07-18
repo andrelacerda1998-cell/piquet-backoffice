@@ -142,6 +142,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/payouts",
   // Pagamentos da app (Payshop Online Payments / Paylands)
   "/finance/app-payments",
+  // GMV real (Payshop cobrado + serviços concluídos)
+  "/finance/gmv",
   // Objetivos do ano (métrica real + snapshots diários)
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)
@@ -180,6 +182,7 @@ const REAL_DATA = new Set<string>([
   "/marketing/creatives",
   "/marketing/leads", // Formulário da landing → POST /api/leads → tabela leads.
   "/finance/app-payments",
+  "/finance/gmv", // GMV real = Payshop cobrado + serviços concluídos.
   "/dev-tasks",
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).

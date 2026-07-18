@@ -15,7 +15,7 @@ import {
   getFinanceSummary, getFinanceByService, getDailyRevenue,
   getRevenueByTechnician, getRevenueVsCosts, getCashFlowForecast,
   getFixedVsVariableCosts, getPendingPayments, getRefundsOverTime, getOperationalResult,
-  getTechnicianPayouts, processTechnicianPayout, getAppPayments,
+  getTechnicianPayouts, processTechnicianPayout, getAppPayments, getFinanceGmv,
   getCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, deleteCompanyInvoice,
   type TechnicianPayout, type AppPayment, type PaymentState, type CompanyInvoice,
 } from "@/services/financeService";
@@ -71,6 +71,7 @@ export default function FinancePage() {
   const { data: payouts, refetch: refetchPayouts } = useAsyncData(() => getTechnicianPayouts(), []);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay } = useAsyncData(() => getAppPayments(), []);
+  const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
   const [showInvoice, setShowInvoice] = useState(false);
   const [invForm, setInvForm] = useState({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
@@ -204,7 +205,21 @@ export default function FinancePage() {
           {/* ---------------------------------- RESUMO ---------------------------------- */}
           {tab === "resumo" && (
             <div className="space-y-6">
-              <DemoBadge endpoint="/finance/summary" />
+              {/* GMV real (Payshop + serviços concluídos) — reflete de imediato
+                  um serviço registado em Operações. */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <MetricCard title="GMV do mês" metric={buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0)} format="currency" />
+                  <MetricCard title="Comissão Piquet" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
+                  <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" />
+                  <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
+              </div>
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue * 0.92)} format="currency" />

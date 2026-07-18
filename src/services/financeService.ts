@@ -353,6 +353,24 @@ export async function getAppPayments(): Promise<AppPaymentsData> {
   } as AppPaymentsData)).then((r) => r.data);
 }
 
+/* ==================== GMV REAL (Payshop + serviços) ==================== */
+
+export interface GmvPeriod { gmv: number; commission: number }
+export interface GmvData {
+  month: GmvPeriod;
+  prevMonth: GmvPeriod;
+  prevYearSame: GmvPeriod;
+  year: GmvPeriod;
+}
+
+/** GMV e comissão reais (Payshop cobrado + serviços concluídos), mês e ano. */
+export async function getFinanceGmv(): Promise<GmvData> {
+  const zero = { gmv: 0, commission: 0 };
+  return apiGet<GmvData>("/finance/gmv", () => ({
+    month: zero, prevMonth: zero, prevYearSame: zero, year: zero,
+  })).then((r) => r.data);
+}
+
 /* ==================== FATURAS DE CUSTOS (empresa) ==================== */
 
 export type CompanyInvoiceStatus = "pendente" | "parcial" | "pago";

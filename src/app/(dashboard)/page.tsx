@@ -10,7 +10,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getOverviewMetrics, getDepartmentHealth } from "@/services/dashboardService";
-import { getAppPayments } from "@/services/financeService";
+import { getFinanceGmv } from "@/services/financeService";
 import { getTasksBoard } from "@/services/extrasService";
 import { seriesComparison } from "@/lib/trends";
 import { MonthSelect } from "@/components/ui/MonthSelect";
@@ -46,7 +46,7 @@ export default function OverviewPage() {
   const { data: metrics, loading, error, refetch } = useAsyncData(() => getOverviewMetrics(filters), [filters]);
   const { data: departments } = useAsyncData(() => getDepartmentHealth(), []);
   const { data: board } = useAsyncData(() => getTasksBoard(), []);
-  const { data: appPay } = useAsyncData(() => getAppPayments(), []);
+  const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
   if (loading && !metrics) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -57,17 +57,16 @@ export default function OverviewPage() {
   const ativos = metrics?.activeTechnicians.value ?? 0;
   const aval = metrics?.averageRating.value ?? 0;
 
-  // GMV REAL = total efetivamente cobrado nos pagamentos da app (Payshop).
-  // Definição do André (2026-07-16): "os valores cobrados são o GMV do negócio".
-  // Comparações com meses reais da mesma série — nada é fabricado.
-  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const now = new Date();
-  const cobradoDe = (key: string) => appPay?.monthly.find((m) => m.name === key)?.cobrado ?? 0;
-  const gmv = cobradoDe(monthKey(now));
-  const gmvPrevMes = cobradoDe(monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
-  const gmvPrevAno = cobradoDe(monthKey(new Date(now.getFullYear() - 1, now.getMonth(), 1)));
-  // Comissão fixa da Piquet: 25% do valor do serviço (o técnico fica com 75%).
-  const COMISSAO = 0.25;
+  // GMV REAL = Payshop cobrado + serviços concluídos registados (dois canais).
+  // A comissão respeita os 25% do Payshop e a comissão real de cada serviço
+  // (que pode ser personalizada). Comparações com períodos reais — nada é
+  // fabricado. Fonte: /api/finance/gmv.
+  const gmv = gmvData?.month.gmv ?? 0;
+  const gmvPrevMes = gmvData?.prevMonth.gmv ?? 0;
+  const gmvPrevAno = gmvData?.prevYearSame.gmv ?? 0;
+  const comissao = gmvData?.month.commission ?? 0;
+  const comissaoPrevMes = gmvData?.prevMonth.commission ?? 0;
+  const comissaoPrevAno = gmvData?.prevYearSame.commission ?? 0;
 
   // Mês/ano anterior derivados de séries mensais coerentes (não multiplicadores fixos).
   const mk = (label: string, Icon: Kpi["Icon"], current: number, fmt: KpiFmt, growth: number, vol = 0.05): Kpi => {
@@ -76,9 +75,9 @@ export default function OverviewPage() {
   };
   const kpis: Kpi[] = metrics ? [
     { label: "GMV do mês", Icon: Euro, current: gmv, prevMonth: gmvPrevMes, prevYear: gmvPrevAno, fmt: "currency", real: true,
-      tooltip: "Total cobrado nos pagamentos da app (Payshop) no mês corrente." },
-    { label: "Comissão Piquet", Icon: Percent, current: gmv * COMISSAO, prevMonth: gmvPrevMes * COMISSAO, prevYear: gmvPrevAno * COMISSAO, fmt: "currency", real: true,
-      tooltip: "25% do GMV — margem fixa em todos os serviços." },
+      tooltip: "Volume do negócio no mês: cobrado nos pagamentos da app (Payshop) + serviços concluídos registados." },
+    { label: "Comissão Piquet", Icon: Percent, current: comissao, prevMonth: comissaoPrevMes, prevYear: comissaoPrevAno, fmt: "currency", real: true,
+      tooltip: "Receita da Piquet: 25% do cobrado da app + comissão real de cada serviço registado." },
     mk("Runway", TrendingUp, 0, "months", 0.015, 0.02), // 0 até haver tesouraria real
     mk("Colaboradores", Users, colaboradores, "number", 0.02, 0.02),
     mk("Técnicos ativos", HardHat, ativos, "number", 0.04),
