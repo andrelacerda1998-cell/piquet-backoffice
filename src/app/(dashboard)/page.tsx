@@ -6,7 +6,8 @@ import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getFinanceGmv } from "@/services/financeService";
+import { getFinanceGmv, getUnitEconomics } from "@/services/financeService";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { getGoals } from "@/services/extrasService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -23,6 +24,7 @@ function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
 
 export default function OverviewPage() {
   const { data: gmvData, loading, error, refetch } = useAsyncData(() => getFinanceGmv(), []);
+  const { data: unit } = useAsyncData(() => getUnitEconomics(), []);
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
@@ -85,6 +87,24 @@ export default function OverviewPage() {
               metric={buildMetricValue(clienteTotal, clientePrev, false, undefined, "Instalações da app cliente (App Store + Google Play); variação vs. mês anterior.")} />
             <MetricCard title="Avaliação nas lojas"
               metric={buildMetricValue(storeRating, storeRating, false, undefined, "Média da app cliente (App Store + Google Play).")} />
+          </div>
+        </div>
+
+        {/* ---------- Unit economics (LTV · CAC) ---------- */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Unit economics</p>
+            <DemoBadge endpoint="/finance/unit-economics" />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <MetricCard title="LTV" format="currency"
+              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Receita média da Piquet por cliente. Requer clientes reais (backend de reservas).")} />
+            <MetricCard title="CAC" format="currency"
+              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, false, undefined, "Custo de aquisição por cliente = investimento em anúncios ÷ novos clientes. Requer clientes reais.")} />
+            <MetricCard title="Rácio LTV/CAC"
+              metric={buildMetricValue(unit && unit.cac > 0 ? unit.ltv / unit.cac : 0, 0, false, undefined, "Saudável acima de 3×.")} />
+            <MetricCard title="Investimento (mês)" format="currency"
+              metric={buildMetricValue(unit?.adSpendMonth ?? 0, unit?.adSpendMonth ?? 0, true, undefined, "Investimento real em anúncios este mês (Meta + Google).")} />
           </div>
         </div>
 

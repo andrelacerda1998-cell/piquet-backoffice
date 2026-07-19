@@ -144,6 +144,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/app-payments",
   // GMV real (Payshop cobrado + serviços concluídos)
   "/finance/gmv",
+  // Unit economics (LTV/CAC) — vai ao backend; 0 + selo até haver clientes reais
+  "/finance/unit-economics",
   // Objetivos do ano (métrica real + snapshots diários)
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)

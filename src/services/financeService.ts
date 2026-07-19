@@ -353,6 +353,23 @@ export async function getAppPayments(): Promise<AppPaymentsData> {
   } as AppPaymentsData)).then((r) => r.data);
 }
 
+/* ==================== UNIT ECONOMICS (LTV · CAC) ==================== */
+
+export interface UnitEconomics {
+  ltv: number;
+  cac: number;
+  adSpendMonth: number;
+  newCustomersMonth: number;
+  totalCustomers: number;
+}
+
+/** LTV e CAC reais. Ficam a 0 até haver clientes reais (backend de reservas). */
+export async function getUnitEconomics(): Promise<UnitEconomics> {
+  return apiGet<UnitEconomics>("/finance/unit-economics", () => ({
+    ltv: 0, cac: 0, adSpendMonth: 0, newCustomersMonth: 0, totalCustomers: 0,
+  })).then((r) => r.data);
+}
+
 /* ==================== GMV REAL (Payshop + serviços) ==================== */
 
 export interface GmvPeriod { gmv: number; commission: number }
