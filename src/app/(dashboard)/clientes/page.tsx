@@ -56,10 +56,8 @@ export default function CustomersPage() {
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
-    { id: "segmentos", label: "Segmentos" },
-    { id: "reclamacoes", label: "Reclamações", count: openComplaints },
-    { id: "bloqueados", label: "Bloqueados", count: blocked.length },
     { id: "lista", label: "Lista" },
+    { id: "reclamacoes", label: "Reclamações", count: openComplaints },
     { id: "app", label: "Clientes da app" },
   ];
 
@@ -115,47 +113,49 @@ export default function CustomersPage() {
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "visao" && (
-          <div className="space-y-6">
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 20)} />
-                <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers - 5)} />
-                <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active - 10)} />
-                <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring - 8)} />
-                <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate - 2)} format="percent" />
-                <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV * 0.95)} format="currency" />
-              </div>
-            )}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Novos vs recorrentes">
-                <BarChartComponent
-                  data={(trend ?? []).map((d) => ({ name: d.name, novos: d.novos as number, recorrentes: d.recorrentes as number }))}
-                  bars={[{ key: "novos", color: "#FAB347", name: "Novos" }, { key: "recorrentes", color: "#1C1A17", name: "Recorrentes" }]}
-                />
-              </ChartCard>
-              <ChartCard title="Retenção por coorte"><BarChartComponent data={retention ?? []} /></ChartCard>
-            </div>
-          </div>
-        )}
-
-        {tab === "segmentos" && (
-          <SubTabs
-            tabs={[
-              { id: "origem", label: "Por origem" },
-              { id: "localizacao", label: "Por localização" },
-            ]}
-          >
+          <SubTabs tabs={[
+            { id: "resumo", label: "Resumo" },
+            { id: "origem", label: "Por origem" },
+            { id: "localizacao", label: "Por localização" },
+          ]}>
             {(sub) => (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {sub === "origem" && <>
-                  <ChartCard title="Clientes por origem"><BarChartComponent data={bySource ?? []} /></ChartCard>
-                  <ChartCard title="Distribuição por origem"><DonutChartComponent data={bySource ?? []} centerLabel="Clientes" /></ChartCard>
-                </>}
-                {sub === "localizacao" && <>
-                  <ChartCard title="Clientes por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                  <ChartCard title="Distribuição por localização"><DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" /></ChartCard>
-                </>}
-              </div>
+              <>
+                {sub === "resumo" && (
+                  <div className="space-y-6">
+                    {metrics && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 20)} />
+                        <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers - 5)} />
+                        <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active - 10)} />
+                        <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring - 8)} />
+                        <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate - 2)} format="percent" />
+                        <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV * 0.95)} format="currency" />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Novos vs recorrentes">
+                        <BarChartComponent
+                          data={(trend ?? []).map((d) => ({ name: d.name, novos: d.novos as number, recorrentes: d.recorrentes as number }))}
+                          bars={[{ key: "novos", color: "#FAB347", name: "Novos" }, { key: "recorrentes", color: "#1C1A17", name: "Recorrentes" }]}
+                        />
+                      </ChartCard>
+                      <ChartCard title="Retenção por coorte"><BarChartComponent data={retention ?? []} /></ChartCard>
+                    </div>
+                  </div>
+                )}
+                {sub === "origem" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <ChartCard title="Clientes por origem"><BarChartComponent data={bySource ?? []} /></ChartCard>
+                    <ChartCard title="Distribuição por origem"><DonutChartComponent data={bySource ?? []} centerLabel="Clientes" /></ChartCard>
+                  </div>
+                )}
+                {sub === "localizacao" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <ChartCard title="Clientes por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                    <ChartCard title="Distribuição por localização"><DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" /></ChartCard>
+                  </div>
+                )}
+              </>
             )}
           </SubTabs>
         )}
@@ -172,30 +172,40 @@ export default function CustomersPage() {
           </div>
         )}
 
-        {tab === "bloqueados" && (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">Clientes sem acesso à app até reativação. Bloqueia a partir da Lista.</p>
-            <DataTable
-              columns={[
-                { key: "name", label: "Cliente", render: (r: BlockedCustomer) => <span className="font-medium">{r.name}</span> },
-                { key: "email", label: "Email" },
-                { key: "reason", label: "Motivo" },
-                { key: "at", label: "Bloqueado em" },
-                { key: "acao", label: "", render: (r: BlockedCustomer) => <button onClick={() => unblockCustomer(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
-              ]}
-              data={blocked}
-              keyField="id"
-              emptyMessage="Sem clientes bloqueados 🎉"
-            />
-          </div>
-        )}
-
         {tab === "lista" && (
-          <div className="space-y-4">
-            <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
-            <DataTable columns={columns} data={customers?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
-            {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
-          </div>
+          <SubTabs tabs={[
+            { id: "todos", label: "Todos" },
+            { id: "bloqueados", label: "Bloqueados", count: blocked.length },
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "todos" && (
+                  <div className="space-y-4">
+                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
+                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
+                    {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
+                  </div>
+                )}
+                {sub === "bloqueados" && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-text-secondary">Clientes sem acesso à app até reativação.</p>
+                    <DataTable
+                      columns={[
+                        { key: "name", label: "Cliente", render: (r: BlockedCustomer) => <span className="font-medium">{r.name}</span> },
+                        { key: "email", label: "Email" },
+                        { key: "reason", label: "Motivo" },
+                        { key: "at", label: "Bloqueado em" },
+                        { key: "acao", label: "", render: (r: BlockedCustomer) => <button onClick={() => unblockCustomer(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
+                      ]}
+                      data={blocked}
+                      keyField="id"
+                      emptyMessage="Sem clientes bloqueados 🎉"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </SubTabs>
         )}
 
         {tab === "app" && <AppCustomersPanel />}

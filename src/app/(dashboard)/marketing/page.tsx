@@ -109,11 +109,8 @@ export default function MarketingPage() {
   const TABS: TabDef[] = [
     { id: "desempenho", label: "Desempenho" },
     { id: "campanhas", label: "Campanhas", count: campaigns?.length },
-    { id: "push", label: "Push" },
-    { id: "codigos", label: "Códigos de desconto" },
-    { id: "criativos", label: "Criativos", count: creatives?.length },
+    { id: "comunicacao", label: "Comunicação" },
     { id: "crm", label: "CRM & Leads", count: leads?.length },
-    { id: "guioes", label: "Guiões e mensagens" },
   ];
 
   return (
@@ -201,26 +198,63 @@ export default function MarketingPage() {
         )}
 
         {tab === "campanhas" && (
-          <div className="space-y-3">
-            {/* Legenda dos critérios de classificação (baseados no ROAS). */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <span className="font-medium">Classificação por retorno (ROAS):</span>
-              {(["excelente", "bom", "media", "ma", "sem_dados"] as CampaignRating[]).map((k) => (
-                <span key={k} className="inline-flex items-center gap-1.5">
-                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full font-medium", RATING[k].tone)}>{RATING[k].label}</span>
-                  <span className="text-text-muted">{RATING[k].hint}</span>
-                </span>
-              ))}
-            </div>
-            <DataTable columns={campaignColumns} data={campaigns ?? []} keyField="id" />
-          </div>
+          <SubTabs tabs={[{ id: "campanhas", label: "Campanhas" }, { id: "criativos", label: "Criativos" }]}>
+            {(sub) => (
+              <>
+                {sub === "campanhas" && (
+                  <div className="space-y-3">
+                    {/* Legenda dos critérios de classificação (baseados no ROAS). */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+                      <span className="font-medium">Classificação por retorno (ROAS):</span>
+                      {(["excelente", "bom", "media", "ma", "sem_dados"] as CampaignRating[]).map((k) => (
+                        <span key={k} className="inline-flex items-center gap-1.5">
+                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full font-medium", RATING[k].tone)}>{RATING[k].label}</span>
+                          <span className="text-text-muted">{RATING[k].hint}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <DataTable columns={campaignColumns} data={campaigns ?? []} keyField="id" />
+                  </div>
+                )}
+                {sub === "criativos" && (
+                  <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
+                )}
+              </>
+            )}
+          </SubTabs>
         )}
 
-        {tab === "push" && <PushTab />}
-        {tab === "codigos" && <CodigosTab />}
-
-        {tab === "criativos" && (
-          <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
+        {tab === "comunicacao" && (
+          <SubTabs tabs={[
+            { id: "push", label: "Push" },
+            { id: "codigos", label: "Códigos de desconto" },
+            { id: "guioes", label: "Guiões e mensagens" },
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "push" && <PushTab />}
+                {sub === "codigos" && <CodigosTab />}
+                {sub === "guioes" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(scripts ?? []).map((s) => (
+                      <div key={s.id} className="card p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-text-primary">{s.title}</p>
+                            <p className="text-xs text-text-secondary">{s.purpose}</p>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-piquet/15 text-piquet-700">
+                            <MessageSquare className="h-3 w-3" />{s.channel}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{s.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </SubTabs>
         )}
 
         {tab === "crm" && (
@@ -237,24 +271,6 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {tab === "guioes" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(scripts ?? []).map((s) => (
-              <div key={s.id} className="card p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-text-primary">{s.title}</p>
-                    <p className="text-xs text-text-secondary">{s.purpose}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-piquet/15 text-piquet-700">
-                    <MessageSquare className="h-3 w-3" />{s.channel}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{s.content}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </RouteGuard>
   );

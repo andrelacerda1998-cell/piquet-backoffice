@@ -7,7 +7,7 @@ import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
 import { AppTechniciansPanel } from "@/components/ui/AppTechniciansPanel";
-import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -57,10 +57,8 @@ export default function TechniciansPage() {
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
-    { id: "aprovacoes", label: "Aprovações e KYC", count: pending.length },
-    { id: "performance", label: "Performance" },
-    { id: "suspensoes", label: "Suspensões", count: suspensions.length + (suspendedBase?.data.length ?? 0) },
     { id: "lista", label: "Lista" },
+    { id: "aprovacoes", label: "Aprovações e KYC", count: pending.length },
     { id: "app", label: "Técnicos da app" },
   ];
 
@@ -115,29 +113,57 @@ export default function TechniciansPage() {
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "visao" && (
-          <div className="space-y-6">
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 5)} />
-                <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
-                <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active - 2)} />
-                <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices + 1, true)} />
-                <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate - 0.5)} format="percent" />
-                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
-              </div>
+          <SubTabs tabs={[{ id: "resumo", label: "Resumo" }, { id: "performance", label: "Performance" }]}>
+            {(sub) => (
+              <>
+                {sub === "resumo" && (
+                  <div className="space-y-6">
+                    {metrics && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 5)} />
+                        <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
+                        <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active - 2)} />
+                        <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices + 1, true)} />
+                        <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate - 0.5)} format="percent" />
+                        <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Técnicos por categoria"><BarChartComponent data={byCategory ?? []} /></ChartCard>
+                      <ChartCard title="Técnicos por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                    </div>
+                    <ChartCard title="Procura vs oferta por zona" subtitle="Rácio de cobertura por localização">
+                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
+                    </ChartCard>
+                    <div>
+                      <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
+                      <DataTable columns={topColumns} data={topTechs ?? []} keyField="id" />
+                    </div>
+                  </div>
+                )}
+                {sub === "performance" && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-text-secondary">Desempenho dos técnicos com serviços concluídos — aceitação, cancelamento, avaliação e receita gerada.</p>
+                    <DataTable
+                      columns={[
+                        { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
+                        { key: "city", label: "Zona" },
+                        { key: "servicesCompleted", label: "Serviços", sortable: true },
+                        { key: "acceptanceRate", label: "Taxa aceitação", render: (r: Technician) => <span className={cn(r.acceptanceRate < 70 && "text-warning font-medium")}>{formatPercent(r.acceptanceRate)}</span> },
+                        { key: "cancellationRate", label: "Cancelamento", render: (r: Technician) => <span className={cn(r.cancellationRate > 10 && "text-danger font-medium")}>{formatPercent(r.cancellationRate)}</span> },
+                        { key: "averageRating", label: "Avaliação", render: (r: Technician) => <span className={cn(r.averageRating < 4 && r.averageRating > 0 && "text-warning font-medium")}>{r.averageRating > 0 ? `${r.averageRating}★` : "—"}</span> },
+                        { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r: Technician) => formatCurrency(r.piquetRevenue) },
+                        { key: "amountReceived", label: "Recebido", render: (r: Technician) => formatCurrency(r.amountReceived) },
+                      ]}
+                      data={topTechs ?? []}
+                      keyField="id"
+                      onRowClick={setSelected}
+                    />
+                  </div>
+                )}
+              </>
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Técnicos por categoria"><BarChartComponent data={byCategory ?? []} /></ChartCard>
-              <ChartCard title="Técnicos por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-            </div>
-            <ChartCard title="Procura vs oferta por zona" subtitle="Rácio de cobertura por localização">
-              <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-            </ChartCard>
-            <div>
-              <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
-              <DataTable columns={topColumns} data={topTechs ?? []} keyField="id" />
-            </div>
-          </div>
+          </SubTabs>
         )}
 
         {tab === "aprovacoes" && (
@@ -179,71 +205,60 @@ export default function TechniciansPage() {
           </div>
         )}
 
-        {tab === "performance" && (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">Desempenho dos técnicos com serviços concluídos — aceitação, cancelamento, avaliação e receita gerada.</p>
-            <DataTable
-              columns={[
-                { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                { key: "city", label: "Zona" },
-                { key: "servicesCompleted", label: "Serviços", sortable: true },
-                { key: "acceptanceRate", label: "Taxa aceitação", render: (r: Technician) => <span className={cn(r.acceptanceRate < 70 && "text-warning font-medium")}>{formatPercent(r.acceptanceRate)}</span> },
-                { key: "cancellationRate", label: "Cancelamento", render: (r: Technician) => <span className={cn(r.cancellationRate > 10 && "text-danger font-medium")}>{formatPercent(r.cancellationRate)}</span> },
-                { key: "averageRating", label: "Avaliação", render: (r: Technician) => <span className={cn(r.averageRating < 4 && r.averageRating > 0 && "text-warning font-medium")}>{r.averageRating > 0 ? `${r.averageRating}★` : "—"}</span> },
-                { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r: Technician) => formatCurrency(r.piquetRevenue) },
-                { key: "amountReceived", label: "Recebido", render: (r: Technician) => formatCurrency(r.amountReceived) },
-              ]}
-              data={topTechs ?? []}
-              keyField="id"
-              onRowClick={setSelected}
-            />
-          </div>
-        )}
-
-        {tab === "suspensoes" && (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">Técnicos suspensos ou bloqueados — sem acesso a novos serviços até reativação.</p>
-            {suspensions.length > 0 && (
-              <div>
-                <h2 className="font-semibold mb-2 text-sm">Suspensões manuais</h2>
-                <DataTable
-                  columns={[
-                    { key: "name", label: "Técnico", render: (r: Suspension) => <span className="font-medium">{r.name}</span> },
-                    { key: "city", label: "Zona" },
-                    { key: "reason", label: "Motivo" },
-                    { key: "at", label: "Suspenso em" },
-                    { key: "acao", label: "", render: (r: Suspension) => <button onClick={() => reactivate(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
-                  ]}
-                  data={suspensions}
-                  keyField="id"
-                />
-              </div>
-            )}
-            <div>
-              <h2 className="font-semibold mb-2 text-sm">Suspensos na base</h2>
-              <DataTable
-                columns={[
-                  { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                  { key: "city", label: "Zona" },
-                  { key: "categories", label: "Categorias", render: (r: Technician) => r.categories.slice(0, 2).join(", ") },
-                  { key: "registeredAt", label: "Registo", render: (r: Technician) => formatDate(r.registeredAt) },
-                  { key: "status", label: "Estado", render: (r: Technician) => <StatusBadge status={r.status} /> },
-                ]}
-                data={suspendedBase?.data ?? []}
-                keyField="id"
-                onRowClick={setSelected}
-                emptyMessage="Sem técnicos suspensos na base"
-              />
-            </div>
-          </div>
-        )}
-
         {tab === "lista" && (
-          <div className="space-y-4">
-            <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-            <DataTable columns={columns} data={technicians?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
-            {technicians && <Pagination page={page} totalPages={technicians.totalPages} total={technicians.total} pageSize={pageSize} onPageChange={setPage} />}
-          </div>
+          <SubTabs tabs={[
+            { id: "todos", label: "Todos" },
+            { id: "suspensoes", label: "Suspensões", count: suspensions.length + (suspendedBase?.data.length ?? 0) },
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "todos" && (
+                  <div className="space-y-4">
+                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
+                    <DataTable columns={columns} data={technicians?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
+                    {technicians && <Pagination page={page} totalPages={technicians.totalPages} total={technicians.total} pageSize={pageSize} onPageChange={setPage} />}
+                  </div>
+                )}
+                {sub === "suspensoes" && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-text-secondary">Técnicos suspensos ou bloqueados — sem acesso a novos serviços até reativação.</p>
+                    {suspensions.length > 0 && (
+                      <div>
+                        <h2 className="font-semibold mb-2 text-sm">Suspensões manuais</h2>
+                        <DataTable
+                          columns={[
+                            { key: "name", label: "Técnico", render: (r: Suspension) => <span className="font-medium">{r.name}</span> },
+                            { key: "city", label: "Zona" },
+                            { key: "reason", label: "Motivo" },
+                            { key: "at", label: "Suspenso em" },
+                            { key: "acao", label: "", render: (r: Suspension) => <button onClick={() => reactivate(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
+                          ]}
+                          data={suspensions}
+                          keyField="id"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="font-semibold mb-2 text-sm">Suspensos na base</h2>
+                      <DataTable
+                        columns={[
+                          { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
+                          { key: "city", label: "Zona" },
+                          { key: "categories", label: "Categorias", render: (r: Technician) => r.categories.slice(0, 2).join(", ") },
+                          { key: "registeredAt", label: "Registo", render: (r: Technician) => formatDate(r.registeredAt) },
+                          { key: "status", label: "Estado", render: (r: Technician) => <StatusBadge status={r.status} /> },
+                        ]}
+                        data={suspendedBase?.data ?? []}
+                        keyField="id"
+                        onRowClick={setSelected}
+                        emptyMessage="Sem técnicos suspensos na base"
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </SubTabs>
         )}
 
         {tab === "app" && <AppTechniciansPanel />}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Modal, Field } from "@/components/ui/Modal";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -20,19 +20,16 @@ import PricingPage from "./_tabs/precos";
 import ZonesPage from "./_tabs/zonas";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
+// Consolidado (2026-07-19): 7 → 2 grupos. Oferta/preços de um lado,
+// administração do outro.
 const TABS: TabDef[] = [
-  { id: "catalogo", label: "Catálogo" },
-  { id: "precos", label: "Preços" },
-  { id: "zonas", label: "Zonas" },
-  { id: "taxas", label: "Taxas e comissões" },
-  { id: "documentos", label: "Documentos" },
-  { id: "admins", label: "Administradores" },
-  { id: "atividade", label: "Atividade" },
+  { id: "servicos", label: "Serviços e preços" },
+  { id: "administracao", label: "Administração" },
 ];
 
 /** Hub de configuração — oferta, taxas, documentos, admins e auditoria. */
 export default function ConfiguracaoPage() {
-  const [tab, setTab] = useState("catalogo");
+  const [tab, setTab] = useState("servicos");
   return (
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
@@ -41,13 +38,40 @@ export default function ConfiguracaoPage() {
           <p className="text-text-secondary mt-1">Catálogo, preços, zonas, taxas, documentos e administradores</p>
         </div>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
-        {tab === "catalogo" && <CatalogPage />}
-        {tab === "precos" && <PricingPage />}
-        {tab === "zonas" && <ZonesPage />}
-        {tab === "taxas" && <TaxasTab />}
-        {tab === "documentos" && <DocumentosTab />}
-        {tab === "admins" && <AdminsTab />}
-        {tab === "atividade" && <AtividadeTab />}
+
+        {tab === "servicos" && (
+          <SubTabs tabs={[
+            { id: "catalogo", label: "Catálogo" },
+            { id: "precos", label: "Preços" },
+            { id: "zonas", label: "Zonas" },
+            { id: "taxas", label: "Taxas e comissões" },
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "catalogo" && <CatalogPage />}
+                {sub === "precos" && <PricingPage />}
+                {sub === "zonas" && <ZonesPage />}
+                {sub === "taxas" && <TaxasTab />}
+              </>
+            )}
+          </SubTabs>
+        )}
+
+        {tab === "administracao" && (
+          <SubTabs tabs={[
+            { id: "documentos", label: "Documentos" },
+            { id: "admins", label: "Administradores" },
+            { id: "atividade", label: "Atividade" },
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "documentos" && <DocumentosTab />}
+                {sub === "admins" && <AdminsTab />}
+                {sub === "atividade" && <AtividadeTab />}
+              </>
+            )}
+          </SubTabs>
+        )}
       </div>
     </RouteGuard>
   );
