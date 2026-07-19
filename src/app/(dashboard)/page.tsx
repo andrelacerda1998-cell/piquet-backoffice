@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
@@ -11,90 +10,69 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getOverviewMetrics, getDepartmentHealth } from "@/services/dashboardService";
 import { getFinanceGmv } from "@/services/financeService";
-import { getTasksBoard } from "@/services/extrasService";
-import { seriesComparison } from "@/lib/trends";
+import { getTasksBoard, getGoals } from "@/services/extrasService";
+import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
+import { buildMetricValue } from "@/lib/calculations";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { daysUntil } from "@/lib/today";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { FileText, ListChecks, Euro, Percent, TrendingUp, TrendingDown, Minus, Users, HardHat, Star } from "lucide-react";
+import { FileText, ListChecks, Target, TrendingUp, ArrowRight } from "lucide-react";
 
-type KpiFmt = "currency" | "number" | "rating" | "months";
-interface Kpi {
-  label: string;
-  Icon: typeof Euro;
-  current: number;
-  prevMonth: number;
-  prevYear: number;
-  fmt: KpiFmt;
-  higherIsBetter?: boolean;
-  /** true = valor de integração real (sem selo); false = zerado à espera de fonte. */
-  real?: boolean;
-  tooltip?: string;
-}
-
-function fmtKpi(v: number, fmt: KpiFmt) {
-  if (fmt === "currency") return formatCurrency(v);
-  if (fmt === "rating") return `${v.toFixed(1)}★`;
-  if (fmt === "months") return `~${Math.round(v)} meses`;
+function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
+  if (unit === "currency") return formatCurrency(v);
+  if (unit === "percentage") return `${formatNumber(v)}%`;
   return formatNumber(v);
 }
 
 export default function OverviewPage() {
   const filters = useFilters();
-  const [cmp, setCmp] = useState<"mes" | "ano">("mes");
   const { data: metrics, loading, error, refetch } = useAsyncData(() => getOverviewMetrics(filters), [filters]);
   const { data: departments } = useAsyncData(() => getDepartmentHealth(), []);
   const { data: board } = useAsyncData(() => getTasksBoard(), []);
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
+  const { data: goalsData } = useAsyncData(() => getGoals(), []);
+  const { data: growth } = useAsyncData(() => getAppGrowth(), []);
+  const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
 
   if (loading && !metrics) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
-  // Sem fallback inventado: se os departamentos vierem vazios (dados zerados
-  // por falta de integração), o número honesto é 0.
-  const colaboradores = (departments ?? []).reduce((a, d) => a + d.people, 0);
-  const ativos = metrics?.activeTechnicians.value ?? 0;
-  const aval = metrics?.averageRating.value ?? 0;
+  // --- Indicadores REAIS (Payshop cobrado + serviços; downloads; avaliações) ---
+  const gmvMonth = gmvData?.month.gmv ?? 0;
+  const gmvPrevMonth = gmvData?.prevMonth.gmv ?? 0;
+  const commissionMonth = gmvData?.month.commission ?? 0;
+  const commissionPrevMonth = gmvData?.prevMonth.commission ?? 0;
+  const gmvYear = gmvData?.year.gmv ?? 0;
+  const gmvPrevYear = gmvData?.prevYearSame.gmv ?? 0;
 
-  // GMV REAL = Payshop cobrado + serviços concluídos registados (dois canais).
-  // A comissão respeita os 25% do Payshop e a comissão real de cada serviço
-  // (que pode ser personalizada). Comparações com períodos reais — nada é
-  // fabricado. Fonte: /api/finance/gmv.
-  const gmv = gmvData?.month.gmv ?? 0;
-  const gmvPrevMes = gmvData?.prevMonth.gmv ?? 0;
-  const gmvPrevAno = gmvData?.prevYearSame.gmv ?? 0;
-  const comissao = gmvData?.month.commission ?? 0;
-  const comissaoPrevMes = gmvData?.prevMonth.commission ?? 0;
-  const comissaoPrevAno = gmvData?.prevYearSame.commission ?? 0;
+  // Downloads (acumulados por mês, das lojas): total e novos deste mês.
+  const dl = growth?.downloads ?? [];
+  const dlLast = dl[dl.length - 1];
+  const dlPrev = dl[dl.length - 2];
+  const downloadsTotal = dlLast ? dlLast.Cliente + dlLast.Profissional : 0;
+  const downloadsPrev = dlPrev ? dlPrev.Cliente + dlPrev.Profissional : downloadsTotal;
+  const downloadsMonth = Math.max(0, downloadsTotal - downloadsPrev);
 
-  // Mês/ano anterior derivados de séries mensais coerentes (não multiplicadores fixos).
-  const mk = (label: string, Icon: Kpi["Icon"], current: number, fmt: KpiFmt, growth: number, vol = 0.05): Kpi => {
-    const c = seriesComparison(current, { key: `overview:${label}`, monthlyGrowth: growth, volatility: vol });
-    return { label, Icon, current, prevMonth: c.prevMonth, prevYear: c.prevYear, fmt };
-  };
-  const kpis: Kpi[] = metrics ? [
-    { label: "GMV do mês", Icon: Euro, current: gmv, prevMonth: gmvPrevMes, prevYear: gmvPrevAno, fmt: "currency", real: true,
-      tooltip: "Volume do negócio no mês: cobrado nos pagamentos da app (Payshop) + serviços concluídos registados." },
-    { label: "Comissão Piquet", Icon: Percent, current: comissao, prevMonth: comissaoPrevMes, prevYear: comissaoPrevAno, fmt: "currency", real: true,
-      tooltip: "Receita da Piquet: 25% do cobrado da app + comissão real de cada serviço registado." },
-    mk("Runway", TrendingUp, 0, "months", 0.015, 0.02), // 0 até haver tesouraria real
-    mk("Colaboradores", Users, colaboradores, "number", 0.02, 0.02),
-    mk("Técnicos ativos", HardHat, ativos, "number", 0.04),
-    mk("Avaliação média", Star, aval, "rating", 0.004, 0.01),
-  ] : [];
+  // Avaliação média nas lojas (app cliente) — média das fontes disponíveis.
+  const cliRatings = [ratings?.cliente.appStore, ratings?.cliente.googlePlay].filter(Boolean) as { rating: number }[];
+  const storeRating = cliRatings.length
+    ? Math.round((cliRatings.reduce((s, r) => s + r.rating, 0) / cliRatings.length) * 10) / 10
+    : 0;
 
+  const goals = goalsData?.goals ?? [];
+  const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
   const emRisco = (board?.tasks ?? []).filter((t) => t.status !== "concluida" && daysUntil(t.due) <= 3);
 
   return (
     <RouteGuard route="/">
-      <div className="space-y-6">
+      <div className="space-y-8">
         <WelcomeBanner />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Visão executiva</h1>
-            <p className="text-text-secondary mt-1">Visão total do negócio e de todos os departamentos</p>
+            <p className="text-text-secondary mt-1">O retrato do negócio de relance — o que é real, e para onde vamos.</p>
           </div>
           <div className="flex items-center gap-2">
             <MonthSelect />
@@ -103,50 +81,80 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* 6 KPIs de topo, com comparação */}
+        {/* ---------- Indicadores-chave (reais) ---------- */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Indicadores</p>
-            <div className="inline-flex rounded-lg border border-surface-border bg-surface p-0.5 text-xs">
-              {([["mes", "vs mês anterior"], ["ano", "vs ano anterior"]] as const).map(([id, lbl]) => (
-                <button key={id} onClick={() => setCmp(id)}
-                  className={cn("px-3 py-1 rounded-md font-medium transition-colors", cmp === id ? "bg-piquet/15 text-piquet-700" : "text-text-secondary hover:text-text-primary")}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Indicadores-chave</p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {kpis.map((k) => {
-              const prev = cmp === "mes" ? k.prevMonth : k.prevYear;
-              const delta = prev ? ((k.current - prev) / prev) * 100 : 0;
-              const up = delta >= 0;
-              const good = k.higherIsBetter === false ? !up : up;
-              const DeltaIcon = Math.abs(delta) < 0.05 ? Minus : up ? TrendingUp : TrendingDown;
-              return (
-                <div key={k.label} className="card p-4" title={k.tooltip}>
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <k.Icon className="h-4 w-4 text-piquet-600" />
-                    <span className="text-xs font-medium">{k.label}</span>
-                    {!k.real && <DemoBadge endpoint="/dashboard/overview" />}
-                  </div>
-                  <p className="mt-2 text-2xl font-bold text-text-primary">{fmtKpi(k.current, k.fmt)}</p>
-                  {/* Comparações só nos KPIs reais — num zero sem fonte, a
-                      seta seria uma tendência fabricada. */}
-                  {k.real && (
-                    <div className={cn("mt-1.5 inline-flex items-center gap-1 text-xs font-medium", Math.abs(delta) < 0.05 ? "text-text-muted" : good ? "text-success" : "text-danger")}>
-                      <DeltaIcon className="h-3.5 w-3.5" />
-                      {up ? "+" : ""}{delta.toFixed(1)}%
-                      <span className="text-text-muted font-normal">· {fmtKpi(prev, k.fmt)}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <MetricCard title="GMV do mês" format="currency"
+              metric={buildMetricValue(gmvMonth, gmvPrevMonth, false, undefined, "Payshop cobrado + serviços concluídos, no mês.")} />
+            <MetricCard title="Comissão Piquet" format="currency"
+              metric={buildMetricValue(commissionMonth, commissionPrevMonth, false, undefined, "Receita da Piquet no mês.")} />
+            <MetricCard title="GMV do ano" format="currency"
+              metric={buildMetricValue(gmvYear, gmvPrevYear, false, undefined, "Acumulado do ano vs. período homólogo.")} />
+            <MetricCard title="Downloads totais" format="number"
+              metric={buildMetricValue(downloadsTotal, downloadsTotal, false, undefined, "Instalações nas duas apps (App Store + Google Play).")} />
+            <MetricCard title="Downloads (mês)" format="number"
+              metric={buildMetricValue(downloadsMonth, downloadsMonth, false, undefined, "Novas instalações este mês.")} />
+            <MetricCard title="Avaliação nas lojas"
+              metric={buildMetricValue(storeRating, storeRating, false, undefined, "Média da app cliente (App Store + Google Play).")} />
           </div>
         </div>
 
-        {/* Departamentos */}
+        {/* ---------- Objetivos do ano ---------- */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-piquet-600" />
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Objetivos do ano</p>
+              {goals.length > 0 && (
+                <span className="text-xs text-text-secondary">· <b className="text-text-primary">{goalsOnTrack}/{goals.length}</b> no bom caminho</span>
+              )}
+            </div>
+            <Link href="/objetivos" className="text-sm text-piquet-600 font-medium hover:underline">Gerir objetivos →</Link>
+          </div>
+
+          {goals.length === 0 ? (
+            <Link href="/objetivos" className="card p-6 flex items-center gap-4 hover:shadow-elevated transition-shadow">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700 shrink-0"><Target className="h-5 w-5" /></span>
+              <div>
+                <p className="font-medium text-text-primary">Define os objetivos do ano</p>
+                <p className="text-sm text-text-secondary">Associa metas a métricas reais (GMV, comissão, downloads…) e acompanha a evolução diária.</p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0" />
+            </Link>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {goals.slice(0, 6).map((g) => {
+                const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
+                const willHit = g.projection >= g.target;
+                return (
+                  <Link key={g.id} href="/objetivos" className="card p-4 hover:shadow-elevated transition-shadow">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary truncate">{g.label}</p>
+                        <p className="text-xs text-text-muted">{g.metricLabel} · Meta {fmtGoal(g.target, g.unit)}</p>
+                      </div>
+                      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0",
+                        willHit ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
+                        {willHit ? <TrendingUp className="h-3 w-3" /> : <Target className="h-3 w-3" />}
+                        {willHit ? "No bom caminho" : "Em risco"}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-end justify-between">
+                      <span className="text-xl font-bold text-text-primary">{fmtGoal(g.current, g.unit)}</span>
+                      <span className="text-sm text-text-secondary">{pct}%</span>
+                    </div>
+                    <div className="mt-1.5 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                      <div className={cn("h-full rounded-full", willHit ? "bg-success" : "bg-piquet")} style={{ width: `${pct}%` }} />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ---------- Detalhe por departamento (ainda sem integração) ---------- */}
         {departments && departments.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -159,7 +167,6 @@ export default function OverviewPage() {
           </div>
         )}
 
-        {/* Desempenho operacional + Prazos em risco */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-3">
