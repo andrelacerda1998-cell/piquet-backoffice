@@ -14,6 +14,7 @@ import {
 } from "@/services/extrasService";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { useTeamChatRealtime } from "@/hooks/useTeamChatRealtime";
+import { useTeamTasksRealtime } from "@/hooks/useTeamTasksRealtime";
 import { uploadChatImage } from "@/lib/uploadChatImage";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
@@ -402,6 +403,9 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
 
   useEffect(() => { setTasks(base); }, [base]);
 
+  // Tarefas ao vivo: novas/alteradas por qualquer pessoa aparecem sem reload.
+  useTeamTasksRealtime(setTasks);
+
   const filtered = tasks
     .filter((t) => person === "Todos" || t.assignee === person)
     .sort((a, b) => (a.status === "concluida" ? 1 : 0) - (b.status === "concluida" ? 1 : 0) || a.due.localeCompare(b.due));
@@ -421,11 +425,20 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
       title: form.title.trim(), assignee: form.assignee, department: member?.department ?? "",
       priority: form.priority, status: "aberta", due: form.due,
     };
-    setTasks((prev) => [{ ...task, id: `tmp_${Date.now()}` }, ...prev]);
+    const tempId = `tmp_${Date.now()}`;
+    const assigneeName = form.assignee.split(" ")[0];
+    setTasks((prev) => [{ ...task, id: tempId }, ...prev]);
     setOpen(false);
     setForm({ title: "", assignee: TEAM_MEMBERS[2].name, priority: "media", due: "2026-07-10" });
-    createTeamTask(task).catch(() => toast("Falha ao criar tarefa.", "error"));
-    toast(`Tarefa atribuída a ${form.assignee.split(" ")[0]}.`);
+    // Troca a tarefa otimista pela real; o dedupe por id evita duplicar quando
+    // o realtime devolver a mesma tarefa.
+    createTeamTask(task)
+      .then((real) => setTasks((prev) => {
+        const rest = prev.filter((t) => t.id !== tempId);
+        return rest.some((t) => t.id === real.id) ? rest : [real, ...rest];
+      }))
+      .catch(() => { setTasks((prev) => prev.filter((t) => t.id !== tempId)); toast("Falha ao criar tarefa.", "error"); });
+    toast(`Tarefa atribuída a ${assigneeName}.`);
   };
 
   return (
