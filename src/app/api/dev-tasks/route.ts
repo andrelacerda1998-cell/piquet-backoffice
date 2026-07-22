@@ -18,7 +18,7 @@ export const POST = withStaff(async (req, { staff }) => {
     section?: string; title?: string; status?: string;
     description?: string; priority?: string; assignee?: string; position?: number;
   };
-  if (b.section !== "site" && b.section !== "app") return apiErr("section inválida.", 400);
+  if (b.section !== "site" && b.section !== "app" && b.section !== "vendor") return apiErr("section inválida.", 400);
   if (!b.title?.trim()) return apiErr("title é obrigatório.", 400);
 
   const id = `dv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
