@@ -150,6 +150,11 @@ const LIVE_EXACT = new Set<string>([
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)
   "/finance/company-invoices",
+  // Fase 8 — Migração Filament: definições de taxas, lucro do sistema, vouchers
+  // (via API de admin do Laravel, não Supabase — ver src/lib/laravelAdmin.ts)
+  "/fee-settings",
+  "/system-profit",
+  "/vouchers",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -197,6 +202,11 @@ const REAL_DATA = new Set<string>([
   "/team/tasks",
   "/team/agenda",
   "/team/meetings",
+  // Definições de taxas, lucro do sistema e vouchers vêm agora do Laravel
+  // (fonte de verdade da produção), não do seed do Supabase.
+  "/fee-settings",
+  "/system-profit",
+  "/vouchers",
 ]);
 
 /**
@@ -249,6 +259,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
   if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
   if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
+  if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
   return false;
 }
 
