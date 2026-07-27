@@ -20,6 +20,7 @@ import {
   type TechnicianPayout, type AppPayment, type PaymentState, type CompanyInvoice,
 } from "@/services/financeService";
 import { getRevenueByCategory } from "@/services/dashboardService";
+import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -28,7 +29,7 @@ import { usePersistentList } from "@/hooks/usePersistentList";
 import { SEED_REFUNDS, type Refund } from "@/services/backofficeService";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt } from "lucide-react";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, Wallet } from "lucide-react";
 
 const TABS: TabDef[] = [
   // Consolidado (2026-07-17): 8 → 5 abas. Pagamentos da app primeiro (é o
@@ -39,6 +40,8 @@ const TABS: TabDef[] = [
   { id: "receita", label: "Receita" },
   { id: "custos", label: "Custos e faturas" },
   { id: "pagamentos", label: "Pagamentos a técnicos" },
+  // Migrado do Filament (Pages\SystemProfit) — vem da API de admin do Laravel.
+  { id: "lucro-sistema", label: "Lucro do sistema" },
 ];
 
 /** Estado final de um pagamento da app (ciclo de vida do pagamento diferido). */
@@ -49,6 +52,24 @@ const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
   reembolsado: { label: "Reembolsado", tone: "bg-warning-light text-warning" },
   recusado: { label: "Recusado", tone: "bg-danger-light text-danger" },
 };
+
+/**
+ * O Laravel guarda `meta.type` como chave de tradução (ex.:
+ * "internal/services.transactions_type.service"), traduzida em runtime pelo
+ * Filament com `__($state)`. Aqui não temos acesso aos ficheiros de tradução
+ * do Laravel, por isso mapeamos as chaves conhecidas (ver
+ * resources/lang/pt-pt/internal/services.php) e caímos para uma versão
+ * legível do último segmento nas restantes.
+ */
+const WALLET_TYPE_LABEL: Record<string, string> = {
+  "internal/services.transactions_type.service": "Serviço",
+  "internal/services.transactions_type.refund": "Devolução",
+};
+function walletTypeLabel(type: string): string {
+  if (WALLET_TYPE_LABEL[type]) return WALLET_TYPE_LABEL[type];
+  const last = type.split(".").pop() ?? type;
+  return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, " ");
+}
 
 
 export default function FinancePage() {
@@ -72,6 +93,15 @@ export default function FinancePage() {
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay } = useAsyncData(() => getAppPayments(), []);
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
+
+  // Lucro do sistema (wallet) — filtros de data próprios, não os globais do resto da página.
+  const [profitPage, setProfitPage] = useState(1);
+  const [profitFrom, setProfitFrom] = useState("");
+  const [profitTo, setProfitTo] = useState("");
+  const { data: systemProfit, loading: profitLoading, error: profitError, refetch: refetchProfit } = useAsyncData(
+    () => getSystemProfit({ page: profitPage, from: profitFrom || undefined, to: profitTo || undefined }),
+    [profitPage, profitFrom, profitTo]
+  );
 
   const [showInvoice, setShowInvoice] = useState(false);
   const [invForm, setInvForm] = useState({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
@@ -171,6 +201,14 @@ export default function FinancePage() {
     { key: "actions", label: "", render: (r) => r.status === "pendente" ? (
       <button onClick={async () => { try { await processTechnicianPayout(r.id); toast(`Pagamento de ${formatCurrency(r.amountDue)} a ${r.technicianName} processado.`); refetchPayouts(); } catch { toast("Falha ao processar pagamento.", "error"); } }} className="btn-primary text-xs py-1">Processar</button>
     ) : <span className="text-text-muted text-xs">—</span> },
+  ];
+
+  const systemProfitColumns: Column<SystemProfitTransaction>[] = [
+    { key: "created_at", label: "Data", render: (r) => r.created_at ? formatDateTime(r.created_at) : "—" },
+    { key: "type", label: "Tipo", render: (r) => <span className="font-medium">{walletTypeLabel(r.type)}</span> },
+    { key: "description_key", label: "Descrição", render: (r) => r.description_key ?? "—" },
+    { key: "admin_name", label: "Administrador", render: (r) => r.admin_name ?? "—" },
+    { key: "amount", label: "Valor", render: (r) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
   ];
 
   const financeColumns: Column<Record<string, unknown>>[] = [
@@ -539,6 +577,62 @@ export default function FinancePage() {
                   emptyMessage="Sem pagamentos — a primeira sincronização acontece no próximo ciclo"
                 />
               </div>
+            </div>
+          )}
+
+          {/* ------------------------------ LUCRO DO SISTEMA ----------------------------- */}
+          {tab === "lucro-sistema" && (
+            <div className="space-y-6">
+              <p className="text-sm text-text-secondary max-w-2xl">
+                Saldo e livro de transações da wallet do sistema — comissões e taxas retidas pela Piquet em cada serviço.
+              </p>
+
+              {profitLoading && !systemProfit && <LoadingState />}
+              {profitError && <ErrorState message={profitError} onRetry={refetchProfit} />}
+
+              {systemProfit && (
+                <>
+                  <div className="card p-5 border-l-4 border-l-piquet max-w-sm">
+                    <div className="flex items-center gap-2 text-text-secondary">
+                      <Wallet className="h-4 w-4 text-piquet-600" />
+                      <span className="text-sm font-medium">Saldo do sistema</span>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(systemProfit.wallet_balance)}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Field label="De">
+                      <input type="date" value={profitFrom}
+                        onChange={(e) => { setProfitFrom(e.target.value); setProfitPage(1); }}
+                        className="input-field" />
+                    </Field>
+                    <Field label="Até">
+                      <input type="date" value={profitTo}
+                        onChange={(e) => { setProfitTo(e.target.value); setProfitPage(1); }}
+                        className="input-field" />
+                    </Field>
+                    {(profitFrom || profitTo) && (
+                      <button onClick={() => { setProfitFrom(""); setProfitTo(""); setProfitPage(1); }} className="btn-secondary text-sm">
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+
+                  <DataTable
+                    columns={systemProfitColumns}
+                    data={systemProfit.items}
+                    keyField="id"
+                    emptyMessage="Sem transações neste período"
+                  />
+                  <Pagination
+                    page={systemProfit.meta.current_page}
+                    totalPages={systemProfit.meta.last_page}
+                    total={systemProfit.meta.total}
+                    pageSize={systemProfit.meta.per_page}
+                    onPageChange={setProfitPage}
+                  />
+                </>
+              )}
             </div>
           )}
         </div>
