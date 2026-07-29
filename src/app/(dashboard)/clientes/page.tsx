@@ -4,32 +4,41 @@ import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { CustomerDetailDrawer } from "@/components/ui/CustomerDetailDrawer";
 import { AppCustomersPanel } from "@/components/ui/AppCustomersPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
-import { getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend } from "@/services/customersService";
+import {
+  getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend,
+  blockCustomer, restoreCustomer, type RealCustomer,
+} from "@/services/customersService";
 import { getComplaints, type Complaint } from "@/services/extrasService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import type { Customer } from "@/types";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function CustomersPage() {
-  const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
+  const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [tab, setTab] = useState("visao");
-  const [selected, setSelected] = useState<Customer | null>(null);
 
   const { data: metrics } = useAsyncData(() => getCustomerMetrics(), []);
-  const { data: customers, loading } = useAsyncData(
-    () => getCustomers(page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch),
-    [page, pageSize, sortField, sortDirection, debouncedSearch]
+  // Lista real de clientes (App\Filament\Resources\CustomerResource migrado)
+  // -- sem sort do lado do servidor (o Filament só ordenava name/created_at
+  // por clique de coluna, e não vale a pena replicar já).
+  const { data: customers, loading, refetch: refetchCustomers } = useAsyncData(
+    () => getCustomers(page, pageSize, debouncedSearch || undefined),
+    [page, pageSize, debouncedSearch]
+  );
+  // Clientes bloqueados (soft-delete real) -- separado do "Todos" tal como o
+  // Filament faz com o TrashedFilter, para o separador "Bloqueados" e a
+  // contagem no TabDef não dependerem da paginação da lista principal.
+  const { data: blockedCustomers, loading: blockedLoading, refetch: refetchBlocked } = useAsyncData(
+    () => getCustomers(1, 100, undefined, true),
+    []
   );
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
   const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
@@ -40,18 +49,35 @@ export default function CustomersPage() {
 
   const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
 
-  // Clientes bloqueados (persistido) — sem acesso à app até reativação.
-  interface BlockedCustomer { id: string; name: string; email: string; reason: string; at: string }
-  const [blocked, setBlocked] = usePersistentList<BlockedCustomer>("clientes-bloqueados", []);
-  const blockCustomer = (c: Customer) => {
-    if (blocked.some((b) => b.id === c.id)) { toast("Cliente já está bloqueado.", "info"); return; }
-    setBlocked((prev) => [{ id: c.id, name: c.name, email: c.email, reason: "Bloqueio manual pelo backoffice", at: new Date().toISOString().slice(0, 10) }, ...prev]);
-    toast(`Cliente ${c.name} bloqueado.`, "error");
+  // Bloquear/Reativar = soft-delete real do User no Laravel (ver
+  // customersService.ts) -- notifica ninguém (o Filament também não notifica
+  // aqui), só remove/repõe o acesso.
+  const [actingId, setActingId] = useState<number | null>(null);
+  const handleBlock = async (c: RealCustomer) => {
+    setActingId(c.id);
+    try {
+      await blockCustomer(c.id);
+      toast(`Cliente ${c.name ?? c.id} bloqueado.`, "error");
+      refetchCustomers();
+      refetchBlocked();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível bloquear o cliente.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
-  const unblockCustomer = (id: string) => {
-    const b = blocked.find((x) => x.id === id);
-    setBlocked((prev) => prev.filter((x) => x.id !== id));
-    toast(`Cliente ${b?.name} reativado.`);
+  const handleRestore = async (c: RealCustomer) => {
+    setActingId(c.id);
+    try {
+      await restoreCustomer(c.id);
+      toast(`Cliente ${c.name ?? c.id} reativado.`);
+      refetchCustomers();
+      refetchBlocked();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível reativar o cliente.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
 
   const TABS: TabDef[] = [
@@ -83,23 +109,38 @@ export default function CustomersPage() {
     ) : <span className="text-text-muted text-xs">—</span> },
   ];
 
-  const columns: Column<Customer>[] = [
-    { key: "name", label: "Nome", sortable: true },
-    { key: "email", label: "Email" },
-    { key: "phone", label: "Contacto" },
-    { key: "registeredAt", label: "Registo", sortable: true, render: (r) => formatDate(r.registeredAt) },
-    { key: "city", label: "Localização", sortable: true },
-    { key: "serviceCount", label: "Serviços", sortable: true },
-    { key: "totalSpent", label: "Valor gasto", sortable: true, render: (r) => formatCurrency(r.totalSpent) },
-    { key: "piquetRevenue", label: "Receita Piquet", sortable: true, render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "lastServiceAt", label: "Último serviço", render: (r) => r.lastServiceAt ? formatDate(r.lastServiceAt) : "—" },
-    { key: "status", label: "Segmento", render: (r) => <StatusBadge status={r.status} label={r.status.replace(/_/g, " ")} /> },
-    { key: "source", label: "Origem" },
-    { key: "complaintCount", label: "Reclamações", sortable: true },
-    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
-    { key: "acao", label: "", render: (r) => blocked.some((b) => b.id === r.id)
-      ? <button onClick={(e) => { e.stopPropagation(); unblockCustomer(r.id); }} className="text-xs text-success hover:underline">Reativar</button>
-      : <button onClick={(e) => { e.stopPropagation(); blockCustomer(r); }} className="text-xs text-danger hover:underline">Bloquear</button> },
+  // Colunas do CustomerResource::table() do Filament (avatar/nif/email/telefone/
+  // canRequestService/created_at) -- sem os campos fictícios que a lista mock
+  // tinha (cidade, origem, valor gasto, avaliação, ...).
+  const columns: Column<RealCustomer>[] = [
+    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
+    { key: "email", label: "Email", render: (r) => (
+      <span className="inline-flex items-center gap-1.5">
+        {r.email ?? "—"}
+        {r.email && !r.email_verified && <span title="Email não verificado" className="text-warning">⚠</span>}
+      </span>
+    ) },
+    { key: "phone_number", label: "Contacto", render: (r) => (
+      <span className="inline-flex items-center gap-1.5">
+        {r.phone_number ?? "—"}
+        {r.phone_number && !r.phone_verified && <span title="Telefone não verificado" className="text-warning">⚠</span>}
+      </span>
+    ) },
+    { key: "can_request_service", label: "Elegível", render: (r) => r.can_request_service ? "✓" : "—" },
+    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
+    { key: "acao", label: "", render: (r) => r.blocked_at
+      ? <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleRestore(r); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+      : <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleBlock(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button> },
+  ];
+
+  const blockedColumns: Column<RealCustomer>[] = [
+    { key: "name", label: "Cliente", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "email", label: "Email", render: (r) => r.email ?? "—" },
+    { key: "blocked_at", label: "Bloqueado em", render: (r) => r.blocked_at ? formatDate(r.blocked_at) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+    ) },
   ];
 
   return (
@@ -175,14 +216,14 @@ export default function CustomersPage() {
         {tab === "lista" && (
           <SubTabs tabs={[
             { id: "todos", label: "Todos" },
-            { id: "bloqueados", label: "Bloqueados", count: blocked.length },
+            { id: "bloqueados", label: "Bloqueados", count: blockedCustomers?.total ?? 0 },
           ]}>
             {(sub) => (
               <>
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
-                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
+                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} />
                     {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
                   </div>
                 )}
@@ -190,15 +231,10 @@ export default function CustomersPage() {
                   <div className="space-y-4">
                     <p className="text-sm text-text-secondary">Clientes sem acesso à app até reativação.</p>
                     <DataTable
-                      columns={[
-                        { key: "name", label: "Cliente", render: (r: BlockedCustomer) => <span className="font-medium">{r.name}</span> },
-                        { key: "email", label: "Email" },
-                        { key: "reason", label: "Motivo" },
-                        { key: "at", label: "Bloqueado em" },
-                        { key: "acao", label: "", render: (r: BlockedCustomer) => <button onClick={() => unblockCustomer(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
-                      ]}
-                      data={blocked}
+                      columns={blockedColumns}
+                      data={blockedCustomers?.data ?? []}
                       keyField="id"
+                      loading={blockedLoading}
                       emptyMessage="Sem clientes bloqueados 🎉"
                     />
                   </div>
@@ -210,8 +246,6 @@ export default function CustomersPage() {
 
         {tab === "app" && <AppCustomersPanel />}
       </div>
-
-      {selected && <CustomerDetailDrawer customer={selected} onClose={() => setSelected(null)} />}
     </RouteGuard>
   );
 }

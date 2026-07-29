@@ -1,29 +1,72 @@
-import { apiGet } from "./api";
+import { apiGet, apiPut } from "./api";
 import { mockData } from "@/mocks/data";
-import { paginateArray, sortArray } from "@/lib/filters";
-import type { PaginatedResult, SortParams, Customer } from "@/types";
+import type { PaginatedResult } from "@/types";
+
+/**
+ * Clientes reais — migrado do Filament (App\Filament\Resources\CustomerResource)
+ * para a API de admin do Laravel. Ver src/lib/laravelAdmin.ts e
+ * src/app/api/customers/*.
+ *
+ * Forma mínima (id, nome, nif, contactos, verificações, elegibilidade,
+ * bloqueado_em, criado_em) -- não os campos fictícios do antigo `Customer`
+ * (cidade, origem, valor gasto, receita Piquet, avaliação, ...), que
+ * continuam a existir só para o resto do dashboard (métricas/gráficos,
+ * ainda por migrar). Ver `Customer` em src/types para essa forma antiga.
+ */
+export interface RealCustomer {
+  id: number;
+  name: string | null;
+  nif: string | null;
+  email: string | null;
+  phone_number: string | null;
+  email_verified: boolean;
+  phone_verified: boolean;
+  can_request_service: boolean;
+  blocked_at: string | null;
+  created_at: string | null;
+}
+
+interface CustomersApiData {
+  items: RealCustomer[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
 
 export async function getCustomers(
   page = 1,
   pageSize = 20,
-  sort?: SortParams,
   search?: string,
-  segment?: string
-): Promise<PaginatedResult<Customer>> {
-  return apiGet(
+  blockedOnly = false
+): Promise<PaginatedResult<RealCustomer>> {
+  const raw = await apiGet<CustomersApiData>(
     "/customers",
-    () => {
-      let items = [...mockData.customers];
-      if (search) {
-        const q = search.toLowerCase();
-        items = items.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-      }
-      if (segment) items = items.filter((c) => c.status === segment);
-      if (sort) items = sortArray(items, sort.field as keyof Customer, sort.direction);
-      return paginateArray(items, page, pageSize);
-    },
-    { page, pageSize, search, segment, sort: sort?.field, dir: sort?.direction }
+    () => ({ items: [], meta: { current_page: 1, last_page: 1, per_page: pageSize, total: 0 } }),
+    { page, per_page: pageSize, search, blocked: blockedOnly ? 1 : undefined }
   ).then((r) => r.data);
+
+  return {
+    data: raw.items,
+    total: raw.meta.total,
+    page: raw.meta.current_page,
+    pageSize: raw.meta.per_page,
+    totalPages: raw.meta.last_page,
+  };
+}
+
+/**
+ * Bloquear = soft-delete real do User no Laravel (sem conceito nativo de
+ * "bloqueado"). Reativar = restore do soft-delete. Ambas ações reais, tal
+ * como os pagamentos/documentos KYC -- não são formulários locais.
+ */
+export async function blockCustomer(id: number): Promise<RealCustomer> {
+  return apiPut<RealCustomer>(`/customers/${id}/block`, {}, () => {
+    throw new Error("Bloquear clientes precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+export async function restoreCustomer(id: number): Promise<RealCustomer> {
+  return apiPut<RealCustomer>(`/customers/${id}/restore`, {}, () => {
+    throw new Error("Reativar clientes precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
 }
 
 export async function getCustomerMetrics() {

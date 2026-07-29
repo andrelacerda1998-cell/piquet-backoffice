@@ -1,34 +1,37 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { rowToCustomer, customerSortColumn, type CustomerRow } from "@/lib/supabase/adapters";
-import { apiOk, withStaff } from "../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
 
-/** GET /api/customers — lista paginada (vista customers_enriched). */
+export interface AdminCustomer {
+  id: number;
+  name: string | null;
+  nif: string | null;
+  email: string | null;
+  phone_number: string | null;
+  email_verified: boolean;
+  phone_verified: boolean;
+  can_request_service: boolean;
+  blocked_at: string | null;
+  created_at: string | null;
+}
+
+export interface AdminCustomersData {
+  items: AdminCustomer[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
+
+/**
+ * GET /api/customers — lista de clientes, migrado do Filament
+ * (App\Filament\Resources\CustomerResource). Ver src/lib/laravelAdmin.ts e
+ * App\Http\Controllers\Api\Admin\CustomerController no backend.
+ */
 export const GET = withStaff(async (req) => {
-  const q = new URL(req.url).searchParams;
-  const page = Math.max(1, Number(q.get("page") ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(q.get("pageSize") ?? 20)));
-  const search = q.get("search")?.trim();
-  const segment = q.get("segment")?.trim();
-  const sort = q.get("sort") ?? undefined;
-  const dir = q.get("dir") === "asc" ? "asc" : "desc";
-
-  const admin = supabaseAdmin();
-  let query = admin.from("customers_enriched").select("*", { count: "exact" });
-  if (segment) query = query.eq("status", segment);
-  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
-  query = query
-    .order(customerSortColumn(sort), { ascending: dir === "asc" })
-    .range((page - 1) * pageSize, page * pageSize - 1);
-
-  const { data, count, error } = await query;
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as CustomerRow[];
-  const total = count ?? rows.length;
-  return apiOk({
-    data: rows.map(rowToCustomer),
-    total,
-    page,
-    pageSize,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
-  });
+  const url = new URL(req.url);
+  const qs = url.search;
+  try {
+    const data = await laravelAdminRequest<AdminCustomersData>(`/v1/admin/customers${qs}`);
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler os clientes.", e instanceof ApiError ? e.status : 500);
+  }
 });

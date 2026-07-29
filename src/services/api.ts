@@ -182,6 +182,11 @@ const LIVE_DENY = new Set<string>([
  * Nota sobre `/finance/app-payments`: os dados são reais (API do Payshop) mas
  * o tráfego é quase todo de teste (65 de 68 encomendas abaixo de 10 €). É um
  * problema distinto do selo — ver a nota na aba "Pagamentos da app".
+ *
+ * Nota sobre `/customers`: passou a vir do Laravel (tabela `users` real da
+ * produção), não do seed do Supabase — ver CustomerController no backend.
+ * `/customers/metrics`, `/by-location` e `/by-source` continuam ligados ao
+ * seed (ainda por migrar) e por isso ficam de fora.
  */
 const REAL_DATA = new Set<string>([
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
@@ -215,6 +220,8 @@ const REAL_DATA = new Set<string>([
   "/vendor-documents",
   // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
   "/vendor-payments",
+  // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
+  "/customers",
 ]);
 
 /**
@@ -270,6 +277,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
   if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
   if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
+  if (/^\/customers\/[^/]+\/(block|restore)$/.test(path)) return true; // bloquear/reativar cliente
   return false;
 }
 
