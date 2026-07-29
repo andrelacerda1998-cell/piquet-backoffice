@@ -155,11 +155,13 @@ const LIVE_EXACT = new Set<string>([
   "/fee-settings",
   "/system-profit",
   "/vouchers",
+  // Fase 9 — Revisão de documentos KYC dos técnicos (idem, via Laravel)
+  "/vendor-documents",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
   "/services/operational-metrics",
-  "/technicians/pending", // KYC/documentos ainda não modelados
+  "/technicians/pending", // Substituído por /vendor-documents (fila KYC real, ver Fase 9)
 ]);
 /**
  * Endpoints cujos números descrevem MESMO o negócio.
@@ -207,6 +209,8 @@ const REAL_DATA = new Set<string>([
   "/fee-settings",
   "/system-profit",
   "/vouchers",
+  // Documentos KYC dos técnicos — idem, tabela vendor_documents do Laravel.
+  "/vendor-documents",
 ]);
 
 /**
@@ -260,6 +264,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
   if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
   if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
+  if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
   return false;
 }
 
