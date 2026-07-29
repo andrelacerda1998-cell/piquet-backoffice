@@ -107,8 +107,11 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // preenchidas de uma vez pelo seed. (/services saiu desta lista a
     // 2026-07-17: o seed foi apagado e a tabela só tem serviços concluídos
     // registados à mão — dados reais. /customers saiu a 2026-07-29: passou a
-    // vir do Laravel, tabela users real da produção — ver CustomerController.)
-    for (const ep of ["/technicians", "/employees",
+    // vir do Laravel, tabela users real da produção — ver CustomerController.
+    // /technicians saiu também a 2026-07-29: idem, tabela vendors real do
+    // Laravel — ver VendorController. Os derivados /technicians/metrics,
+    // /by-category, /by-location, /top e /coverage continuam fictícios.)
+    for (const ep of ["/employees",
                       "/finance/summary", "/tax/obligations", "/finance/payouts"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
@@ -128,7 +131,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/product/integrations-status", "/dev-tasks", "/team/messages",
                       "/team/tasks", "/team/agenda", "/team/meetings", "/customers",
                       "/customers/metrics", "/customers/by-location", "/customers/by-source",
-                      "/customers/trend", "/customers/retention"]) {
+                      "/customers/trend", "/customers/retention", "/technicians"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

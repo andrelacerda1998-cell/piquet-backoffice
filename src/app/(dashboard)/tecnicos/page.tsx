@@ -6,16 +6,15 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
-import { AppTechniciansPanel } from "@/components/ui/AppTechniciansPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { getTechnicians, getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians } from "@/services/techniciansService";
+import { getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians } from "@/services/techniciansService";
 import {
   getVendorDocuments, approveVendorDocument, declineVendorDocument,
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
+import { getVendors, suspendVendor, restoreVendor, type RealVendor } from "@/services/vendorsService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/formatters";
@@ -25,15 +24,24 @@ import type { Technician } from "@/types";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function TechniciansPage() {
-  const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
+  const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [tab, setTab] = useState("visao");
   const [selected, setSelected] = useState<Technician | null>(null);
 
   const { data: metrics } = useAsyncData(() => getTechnicianMetrics(), []);
-  const { data: technicians, loading } = useAsyncData(
-    () => getTechnicians(page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch),
-    [page, pageSize, sortField, sortDirection, debouncedSearch]
+  // Lista real de técnicos (App\Filament\Resources\VendorResource migrado)
+  // -- sem sort do lado do servidor, tal como Clientes.
+  const { data: vendors, loading, refetch: refetchVendors } = useAsyncData(
+    () => getVendors(page, pageSize, debouncedSearch || undefined),
+    [page, pageSize, debouncedSearch]
+  );
+  // Técnicos suspensos (soft-delete real) -- separado do "Todos", tal como o
+  // Filament faz com o TrashedFilter, para o separador "Suspensões" e a
+  // contagem no TabDef não dependerem da paginação da lista principal.
+  const { data: suspendedVendors, loading: suspendedLoading, refetch: refetchSuspended } = useAsyncData(
+    () => getVendors(1, 100, undefined, true),
+    []
   );
   const { data: byCategory } = useAsyncData(() => getTechniciansByCategory(), []);
   const { data: byLocation } = useAsyncData(() => getTechniciansByLocation(), []);
@@ -77,26 +85,41 @@ export default function TechniciansPage() {
     }
   };
 
-  // Suspensões manuais (persistidas) + suspensos da base.
-  interface Suspension { id: string; name: string; city: string; reason: string; at: string }
-  const [suspensions, setSuspensions] = usePersistentList<Suspension>("suspensoes-manuais", []);
-  const { data: suspendedBase } = useAsyncData(() => getTechnicians(1, 50, undefined, undefined, "suspenso"), []);
-  const suspend = (t: Technician) => {
-    if (suspensions.some((s) => s.id === t.id)) { toast("Técnico já está suspenso.", "info"); return; }
-    setSuspensions((prev) => [{ id: t.id, name: t.name, city: t.city, reason: "Suspensão manual pelo backoffice", at: new Date().toISOString().slice(0, 10) }, ...prev]);
-    toast(`Técnico ${t.name} suspenso.`, "error");
+  // Suspender/Reativar = soft-delete real do Vendor no Laravel (ver
+  // vendorsService.ts) -- SEM a restrição de super-admin que o Filament tem
+  // (decisão explícita, ver nota no VendorController do backend).
+  const [actingId, setActingId] = useState<number | null>(null);
+  const handleSuspend = async (v: RealVendor) => {
+    setActingId(v.id);
+    try {
+      await suspendVendor(v.id);
+      toast(`Técnico ${v.name ?? v.id} suspenso.`, "error");
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível suspender o técnico.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
-  const reactivate = (id: string) => {
-    const s = suspensions.find((x) => x.id === id);
-    setSuspensions((prev) => prev.filter((x) => x.id !== id));
-    toast(`Técnico ${s?.name} reativado.`);
+  const handleRestore = async (v: RealVendor) => {
+    setActingId(v.id);
+    try {
+      await restoreVendor(v.id);
+      toast(`Técnico ${v.name ?? v.id} reativado.`);
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível reativar o técnico.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
-    { id: "app", label: "Técnicos da app" },
   ];
 
   const topColumns: Column<Technician>[] = [
@@ -108,23 +131,31 @@ export default function TechniciansPage() {
     { key: "piquetRevenue", label: "Receita gerada", render: (r) => formatCurrency(r.piquetRevenue) },
   ];
 
-  const columns: Column<Technician>[] = [
-    { key: "name", label: "Nome", sortable: true },
-    { key: "categories", label: "Categorias", render: (r) => r.categories.join(", ") },
-    { key: "city", label: "Localização", sortable: true },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "documentationComplete", label: "Documentação", render: (r) => r.documentationComplete ? "✓" : "⚠️" },
-    { key: "registeredAt", label: "Registo", render: (r) => formatDate(r.registeredAt) },
-    { key: "servicesCompleted", label: "Serviços", sortable: true },
-    { key: "acceptanceRate", label: "Aceitação", render: (r) => formatPercent(r.acceptanceRate) },
-    { key: "cancellationRate", label: "Cancelamento", render: (r) => formatPercent(r.cancellationRate) },
-    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
-    { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
-    { key: "lastActivityAt", label: "Última atividade", render: (r) => r.lastActivityAt ? formatDate(r.lastActivityAt) : "—" },
-    { key: "acao", label: "", render: (r) => suspensions.some((s) => s.id === r.id)
-      ? <button onClick={(e) => { e.stopPropagation(); reactivate(r.id); }} className="text-xs text-success hover:underline">Reativar</button>
-      : <button onClick={(e) => { e.stopPropagation(); suspend(r); }} className="text-xs text-danger hover:underline">Suspender</button> },
+  // Colunas do VendorResource::table() do Filament (nif/telefone/preço/zonas/
+  // elegibilidade/validação AT/estado) -- sem os campos fictícios que a lista
+  // mock tinha (categorias, avaliação, receita, serviços concluídos, ...).
+  const columns: Column<RealVendor>[] = [
+    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
+    { key: "phone_number", label: "Contacto", render: (r) => r.phone_number ?? "—" },
+    { key: "price_rate", label: "Preço/h", render: (r) => r.price_rate !== null ? formatCurrency(r.price_rate) : "—" },
+    { key: "operation_areas", label: "Zonas", render: (r) => r.operation_areas.length ? r.operation_areas.join(", ") : "—" },
+    { key: "can_accept_service", label: "Elegível", render: (r) => r.can_accept_service ? "✓" : "—" },
+    { key: "at_valid", label: "AT", render: (r) => r.at_valid ? "✓" : "⚠️" },
+    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
+    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleSuspend(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+    ) },
+  ];
+
+  const suspendedColumns: Column<RealVendor>[] = [
+    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
+    { key: "suspended_at", label: "Suspenso em", render: (r) => r.suspended_at ? formatDate(r.suspended_at) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+    ) },
   ];
 
   return (
@@ -248,60 +279,33 @@ export default function TechniciansPage() {
         {tab === "lista" && (
           <SubTabs tabs={[
             { id: "todos", label: "Todos" },
-            { id: "suspensoes", label: "Suspensões", count: suspensions.length + (suspendedBase?.data.length ?? 0) },
+            { id: "suspensoes", label: "Suspensões", count: suspendedVendors?.total ?? 0 },
           ]}>
             {(sub) => (
               <>
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                    <DataTable columns={columns} data={technicians?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
-                    {technicians && <Pagination page={page} totalPages={technicians.totalPages} total={technicians.total} pageSize={pageSize} onPageChange={setPage} />}
+                    <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading} />
+                    {vendors && <Pagination page={page} totalPages={vendors.totalPages} total={vendors.total} pageSize={pageSize} onPageChange={setPage} />}
                   </div>
                 )}
                 {sub === "suspensoes" && (
                   <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Técnicos suspensos ou bloqueados — sem acesso a novos serviços até reativação.</p>
-                    {suspensions.length > 0 && (
-                      <div>
-                        <h2 className="font-semibold mb-2 text-sm">Suspensões manuais</h2>
-                        <DataTable
-                          columns={[
-                            { key: "name", label: "Técnico", render: (r: Suspension) => <span className="font-medium">{r.name}</span> },
-                            { key: "city", label: "Zona" },
-                            { key: "reason", label: "Motivo" },
-                            { key: "at", label: "Suspenso em" },
-                            { key: "acao", label: "", render: (r: Suspension) => <button onClick={() => reactivate(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
-                          ]}
-                          data={suspensions}
-                          keyField="id"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="font-semibold mb-2 text-sm">Suspensos na base</h2>
-                      <DataTable
-                        columns={[
-                          { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                          { key: "city", label: "Zona" },
-                          { key: "categories", label: "Categorias", render: (r: Technician) => r.categories.slice(0, 2).join(", ") },
-                          { key: "registeredAt", label: "Registo", render: (r: Technician) => formatDate(r.registeredAt) },
-                          { key: "status", label: "Estado", render: (r: Technician) => <StatusBadge status={r.status} /> },
-                        ]}
-                        data={suspendedBase?.data ?? []}
-                        keyField="id"
-                        onRowClick={setSelected}
-                        emptyMessage="Sem técnicos suspensos na base"
-                      />
-                    </div>
+                    <p className="text-sm text-text-secondary">Técnicos suspensos — sem acesso a novos serviços até reativação.</p>
+                    <DataTable
+                      columns={suspendedColumns}
+                      data={suspendedVendors?.data ?? []}
+                      keyField="id"
+                      loading={suspendedLoading}
+                      emptyMessage="Sem técnicos suspensos 🎉"
+                    />
                   </div>
                 )}
               </>
             )}
           </SubTabs>
         )}
-
-        {tab === "app" && <AppTechniciansPanel />}
       </div>
 
       {selected && <TechnicianDetailDrawer technician={selected} onClose={() => setSelected(null)} />}

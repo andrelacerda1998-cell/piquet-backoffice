@@ -1,35 +1,43 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { rowToTechnician, technicianSortColumn, type TechnicianRow } from "@/lib/supabase/adapters";
-import { apiOk, withStaff } from "../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
 
-/** GET /api/technicians — lista paginada (vista technicians_enriched). */
+export interface AdminVendor {
+  id: number;
+  name: string | null;
+  nif: string | null;
+  phone_number: string | null;
+  price_rate: number | null;
+  operation_areas: string[];
+  can_accept_service: boolean;
+  at_valid: boolean;
+  at_validated_at: string | null;
+  status: string | null;
+  suspended_at: string | null;
+  created_at: string | null;
+}
+
+export interface AdminVendorsData {
+  items: AdminVendor[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
+
+/**
+ * GET /api/technicians — lista de técnicos, migrado do Filament
+ * (App\Filament\Resources\VendorResource) para a API de admin do Laravel.
+ * Substitui a versão anterior (Supabase, vista `technicians_enriched` com
+ * dados de seed fictícios) -- ver App\Http\Controllers\Api\Admin\
+ * VendorController no backend. Os restantes endpoints /technicians/* (metrics,
+ * by-category, by-location, top, coverage) continuam ligados ao Supabase por
+ * agora -- "Visão geral" fica para uma fatia futura.
+ */
 export const GET = withStaff(async (req) => {
-  const q = new URL(req.url).searchParams;
-  const page = Math.max(1, Number(q.get("page") ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(q.get("pageSize") ?? 20)));
-  const search = q.get("search")?.trim();
-  const status = q.get("status")?.trim();
-  const sort = q.get("sort") ?? undefined;
-  const dir = q.get("dir") === "asc" ? "asc" : "desc";
-
-  const admin = supabaseAdmin();
-  let query = admin.from("technicians_enriched").select("*", { count: "exact" });
-  if (status) query = query.eq("status", status);
-  // Pesquisa por nome (a pesquisa por categoria far-se-á quando houver índice GIN).
-  if (search) query = query.ilike("name", `%${search}%`);
-  query = query
-    .order(technicianSortColumn(sort), { ascending: dir === "asc" })
-    .range((page - 1) * pageSize, page * pageSize - 1);
-
-  const { data, count, error } = await query;
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as TechnicianRow[];
-  const total = count ?? rows.length;
-  return apiOk({
-    data: rows.map(rowToTechnician),
-    total,
-    page,
-    pageSize,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
-  });
+  const url = new URL(req.url);
+  const qs = url.search;
+  try {
+    const data = await laravelAdminRequest<AdminVendorsData>(`/v1/admin/vendors${qs}`);
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler os técnicos.", e instanceof ApiError ? e.status : 500);
+  }
 });
