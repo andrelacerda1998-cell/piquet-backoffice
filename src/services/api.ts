@@ -157,11 +157,18 @@ const LIVE_EXACT = new Set<string>([
   "/finance/budget",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
   "/support/inbox",
+  // Fase 8 — Migração Filament: definições de taxas, lucro do sistema, vouchers
+  // (via API de admin do Laravel, não Supabase — ver src/lib/laravelAdmin.ts)
+  "/fee-settings",
+  "/system-profit",
+  "/vouchers",
+  // Fase 9 — Revisão de documentos KYC dos técnicos (idem, via Laravel)
+  "/vendor-documents",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
   "/services/operational-metrics",
-  "/technicians/pending", // KYC/documentos ainda não modelados
+  "/technicians/pending", // Substituído por /vendor-documents (fila KYC real, ver Fase 9)
 ]);
 /**
  * Endpoints cujos números descrevem MESMO o negócio.
@@ -229,6 +236,13 @@ const REAL_DATA = new Set<string>([
   "/team/tasks",
   "/team/agenda",
   "/team/meetings",
+  // Definições de taxas, lucro do sistema e vouchers vêm agora do Laravel
+  // (fonte de verdade da produção), não do seed do Supabase.
+  "/fee-settings",
+  "/system-profit",
+  "/vouchers",
+  // Documentos KYC dos técnicos — idem, tabela vendor_documents do Laravel.
+  "/vendor-documents",
 ]);
 
 /**
@@ -290,6 +304,8 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status)$/.test(path)) return true; // responder/mudar estado de ticket
+  if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
+  if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
   return false;
 }
 

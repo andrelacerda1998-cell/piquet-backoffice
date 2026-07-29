@@ -8,15 +8,17 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
 import { AppTechniciansPanel } from "@/components/ui/AppTechniciansPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { useTabParam } from "@/hooks/useTabParam";
-import RecrutamentoPage from "../recrutamento/page";
 import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
-import { getTechnicians, getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians, getPendingTechnicians, type PendingTechnician } from "@/services/techniciansService";
-import { TechApprovalDrawer } from "@/components/ui/TechApprovalDrawer";
+import { getTechnicians, getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians } from "@/services/techniciansService";
+import {
+  getVendorDocuments, approveVendorDocument, declineVendorDocument,
+  type VendorDocument, type VendorDocumentStatus,
+} from "@/services/vendorDocumentsService";
+import { Modal, Field } from "@/components/ui/Modal";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import type { Technician } from "@/types";
@@ -25,7 +27,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 export default function TechniciansPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
-  const [tab, setTab] = useTabParam("visao");
+  const [tab, setTab] = useState("visao");
   const [selected, setSelected] = useState<Technician | null>(null);
 
   const { data: metrics } = useAsyncData(() => getTechnicianMetrics(), []);
@@ -37,10 +39,43 @@ export default function TechniciansPage() {
   const { data: byLocation } = useAsyncData(() => getTechniciansByLocation(), []);
   const { data: coverage } = useAsyncData(() => getCoverageVsDemand(), []);
   const { data: topTechs } = useAsyncData(() => getTopTechnicians(10), []);
-  const { data: pendingData } = useAsyncData(() => getPendingTechnicians(12), []);
-  const [pending, setPending] = usePersistentList<PendingTechnician>("pending-technicians", pendingData);
-  const [reviewing, setReviewing] = useState<string | null>(null);
-  const reviewingCand = pending.find((p) => p.id === reviewing) ?? null;
+
+  // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
+  // migrado). Contagem do separador vem sempre de "pending", independente do
+  // filtro escolhido dentro do separador.
+  const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
+  const [docStatus, setDocStatus] = useState<VendorDocumentStatus>("pending");
+  const docsData = useAsyncData(() => getVendorDocuments(docStatus, 1, 50), [docStatus]);
+  const [reviewDoc, setReviewDoc] = useState<VendorDocument | null>(null);
+  const [reviewAction, setReviewAction] = useState<"approve" | "decline" | null>(null);
+  const [expirationDate, setExpirationDate] = useState("");
+  const [declineReason, setDeclineReason] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+
+  const openApprove = (doc: VendorDocument) => { setReviewDoc(doc); setReviewAction("approve"); setExpirationDate(""); };
+  const openDecline = (doc: VendorDocument) => { setReviewDoc(doc); setReviewAction("decline"); setDeclineReason(""); };
+  const closeReview = () => { setReviewDoc(null); setReviewAction(null); };
+
+  const confirmReview = async () => {
+    if (!reviewDoc || !reviewAction) return;
+    if (reviewAction === "decline" && !declineReason.trim()) { toast("Indica o motivo da recusa.", "error"); return; }
+    setSavingReview(true);
+    try {
+      if (reviewAction === "approve") {
+        await approveVendorDocument(reviewDoc.id, expirationDate || null);
+        toast(`"${reviewDoc.document_type}" de ${reviewDoc.vendor_name ?? "técnico"} aprovado — notificação enviada.`);
+      } else {
+        await declineVendorDocument(reviewDoc.id, declineReason.trim());
+        toast(`"${reviewDoc.document_type}" de ${reviewDoc.vendor_name ?? "técnico"} recusado — notificação enviada.`, "error");
+      }
+      closeReview();
+      docsData.refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível processar o documento.", "error");
+    } finally {
+      setSavingReview(false);
+    }
+  };
 
   // Suspensões manuais (persistidas) + suspensos da base.
   interface Suspension { id: string; name: string; city: string; reason: string; at: string }
@@ -60,22 +95,9 @@ export default function TechniciansPage() {
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
-    { id: "aprovacoes", label: "Aprovações e KYC", count: pending.length },
-    { id: "recrutamento", label: "Recrutamento" },
+    { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
     { id: "app", label: "Técnicos da app" },
   ];
-
-  const decide = (cand: PendingTechnician, approved: boolean) => {
-    setPending((prev) => prev.filter((p) => p.id !== cand.id));
-    setReviewing(null);
-    toast(approved ? `Técnico ${cand.name} aprovado e adicionado à base.` : `Candidatura de ${cand.name} rejeitada.`, approved ? "success" : "error");
-  };
-  const verifyDoc = (candId: string, docName: string) => {
-    setPending((prev) => prev.map((p) => p.id === candId
-      ? { ...p, documents: p.documents.map((d) => d.name === docName ? { ...d, status: "verificado" } : d) }
-      : p));
-    toast(`Documento "${docName}" verificado.`);
-  };
 
   const topColumns: Column<Technician>[] = [
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name}</span> },
@@ -179,32 +201,47 @@ export default function TechniciansPage() {
                 <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
               </div>
             )}
-            <p className="text-sm text-text-secondary">Candidatos a técnico à espera de validação. Clica num perfil para rever a documentação (KYC) e depois aprovar ou rejeitar.</p>
-            {pending.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-text-muted">Sem candidaturas pendentes 🎉</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {pending.map((t) => {
-                  const missing = t.documents.filter((d) => d.status !== "verificado").length;
-                  return (
-                    <button key={t.id} onClick={() => setReviewing(t.id)} className="card p-4 flex items-center gap-3 text-left hover:shadow-elevated transition-shadow">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-sm font-bold">
-                        {t.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-text-primary truncate">{t.name}</p>
-                        <p className="text-xs text-text-secondary truncate">{t.categories.slice(0, 2).join(", ")} · {t.city}</p>
-                        <span className={cn("inline-flex items-center gap-1 mt-1 text-xs font-medium", missing === 0 ? "text-success" : "text-warning")}>
-                          <span className={cn("h-1.5 w-1.5 rounded-full", missing === 0 ? "bg-success" : "bg-warning")} />
-                          {missing === 0 ? "Documentos completos" : `${missing} documento${missing === 1 ? "" : "s"} por validar`}
-                        </span>
-                      </div>
-                      <span className="text-piquet-600 text-sm font-medium">Rever →</span>
-                    </button>
-                  );
-                })}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-text-secondary max-w-2xl">
+                Documentos enviados pelos técnicos, à espera de revisão. Aprovar ou recusar notifica o técnico a sério (email + push) <DemoBadge endpoint="/vendor-documents" />
+              </p>
+              <div className="flex gap-1 shrink-0">
+                {([
+                  { id: "pending", label: "Pendentes" },
+                  { id: "approved", label: "Aprovados" },
+                  { id: "declined", label: "Recusados" },
+                ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
+                  <button key={s.id} onClick={() => setDocStatus(s.id)}
+                    className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
+                    {s.label}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+            <DataTable
+              columns={[
+                { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
+                { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
+                { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
+                { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
+                  ? <a href={r.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">Ver ficheiro</a>
+                  : <span className="text-text-muted text-xs">—</span> },
+                { key: "estado_detalhe", label: "Detalhe", render: (r: VendorDocument) =>
+                  r.status === "declined" && r.reason ? <span className="text-xs text-danger">{r.reason}</span>
+                  : r.status === "approved" && r.expiration_date ? <span className="text-xs text-text-muted">Expira {formatDate(r.expiration_date)}</span>
+                  : <span className="text-text-muted text-xs">—</span> },
+                { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
+                  <div className="flex items-center gap-3 justify-end">
+                    <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
+                    <button onClick={() => openDecline(r)} className="text-xs text-danger hover:underline">Recusar</button>
+                  </div>
+                ) : null },
+              ]}
+              data={docsData.data?.items ?? []}
+              keyField="id"
+              loading={docsData.loading}
+              emptyMessage={docStatus === "pending" ? "Sem documentos pendentes 🎉" : "Sem documentos neste estado"}
+            />
           </div>
         )}
 
@@ -264,20 +301,50 @@ export default function TechniciansPage() {
           </SubTabs>
         )}
 
-        {tab === "recrutamento" && <RecrutamentoPage />}
         {tab === "app" && <AppTechniciansPanel />}
       </div>
 
       {selected && <TechnicianDetailDrawer technician={selected} onClose={() => setSelected(null)} />}
-      {reviewingCand && (
-        <TechApprovalDrawer
-          candidate={reviewingCand}
-          onClose={() => setReviewing(null)}
-          onVerifyDoc={(doc) => verifyDoc(reviewingCand.id, doc)}
-          onApprove={() => decide(reviewingCand, true)}
-          onReject={() => decide(reviewingCand, false)}
-        />
-      )}
+
+      <Modal
+        open={!!reviewDoc}
+        onClose={closeReview}
+        title={reviewAction === "approve" ? "Aprovar documento" : "Recusar documento"}
+        subtitle={reviewDoc ? `${reviewDoc.document_type ?? "Documento"} · ${reviewDoc.vendor_name ?? "—"}` : undefined}
+        footer={
+          <>
+            <button onClick={closeReview} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={confirmReview} disabled={savingReview} className="btn-primary text-sm">
+              {savingReview ? "A processar…" : reviewAction === "approve" ? "Aprovar" : "Recusar"}
+            </button>
+          </>
+        }
+      >
+        {reviewDoc && reviewAction === "approve" && (
+          <div className="space-y-4">
+            {reviewDoc.file_url && (
+              <a href={reviewDoc.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-piquet-600 hover:underline">
+                Ver ficheiro antes de aprovar →
+              </a>
+            )}
+            <Field label="Data de expiração" hint="Opcional">
+              <input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="input-field" />
+            </Field>
+          </div>
+        )}
+        {reviewDoc && reviewAction === "decline" && (
+          <div className="space-y-4">
+            {reviewDoc.file_url && (
+              <a href={reviewDoc.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-piquet-600 hover:underline">
+                Ver ficheiro antes de recusar →
+              </a>
+            )}
+            <Field label="Motivo" hint="Obrigatório — vai no email para o técnico">
+              <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={4} className="input-field" placeholder="Ex.: Documento ilegível, por favor envia uma foto mais nítida." />
+            </Field>
+          </div>
+        )}
+      </Modal>
     </RouteGuard>
   );
 }

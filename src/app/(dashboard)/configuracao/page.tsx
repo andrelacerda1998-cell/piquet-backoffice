@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Modal, Field } from "@/components/ui/Modal";
+import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import {
-  SEED_FEES, SEED_ADMINS, ADMIN_ROLES, getActivityLog,
-  type FeeConfig, type Admin, type ActivityEntry,
+  SEED_ADMINS, ADMIN_ROLES, getActivityLog,
+  type Admin, type ActivityEntry,
 } from "@/services/backofficeService";
+import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -79,76 +81,111 @@ export default function ConfiguracaoPage() {
 
 /* ---------------------------- Taxas e comissões ---------------------------- */
 
+// Espelha o formulário do Filament (Pages\FeeSettings, sobre App\Settings\RateSettings):
+// os períodos do dia são rotulados pela faixa horária, não pelo nome do campo.
+const TIME_PERIODS: { key: keyof Omit<FeeSettings, "kilometer_price" | "system_commission">; label: string }[] = [
+  { key: "daytime", label: "08:00 – 17:59" },
+  { key: "evening", label: "18:00 – 20:59" },
+  { key: "night", label: "21:00 – 23:59" },
+  { key: "late_night", label: "00:00 – 02:59" },
+  { key: "midnight", label: "03:00 – 07:59" },
+];
+
 function TaxasTab() {
-  const [rawFees, setFees] = usePersistentList<FeeConfig>("fees", SEED_FEES);
-  // Normaliza dados persistidos antigos: cancelamentos passaram de € a % a
-  // 2026-07-22 e `enabled` pode não existir (assume-se em vigor).
-  const fees = rawFees.map((f) => ({
-    ...f,
-    enabled: f.enabled ?? true,
-    unit: f.id.startsWith("fee_cancel") ? ("%" as const) : f.unit,
-  }));
-  const [draft, setDraft] = useState<Record<string, number>>({});
+  const { data, loading, error, refetch } = useAsyncData(() => getFeeSettings(), []);
+  const [draft, setDraft] = useState<FeeSettings | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = (id: string) => {
-    const value = draft[id];
-    if (value === undefined || Number.isNaN(value) || value < 0) { toast("Valor inválido.", "error"); return; }
-    const fee = fees.find((f) => f.id === id);
-    if (fee?.unit === "%" && value > 100) { toast("Uma percentagem não pode passar de 100%.", "error"); return; }
-    setFees((prev) => prev.map((f) => (f.id === id ? { ...f, value, unit: f.id.startsWith("fee_cancel") ? "%" : f.unit } : f)));
-    setDraft((d) => { const n = { ...d }; delete n[id]; return n; });
-    toast(`"${fee?.label}" atualizado para ${value}${fee?.unit}.`);
-  };
+  useEffect(() => { if (data) setDraft(data); }, [data]);
 
-  const toggleFee = (id: string) => {
-    const fee = fees.find((f) => f.id === id);
-    setFees((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !(f.enabled ?? true) } : f)));
-    toast(`"${fee?.label}" ${fee?.enabled ? "desativada — deixa de ser aplicada" : "ativada"}.`);
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  if (!draft) return null;
+
+  const dirty = data && JSON.stringify(data) !== JSON.stringify(draft);
+
+  const set = (key: keyof FeeSettings, value: number) => setDraft((d) => (d ? { ...d, [key]: value } : d));
+
+  const save = async () => {
+    if (!draft) return;
+    for (const { key, label } of TIME_PERIODS) {
+      if (!Number.isInteger(draft[key]) || draft[key] < 0) {
+        toast(`"${label}" tem de ser um número inteiro ≥ 0.`, "error");
+        return;
+      }
+    }
+    if (draft.kilometer_price < 0) { toast('"Preço por km" tem de ser ≥ 0.', "error"); return; }
+    if (!Number.isInteger(draft.system_commission) || draft.system_commission < 0 || draft.system_commission > 100) {
+      toast('"Comissão do sistema" tem de ser um número inteiro entre 0 e 100.', "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await updateFeeSettings(draft);
+      setDraft(saved);
+      toast("Definições de taxas atualizadas.");
+      refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível gravar as definições de taxas.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-secondary">Comissões, taxas fixas, acréscimos dinâmicos e penalizações de cancelamento — aplicadas ao cálculo dos serviços. Desativa uma taxa para a suspender sem perder o valor configurado.</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {fees.map((f) => {
-          const editing = draft[f.id] !== undefined;
-          return (
-            <div key={f.id} className={cn("card p-4 flex items-center gap-4", !f.enabled && "opacity-60")}>
-              <button
-                onClick={() => toggleFee(f.id)}
-                role="switch"
-                aria-checked={f.enabled}
-                title={f.enabled ? "Desativar esta taxa" : "Ativar esta taxa"}
-                className={cn("relative h-5 w-9 rounded-full transition-colors shrink-0", f.enabled ? "bg-success" : "bg-surface-border")}
-              >
-                <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all", f.enabled ? "left-[18px]" : "left-0.5")} />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-text-primary flex items-center gap-2">
-                  {f.label}
-                  {!f.enabled && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-subtle text-text-muted">Desativada</span>}
-                </p>
-                <p className="text-xs text-text-secondary">{f.description}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {editing ? (
-                  <>
-                    <input type="number" min={0} step={0.1} value={draft[f.id]}
-                      onChange={(e) => setDraft((d) => ({ ...d, [f.id]: Number(e.target.value) }))}
-                      className="input-field w-24 text-sm py-1.5" autoFocus />
-                    <span className="text-sm text-text-muted">{f.unit}</span>
-                    <button onClick={() => save(f.id)} className="btn-primary text-xs py-1.5">Guardar</button>
-                  </>
-                ) : (
-                  <>
-                    <span className={cn("text-xl font-bold", f.enabled ? "text-text-primary" : "text-text-muted line-through")}>{f.value}{f.unit}</span>
-                    <button onClick={() => setDraft((d) => ({ ...d, [f.id]: f.value }))} className="text-xs text-piquet-600 hover:underline">Editar</button>
-                  </>
-                )}
+    <div className="space-y-6">
+      <p className="text-sm text-text-secondary">
+        Multiplicadores da tarifa base por período do dia, preço por km e comissão retida pela Piquet — aplicados ao cálculo de todos os serviços.
+      </p>
+
+      <div>
+        <h3 className="font-semibold mb-3">Taxas horárias</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {TIME_PERIODS.map(({ key, label }) => (
+            <div key={key} className="card p-4">
+              <p className="text-xs text-text-secondary mb-2">{label}</p>
+              <div className="flex items-center gap-2">
+                <input type="number" min={0} step={1} value={draft[key]}
+                  onChange={(e) => set(key, Number(e.target.value))}
+                  className="input-field text-sm py-1.5" />
+                <span className="text-sm text-text-muted shrink-0">%</span>
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-3">Configurações de taxas</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <div className="card p-4">
+            <p className="text-xs text-text-secondary mb-2">Preço por km (deslocação)</p>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} step={0.01} value={draft.kilometer_price}
+                onChange={(e) => set("kilometer_price", Number(e.target.value))}
+                className="input-field text-sm py-1.5" />
+              <span className="text-sm text-text-muted shrink-0">€</span>
+            </div>
+          </div>
+          <div className="card p-4">
+            <p className="text-xs text-text-secondary mb-2">Comissão do sistema</p>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} max={100} step={1} value={draft.system_commission}
+                onChange={(e) => set("system_commission", Number(e.target.value))}
+                className="input-field text-sm py-1.5" />
+              <span className="text-sm text-text-muted shrink-0">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={!dirty || saving} className="btn-primary text-sm">
+          {saving ? "A gravar…" : "Guardar alterações"}
+        </button>
+        {dirty && !saving && (
+          <button onClick={() => setDraft(data ?? null)} className="btn-secondary text-sm">Cancelar</button>
+        )}
       </div>
     </div>
   );
