@@ -102,10 +102,10 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     const { isDemoEndpoint, isLiveEndpoint } = await load();
     // Estes vão ao backend real E MESMO ASSIM são ficção: as tabelas foram
     // preenchidas de uma vez pelo seed. (/services saiu desta lista a
-    // 2026-07-17: o seed foi apagado e a tabela só tem serviços concluídos
-    // registados à mão — dados reais.)
-    for (const ep of ["/customers", "/technicians", "/employees",
-                      "/finance/summary", "/tax/obligations", "/finance/payouts"]) {
+    // 2026-07-17, /customers+/technicians a 2026-07-20 e /employees a
+    // 2026-07-22: o seed foi apagado e passam a ser dados reais ou vazios.)
+    // (/finance/payouts saiu a 2026-07-22: passou a derivar dos serviços concluídos.)
+    for (const ep of ["/finance/summary", "/tax/obligations"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
     }
@@ -117,12 +117,15 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // migrado corre o fetcher mock SEM selo e SEM zeragem — mentira perfeita.
     // (Aconteceu com /product/ratings: mostrou avaliações inventadas como
     // reais até este teste existir.)
-    for (const ep of ["/services", "/goals", "/finance/company-invoices", "/finance/gmv",
+    for (const ep of ["/services", "/customers", "/customers/metrics",
+                      "/technicians", "/technicians/metrics", "/technicians/coverage",
+                      "/goals", "/finance/company-invoices", "/finance/gmv", "/finance/unit-economics",
                       "/marketing/campaigns", "/marketing/metrics",
                       "/marketing/channels", "/marketing/creatives", "/marketing/leads",
                       "/finance/app-payments", "/product/growth", "/product/ratings",
-                      "/product/integrations-status", "/dev-tasks", "/team/messages",
-                      "/team/tasks", "/team/agenda", "/team/meetings"]) {
+                      "/product/integrations-status", "/product/funnel", "/dev-tasks", "/tasks", "/team/messages",
+                      "/team/tasks", "/team/agenda", "/team/meetings",
+                      "/finance/budget", "/employees", "/employees/dashboard", "/finance/payouts"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

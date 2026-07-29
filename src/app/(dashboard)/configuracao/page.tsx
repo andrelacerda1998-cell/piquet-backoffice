@@ -80,28 +80,54 @@ export default function ConfiguracaoPage() {
 /* ---------------------------- Taxas e comissões ---------------------------- */
 
 function TaxasTab() {
-  const [fees, setFees] = usePersistentList<FeeConfig>("fees", SEED_FEES);
+  const [rawFees, setFees] = usePersistentList<FeeConfig>("fees", SEED_FEES);
+  // Normaliza dados persistidos antigos: cancelamentos passaram de € a % a
+  // 2026-07-22 e `enabled` pode não existir (assume-se em vigor).
+  const fees = rawFees.map((f) => ({
+    ...f,
+    enabled: f.enabled ?? true,
+    unit: f.id.startsWith("fee_cancel") ? ("%" as const) : f.unit,
+  }));
   const [draft, setDraft] = useState<Record<string, number>>({});
 
   const save = (id: string) => {
     const value = draft[id];
     if (value === undefined || Number.isNaN(value) || value < 0) { toast("Valor inválido.", "error"); return; }
-    setFees((prev) => prev.map((f) => (f.id === id ? { ...f, value } : f)));
-    setDraft((d) => { const n = { ...d }; delete n[id]; return n; });
     const fee = fees.find((f) => f.id === id);
+    if (fee?.unit === "%" && value > 100) { toast("Uma percentagem não pode passar de 100%.", "error"); return; }
+    setFees((prev) => prev.map((f) => (f.id === id ? { ...f, value, unit: f.id.startsWith("fee_cancel") ? "%" : f.unit } : f)));
+    setDraft((d) => { const n = { ...d }; delete n[id]; return n; });
     toast(`"${fee?.label}" atualizado para ${value}${fee?.unit}.`);
+  };
+
+  const toggleFee = (id: string) => {
+    const fee = fees.find((f) => f.id === id);
+    setFees((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !(f.enabled ?? true) } : f)));
+    toast(`"${fee?.label}" ${fee?.enabled ? "desativada — deixa de ser aplicada" : "ativada"}.`);
   };
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-text-secondary">Comissões, taxas fixas, acréscimos dinâmicos e penalizações de cancelamento — aplicadas ao cálculo dos serviços.</p>
+      <p className="text-sm text-text-secondary">Comissões, taxas fixas, acréscimos dinâmicos e penalizações de cancelamento — aplicadas ao cálculo dos serviços. Desativa uma taxa para a suspender sem perder o valor configurado.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {fees.map((f) => {
           const editing = draft[f.id] !== undefined;
           return (
-            <div key={f.id} className="card p-4 flex items-center gap-4">
+            <div key={f.id} className={cn("card p-4 flex items-center gap-4", !f.enabled && "opacity-60")}>
+              <button
+                onClick={() => toggleFee(f.id)}
+                role="switch"
+                aria-checked={f.enabled}
+                title={f.enabled ? "Desativar esta taxa" : "Ativar esta taxa"}
+                className={cn("relative h-5 w-9 rounded-full transition-colors shrink-0", f.enabled ? "bg-success" : "bg-surface-border")}
+              >
+                <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all", f.enabled ? "left-[18px]" : "left-0.5")} />
+              </button>
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-text-primary">{f.label}</p>
+                <p className="font-medium text-text-primary flex items-center gap-2">
+                  {f.label}
+                  {!f.enabled && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-subtle text-text-muted">Desativada</span>}
+                </p>
                 <p className="text-xs text-text-secondary">{f.description}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -115,7 +141,7 @@ function TaxasTab() {
                   </>
                 ) : (
                   <>
-                    <span className="text-xl font-bold text-text-primary">{f.value}{f.unit}</span>
+                    <span className={cn("text-xl font-bold", f.enabled ? "text-text-primary" : "text-text-muted line-through")}>{f.value}{f.unit}</span>
                     <button onClick={() => setDraft((d) => ({ ...d, [f.id]: f.value }))} className="text-xs text-piquet-600 hover:underline">Editar</button>
                   </>
                 )}
@@ -144,15 +170,37 @@ const SEED_DOCS: RequiredDoc[] = [
 
 function DocumentosTab() {
   const [docs, setDocs] = usePersistentList<RequiredDoc>("required-docs", SEED_DOCS);
+  const [showAdd, setShowAdd] = useState(false);
+  const [docForm, setDocForm] = useState({ name: "", appliesTo: "Todos os técnicos", required: true });
   const toggle = (id: string) => {
     setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, required: !d.required } : d)));
     const d = docs.find((x) => x.id === id);
     toast(`"${d?.name}" agora é ${d?.required ? "opcional" : "obrigatório"}.`);
   };
+  const removeDoc = (id: string) => {
+    const d = docs.find((x) => x.id === id);
+    setDocs((prev) => prev.filter((x) => x.id !== id));
+    toast(`"${d?.name}" removido da lista de documentos.`);
+  };
+  const addDoc = () => {
+    if (!docForm.name.trim()) { toast("Indica o nome do documento.", "error"); return; }
+    setDocs((prev) => [...prev, {
+      id: `doc_${Date.now()}`,
+      name: docForm.name.trim(),
+      appliesTo: docForm.appliesTo.trim() || "Todos os técnicos",
+      required: docForm.required,
+    }]);
+    setShowAdd(false);
+    setDocForm({ name: "", appliesTo: "Todos os técnicos", required: true });
+    toast("Documento adicionado.");
+  };
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-text-secondary">Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os na aba Técnicos.</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-text-secondary">Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os na aba Técnicos.</p>
+        <button onClick={() => setShowAdd(true)} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Adicionar documento</button>
+      </div>
       <div className="space-y-2">
         {docs.map((d) => (
           <div key={d.id} className="card px-4 py-3 flex items-center gap-3">
@@ -168,9 +216,37 @@ function DocumentosTab() {
             <button onClick={() => toggle(d.id)} className="text-xs text-piquet-600 hover:underline shrink-0">
               Tornar {d.required ? "opcional" : "obrigatório"}
             </button>
+            <button onClick={() => removeDoc(d.id)} className="text-xs text-text-muted hover:text-danger shrink-0">Eliminar</button>
           </div>
         ))}
+        {docs.length === 0 && <p className="text-sm text-text-muted p-4">Sem documentos configurados — adiciona o primeiro.</p>}
       </div>
+
+      <Modal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Adicionar documento"
+        subtitle="Passa a ser pedido aos técnicos no registo"
+        footer={
+          <>
+            <button onClick={() => setShowAdd(false)} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={addDoc} className="btn-primary text-sm">Adicionar</button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Nome do documento">
+            <input value={docForm.name} onChange={(e) => setDocForm({ ...docForm, name: e.target.value })} placeholder="Ex.: Certificado de gás (CNAEE)" className="input-field" />
+          </Field>
+          <Field label="Aplica-se a">
+            <input value={docForm.appliesTo} onChange={(e) => setDocForm({ ...docForm, appliesTo: e.target.value })} placeholder="Ex.: Todos os técnicos, ou categorias específicas" className="input-field" />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={docForm.required} onChange={(e) => setDocForm({ ...docForm, required: e.target.checked })} />
+            Obrigatório para aprovação
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }

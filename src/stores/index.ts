@@ -172,7 +172,7 @@ export const useUiStore = create<UiState>()(
 
 export interface AppNotification {
   id: string;
-  kind: "ticket" | "sistema" | "chat" | "tarefa" | "reuniao";
+  kind: "ticket" | "sistema" | "chat" | "tarefa" | "reuniao" | "lead";
   title: string;
   body: string;
   at: string;

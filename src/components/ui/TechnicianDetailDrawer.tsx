@@ -6,11 +6,13 @@ import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { toast } from "@/stores";
+import { REQUIRED_DOCS, type DocStatus, type TechDocument } from "@/services/techniciansService";
 import type { Technician } from "@/types";
-import { X, Star, Smartphone, ShieldCheck } from "lucide-react";
+import { X, Star, Smartphone, ShieldCheck, FileCheck2, FileClock, FileX2, Check } from "lucide-react";
 
 const TABS = [
   { id: "dados", label: "Dados" },
+  { id: "documentacao", label: "Documentação" },
   { id: "servicos", label: "Serviços" },
   { id: "financeiro", label: "Financeiro" },
   { id: "avaliacoes", label: "Avaliações" },
@@ -20,10 +22,48 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function TechnicianDetailDrawer({ technician, onClose }: { technician: Technician; onClose: () => void }) {
+const DOC_UI: Record<DocStatus, { label: string; tone: string; Icon: typeof FileCheck2 }> = {
+  verificado: { label: "Verificado", tone: "text-success", Icon: FileCheck2 },
+  submetido: { label: "Por validar", tone: "text-warning", Icon: FileClock },
+  em_falta: { label: "Em falta", tone: "text-danger", Icon: FileX2 },
+};
+
+// Estados em que ainda faz sentido aprovar/recusar (ainda não está na operação).
+const PENDING_APPROVAL = ["registado", "perfil_incompleto", "em_validacao", "rejeitado"];
+
+export function TechnicianDetailDrawer({ technician, onClose, onApprove, onReject }: {
+  technician: Technician;
+  onClose: () => void;
+  onApprove?: (t: Technician) => void;
+  onReject?: (t: Technician) => void;
+}) {
   const [tab, setTab] = useState<TabId>("dados");
   const t = technician;
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
+
+  // Documentos KYC. O técnico real só guarda `documentationComplete`; sem
+  // histórico por documento, deriva-se: completo → verificado, senão → por
+  // validar. O gestor pode validar cada um aqui (estado local, pronto p/ API).
+  const [docs, setDocs] = useState<TechDocument[]>(() =>
+    REQUIRED_DOCS.map((name) => ({ name, status: t.documentationComplete ? "verificado" : "submetido" })),
+  );
+  const verifiedCount = docs.filter((d) => d.status === "verificado").length;
+  const allVerified = verifiedCount === docs.length;
+  const canDecide = PENDING_APPROVAL.includes(t.status);
+
+  const validateDoc = (name: string) => {
+    setDocs((prev) => prev.map((d) => (d.name === name ? { ...d, status: "verificado" } : d)));
+    toast(`Documento "${name}" validado.`);
+  };
+  const approve = () => {
+    if (!allVerified) { toast("Valida todos os documentos antes de aprovar.", "info"); return; }
+    (onApprove ?? (() => toast(`Técnico ${t.name} aprovado.`)))(t);
+    onClose();
+  };
+  const reject = () => {
+    (onReject ?? (() => toast(`Técnico ${t.name} recusado.`, "error")))(t);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -71,6 +111,51 @@ export function TechnicianDetailDrawer({ technician, onClose }: { technician: Te
               <Row label="Estado" value={<StatusBadge status={t.status} />} />
               <Row label="Registo" value={formatDate(t.registeredAt)} />
               <Row label="Aprovado em" value={t.approvedAt ? formatDate(t.approvedAt) : "—"} />
+            </div>
+          )}
+          {tab === "documentacao" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-text-secondary">Verificação de identidade e habilitações (KYC).</p>
+                <span className={cn("text-xs font-semibold", allVerified ? "text-success" : "text-warning")}>
+                  {verifiedCount}/{docs.length} verificados
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {docs.map((d) => {
+                  const ui = DOC_UI[d.status];
+                  return (
+                    <div key={d.name} className="flex items-center gap-3 rounded-lg border border-surface-border px-3 py-2.5">
+                      <ui.Icon className={cn("h-5 w-5 shrink-0", ui.tone)} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">{d.name}</p>
+                        <p className={cn("text-xs", ui.tone)}>{ui.label}</p>
+                      </div>
+                      {d.status !== "verificado" && (
+                        <button onClick={() => validateDoc(d.name)} className="btn-secondary text-xs py-1.5 shrink-0">
+                          <Check className="h-3.5 w-3.5" /> Validar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {canDecide ? (
+                <div className="flex items-center gap-2 pt-2 border-t border-surface-border">
+                  <button onClick={approve} disabled={!allVerified}
+                    className={cn("btn-primary text-sm flex-1", !allVerified && "opacity-50 cursor-not-allowed")}>
+                    Aprovar técnico
+                  </button>
+                  <button onClick={reject} className="btn-secondary text-sm flex-1 text-danger">Recusar</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg bg-surface-subtle px-3 py-2.5 text-sm text-text-secondary">
+                  <ShieldCheck className="h-4 w-4 text-success shrink-0" />
+                  Técnico já aprovado{t.approvedAt ? ` em ${formatDate(t.approvedAt)}` : ""}.
+                </div>
+              )}
             </div>
           )}
           {tab === "servicos" && (

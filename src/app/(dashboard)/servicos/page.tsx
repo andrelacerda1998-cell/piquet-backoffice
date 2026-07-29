@@ -6,6 +6,9 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import ServicosPersonalizadosPage from "../servicos-personalizados/page";
+import QualidadePage from "../qualidade/page";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ChartCard, DonutChartComponent, FunnelChartComponent } from "@/components/charts/Charts";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
@@ -16,7 +19,7 @@ import { getServices, getStatusDistribution, getMainFunnel, createCompletedServi
 import { getOperationalMetrics } from "@/services/supportService";
 import { getIncidents, incidentTypeLabel, type Incident } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDuration } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS, DEFAULT_SETTINGS } from "@/config/dashboard";
 import { downloadCsv, cn } from "@/lib/utils";
 import { toast } from "@/stores";
@@ -42,7 +45,7 @@ export default function ServicesPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [selectedService, setSelectedService] = useState<ServiceRequest | null>(null);
-  const [tab, setTab] = useState("pedidos");
+  const [tab, setTab] = useTabParam("pedidos");
   const [showCreate, setShowCreate] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
   const emptyForm = {
@@ -91,6 +94,8 @@ export default function ServicesPage() {
     { id: "app", label: "Reservas da app" },
     { id: "incidentes", label: "Incidentes", count: (incidents ?? []).filter((i) => i.status !== "resolvido").length },
     { id: "desempenho", label: "Desempenho (SLA)" },
+    { id: "personalizados", label: "Pedidos personalizados" },
+    { id: "qualidade", label: "Qualidade" },
   ];
 
   const createService = async () => {
@@ -150,23 +155,21 @@ export default function ServicesPage() {
   const { data: statusDist } = useAsyncData(() => getStatusDistribution(filters), [filters]);
   const { data: funnel } = useAsyncData(() => getMainFunnel(filters), [filters]);
 
+  // Sem ID; sem Agendado, Valor técnico, Origem, Tempo técnico e Reclamação
+  // (pedido do André 2026-07-22). Avaliação visível junto ao estado.
   const columns: Column<ServiceRequest>[] = [
-    { key: "id", label: "ID", sortable: true, render: (r) => <span className="font-mono text-xs">{r.id}</span> },
     { key: "requestedAt", label: "Data", sortable: true, render: (r) => formatDate(r.requestedAt) },
     { key: "customerName", label: "Cliente", sortable: true },
     { key: "technicianName", label: "Técnico", render: (r) => r.technicianName ?? "—" },
     { key: "categoryName", label: "Categoria" },
     { key: "serviceName", label: "Serviço" },
     { key: "city", label: "Localização", sortable: true },
-    { key: "scheduledAt", label: "Agendado", render: (r) => r.scheduledAt ? formatDate(r.scheduledAt) : "—" },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} label={SERVICE_STATUS_LABELS[r.status]} /> },
+    { key: "rating", label: "Avaliação", render: (r) => r.rating
+      ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
+      : <span className="text-text-muted">—</span> },
     { key: "totalCustomerValue", label: "Valor total", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue) },
-    { key: "technicianValue", label: "Valor técnico", render: (r) => formatCurrency(r.technicianValue) },
     { key: "piquetRevenue", label: "Receita Piquet", sortable: true, render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "source", label: "Origem" },
-    { key: "technicianAssignmentTimeMinutes", label: "Tempo técnico", render: (r) => r.technicianAssignmentTimeMinutes ? formatDuration(r.technicianAssignmentTimeMinutes) : "—" },
-    { key: "rating", label: "Avaliação", render: (r) => r.rating ? `${r.rating}★` : "—" },
-    { key: "hasComplaint", label: "Reclamação", render: (r) => r.hasComplaint ? "⚠️" : "—" },
   ];
 
   const handleExport = () => {
@@ -282,6 +285,9 @@ export default function ServicesPage() {
             </div>
           </div>
         )}
+
+        {tab === "personalizados" && <ServicosPersonalizadosPage />}
+        {tab === "qualidade" && <QualidadePage />}
 
         {/* Modal — registar / editar serviço concluído */}
         <Modal

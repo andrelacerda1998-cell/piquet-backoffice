@@ -112,7 +112,7 @@ export interface PendingTechnician {
   documents: TechDocument[];
 }
 
-const REQUIRED_DOCS = [
+export const REQUIRED_DOCS = [
   "Cartão de cidadão",
   "NIF",
   "IBAN",

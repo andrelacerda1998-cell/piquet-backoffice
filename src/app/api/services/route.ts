@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { rowToService, serviceSortColumn, embedName, type ServiceRow } from "@/lib/supabase/adapters";
 import { getDateRangeFromPreset } from "@/lib/filters";
 import { apiOk, apiErr, withStaff } from "../_lib/handler";
+import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../_lib/entities";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import type { PeriodPreset } from "@/types";
 
@@ -111,8 +112,17 @@ export const POST = withStaff(async (req) => {
   const vat = amount - amount / (1 + DEFAULT_TAX_CONFIG.vatRate);
   const rating = b.rating != null ? Math.min(5, Math.max(1, Number(b.rating))) : null;
 
+  // Cria/reutiliza o cliente e o técnico (por nome) e liga as FKs, para
+  // aparecerem nas abas Clientes/Técnicos com as métricas por relação.
+  const admin = supabaseAdmin();
+  const city = b.city ?? null;
+  const customerId = await upsertCustomerByName(admin, b.customerName, city);
+  const technicianId = await upsertTechnicianByName(admin, b.technicianName, city, b.categoryId ?? null);
+
   const row = {
     id: `srv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    customer_id: customerId,
+    technician_id: technicianId,
     customer_name: b.customerName?.trim() || null,
     technician_name: b.technicianName.trim(),
     category_id: b.categoryId ?? null,
@@ -134,7 +144,9 @@ export const POST = withStaff(async (req) => {
     internal_notes: [] as string[],
   };
 
-  const { error } = await supabaseAdmin().from("services").insert(row);
+  const { error } = await admin.from("services").insert(row);
   if (error) return apiErr(error.message, 400);
+  // Alinha as categorias do técnico com os serviços que executou.
+  await syncTechnicianCategories(admin, technicianId);
   return apiOk({ id: row.id }, 201);
 });

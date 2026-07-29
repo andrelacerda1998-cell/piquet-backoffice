@@ -1,44 +1,52 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DemoBadge } from "@/components/ui/DemoBadge";
-import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import ImpostosRhPage from "../impostos-rh/page";
 import { Modal, Field } from "@/components/ui/Modal";
-import { ChartCard, LineChartComponent, BarChartComponent, AreaChartComponent, CashFlowChart, DonutChartComponent } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent, AreaChartComponent, CashFlowChart, DonutChartComponent } from "@/components/charts/Charts";
 import { LoadingState, ErrorState } from "@/components/ui/States";
-import { useAsyncData, useFilters, usePagination } from "@/hooks/useDashboard";
+import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import {
-  getFinanceSummary, getFinanceByService, getDailyRevenue,
-  getRevenueByTechnician, getRevenueVsCosts, getCashFlowForecast,
-  getFixedVsVariableCosts, getPendingPayments, getRefundsOverTime, getOperationalResult,
+  getFinanceSummary, getRevenueVsCosts, getCashFlowForecast,
+  getOperationalResult,
   getTechnicianPayouts, processTechnicianPayout, getAppPayments, getFinanceGmv,
   getCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, deleteCompanyInvoice,
+  getBudgetItems, createBudgetItem, updateBudgetItem, deleteBudgetItem,
+  BUDGET_FREQUENCY_LABELS, BUDGET_CATEGORY_LABELS, INVOICE_RECURRENCE_LABELS,
   type TechnicianPayout, type AppPayment, type PaymentState, type CompanyInvoice,
+  type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
+  type InvoiceRecurrence,
 } from "@/services/financeService";
-import { getRevenueByCategory } from "@/services/dashboardService";
+import { buildMonthlyPlan, type PlanItem } from "@/lib/budgetPlan";
+import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService";
+import { getLeads } from "@/services/extrasService";
+import { PIQUET_COMMISSION } from "@/mocks/data";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { SEED_REFUNDS, type Refund } from "@/services/backofficeService";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt } from "lucide-react";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight } from "lucide-react";
 
 const TABS: TabDef[] = [
-  // Consolidado (2026-07-17): 8 → 5 abas. Pagamentos da app primeiro (é o
-  // único real). Tesouraria fundida no Resumo; Faturação e Reembolsos passaram
-  // a sub-abas de "Custos e faturas".
-  { id: "app-pagamentos", label: "Pagamentos da app" },
+  // Consolidado (2026-07-17): 8 → 5 abas. Tesouraria fundida no Resumo;
+  // Faturação e Reembolsos passaram a sub-abas de "Custos e faturas".
+  // 2026-07-21: Resumo primeiro (default), com as próximas faturas a pagar.
   { id: "resumo", label: "Resumo" },
-  { id: "receita", label: "Receita" },
+  { id: "app-pagamentos", label: "Pagamentos da app" },
+  // "Receita" escondida a 2026-07-22: era 100% demo (seed zerado). Volta
+  // quando ligar aos serviços reais + Payshop (mesma fonte do GMV).
   { id: "custos", label: "Custos e faturas" },
+  { id: "planeamento", label: "Planeamento" },
   { id: "pagamentos", label: "Pagamentos a técnicos" },
+  { id: "impostos", label: "Impostos e RH" },
 ];
 
 /** Estado final de um pagamento da app (ciclo de vida do pagamento diferido). */
@@ -53,42 +61,141 @@ const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
 
 export default function FinancePage() {
   const filters = useFilters();
-  const { page, setPage, pageSize, sortField, sortDirection, handleSort } = usePagination();
   const [cashFlowScenario, setCashFlowScenario] = useState<"conservador" | "base" | "otimista">("base");
-  const [tab, setTab] = useState("app-pagamentos");
+  const [tab, setTab] = useTabParam("resumo");
 
   const { data: summary, loading, error, refetch } = useAsyncData(() => getFinanceSummary(filters), [filters]);
-  const { data: byService } = useAsyncData(() => getFinanceByService(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined), [filters, page, pageSize, sortField, sortDirection]);
-  const { data: dailyRevenue } = useAsyncData(() => getDailyRevenue(filters), [filters]);
-  const { data: byTechnician } = useAsyncData(() => getRevenueByTechnician(filters), [filters]);
-  const { data: byCategory } = useAsyncData(() => getRevenueByCategory(filters), [filters]);
   const { data: revenueVsCosts } = useAsyncData(() => getRevenueVsCosts(filters), [filters]);
   const { data: cashFlow } = useAsyncData(() => getCashFlowForecast(cashFlowScenario), [cashFlowScenario]);
-  const { data: fixedVsVariable } = useAsyncData(() => getFixedVsVariableCosts(), []);
-  const { data: pendingPayments } = useAsyncData(() => getPendingPayments(), []);
-  const { data: refunds } = useAsyncData(() => getRefundsOverTime(), []);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: payouts, refetch: refetchPayouts } = useAsyncData(() => getTechnicianPayouts(), []);
+  const payoutPending = useMemo(() => (payouts ?? []).filter((p) => p.status === "pendente"), [payouts]);
+  const payoutDone = useMemo(() => (payouts ?? []).filter((p) => p.status === "processado"), [payouts]);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay } = useAsyncData(() => getAppPayments(), []);
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [invForm, setInvForm] = useState({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
-
-  // Reembolsos (persistidos) — marcar concluído sobrevive ao refresh.
-  const [refundList, setRefundList] = usePersistentList<Refund>("reembolsos", SEED_REFUNDS);
-  const completeRefund = (id: string) => {
-    setRefundList((prev) => prev.map((r) => (r.id === id ? { ...r, status: "concluido" } : r)));
-    const r = refundList.find((x) => x.id === id);
-    toast(`Reembolso de ${formatCurrency(r?.amount ?? 0)} a ${r?.customerName} concluído.`);
+  const [invModal, setInvModal] = useState<{ open: boolean; editing: CompanyInvoice | null }>({ open: false, editing: null });
+  const emptyInvForm = () => ({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "", recurrence: "nenhuma" as InvoiceRecurrence });
+  const [invForm, setInvForm] = useState(emptyInvForm());
+  const openInvoiceModal = (inv: CompanyInvoice | null) => {
+    setInvForm(inv
+      ? {
+          vendor: inv.vendor, description: inv.description, amount: inv.amount,
+          issueDate: inv.issueDate ? inv.issueDate.slice(0, 10) : "",
+          dueDate: inv.dueDate ? inv.dueDate.slice(0, 10) : "",
+          recurrence: inv.recurrence ?? "nenhuma",
+        }
+      : emptyInvForm());
+    setInvModal({ open: true, editing: inv });
   };
 
-  const invoices = companyInv?.invoices ?? [];
+  // ------------------------- Planeamento financeiro mensal -------------------------
+  // Mês corrente REAL (o lib/today está fixado numa data de demo — não serve aqui).
+  const nowMonth = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+  const { data: budgetItems, refetch: refetchBudget } = useAsyncData(() => getBudgetItems(), []);
+  const { data: teamPage } = useAsyncData(() => getEmployees(1, 100), []);
+  const emptyBudgetForm = useMemo(() => ({
+    name: "", kind: "custo" as BudgetKind, category: "outros" as BudgetCategory,
+    amount: 0, frequency: "mensal" as BudgetFrequency, startMonth: nowMonth, notes: "",
+  }), [nowMonth]);
+  const [budgetModal, setBudgetModal] = useState<{ open: boolean; editing: BudgetItem | null }>({ open: false, editing: null });
+  const [budgetForm, setBudgetForm] = useState(emptyBudgetForm);
+  const openBudgetModal = (item: BudgetItem | null) => {
+    setBudgetForm(item
+      ? { name: item.name, kind: item.kind, category: item.category, amount: item.amount, frequency: item.frequency, startMonth: item.startMonth, notes: item.notes ?? "" }
+      : emptyBudgetForm);
+    setBudgetModal({ open: true, editing: item });
+  };
+  const saveBudgetItem = async () => {
+    if (!budgetForm.name.trim() || !(budgetForm.amount > 0)) { toast("Indica o nome e um valor positivo.", "error"); return; }
+    const payload = { ...budgetForm, name: budgetForm.name.trim(), amount: Number(budgetForm.amount), notes: budgetForm.notes.trim() || undefined };
+    try {
+      if (budgetModal.editing) { await updateBudgetItem(budgetModal.editing.id, payload); toast("Linha atualizada."); }
+      else { await createBudgetItem(payload); toast("Linha adicionada ao plano."); }
+      setBudgetModal({ open: false, editing: null });
+      refetchBudget();
+    } catch (e) { toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error"); }
+  };
+  const toggleBudgetItem = async (item: BudgetItem) => {
+    try { await updateBudgetItem(item.id, { active: !item.active }); refetchBudget(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+  const removeBudgetItem = async (item: BudgetItem) => {
+    try { await deleteBudgetItem(item.id); toast("Linha removida."); refetchBudget(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+
+  const invoices = useMemo(() => companyInv?.invoices ?? [], [companyInv]);
   const invKpis = companyInv?.kpis;
 
+  // Próximas faturas a pagar (por vencimento; atrasadas/mais próximas primeiro).
+  const openInvoices = invoices
+    .filter((i) => i.status !== "pago")
+    .sort((a, b) => {
+      const ad = a.dueDate || "9999-12-31", bd = b.dueDate || "9999-12-31";
+      return ad < bd ? -1 : ad > bd ? 1 : 0;
+    });
+  const totalOutstanding = openInvoices.reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
+
+  // Projeção 12 meses: linhas do orçamento + faturas reais a pagar + equipa
+  // (colaboradores de Impostos e RH, custo mensal desde o início do contrato).
+  const planTeam = useMemo(
+    () => (teamPage?.data ?? [])
+      .filter((e) => !["inativo", "contrato_terminado"].includes(e.employmentStatus) && e.startDate)
+      .map((e) => ({
+        // Custo manual (se definido) ganha ao calculado — pedido do André 2026-07-22.
+        monthlyCost: effectiveMonthlyCost(e, e.cost),
+        startMonth: e.startDate.slice(0, 7),
+        endMonth: e.endDate ? e.endDate.slice(0, 7) : null,
+        name: e.fullName,
+      })),
+    [teamPage]
+  );
+  const planInvoices = useMemo(() => invoices.map((i) => ({ ...i, name: i.vendor })), [invoices]);
+  // Orçamentos aceites no CRM = receita futura conhecida: a comissão Piquet
+  // entra como entrada prevista no mês da execução (ou no mês atual, se já passou).
+  const { data: leadsData } = useAsyncData(() => getLeads(), []);
+  const planLeadInflows = useMemo<PlanItem[]>(
+    () => (leadsData ?? [])
+      .filter((l) => l.stage === "orcamento_aceite" && (l.quoteValue ?? 0) > 0)
+      .map((l) => {
+        const commission = l.technicianValue != null
+          ? Math.max(0, (l.quoteValue ?? 0) - l.technicianValue)
+          : (l.quoteValue ?? 0) * PIQUET_COMMISSION;
+        const execMonth = l.executionDate ? l.executionDate.slice(0, 7) : nowMonth;
+        return {
+          kind: "entrada" as const,
+          amount: Math.round(commission * 100) / 100,
+          frequency: "unica" as const,
+          startMonth: execMonth < nowMonth ? nowMonth : execMonth,
+          active: true,
+          name: `Orçamento aceite — ${l.name}`,
+        };
+      }),
+    [leadsData, nowMonth]
+  );
+  const plan = useMemo(
+    () => buildMonthlyPlan([...(budgetItems ?? []), ...planLeadInflows], planInvoices, { fromMonth: nowMonth, horizon: 12, team: planTeam }),
+    [budgetItems, planLeadInflows, planInvoices, nowMonth, planTeam]
+  );
+  const [openMonth, setOpenMonth] = useState<string | null>(null);
+  const peakMonth = useMemo(
+    () => plan.months.reduce((max, m) => (m.net > max.net ? m : max), plan.months[0]),
+    [plan]
+  );
+
   const markInvoicePaid = async (inv: CompanyInvoice) => {
-    try { await updateCompanyInvoice(inv.id, { markPaid: true }); toast("Fatura marcada como paga."); refetchInvoices(); }
+    try {
+      const res = await updateCompanyInvoice(inv.id, { markPaid: true });
+      toast(res.spawned
+        ? `Fatura paga. Próxima ${INVOICE_RECURRENCE_LABELS[inv.recurrence]?.toLowerCase() ?? ""} gerada${res.spawned.dueDate ? ` — vence ${formatDate(res.spawned.dueDate)}` : ""}.`
+        : "Fatura marcada como paga.");
+      refetchInvoices();
+    }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
   const registerPartial = async (inv: CompanyInvoice) => {
@@ -103,19 +210,28 @@ export default function FinancePage() {
     try { await deleteCompanyInvoice(inv.id); toast("Fatura removida."); refetchInvoices(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
-  const createInvoice = async () => {
+  const saveInvoice = async () => {
     if (!invForm.vendor.trim() || !(invForm.amount > 0)) { toast("Indica o fornecedor e o valor.", "error"); return; }
     try {
-      await createCompanyInvoice({
-        vendor: invForm.vendor.trim(), description: invForm.description.trim(),
-        amount: Number(invForm.amount), issueDate: invForm.issueDate, dueDate: invForm.dueDate || undefined,
-      });
-      setShowInvoice(false);
-      setInvForm({ vendor: "", description: "", amount: 0, issueDate: todayISO(), dueDate: "" });
-      toast("Fatura registada.");
+      if (invModal.editing) {
+        await updateCompanyInvoice(invModal.editing.id, {
+          vendor: invForm.vendor.trim(), description: invForm.description.trim(),
+          amount: Number(invForm.amount), issueDate: invForm.issueDate, dueDate: invForm.dueDate,
+          recurrence: invForm.recurrence,
+        });
+        toast("Fatura atualizada.");
+      } else {
+        await createCompanyInvoice({
+          vendor: invForm.vendor.trim(), description: invForm.description.trim(),
+          amount: Number(invForm.amount), issueDate: invForm.issueDate, dueDate: invForm.dueDate || undefined,
+          recurrence: invForm.recurrence,
+        });
+        toast("Fatura registada.");
+      }
+      setInvModal({ open: false, editing: null });
       refetchInvoices();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível registar.", "error");
+      toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
     }
   };
 
@@ -130,6 +246,11 @@ export default function FinancePage() {
         <p className="font-medium flex items-center gap-1.5">
           {r.vendor}
           {r.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">Outlook</span>}
+          {r.recurrence !== "nenhuma" && (
+            <span title="Fatura recorrente — ao ser paga, a próxima é gerada automaticamente" className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded bg-info-light text-info">
+              <RefreshCw className="h-2.5 w-2.5" /> {INVOICE_RECURRENCE_LABELS[r.recurrence]}
+            </span>
+          )}
         </p>
         <p className="text-xs text-text-muted">{r.description || "—"}</p>
       </div>
@@ -153,7 +274,39 @@ export default function FinancePage() {
       <div className="flex items-center gap-2 justify-end">
         {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
         {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
+        <button onClick={() => openInvoiceModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
         <button onClick={() => removeInvoice(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      </div>
+    ) },
+  ];
+
+  const budgetColumns: Column<BudgetItem>[] = [
+    { key: "name", label: "Nome", render: (r) => (
+      <div className={cn(!r.active && "opacity-50")}>
+        <p className="font-medium">{r.name}</p>
+        <p className="text-xs text-text-muted">{BUDGET_CATEGORY_LABELS[r.category]}{r.notes ? ` · ${r.notes}` : ""}</p>
+      </div>
+    ) },
+    { key: "kind", label: "Tipo", render: (r) => (
+      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+        r.kind === "entrada" ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
+        {r.kind === "entrada" ? "Entrada" : "Custo"}
+      </span>
+    ) },
+    { key: "amount", label: "Valor", render: (r) => <span className={cn("font-semibold", !r.active && "opacity-50")}>{formatCurrency(r.amount)}</span> },
+    { key: "frequency", label: "Periodicidade", render: (r) => BUDGET_FREQUENCY_LABELS[r.frequency] },
+    { key: "startMonth", label: "Início", render: (r) => <span className="tabular-nums">{r.startMonth}</span> },
+    { key: "active", label: "Estado", render: (r) => (
+      <button onClick={() => toggleBudgetItem(r)} className={cn("text-xs px-2 py-0.5 rounded-full font-medium",
+        r.active ? "bg-success-light text-success" : "bg-surface-subtle text-text-muted")}
+        title={r.active ? "Clica para pausar (sai da projeção)" : "Clica para reativar"}>
+        {r.active ? "Ativa" : "Pausada"}
+      </button>
+    ) },
+    { key: "actions", label: "", render: (r) => (
+      <div className="flex items-center gap-2 justify-end">
+        <button onClick={() => openBudgetModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
+        <button onClick={() => removeBudgetItem(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
       </div>
     ) },
   ];
@@ -171,18 +324,6 @@ export default function FinancePage() {
     { key: "actions", label: "", render: (r) => r.status === "pendente" ? (
       <button onClick={async () => { try { await processTechnicianPayout(r.id); toast(`Pagamento de ${formatCurrency(r.amountDue)} a ${r.technicianName} processado.`); refetchPayouts(); } catch { toast("Falha ao processar pagamento.", "error"); } }} className="btn-primary text-xs py-1">Processar</button>
     ) : <span className="text-text-muted text-xs">—</span> },
-  ];
-
-  const financeColumns: Column<Record<string, unknown>>[] = [
-    { key: "id", label: "Serviço", render: (r) => String(r.id) },
-    { key: "customerName", label: "Cliente", sortable: true },
-    { key: "technicianName", label: "Técnico" },
-    { key: "totalCustomerValue", label: "Valor cliente", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue as number) },
-    { key: "technicianValue", label: "Valor técnico", render: (r) => formatCurrency(r.technicianValue as number) },
-    { key: "piquetRevenue", label: "Receita Piquet", sortable: true, render: (r) => formatCurrency(r.piquetRevenue as number) },
-    { key: "vat", label: "IVA", render: (r) => formatCurrency(r.vat as number) },
-    { key: "paymentStatus", label: "Pagamento", render: (r) => <StatusBadge status={r.paymentStatus as string} /> },
-    { key: "invoiceStatus", label: "Fatura", render: (r) => <StatusBadge status={r.invoiceStatus as string} /> },
   ];
 
   if (loading && !summary) return <LoadingState />;
@@ -215,6 +356,46 @@ export default function FinancePage() {
                   <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" />
                   <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" />
                 </div>
+              </div>
+
+              {/* Próximas faturas a pagar */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Próximas faturas a pagar</p>
+                  <button onClick={() => setTab("custos")} className="text-sm text-piquet-600 font-medium hover:underline">Ver todas →</button>
+                </div>
+                <div className="card divide-y divide-surface-border">
+                  {openInvoices.length === 0 ? (
+                    <p className="p-4 text-sm text-text-secondary">Sem faturas por pagar. 🎉</p>
+                  ) : openInvoices.slice(0, 6).map((inv) => (
+                    <div key={inv.id} className="flex items-center justify-between gap-3 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                          {inv.vendor}
+                          {inv.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted shrink-0">Outlook</span>}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {inv.dueDate
+                            ? <span className={cn(inv.overdue && "text-danger font-medium")}>Vence {formatDate(inv.dueDate)}{inv.overdue && " · atrasada ⚠️"}</span>
+                            : "Sem data de vencimento"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <p className="font-semibold text-sm">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
+                          <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full capitalize", invStatusTone[inv.status])}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
+                        </div>
+                        <button onClick={() => markInvoicePaid(inv)} className="text-xs text-success hover:underline whitespace-nowrap">Marcar paga</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {openInvoices.length > 0 && (
+                  <p className="text-xs text-text-muted mt-2">
+                    {openInvoices.length} fatura(s) por pagar · total em falta <b className="text-text-primary">{formatCurrency(totalOutstanding)}</b>
+                    {openInvoices.length > 6 && " · mostrando as 6 mais próximas"}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -288,155 +469,170 @@ export default function FinancePage() {
             </div>
           )}
 
-          {/* ---------------------------------- RECEITA --------------------------------- */}
-          {tab === "receita" && (
+          {/* ---------------------------------- CUSTOS ---------------------------------- */}
+          {/* Simplificado (2026-07-22): só "Faturas a pagar" (dados reais das company_invoices).
+              As sub-abas demo — Estrutura, Pagamentos pendentes, Reembolsos — e os KPIs de
+              custos operacionais foram removidos até haver integração real que os alimente. */}
+          {tab === "custos" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* previous = current: sem comparação fabricada (são contagens atuais). */}
+                <MetricCard title="Por pagar (total)" metric={buildMetricValue(invKpis?.totalOutstanding ?? 0, invKpis?.totalOutstanding ?? 0)} format="currency" />
+                <MetricCard title="Pendentes" metric={buildMetricValue(invKpis?.pendingCount ?? 0, invKpis?.pendingCount ?? 0)} />
+                <MetricCard title="Parciais" metric={buildMetricValue(invKpis?.partialCount ?? 0, invKpis?.partialCount ?? 0)} />
+                <MetricCard title="Vencidas" metric={buildMetricValue(invKpis?.overdueCount ?? 0, invKpis?.overdueCount ?? 0)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold">Faturas a pagar</h2>
+                  <p className="text-xs text-text-secondary">Manuais e recebidas por email (Outlook) · estados Pendente / Parcial / Pago</p>
+                </div>
+                <button onClick={() => openInvoiceModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
+              </div>
+              <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)." />
+            </div>
+          )}
+
+          {/* -------------------------------- PLANEAMENTO -------------------------------- */}
+          {/* Planeamento financeiro mensal (2026-07-22): quanto dinheiro é preciso em cada
+              mês. Linhas de orçamento reais (custos recorrentes + entradas previstas,
+              tabela budget_items) projetadas 12 meses, somadas às faturas reais a pagar. */}
+          {tab === "planeamento" && (
             <div className="space-y-6">
-              <DemoBadge endpoint="/finance/by-service" />
-              <SubTabs
-                tabs={[
-                  { id: "evolucao", label: "Evolução diária" },
-                  { id: "tecnico", label: "Por técnico" },
-                  { id: "categoria", label: "Por categoria" },
-                ]}
-              >
-                {(sub) => (
-                  <>
-                    {sub === "evolucao" && (
-                      <ChartCard title="Receita diária Piquet">
-                        <LineChartComponent data={(dailyRevenue ?? []).slice(-30).map((d) => ({ name: d.name.slice(5), value: d.value }))} currency />
-                      </ChartCard>
-                    )}
-                    {sub === "tecnico" && (
-                      <ChartCard title="Receita por técnico (top 10)">
-                        <BarChartComponent data={byTechnician ?? []} currency />
-                      </ChartCard>
-                    )}
-                    {sub === "categoria" && (
-                      <ChartCard title="Receita por categoria">
-                        <DonutChartComponent data={byCategory ?? []} currency centerLabel="Receita" />
-                      </ChartCard>
-                    )}
-                  </>
-                )}
-              </SubTabs>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* previous = current: são projeções do próprio plano, sem comparação fabricada. */}
+                <MetricCard title="Necessidade este mês" metric={buildMetricValue(plan.months[0]?.net ?? 0, plan.months[0]?.net ?? 0)} format="currency" />
+                <MetricCard title="Custos este mês" metric={buildMetricValue(plan.months[0]?.totalCosts ?? 0, plan.months[0]?.totalCosts ?? 0)} format="currency" />
+                <MetricCard title="Média mensal (12m)" metric={buildMetricValue(plan.totals.net / 12, plan.totals.net / 12)} format="currency" />
+                <MetricCard title={`Pico · ${peakMonth?.label ?? "—"}`} metric={buildMetricValue(peakMonth?.net ?? 0, peakMonth?.net ?? 0)} format="currency" />
+              </div>
+
               <div>
-                <h2 className="font-semibold mb-3">Detalhe financeiro por serviço</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Próximos 12 meses</p>
+                <div className="card overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-text-muted border-b border-surface-border">
+                        <th className="p-3 font-medium">Mês</th>
+                        <th className="p-3 font-medium text-right">Custos recorrentes</th>
+                        <th className="p-3 font-medium text-right">Equipa</th>
+                        <th className="p-3 font-medium text-right">Faturas a pagar</th>
+                        <th className="p-3 font-medium text-right">Custos totais</th>
+                        <th className="p-3 font-medium text-right">Entradas previstas</th>
+                        <th className="p-3 font-medium text-right">Necessidade líquida</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.months.map((m, i) => (
+                        <Fragment key={m.month}>
+                          <tr
+                            onClick={() => setOpenMonth(openMonth === m.month ? null : m.month)}
+                            title="Clica para ver a composição do mês"
+                            className={cn("border-b border-surface-border last:border-0 cursor-pointer hover:bg-surface-subtle/40", i === 0 && "bg-surface-subtle/60")}
+                          >
+                            <td className="p-3 font-medium capitalize whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1">
+                                <ChevronRight className={cn("h-3.5 w-3.5 text-text-muted transition-transform", openMonth === m.month && "rotate-90")} />
+                                {m.label}
+                              </span>
+                              {i === 0 && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-piquet/15 text-piquet-700">atual</span>}
+                            </td>
+                            <td className="p-3 text-right tabular-nums">{formatCurrency(m.recurringCosts)}</td>
+                            <td className="p-3 text-right tabular-nums">{m.teamCosts > 0 ? formatCurrency(m.teamCosts) : <span className="text-text-muted">—</span>}</td>
+                            <td className="p-3 text-right tabular-nums">{m.invoices > 0 ? formatCurrency(m.invoices) : <span className="text-text-muted">—</span>}</td>
+                            <td className="p-3 text-right tabular-nums font-semibold">{formatCurrency(m.totalCosts)}</td>
+                            <td className="p-3 text-right tabular-nums">{m.expectedInflow > 0 ? formatCurrency(m.expectedInflow) : <span className="text-text-muted">—</span>}</td>
+                            <td className={cn("p-3 text-right tabular-nums font-semibold", m.net > 0 ? "text-danger" : "text-success")}>
+                              {m.net > 0 ? formatCurrency(m.net) : m.totalCosts === 0 && m.expectedInflow === 0 ? <span className="text-text-muted font-normal">—</span> : `coberto (+${formatCurrency(-m.net)})`}
+                            </td>
+                          </tr>
+                          {openMonth === m.month && (
+                            <tr className="border-b border-surface-border bg-surface-subtle/30">
+                              <td colSpan={7} className="p-4">
+                                {m.totalCosts === 0 && m.expectedInflow === 0 ? (
+                                  <p className="text-sm text-text-secondary">Sem custos nem entradas previstas em {m.label}.</p>
+                                ) : (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                                    {([
+                                      { title: "Custos recorrentes", entries: m.detail.costs },
+                                      { title: "Equipa", entries: m.detail.team },
+                                      { title: "Faturas a pagar", entries: m.detail.invoices },
+                                      { title: "Entradas previstas", entries: m.detail.inflows },
+                                    ] as const).filter((g) => g.entries.length > 0).map((g) => (
+                                      <div key={g.title}>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-text-muted mb-2">{g.title}</p>
+                                        <ul className="space-y-1">
+                                          {g.entries.map((e, j) => (
+                                            <li key={j} className={cn("flex items-center justify-between gap-3", e.projected && "text-text-muted")}>
+                                              <span className="truncate">{e.name}</span>
+                                              <span className="tabular-nums font-medium shrink-0">{formatCurrency(e.amount)}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-surface-border text-xs">
+                        <td className="p-3 font-semibold">Total 12 meses</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.recurringCosts)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.teamCosts)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.invoices)}</td>
+                        <td className="p-3 text-right tabular-nums font-semibold">{formatCurrency(plan.totals.totalCosts)}</td>
+                        <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.expectedInflow)}</td>
+                        <td className={cn("p-3 text-right tabular-nums font-semibold", plan.totals.net > 0 ? "text-danger" : "text-success")}>{formatCurrency(plan.totals.net)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <p className="text-xs text-text-muted mt-2">
+                  Clica num mês para ver a composição. Necessidade líquida = custos do mês (recorrentes + equipa + faturas por pagar) − entradas previstas. A equipa vem dos colaboradores em Impostos e RH (custo mensal p/ empresa, desde o início do contrato). As faturas vencidas contam no mês atual; as recorrentes projetam-se nos meses seguintes pelo valor total (previstas). As entradas incluem as linhas do plano e a comissão dos orçamentos aceites no CRM (mês da execução).
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h2 className="font-semibold">Linhas do plano</h2>
+                    <p className="text-xs text-text-secondary">Custos recorrentes e entradas previstas — definidos por ti, com periodicidade</p>
+                  </div>
+                  <button onClick={() => openBudgetModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova linha</button>
+                </div>
                 <DataTable
-                  columns={financeColumns}
-                  data={byService?.data ?? []}
+                  columns={budgetColumns}
+                  data={budgetItems ?? []}
                   keyField="id"
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
+                  emptyMessage="Sem linhas no plano — adiciona os teus custos fixos (salários, renda, software…) e entradas previstas para veres quanto precisas em cada mês."
                 />
-                {byService && <Pagination page={page} totalPages={byService.totalPages} total={byService.total} pageSize={pageSize} onPageChange={setPage} />}
               </div>
             </div>
           )}
 
-          {/* ---------------------------------- CUSTOS ---------------------------------- */}
-          {tab === "custos" && (
-            <div className="space-y-6">
-              <DemoBadge endpoint="/finance/operational-result" />
-              {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard title="Custos operacionais" metric={buildMetricValue(summary.operatingCosts, summary.operatingCosts * 0.98, true)} format="currency" />
-                  <MetricCard title="Custo equipa" metric={buildMetricValue(summary.teamCosts, summary.teamCosts * 0.99, true)} format="currency" />
-                  <MetricCard title="Pagamentos pendentes" metric={buildMetricValue(summary.pendingPayments, summary.pendingPayments * 1.1, true)} format="currency" />
-                  <MetricCard title="Reembolsos" metric={buildMetricValue(summary.refunds, summary.refunds * 0.8, true)} format="currency" />
-                </div>
-              )}
-              <SubTabs
-                tabs={[
-                  { id: "estrutura", label: "Estrutura" },
-                  { id: "faturas", label: "Faturas a pagar" },
-                  { id: "pendentes", label: "Pagamentos pendentes" },
-                  { id: "reembolsos", label: "Reembolsos" },
-                ]}
-              >
-                {(sub) => (
-                  <>
-                    {sub === "estrutura" && (
-                      <ChartCard title="Custos fixos vs variáveis">
-                        <DonutChartComponent data={fixedVsVariable ?? []} currency centerLabel="Custos" />
-                      </ChartCard>
-                    )}
-                    {sub === "faturas" && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          {/* previous = current: sem comparação fabricada (são contagens atuais). */}
-                          <MetricCard title="Por pagar (total)" metric={buildMetricValue(invKpis?.totalOutstanding ?? 0, invKpis?.totalOutstanding ?? 0)} format="currency" />
-                          <MetricCard title="Pendentes" metric={buildMetricValue(invKpis?.pendingCount ?? 0, invKpis?.pendingCount ?? 0)} />
-                          <MetricCard title="Parciais" metric={buildMetricValue(invKpis?.partialCount ?? 0, invKpis?.partialCount ?? 0)} />
-                          <MetricCard title="Vencidas" metric={buildMetricValue(invKpis?.overdueCount ?? 0, invKpis?.overdueCount ?? 0)} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h2 className="font-semibold">Faturas a pagar</h2>
-                            <p className="text-xs text-text-secondary">Manuais e recebidas por email (Outlook) · estados Pendente / Parcial / Pago</p>
-                          </div>
-                          <button onClick={() => setShowInvoice(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
-                        </div>
-                        <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)." />
-                      </div>
-                    )}
-                    {sub === "pendentes" && (
-                      <ChartCard title="Pagamentos pendentes">
-                        <BarChartComponent data={pendingPayments ?? []} currency />
-                      </ChartCard>
-                    )}
-                    {sub === "reembolsos" && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <MetricCard title="Pendentes" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").length, 2, true)} />
-                          <MetricCard title="Valor pendente" metric={buildMetricValue(refundList.filter((r) => r.status === "pendente").reduce((s, r) => s + r.amount, 0), 150, true)} format="currency" />
-                          <MetricCard title="Concluídos" metric={buildMetricValue(refundList.filter((r) => r.status === "concluido").length, 1)} />
-                        </div>
-                        <DataTable
-                          columns={[
-                            { key: "serviceId", label: "Serviço", render: (r: Refund) => <span className="font-mono text-xs">{r.serviceId}</span> },
-                            { key: "customerName", label: "Cliente", render: (r: Refund) => <span className="font-medium">{r.customerName}</span> },
-                            { key: "amount", label: "Valor", render: (r: Refund) => <span className="font-semibold">{formatCurrency(r.amount)}</span> },
-                            { key: "reason", label: "Motivo" },
-                            { key: "method", label: "Método" },
-                            { key: "requestedAt", label: "Pedido em", render: (r: Refund) => formatDate(r.requestedAt) },
-                            { key: "status", label: "Estado", render: (r: Refund) => (
-                              <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                                r.status === "concluido" ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
-                                {r.status === "concluido" ? "Concluído" : "Pendente"}
-                              </span>
-                            ) },
-                            { key: "acao", label: "", render: (r: Refund) => r.status === "pendente"
-                              ? <button onClick={() => completeRefund(r.id)} className="btn-primary text-xs py-1">Marcar reembolsado</button>
-                              : <span className="text-text-muted text-xs">—</span> },
-                          ]}
-                          data={refundList}
-                          keyField="id"
-                          emptyMessage="Sem reembolsos"
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </SubTabs>
-            </div>
-          )}
-
           {/* -------------------------------- PAGAMENTOS -------------------------------- */}
+          {/* Real desde 2026-07-22: derivado dos serviços concluídos (valor do
+              técnico por técnico × mês); "Processar" grava o registo do pagamento. */}
           {tab === "pagamentos" && (
             <div className="space-y-6">
-              <DemoBadge endpoint="/finance/payouts" />
-              {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard title="Devido a técnicos" metric={buildMetricValue(summary.technicianOwed, summary.technicianOwed * 0.93)} format="currency" />
-                  <MetricCard title="Já pago" metric={buildMetricValue(summary.technicianPaid, summary.technicianPaid * 0.9)} format="currency" />
-                  <MetricCard title="Pendentes" metric={buildMetricValue((payouts ?? []).filter((p) => p.status === "pendente").length, 10, true)} />
-                  <MetricCard title="Total a processar" metric={buildMetricValue((payouts ?? []).filter((p) => p.status === "pendente").reduce((a, p) => a + p.amountDue, 0), 5000)} format="currency" />
-                </div>
-              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* previous = current: valores atuais reais, sem comparação fabricada. */}
+                <MetricCard title="Por pagar a técnicos" metric={buildMetricValue(payoutPending.reduce((a, p) => a + p.amountDue, 0), payoutPending.reduce((a, p) => a + p.amountDue, 0))} format="currency" />
+                <MetricCard title="Pagamentos pendentes" metric={buildMetricValue(payoutPending.length, payoutPending.length)} />
+                <MetricCard title="Já processado" metric={buildMetricValue(payoutDone.reduce((a, p) => a + p.amountDue, 0), payoutDone.reduce((a, p) => a + p.amountDue, 0))} format="currency" />
+                <MetricCard title="Serviços cobertos" metric={buildMetricValue((payouts ?? []).reduce((a, p) => a + p.services, 0), (payouts ?? []).reduce((a, p) => a + p.services, 0))} />
+              </div>
               <div>
-                <h2 className="font-semibold mb-3">Pagamentos a técnicos — {payouts?.[0]?.period ?? "período atual"}</h2>
-                <DataTable columns={payoutColumns} data={payouts ?? []} keyField="id" />
+                <div className="mb-3">
+                  <h2 className="font-semibold">Pagamentos a técnicos</h2>
+                  <p className="text-xs text-text-secondary">Derivados dos serviços concluídos em Operações (valor do técnico, por técnico e mês)</p>
+                </div>
+                <DataTable columns={payoutColumns} data={payouts ?? []} keyField="id" emptyMessage="Sem pagamentos — aparecem ao registar serviços concluídos em Operações." />
               </div>
             </div>
           )}
@@ -541,17 +737,19 @@ export default function FinancePage() {
               </div>
             </div>
           )}
+
+          {tab === "impostos" && <ImpostosRhPage />}
         </div>
 
         <Modal
-          open={showInvoice}
-          onClose={() => setShowInvoice(false)}
-          title="Nova fatura"
-          subtitle="Registar uma fatura a pagar"
+          open={invModal.open}
+          onClose={() => setInvModal({ open: false, editing: null })}
+          title={invModal.editing ? "Editar fatura" : "Nova fatura"}
+          subtitle={invModal.editing ? "Alterar os dados da fatura" : "Registar uma fatura a pagar"}
           footer={
             <>
-              <button onClick={() => setShowInvoice(false)} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={createInvoice} className="btn-primary text-sm">Adicionar fatura</button>
+              <button onClick={() => setInvModal({ open: false, editing: null })} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={saveInvoice} className="btn-primary text-sm">{invModal.editing ? "Guardar" : "Adicionar fatura"}</button>
             </>
           }
         >
@@ -573,6 +771,64 @@ export default function FinancePage() {
                 <input type="date" value={invForm.dueDate} onChange={(e) => setInvForm({ ...invForm, dueDate: e.target.value })} className="input-field" />
               </Field>
             </div>
+            <Field label="Repetição">
+              <select value={invForm.recurrence} onChange={(e) => setInvForm({ ...invForm, recurrence: e.target.value as InvoiceRecurrence })} className="input-field">
+                {Object.entries(INVOICE_RECURRENCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </Field>
+            {invForm.recurrence !== "nenhuma" && (
+              <p className="text-xs text-text-muted">
+                Ao marcares esta fatura como paga, a próxima é criada automaticamente com as datas avançadas ({INVOICE_RECURRENCE_LABELS[invForm.recurrence].toLowerCase()}).
+              </p>
+            )}
+          </div>
+        </Modal>
+
+        <Modal
+          open={budgetModal.open}
+          onClose={() => setBudgetModal({ open: false, editing: null })}
+          title={budgetModal.editing ? "Editar linha do plano" : "Nova linha do plano"}
+          subtitle="Custo recorrente ou entrada prevista"
+          footer={
+            <>
+              <button onClick={() => setBudgetModal({ open: false, editing: null })} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={saveBudgetItem} className="btn-primary text-sm">{budgetModal.editing ? "Guardar" : "Adicionar"}</button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Nome">
+              <input value={budgetForm.name} onChange={(e) => setBudgetForm({ ...budgetForm, name: e.target.value })} placeholder="Ex.: Renda do escritório" className="input-field" />
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Tipo">
+                <select value={budgetForm.kind} onChange={(e) => setBudgetForm({ ...budgetForm, kind: e.target.value as BudgetKind })} className="input-field">
+                  <option value="custo">Custo</option>
+                  <option value="entrada">Entrada prevista</option>
+                </select>
+              </Field>
+              <Field label="Categoria">
+                <select value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value as BudgetCategory })} className="input-field">
+                  {Object.entries(BUDGET_CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Valor (€)">
+                <input type="number" min={0} step="0.01" value={budgetForm.amount} onChange={(e) => setBudgetForm({ ...budgetForm, amount: Number(e.target.value) })} className="input-field" />
+              </Field>
+              <Field label="Periodicidade">
+                <select value={budgetForm.frequency} onChange={(e) => setBudgetForm({ ...budgetForm, frequency: e.target.value as BudgetFrequency })} className="input-field">
+                  {Object.entries(BUDGET_FREQUENCY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label={budgetForm.frequency === "unica" ? "Mês" : "Desde"}>
+                <input type="month" value={budgetForm.startMonth} onChange={(e) => setBudgetForm({ ...budgetForm, startMonth: e.target.value })} className="input-field" />
+              </Field>
+            </div>
+            <Field label="Notas (opcional)">
+              <input value={budgetForm.notes} onChange={(e) => setBudgetForm({ ...budgetForm, notes: e.target.value })} placeholder="Ex.: contrato renova em janeiro" className="input-field" />
+            </Field>
           </div>
         </Modal>
       </PermissionGate>

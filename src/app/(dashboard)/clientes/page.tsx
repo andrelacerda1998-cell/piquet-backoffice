@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CustomerDetailDrawer } from "@/components/ui/CustomerDetailDrawer";
 import { AppCustomersPanel } from "@/components/ui/AppCustomersPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import SuportePage from "../suporte/page";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -23,7 +25,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 export default function CustomersPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
-  const [tab, setTab] = useState("visao");
+  const [tab, setTab] = useTabParam("visao");
   const [selected, setSelected] = useState<Customer | null>(null);
 
   const { data: metrics } = useAsyncData(() => getCustomerMetrics(), []);
@@ -58,6 +60,7 @@ export default function CustomersPage() {
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
+    { id: "suporte", label: "Suporte" },
     { id: "app", label: "Clientes da app" },
   ];
 
@@ -208,6 +211,7 @@ export default function CustomersPage() {
           </SubTabs>
         )}
 
+        {tab === "suporte" && <SuportePage />}
         {tab === "app" && <AppCustomersPanel />}
       </div>
 

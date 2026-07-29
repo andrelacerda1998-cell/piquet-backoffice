@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
-import { mapInvoice, type InvoiceRow } from "../../_lib/companyInvoices";
+import { mapInvoice, INVOICE_RECURRENCES, type InvoiceRow } from "../../_lib/companyInvoices";
 
 /**
  * GET /api/finance/company-invoices — faturas de custos da empresa, com KPIs.
@@ -32,11 +32,12 @@ export const GET = withStaff(async () => {
 export const POST = withStaff(async (req, { staff }) => {
   const b = (await req.json()) as {
     vendor?: string; description?: string; amount?: number;
-    issueDate?: string; dueDate?: string;
+    issueDate?: string; dueDate?: string; recurrence?: string;
   };
   const amount = Number(b.amount);
   if (!b.vendor?.trim()) return apiErr("Indica o fornecedor.", 400);
   if (!(amount > 0)) return apiErr("Indica um valor maior que zero.", 400);
+  const recurrence = b.recurrence && INVOICE_RECURRENCES.includes(b.recurrence) ? b.recurrence : "nenhuma";
 
   const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const { error } = await supabaseAdmin().from("company_invoices").insert({
@@ -47,6 +48,7 @@ export const POST = withStaff(async (req, { staff }) => {
     amount_paid: 0,
     issue_date: b.issueDate || null,
     due_date: b.dueDate || null,
+    recurrence,
     source: "manual",
     created_by: staff.userId,
   });

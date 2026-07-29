@@ -121,15 +121,36 @@ describe("POST /api/team/messages", () => {
 });
 
 describe("PUT /api/finance/payouts/:id/process", () => {
-  it("marca o pagamento como processado", async () => {
-    setTable("technician_payouts", {
-      data: { id: "payout_1", technician_name: "Rui", services: 5, amount_due: 300, period: "Junho 2026", status: "processado" },
+  // Desde 2026-07-22 os payouts derivam dos SERVIÇOS concluídos (não do seed):
+  // o processar re-deriva o valor no servidor e grava um registo idempotente.
+  it("re-deriva o payout dos serviços concluídos e marca-o processado", async () => {
+    setTable("services", {
+      data: [
+        { technician_id: "t1", technician_name: "Rui", technician_value: 150, completed_at: "2026-06-15T10:00:00Z", created_at: "2026-06-10T09:00:00Z" },
+        { technician_id: "t1", technician_name: "Rui", technician_value: 150, completed_at: "2026-06-20T10:00:00Z", created_at: "2026-06-18T09:00:00Z" },
+      ],
       error: null,
     });
-    const res = await payoutProcessPUT(req("http://localhost/api/finance/payouts/payout_1/process", { method: "PUT" }), ctx({ id: "payout_1" }));
+    setTable("technician_payout_records", { data: null, error: null });
+    const id = "po|2026-06|t1";
+    const res = await payoutProcessPUT(
+      req(`http://localhost/api/finance/payouts/${encodeURIComponent(id)}/process`, { method: "PUT" }),
+      ctx({ id })
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.status).toBe("processado");
     expect(body.data.technicianName).toBe("Rui");
+    expect(body.data.amountDue).toBe(300); // 150 + 150 agregados por técnico × mês
+    expect(body.data.services).toBe(2);
+  });
+
+  it("404 quando o payout derivado não existe (id forjado não grava nada)", async () => {
+    setTable("services", { data: [], error: null });
+    const res = await payoutProcessPUT(
+      req("http://localhost/api/finance/payouts/po%7C2026-06%7Ct9/process", { method: "PUT" }),
+      ctx({ id: "po|2026-06|t9" })
+    );
+    expect(res.status).toBe(404);
   });
 });

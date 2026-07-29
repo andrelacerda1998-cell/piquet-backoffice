@@ -10,34 +10,113 @@ import { ChartCard, BarChartComponent, AreaChartComponent } from "@/components/c
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import {
   getEmployees, getTeamDashboard, getTaxObligations, getTaxSummary,
-  markTaxObligationPaid, simulateHiring, getBudgetComparison,
-  computeEmployeeCost, deactivateEmployee,
+  markTaxObligationPaid, simulateHiring,
+  computeEmployeeCost, deactivateEmployee, createEmployee, updateEmployee, effectiveMonthlyCost,
   getTeamCostEvolution, getCostByDepartmentChart,
 } from "@/services/employeesService";
+import { Modal, Field } from "@/components/ui/Modal";
+import { toast } from "@/stores";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import type { Employee, TaxObligation, ContractType } from "@/types";
 import { X, Plus, Calculator } from "lucide-react";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
-type Tab = "fiscal" | "colaboradores" | "simulador" | "orcamento";
+type Tab = "fiscal" | "colaboradores" | "simulador";
+
+const CONTRACT_LABELS: Record<ContractType, string> = {
+  sem_termo: "Sem termo",
+  a_termo: "A termo",
+  prestacao_servicos: "Prestação de serviços",
+  estagio: "Estágio",
+  administrador: "Administrador",
+  part_time: "Part-time",
+  outro: "Outro",
+};
+
+const EMPTY_EMP_FORM = {
+  fullName: "", jobTitle: "", department: "",
+  contractType: "sem_termo" as ContractType,
+  grossMonthlySalary: 0, annualSalaryPayments: 14, mealAllowanceMonthly: 0,
+  monthlyCompanyCost: 0, // 0 = não definido → cálculo automático
+  startDate: "", notes: "",
+};
 
 export default function TaxHRPage() {
   const [tab, setTab] = useState<Tab>("fiscal");
   const [calendarView, setCalendarView] = useState<"lista" | "mensal">("lista");
   const [selectedEmployee, setSelectedEmployee] = useState<(Employee & { cost: ReturnType<typeof computeEmployeeCost> }) | null>(null);
-  const [_showAddEmployee, setShowAddEmployee] = useState(false);
+  const [empModal, setEmpModal] = useState<{ open: boolean; editing: Employee | null }>({ open: false, editing: null });
+  const [empForm, setEmpForm] = useState(EMPTY_EMP_FORM);
+  const openEmpModal = (emp: Employee | null) => {
+    setEmpForm(emp
+      ? {
+          fullName: emp.fullName, jobTitle: emp.jobTitle, department: emp.department,
+          contractType: emp.contractType,
+          grossMonthlySalary: emp.grossMonthlySalary, annualSalaryPayments: emp.annualSalaryPayments,
+          mealAllowanceMonthly: emp.mealAllowanceMonthly,
+          monthlyCompanyCost: emp.monthlyCompanyCost && emp.monthlyCompanyCost > 0 ? emp.monthlyCompanyCost : 0,
+          startDate: emp.startDate ? emp.startDate.slice(0, 10) : "",
+          notes: emp.notes ?? "",
+        }
+      : EMPTY_EMP_FORM);
+    setEmpModal({ open: true, editing: emp });
+  };
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
 
   const { data: taxSummary } = useAsyncData(() => getTaxSummary(), []);
   const { data: obligations } = useAsyncData(() => getTaxObligations(), []);
-  const { data: teamDashboard } = useAsyncData(() => getTeamDashboard(), []);
+  const { data: teamDashboard, refetch: refetchDashboard } = useAsyncData(() => getTeamDashboard(), []);
   const { data: employees, loading, refetch } = useAsyncData(
     () => getEmployees(page, pageSize, undefined, debouncedSearch),
     [page, pageSize, debouncedSearch]
   );
-  const { data: budget } = useAsyncData(() => getBudgetComparison(), []);
+
+  const saveEmployee = async () => {
+    if (!empForm.fullName.trim() || !(empForm.grossMonthlySalary > 0) || !empForm.startDate) {
+      toast("Indica o nome, o salário bruto e o início do contrato.", "error");
+      return;
+    }
+    const manualCost = Number(empForm.monthlyCompanyCost) > 0 ? Number(empForm.monthlyCompanyCost) : null;
+    try {
+      if (empModal.editing) {
+        await updateEmployee(empModal.editing.id, {
+          fullName: empForm.fullName.trim(),
+          jobTitle: empForm.jobTitle.trim(),
+          department: empForm.department.trim(),
+          contractType: empForm.contractType,
+          grossMonthlySalary: Number(empForm.grossMonthlySalary),
+          annualSalaryPayments: Number(empForm.annualSalaryPayments) || 14,
+          mealAllowanceMonthly: Number(empForm.mealAllowanceMonthly) || 0,
+          monthlyCompanyCost: manualCost, // null limpa o manual → volta ao automático
+          startDate: empForm.startDate,
+          notes: empForm.notes.trim(),
+        });
+        toast("Colaborador atualizado.");
+      } else {
+        await createEmployee({
+          fullName: empForm.fullName.trim(),
+          jobTitle: empForm.jobTitle.trim() || undefined,
+          department: empForm.department.trim() || undefined,
+          contractType: empForm.contractType,
+          grossMonthlySalary: Number(empForm.grossMonthlySalary),
+          annualSalaryPayments: Number(empForm.annualSalaryPayments) || 14,
+          mealAllowanceMonthly: Number(empForm.mealAllowanceMonthly) || 0,
+          monthlyCompanyCost: manualCost ?? undefined,
+          startDate: empForm.startDate,
+          notes: empForm.notes.trim() || undefined,
+        });
+        toast("Colaborador registado.");
+      }
+      setEmpModal({ open: false, editing: null });
+      setEmpForm(EMPTY_EMP_FORM);
+      refetch();
+      refetchDashboard();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
+    }
+  };
   const { data: teamCostEvolution } = useAsyncData(() => getTeamCostEvolution(), []);
   const { data: costByDept } = useAsyncData(() => getCostByDepartmentChart(), []);
 
@@ -91,7 +170,8 @@ export default function TaxHRPage() {
     { key: "fullName", label: "Nome" },
     { key: "jobTitle", label: "Cargo" },
     { key: "department", label: "Departamento" },
-    { key: "contractType", label: "Contrato", render: (r) => r.contractType.replace(/_/g, " ") },
+    { key: "contractType", label: "Contrato", render: (r) => CONTRACT_LABELS[r.contractType] ?? r.contractType.replace(/_/g, " ") },
+    { key: "startDate", label: "Início do contrato", render: (r) => r.startDate ? formatDate(r.startDate) : "—" },
     { key: "employmentStatus", label: "Estado", render: (r) => <StatusBadge status={r.employmentStatus} /> },
     { key: "grossMonthlySalary", label: "Salário bruto", render: (r) => (
       <PermissionGate permission="view_salaries" fallback="***">
@@ -100,12 +180,17 @@ export default function TaxHRPage() {
     )},
     { key: "cost", label: "Custo mensal", render: (r) => (
       <PermissionGate permission="view_individual_costs" fallback="***">
-        {formatCurrency(r.cost.averageMonthlyCost)}
+        <span className="inline-flex items-center gap-1.5">
+          {formatCurrency(effectiveMonthlyCost(r, r.cost))}
+          {r.monthlyCompanyCost != null && r.monthlyCompanyCost > 0 && (
+            <span title="Custo definido à mão — substitui o cálculo automático" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">manual</span>
+          )}
+        </span>
       </PermissionGate>
     )},
     { key: "costAnnual", label: "Custo anual", render: (r) => (
       <PermissionGate permission="view_individual_costs" fallback="***">
-        {formatCurrency(r.cost.totalAnnualCost)}
+        {formatCurrency(r.monthlyCompanyCost != null && r.monthlyCompanyCost > 0 ? r.monthlyCompanyCost * 12 : r.cost.totalAnnualCost)}
       </PermissionGate>
     )},
   ];
@@ -114,7 +199,6 @@ export default function TaxHRPage() {
     { id: "fiscal", label: "Fiscal" },
     { id: "colaboradores", label: "Colaboradores" },
     { id: "simulador", label: "Simulador" },
-    { id: "orcamento", label: "Orçamento" },
   ];
 
   return (
@@ -135,7 +219,8 @@ export default function TaxHRPage() {
                 <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth * 0.9)} format="currency" />
                 <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending * 1.05, true)} format="currency" />
                 <MetricCard title="IVA estimado" metric={buildMetricValue(taxSummary.ivaEstimado, taxSummary.ivaEstimado * 0.95, true)} format="currency" />
-                <MetricCard title="Seg. Social est." metric={buildMetricValue(taxSummary.estimatedSocialSecurity, taxSummary.estimatedSocialSecurity * 0.98, true)} format="currency" />
+                {/* REAL: TSU da entidade derivada da folha atual dos colaboradores (não do seed fiscal). */}
+                <MetricCard title="TSU equipa (mensal)" metric={buildMetricValue(teamDashboard?.socialSecurityMonthly ?? 0, teamDashboard?.socialSecurityMonthly ?? 0)} format="currency" />
                 <MetricCard title="Vencidas" metric={buildMetricValue(taxSummary.overdueCount, 0, true)} />
               </div>
             )}
@@ -162,14 +247,15 @@ export default function TaxHRPage() {
           <>
             {teamDashboard && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* previous = current: sem comparação fabricada (são valores atuais). */}
                 <MetricCard title="Total colaboradores" metric={buildMetricValue(teamDashboard.totalEmployees, teamDashboard.totalEmployees)} />
-                <MetricCard title="Ativos" metric={buildMetricValue(teamDashboard.activeEmployees, teamDashboard.activeEmployees - 1)} />
+                <MetricCard title="Ativos" metric={buildMetricValue(teamDashboard.activeEmployees, teamDashboard.activeEmployees)} />
                 <PermissionGate permission="view_aggregated_costs">
-                  <MetricCard title="Custo mensal equipa" metric={buildMetricValue(teamDashboard.monthlyTeamCost, teamDashboard.monthlyTeamCost * 0.98, true)} format="currency" />
-                  <MetricCard title="Custo médio/colaborador" metric={buildMetricValue(teamDashboard.averageCostPerEmployee, teamDashboard.averageCostPerEmployee * 0.98, true)} format="currency" />
+                  <MetricCard title="Custo mensal equipa" metric={buildMetricValue(teamDashboard.monthlyTeamCost, teamDashboard.monthlyTeamCost)} format="currency" />
+                  <MetricCard title="Custo médio/colaborador" metric={buildMetricValue(teamDashboard.averageCostPerEmployee, teamDashboard.averageCostPerEmployee)} format="currency" />
                 </PermissionGate>
-                <MetricCard title="Novas contratações" metric={buildMetricValue(teamDashboard.newHires, 1)} />
-                <MetricCard title="Saídas" metric={buildMetricValue(teamDashboard.departures, 0, true)} />
+                <MetricCard title="Novas contratações" metric={buildMetricValue(teamDashboard.newHires, teamDashboard.newHires)} />
+                <MetricCard title="Saídas" metric={buildMetricValue(teamDashboard.departures, teamDashboard.departures)} />
               </div>
             )}
 
@@ -185,7 +271,7 @@ export default function TaxHRPage() {
             <div className="flex justify-between items-center">
               <SearchInput value={search} onChange={setSearch} className="max-w-sm" placeholder="Pesquisar colaboradores..." />
               <PermissionGate permission="manage_employees">
-                <button onClick={() => setShowAddEmployee(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Adicionar</button>
+                <button onClick={() => openEmpModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Adicionar</button>
               </PermissionGate>
             </div>
 
@@ -220,39 +306,71 @@ export default function TaxHRPage() {
           </div>
         )}
 
-        {tab === "orcamento" && (
-          <div>
-            <h3 className="font-semibold mb-4">Orçamento vs Real — pessoal e fiscal</h3>
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-surface-muted/50">
-                    <th className="px-4 py-3 text-left">Categoria</th>
-                    <th className="px-4 py-3 text-right">Previsto</th>
-                    <th className="px-4 py-3 text-right">Real</th>
-                    <th className="px-4 py-3 text-right">Desvio €</th>
-                    <th className="px-4 py-3 text-right">Desvio %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(budget ?? []).map((b) => (
-                    <tr key={b.id} className="border-b last:border-0">
-                      <td className="px-4 py-3">{b.name}</td>
-                      <td className="px-4 py-3 text-right">{formatCurrency(b.planned)}</td>
-                      <td className="px-4 py-3 text-right">{formatCurrency(b.actual)}</td>
-                      <td className={`px-4 py-3 text-right ${b.variance > 0 ? "text-danger" : "text-success"}`}>{formatCurrency(b.variance)}</td>
-                      <td className={`px-4 py-3 text-right ${b.variancePercent > 0 ? "text-danger" : "text-success"}`}>{formatPercent(b.variancePercent)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {selectedEmployee && (
+          <EmployeeDrawer
+            employee={selectedEmployee}
+            onClose={() => setSelectedEmployee(null)}
+            onDeactivate={async () => { await deactivateEmployee(selectedEmployee.id); setSelectedEmployee(null); refetch(); refetchDashboard(); }}
+            onEdit={() => { setSelectedEmployee(null); openEmpModal(selectedEmployee); }}
+          />
         )}
 
-        {selectedEmployee && (
-          <EmployeeDrawer employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} onDeactivate={async () => { await deactivateEmployee(selectedEmployee.id); setSelectedEmployee(null); refetch(); }} />
-        )}
+        <Modal
+          open={empModal.open}
+          onClose={() => setEmpModal({ open: false, editing: null })}
+          title={empModal.editing ? "Editar colaborador" : "Adicionar colaborador"}
+          subtitle="Salário e início do contrato entram no planeamento mensal"
+          footer={
+            <>
+              <button onClick={() => setEmpModal({ open: false, editing: null })} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={saveEmployee} className="btn-primary text-sm">{empModal.editing ? "Guardar" : "Adicionar"}</button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Nome completo">
+              <input value={empForm.fullName} onChange={(e) => setEmpForm({ ...empForm, fullName: e.target.value })} placeholder="Ex.: Rodrigo Silva" className="input-field" />
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Cargo">
+                <input value={empForm.jobTitle} onChange={(e) => setEmpForm({ ...empForm, jobTitle: e.target.value })} placeholder="Ex.: Developer" className="input-field" />
+              </Field>
+              <Field label="Departamento">
+                <input value={empForm.department} onChange={(e) => setEmpForm({ ...empForm, department: e.target.value })} placeholder="Ex.: Tecnologia" className="input-field" />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Tipo de contrato">
+                <select value={empForm.contractType} onChange={(e) => setEmpForm({ ...empForm, contractType: e.target.value as ContractType })} className="input-field">
+                  {Object.entries(CONTRACT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="Início do contrato">
+                <input type="date" value={empForm.startDate} onChange={(e) => setEmpForm({ ...empForm, startDate: e.target.value })} className="input-field" />
+              </Field>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Salário bruto (€/mês)">
+                <input type="number" min={0} step="0.01" value={empForm.grossMonthlySalary} onChange={(e) => setEmpForm({ ...empForm, grossMonthlySalary: Number(e.target.value) })} className="input-field" />
+              </Field>
+              <Field label="Pagamentos/ano">
+                <input type="number" min={12} max={14} value={empForm.annualSalaryPayments} onChange={(e) => setEmpForm({ ...empForm, annualSalaryPayments: Number(e.target.value) })} className="input-field" />
+              </Field>
+              <Field label="Sub. alimentação (€/mês)">
+                <input type="number" min={0} step="0.01" value={empForm.mealAllowanceMonthly} onChange={(e) => setEmpForm({ ...empForm, mealAllowanceMonthly: Number(e.target.value) })} className="input-field" />
+              </Field>
+            </div>
+            <Field label="Custo mensal p/ empresa (€, opcional)">
+              <input type="number" min={0} step="0.01" value={empForm.monthlyCompanyCost} onChange={(e) => setEmpForm({ ...empForm, monthlyCompanyCost: Number(e.target.value) })} placeholder="0 = calcular automaticamente" className="input-field" />
+            </Field>
+            <Field label="Notas (opcional)">
+              <input value={empForm.notes} onChange={(e) => setEmpForm({ ...empForm, notes: e.target.value })} placeholder="Ex.: renovação em janeiro" className="input-field" />
+            </Field>
+            <p className="text-xs text-text-muted">
+              Se definires o custo mensal p/ empresa, é ESSE o valor usado no Planeamento e nos totais de equipa. Se ficar a 0, calcula-se automaticamente (salário + TSU 23,75% + subsídios, defaults PT). Prestação de serviços: indica o valor mensal do contrato no campo do salário.
+            </p>
+          </div>
+        </Modal>
       </div>
     </RouteGuard>
   );
@@ -276,10 +394,11 @@ function ResultRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EmployeeDrawer({ employee, onClose, onDeactivate }: {
+function EmployeeDrawer({ employee, onClose, onDeactivate, onEdit }: {
   employee: Employee & { cost: ReturnType<typeof computeEmployeeCost> };
   onClose: () => void;
   onDeactivate: () => void;
+  onEdit: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -303,12 +422,17 @@ function EmployeeDrawer({ employee, onClose, onDeactivate }: {
             <ResultRow label="Seguros (anual)" value={formatCurrency(employee.cost.insurance)} />
             <ResultRow label="Equipamento (anual)" value={formatCurrency(employee.cost.equipment)} />
             <ResultRow label="Software (anual)" value={formatCurrency(employee.cost.software)} />
-            <ResultRow label="Custo mensal médio" value={formatCurrency(employee.cost.averageMonthlyCost)} />
-            <ResultRow label="Custo anual total" value={formatCurrency(employee.cost.totalAnnualCost)} />
+            <ResultRow label="Custo mensal médio (calculado)" value={formatCurrency(employee.cost.averageMonthlyCost)} />
+            <ResultRow
+              label="Custo mensal p/ empresa (usado no Planeamento)"
+              value={`${formatCurrency(effectiveMonthlyCost(employee, employee.cost))}${employee.monthlyCompanyCost && employee.monthlyCompanyCost > 0 ? " · manual" : " · automático"}`}
+            />
+            <ResultRow label="Custo anual total" value={formatCurrency(employee.monthlyCompanyCost && employee.monthlyCompanyCost > 0 ? employee.monthlyCompanyCost * 12 : employee.cost.totalAnnualCost)} />
           </PermissionGate>
         </div>
         <PermissionGate permission="manage_employees">
-          <button onClick={onDeactivate} className="mt-6 btn-secondary text-sm text-danger w-full">Desativar colaborador</button>
+          <button onClick={onEdit} className="mt-6 btn-primary text-sm w-full">Editar dados</button>
+          <button onClick={onDeactivate} className="mt-3 btn-secondary text-sm text-danger w-full">Desativar colaborador</button>
         </PermissionGate>
       </div>
     </div>

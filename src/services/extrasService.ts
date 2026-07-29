@@ -578,32 +578,78 @@ export async function getComplaints(): Promise<Complaint[]> {
 
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
 
+// Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
+export type LeadStage = "nao_iniciado" | "orcamento_enviado" | "orcamento_aceite" | "recusado" | "concluido";
+
+export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
+  { id: "nao_iniciado", label: "Não iniciado" },
+  { id: "orcamento_enviado", label: "Orçamento enviado" },
+  { id: "orcamento_aceite", label: "Orçamento aceite" },
+  { id: "recusado", label: "Recusado" },
+  { id: "concluido", label: "Concluído" },
+];
+export const LEAD_STAGE_LABEL: Record<LeadStage, string> =
+  Object.fromEntries(LEAD_STAGES.map((s) => [s.id, s.label])) as Record<LeadStage, string>;
+
 export interface Lead {
   id: string;
   name: string;
+  phone: string;
   source: string;
   city: string;
-  stage: "novo" | "contactado" | "qualificado" | "convertido" | "perdido";
+  message: string;
+  stage: LeadStage;
   value: number;
   createdAt: string;
+  // Gestão do pedido (preenchidos ao longo do funil).
+  quoteValue: number | null;      // valor do orçamento
+  technicianValue: number | null; // valor do técnico (margem Piquet = orçamento − este)
+  technicianName: string;
+  categoryId: string;
+  executionDate: string;          // data de execução (ISO ou "")
+  rating: number | null;          // classificação do serviço
+  serviceId: string | null;       // serviço criado em Operações quando concluído
+}
+
+/** Campos editáveis de um pedido no CRM. */
+export interface LeadPatch {
+  name?: string; phone?: string; city?: string; message?: string; stage?: LeadStage;
+  technicianName?: string; categoryId?: string; quoteValue?: number | null;
+  technicianValue?: number | null; executionDate?: string; rating?: number | null;
 }
 
 export async function getLeads(): Promise<Lead[]> {
-  return apiGet("/marketing/leads", () => {
-    const names = ["Helena Marques", "Bruno Tavares", "Rita Nunes", "Miguel Antunes", "Carla Sousa", "Nuno Faria", "Sofia Melo", "Paulo Reis"];
-    const sources = ["Meta Ads", "Google Ads", "Instagram", "Referência", "Website"];
-    const stages: Lead["stage"][] = ["novo", "contactado", "qualificado", "convertido", "perdido"];
-    const cities = ["Lisboa", "Cascais", "Sintra", "Amadora", "Loures"];
-    return names.map((name, i) => ({
-      id: `lead_${i + 1}`,
-      name,
-      source: sources[i % sources.length],
-      city: cities[i % cities.length],
-      stage: stages[i % stages.length],
-      value: 40 + ((i * 37) % 260),
-      createdAt: `2026-06-${String(10 + (i % 18)).padStart(2, "0")}`,
-    }));
-  }).then((r) => r.data);
+  // Endpoint REAL (tabela `leads`): sem backend devolve lista vazia (deepZero).
+  return apiGet<Lead[]>("/marketing/leads", () => []).then((r) => r.data);
+}
+
+/** Edita um pedido no CRM (PUT /api/marketing/leads/:id). Ao concluir, cria o serviço. */
+export async function updateLead(id: string, patch: LeadPatch): Promise<{ serviceId: string | null }> {
+  return apiPut<{ id: string; serviceId: string | null }>(`/marketing/leads/${id}`, patch, () => ({ id, serviceId: null }))
+    .then((r) => ({ serviceId: r.data.serviceId }));
+}
+
+/** Atalho: muda só o estado. */
+export async function updateLeadStage(id: string, stage: LeadStage): Promise<{ serviceId: string | null }> {
+  return updateLead(id, { stage });
+}
+
+export interface NewLead { name: string; phone: string; city: string; message: string; source?: string }
+
+/** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
+export async function deleteLead(id: string): Promise<void> {
+  await apiDelete(`/marketing/leads/${id}`, () => null);
+}
+
+/** Regista um pedido à mão no CRM (POST /api/marketing/leads). */
+export async function createLead(input: NewLead): Promise<Lead> {
+  const now = new Date().toISOString();
+  return apiPost<Lead>("/marketing/leads", input, () => ({
+    id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
+    stage: "nao_iniciado", value: 0, createdAt: now,
+    quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
+    executionDate: "", rating: null, serviceId: null,
+  })).then((r) => r.data);
 }
 
 export interface MessageScript {

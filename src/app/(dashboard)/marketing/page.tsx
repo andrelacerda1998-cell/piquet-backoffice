@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -8,8 +8,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
+import { useTabParam } from "@/hooks/useTabParam";
 import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown } from "@/services/marketingService";
-import { getLeads, getScripts, type Lead } from "@/services/extrasService";
+import { getLeads, getScripts, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
+import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -18,7 +20,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2 } from "lucide-react";
 import type { MarketingCampaign } from "@/types";
 
 /**
@@ -46,17 +48,18 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
   sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
 };
 
-const LEAD_TONE: Record<Lead["stage"], string> = {
-  novo: "bg-info-light text-info",
-  contactado: "bg-warning-light text-warning",
-  qualificado: "bg-piquet/15 text-piquet-700",
-  convertido: "bg-success-light text-success",
-  perdido: "bg-danger-light text-danger",
+const LEAD_TONE: Record<LeadStage, string> = {
+  nao_iniciado: "bg-info-light text-info",
+  orcamento_enviado: "bg-warning-light text-warning",
+  orcamento_aceite: "bg-piquet/15 text-piquet-700",
+  recusado: "bg-danger-light text-danger",
+  concluido: "bg-success-light text-success",
 };
 
 export default function MarketingPage() {
   const filters = useFilters();
-  const [tab, setTab] = useState("desempenho");
+  // ?tab= no URL (deep-link das notificações de leads → /marketing?tab=crm).
+  const [tab, setTab] = useTabParam("desempenho");
   const { data: metrics } = useAsyncData(() => getMarketingMetrics(filters), [filters]);
   const { data: campaigns } = useAsyncData(() => getCampaigns(), []);
   const { data: funnel } = useAsyncData(() => getMarketingFunnel(), []);
@@ -64,13 +67,129 @@ export default function MarketingPage() {
   const { data: leads } = useAsyncData(() => getLeads(), []);
   const { data: scripts } = useAsyncData(() => getScripts(), []);
 
+  // Estado local dos pedidos, para editar (com feedback otimista).
+  const [leadRows, setLeadRows] = useState<Lead[]>([]);
+  useEffect(() => { setLeadRows(leads ?? []); }, [leads]);
+
+  // Editar pedido (dados + orçamento + valor do técnico + data + classificação + estado).
+  // Modelo: escreve-se o orçamento e o valor do técnico; a margem é sempre orçamento − técnico.
+  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
+  const [editing, setEditing] = useState<Lead | null>(null);
+  const [editForm, setEditForm] = useState(EMPTY_EDIT);
+  const openEdit = (lead: Lead, presetStage?: LeadStage) => {
+    const q = lead.quoteValue, tv = lead.technicianValue;
+    // Valor do técnico é o campo editável; por omissão 75% do orçamento (margem 25%).
+    const techDefault = tv != null ? tv : (q != null ? Math.round(q * 0.75 * 100) / 100 : null);
+    setEditForm({
+      name: lead.name === "—" ? "" : lead.name || "",
+      phone: lead.phone || "",
+      city: lead.city === "—" ? "" : lead.city || "",
+      message: lead.message || "",
+      technicianName: lead.technicianName || "",
+      categoryId: lead.categoryId || "",
+      quoteValue: q != null ? String(q) : "",
+      technicianValue: techDefault != null ? String(techDefault) : "",
+      executionDate: lead.executionDate ? lead.executionDate.slice(0, 10) : "",
+      rating: lead.rating != null ? String(lead.rating) : "",
+      stage: presetStage ?? lead.stage,
+    });
+    setEditing(lead);
+  };
+  const saveEdit = async () => {
+    if (!editing) return;
+    const q = editForm.quoteValue.trim() === "" ? null : Number(editForm.quoteValue);
+    // O técnico é o valor introduzido; por omissão 75% do orçamento. Margem = orçamento − técnico.
+    const techValue = editForm.technicianValue.trim() !== ""
+      ? Number(editForm.technicianValue)
+      : (q != null ? Math.round(q * 0.75 * 100) / 100 : null);
+    const patch: LeadPatch = {
+      name: editForm.name.trim(), phone: editForm.phone.trim(), city: editForm.city.trim(),
+      message: editForm.message.trim(), technicianName: editForm.technicianName.trim(),
+      categoryId: editForm.categoryId, quoteValue: q, technicianValue: techValue,
+      executionDate: editForm.executionDate || "",
+      rating: editForm.rating.trim() === "" ? null : Number(editForm.rating),
+      stage: editForm.stage,
+    };
+    try {
+      const { serviceId } = await updateLead(editing.id, patch);
+      setLeadRows(await getLeads());
+      setEditing(null);
+      toast(serviceId ? "Concluído — serviço criado em Operações." : "Pedido atualizado.");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
+    }
+  };
+
+  // Mudança rápida de estado pela tabela. Concluir passa pelo editar (precisa de
+  // técnico + valor para criar o serviço).
+  const changeStage = async (lead: Lead, stage: LeadStage) => {
+    if (stage === "concluido") { openEdit(lead, "concluido"); return; }
+    setLeadRows((prev) => prev.map((l) => (l.id === lead.id ? { ...l, stage } : l)));
+    try {
+      await updateLead(lead.id, { stage });
+      toast(`Estado atualizado para "${LEAD_STAGE_LABEL[stage]}".`);
+    } catch {
+      setLeadRows((prev) => prev.map((l) => (l.id === lead.id ? { ...l, stage: lead.stage } : l)));
+      toast("Não foi possível atualizar o estado.", "error");
+    }
+  };
+
+  // Eliminar um pedido (com confirmação; o serviço em Operações não é afetado).
+  const removeLead = async (lead: Lead) => {
+    const label = lead.name || lead.phone || "este pedido";
+    const aviso = lead.serviceId ? "\n\nO serviço já criado em Operações NÃO é afetado." : "";
+    if (!window.confirm(`Eliminar o pedido de "${label}"?${aviso}`)) return;
+    const prev = leadRows;
+    setLeadRows((rows) => rows.filter((l) => l.id !== lead.id));
+    try {
+      await deleteLead(lead.id);
+      toast("Pedido eliminado.");
+    } catch {
+      setLeadRows(prev);
+      toast("Não foi possível eliminar o pedido.", "error");
+    }
+  };
+
+  // Registo manual de um pedido (ex.: recebido pela app do WhatsApp).
+  const [showLead, setShowLead] = useState(false);
+  const [leadForm, setLeadForm] = useState({ name: "", phone: "", city: "", message: "" });
+  const submitLead = async () => {
+    if (!leadForm.name.trim() && !leadForm.phone.trim()) { toast("Indica o nome ou o telefone.", "info"); return; }
+    try {
+      const created = await createLead({ ...leadForm, source: "whatsapp" });
+      setLeadRows((prev) => [created, ...prev]);
+      setLeadForm({ name: "", phone: "", city: "", message: "" });
+      setShowLead(false);
+      toast("Pedido registado no CRM.");
+    } catch {
+      toast("Não foi possível registar o pedido.", "error");
+    }
+  };
+
   const leadColumns: Column<Lead>[] = [
-    { key: "name", label: "Lead", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "source", label: "Origem" },
-    { key: "city", label: "Cidade" },
-    { key: "value", label: "Valor estimado", render: (r) => formatCurrency(r.value) },
-    { key: "stage", label: "Fase", render: (r) => <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", LEAD_TONE[r.stage])}>{r.stage}</span> },
-    { key: "createdAt", label: "Entrada", sortable: true, render: (r) => formatDate(r.createdAt) },
+    { key: "name", label: "Contacto", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "phone", label: "Telefone", render: (r) => r.phone || "—" },
+    { key: "message", label: "Pedido", render: (r) => <span className="block max-w-[220px] truncate text-text-secondary" title={r.message}>{r.message || "—"}</span> },
+    { key: "quoteValue", label: "Orçamento", render: (r) => r.quoteValue != null ? (
+      <span>{formatCurrency(r.quoteValue)}
+        {r.technicianValue != null && <span className="block text-xs text-text-muted">margem {formatCurrency(r.quoteValue - r.technicianValue)}</span>}
+      </span>
+    ) : <span className="text-text-muted">—</span> },
+    { key: "stage", label: "Estado", render: (r) => (
+      <select value={r.stage} onChange={(e) => changeStage(r, e.target.value as LeadStage)}
+        className={cn("text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-piquet", LEAD_TONE[r.stage])}>
+        {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+    ) },
+    { key: "acoes", label: "", render: (r) => (
+      <div className="flex items-center gap-2">
+        <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
+        {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success">✓ serviço</span>}
+        <button onClick={() => removeLead(r)} title="Eliminar pedido" className="text-text-muted hover:text-danger transition-colors">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    ) },
   ];
   const { data: channels } = useAsyncData(() => getChannelBreakdown(), []);
 
@@ -259,19 +378,147 @@ export default function MarketingPage() {
 
         {tab === "crm" && (
           <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-text-secondary max-w-2xl">
+                Pedidos de serviço recebidos do formulário da landing (piquetapp.com) e do WhatsApp.
+                Muda o estado de cada pedido à medida que avança.
+              </p>
+              <button onClick={() => setShowLead(true)} className="btn-primary text-sm shrink-0">Registar pedido</button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {(["novo", "contactado", "qualificado", "convertido", "perdido"] as Lead["stage"][]).map((st) => (
-                <div key={st} className="card p-3">
-                  <p className="text-xs text-text-secondary capitalize">{st}</p>
-                  <p className="text-xl font-bold text-text-primary">{(leads ?? []).filter((l) => l.stage === st).length}</p>
+              {LEAD_STAGES.map((s) => (
+                <div key={s.id} className="card p-3">
+                  <p className="text-xs text-text-secondary">{s.label}</p>
+                  <p className="text-xl font-bold text-text-primary">{leadRows.filter((l) => l.stage === s.id).length}</p>
                 </div>
               ))}
             </div>
-            <DataTable columns={leadColumns} data={leads ?? []} keyField="id" />
+            <DataTable columns={leadColumns} data={leadRows} keyField="id"
+              emptyMessage="Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem." />
           </div>
         )}
 
       </div>
+
+      <Modal
+        open={showLead}
+        onClose={() => setShowLead(false)}
+        title="Registar pedido"
+        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra no CRM como “Não iniciado”."
+        footer={
+          <>
+            <button onClick={() => setShowLead(false)} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={submitLead} className="btn-primary text-sm">Registar</button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nome">
+            <input value={leadForm.name} onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })} placeholder="Nome do cliente" className="input-field" />
+          </Field>
+          <Field label="Telefone">
+            <input value={leadForm.phone} onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })} placeholder="912 000 000" className="input-field" />
+          </Field>
+          <Field label="Cidade">
+            <input value={leadForm.city} onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })} placeholder="Ex.: Almada" className="input-field" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Pedido">
+              <textarea value={leadForm.message} onChange={(e) => setLeadForm({ ...leadForm, message: e.target.value })} rows={3} placeholder="O que o cliente precisa" className="input-field" />
+            </Field>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Editar pedido — dados, orçamento, margem, execução, classificação, estado */}
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Editar pedido"
+        subtitle={editForm.stage === "concluido"
+          ? "Ao guardar como “Concluído”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
+          : "Atualiza os dados e o estado do pedido."}
+        size="lg"
+        footer={
+          <>
+            <button onClick={() => setEditing(null)} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={saveEdit} className="btn-primary text-sm">Guardar</button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nome do cliente">
+            <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="input-field" />
+          </Field>
+          <Field label="Telefone">
+            <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="input-field" />
+          </Field>
+          <Field label="Cidade">
+            <input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} className="input-field" />
+          </Field>
+          <Field label="Estado">
+            <select value={editForm.stage} onChange={(e) => setEditForm({ ...editForm, stage: e.target.value as LeadStage })} className="input-field">
+              {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Mensagem recebida (landing / WhatsApp)">
+              {editForm.message.trim()
+                ? <p className="rounded-lg border border-surface-border bg-surface-subtle px-3 py-2 text-sm text-text-primary whitespace-pre-wrap">{editForm.message}</p>
+                : <p className="text-sm text-text-muted">Sem mensagem registada.</p>}
+            </Field>
+          </div>
+          <Field label="Técnico">
+            <input value={editForm.technicianName} onChange={(e) => setEditForm({ ...editForm, technicianName: e.target.value })} placeholder="Nome do técnico" className="input-field" />
+          </Field>
+          <Field label="Categoria">
+            <select value={editForm.categoryId} onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })} className="input-field">
+              <option value="">—</option>
+              {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Valor do orçamento (€)">
+            <input type="number" step="0.01" min="0" value={editForm.quoteValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                const q = v.trim() === "" ? null : Number(v);
+                // Sugere 75% ao técnico enquanto não for definido à mão (margem 25%).
+                setEditForm((f) => ({ ...f, quoteValue: v, technicianValue: f.technicianValue.trim() === "" && q != null ? String(Math.round(q * 0.75 * 100) / 100) : f.technicianValue }));
+              }}
+              placeholder="0,00" className="input-field" />
+          </Field>
+          <Field label="Valor a pagar ao técnico (€)">
+            <input type="number" step="0.01" min="0" value={editForm.technicianValue}
+              onChange={(e) => setEditForm({ ...editForm, technicianValue: e.target.value })} placeholder="0,00" className="input-field" />
+          </Field>
+          <Field label="Data de execução">
+            <input type="date" value={editForm.executionDate} onChange={(e) => setEditForm({ ...editForm, executionDate: e.target.value })} className="input-field" />
+          </Field>
+          <Field label="Classificação (1–5)">
+            <select value={editForm.rating} onChange={(e) => setEditForm({ ...editForm, rating: e.target.value })} className="input-field">
+              <option value="">—</option>
+              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} ★</option>)}
+            </select>
+          </Field>
+        </div>
+        {editForm.quoteValue.trim() !== "" && (() => {
+          const q = Number(editForm.quoteValue) || 0;
+          const tech = editForm.technicianValue.trim() !== "" ? (Number(editForm.technicianValue) || 0) : q * 0.75;
+          const margin = Math.max(0, q - tech);
+          const pct = q > 0 ? (margin / q) * 100 : 0;
+          return (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-piquet/10 border border-piquet/20 px-4 py-3">
+              <div>
+                <p className="text-xs text-text-muted">Margem da Piquet (calculada automaticamente)</p>
+                <p className="text-xl font-bold text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
+              </div>
+              <p className="text-xs text-text-secondary text-right leading-relaxed">
+                Orçamento {formatCurrency(q)}<br />− Técnico {formatCurrency(tech)}
+              </p>
+            </div>
+          );
+        })()}
+      </Modal>
     </RouteGuard>
   );
 }

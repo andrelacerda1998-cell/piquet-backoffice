@@ -11,10 +11,14 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { getGoals } from "@/services/extrasService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import ObjetivosPage from "./objetivos/page";
+import RelatoriosPage from "./relatorios/page";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { FileText, ListChecks, Target, TrendingUp, ArrowRight } from "lucide-react";
+import { ListChecks, Target, TrendingUp, ArrowRight } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -28,6 +32,7 @@ export default function OverviewPage() {
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
+  const [tab, setTab] = useTabParam("resumo");
 
   if (loading && !gmvData) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -56,6 +61,12 @@ export default function OverviewPage() {
   const goals = goalsData?.goals ?? [];
   const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
 
+  const TABS: TabDef[] = [
+    { id: "resumo", label: "Resumo" },
+    { id: "objetivos", label: "Objetivos do ano" },
+    { id: "relatorios", label: "Relatórios" },
+  ];
+
   return (
     <RouteGuard route="/">
       <div className="space-y-8">
@@ -68,11 +79,14 @@ export default function OverviewPage() {
           </div>
           <div className="flex items-center gap-2">
             <MonthSelect />
-            <Link href="/relatorios" className="btn-secondary text-sm"><FileText className="h-4 w-4" /> Relatórios</Link>
             <Link href="/chat?tab=tarefas" className="btn-secondary text-sm"><ListChecks className="h-4 w-4" /> Equipa</Link>
           </div>
         </div>
 
+        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+        {tab === "resumo" && (
+        <div className="space-y-8">
         {/* ---------- Indicadores-chave (reais) ---------- */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Indicadores-chave</p>
@@ -92,19 +106,21 @@ export default function OverviewPage() {
 
         {/* ---------- Unit economics (LTV · CAC) ---------- */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Unit economics</p>
-            <DemoBadge endpoint="/finance/unit-economics" />
+            <span className="text-xs text-text-muted">
+              {unit?.newCustomersMonth ?? 0} clientes · {formatCurrency(unit?.adSpendMonth ?? 0)} em anúncios (mês)
+            </span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <MetricCard title="LTV" format="currency"
-              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Receita média da Piquet por cliente. Requer clientes reais (backend de reservas).")} />
             <MetricCard title="CAC" format="currency"
-              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, false, undefined, "Custo de aquisição por cliente = investimento em anúncios ÷ novos clientes. Requer clientes reais.")} />
+              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, true, undefined, "Custo de aquisição por cliente = investimento em anúncios (mês) ÷ clientes novos (mês). Menor é melhor.")} />
+            <MetricCard title="Serviços / cliente"
+              metric={buildMetricValue(unit?.servicesPerCustomer ?? 0, unit?.servicesPerCustomer ?? 0, false, undefined, "Serviços concluídos por cliente novo este mês.")} />
+            <MetricCard title="LTV" format="currency"
+              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Comissão média da Piquet por cliente (todo o histórico de serviços).")} />
             <MetricCard title="Rácio LTV/CAC"
-              metric={buildMetricValue(unit && unit.cac > 0 ? unit.ltv / unit.cac : 0, 0, false, undefined, "Saudável acima de 3×.")} />
-            <MetricCard title="Investimento (mês)" format="currency"
-              metric={buildMetricValue(unit?.adSpendMonth ?? 0, unit?.adSpendMonth ?? 0, true, undefined, "Investimento real em anúncios este mês (Meta + Google).")} />
+              metric={buildMetricValue(unit && unit.cac > 0 ? Math.round((unit.ltv / unit.cac) * 100) / 100 : 0, 0, false, undefined, "LTV ÷ CAC. Saudável acima de 3×.")} />
           </div>
         </div>
 
@@ -161,6 +177,11 @@ export default function OverviewPage() {
             </div>
           )}
         </div>
+        </div>
+        )}
+
+        {tab === "objetivos" && <ObjetivosPage />}
+        {tab === "relatorios" && <RelatoriosPage />}
       </div>
     </RouteGuard>
   );

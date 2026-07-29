@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -11,13 +11,13 @@ import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/c
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus,
+  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel,
   type Bug, type SystemLog, type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDateTime } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight } from "lucide-react";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
   info: "bg-surface-subtle text-text-secondary",
@@ -28,6 +28,8 @@ const LOG_TONE: Record<SystemLog["level"], string> = {
 const BUG_STATUS_LABEL: Record<Bug["status"], string> = {
   ativo: "Ativo", em_correcao: "Em correção", resolvido: "Resolvido",
 };
+
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 function RatingCard({ app, store, info }: { app: string; store: string; info: StoreRatingInfo | null }) {
   return (
@@ -64,6 +66,33 @@ export default function ProdutoPage() {
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
 
+  // Funil da app (Mixpanel): período à escolha — atalhos + meses de calendário.
+  const [funnelPeriod, setFunnelPeriod] = useState("30d");
+  const funnelOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [
+      { value: "30d", label: "Últimos 30 dias" },
+      { value: "90d", label: "Últimos 90 dias" },
+      { value: "ano", label: "Este ano" },
+    ];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1);
+      opts.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}` });
+    }
+    return opts;
+  }, []);
+  const funnelRange = useMemo(() => {
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const now = new Date();
+    if (funnelPeriod === "30d") return { from: iso(new Date(Date.now() - 30 * 864e5)), to: iso(now) };
+    if (funnelPeriod === "90d") return { from: iso(new Date(Date.now() - 90 * 864e5)), to: iso(now) };
+    if (funnelPeriod === "ano") return { from: `${now.getUTCFullYear()}-01-01`, to: iso(now) };
+    const [y, m] = funnelPeriod.split("-").map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { from: `${funnelPeriod}-01`, to: `${funnelPeriod}-${String(last).padStart(2, "0")}` };
+  }, [funnelPeriod]);
+  const { data: funnel, loading: funnelLoading } = useAsyncData(() => getAppFunnel(funnelRange.from, funnelRange.to), [funnelPeriod]);
+
   // Totais e variação mês-a-mês derivados das séries de crescimento.
   const dl = growth?.downloads ?? [];
   const reg = growth?.registrations ?? [];
@@ -85,6 +114,7 @@ export default function ProdutoPage() {
   const TABS: TabDef[] = [
     { id: "apps", label: "Apps" },
     { id: "bugs", label: "Bugs", count: (bugs ?? []).filter((b) => b.status !== "resolvido").length },
+    { id: "funil", label: "Funil (app)" },
     { id: "logs", label: "Logs" },
     { id: "integracoes", label: "Integrações" },
   ];
@@ -304,6 +334,98 @@ export default function ProdutoPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {tab === "funil" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-5 w-5 text-piquet-600" />
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">Funil da jornada na app</h2>
+                  <p className="text-xs text-text-muted">Onde os utilizadores param, a partir do Mixpanel.</p>
+                </div>
+              </div>
+              <select value={funnelPeriod} onChange={(e) => setFunnelPeriod(e.target.value)} className="input-field w-auto">
+                {funnelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {funnelLoading && !funnel ? (
+              <div className="card p-6 text-sm text-text-secondary">A carregar o funil…</div>
+            ) : !funnel ? null : !funnel.configured ? (
+              <div className="card p-6 max-w-2xl">
+                <p className="text-sm text-text-secondary">
+                  Mostra onde os utilizadores param (abrir app → ver serviço → reservar → pagar), a partir do Mixpanel.
+                  Ainda não está ligado. Para ativar, adiciona na Vercel:
+                </p>
+                <ul className="mt-3 space-y-1 text-sm text-text-secondary">
+                  <li>• <code className="text-text-primary">MIXPANEL_SA_USERNAME</code> e <code className="text-text-primary">MIXPANEL_SA_SECRET</code> — Service Account (Organization Settings → Service Accounts)</li>
+                  <li>• <code className="text-text-primary">MIXPANEL_PROJECT_ID</code> — id do projeto (Project Settings)</li>
+                  <li>• <code className="text-text-primary">MIXPANEL_FUNNEL_ID</code> — id do funil guardado (opcional; senão usa o primeiro)</li>
+                  <li>• <code className="text-text-primary">MIXPANEL_API_HOST</code> — <code>https://eu.mixpanel.com</code> se o projeto for na UE (opcional)</li>
+                </ul>
+                <p className="mt-3 text-xs text-text-muted">Passo-a-passo completo em <code>MIXPANEL_SETUP.md</code>. Cria o funil no Mixpanel com os passos da jornada; aqui aparece o drop-off de cada passo.</p>
+              </div>
+            ) : funnel.error ? (
+              <div className="card p-6 border-l-4 border-danger bg-danger-light/40">
+                <p className="font-semibold text-text-primary">Não foi possível ler o funil do Mixpanel</p>
+                <p className="text-sm text-text-secondary mt-1 break-words">{funnel.error}</p>
+                <p className="text-xs text-text-muted mt-2">Verifica as credenciais e, se o projeto for na UE, define <code>MIXPANEL_API_HOST=https://eu.mixpanel.com</code>. Detalhes em <code>MIXPANEL_SETUP.md</code>.</p>
+              </div>
+            ) : funnel.steps.length === 0 ? (
+              <div className="card p-6 text-sm text-text-secondary">Sem dados do funil neste período. Experimenta outro no seletor.</div>
+            ) : (
+              (() => {
+                // Uma só vista: barra por passo (largura = % do topo), com
+                // utilizadores, % do topo e queda face ao passo anterior.
+                const top = funnel.steps[0]?.count || 1;
+                const stepLabel = (e: string) => e.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+                const totalConv = (funnel.steps[funnel.steps.length - 1]?.overallConvRatio ?? 0) * 100;
+                return (
+                  <div className="card p-5 space-y-1">
+                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-surface-border mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{funnel.name || "Funil da app"}</p>
+                        <p className="text-xs text-text-muted">{formatDate(funnel.from)} → {formatDate(funnel.to)} · {formatNumber(top)} utilizadores no topo</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-3xl font-bold text-text-primary">{totalConv.toFixed(1)}%</p>
+                        <p className="text-xs text-text-muted">chegam ao fim</p>
+                      </div>
+                    </div>
+                    {funnel.steps.map((s, i) => (
+                      <div key={i} className="py-2">
+                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                          <p className="text-sm font-medium text-text-primary truncate">
+                            <span className="text-text-muted mr-1.5">{i + 1}.</span>{stepLabel(s.event)}
+                          </p>
+                          <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
+                            <span className="text-sm font-semibold">{formatNumber(s.count)}</span>
+                            <span className="text-xs text-text-muted w-14 text-right">{(s.overallConvRatio * 100).toFixed(1)}%</span>
+                            {i === 0 ? (
+                              <span className="text-xs text-text-muted w-16 text-right">início</span>
+                            ) : (
+                              <span className={cn("inline-flex items-center justify-end gap-0.5 text-xs font-semibold w-16", s.dropOff > 0.5 ? "text-danger" : s.dropOff > 0.25 ? "text-warning" : "text-success")}>
+                                <ArrowDownRight className="h-3.5 w-3.5" /> −{(s.dropOff * 100).toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-3 rounded-full bg-surface-subtle overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full transition-all", i === funnel.steps.length - 1 ? "bg-success" : "bg-piquet")}
+                            style={{ width: `${Math.max(1.5, (s.count / top) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-xs text-text-muted pt-2">A percentagem é sobre o topo do funil; a seta é a queda face ao passo anterior — vermelho quando cai mais de metade.</p>
+                  </div>
+                );
+              })()
+            )}
           </div>
         )}
       </div>

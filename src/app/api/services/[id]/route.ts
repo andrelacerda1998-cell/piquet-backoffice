@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { rowToService, embedName, type ServiceRow } from "@/lib/supabase/adapters";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../../_lib/entities";
 
 const SELECT = "*, customer:customers(name), technician:technicians(name), category:categories(name)";
 
@@ -61,6 +62,23 @@ export const PUT = withStaff(async (req, { params }) => {
   }
   if (Object.keys(patch).length === 0) return apiErr("Nada para atualizar.", 400);
 
+  const admin = supabaseAdmin();
+  // Técnico atual (antes da edição), para re-sincronizar as categorias se a
+  // categoria ou o técnico mudarem.
+  const { data: before } = await admin.from("services").select("technician_id").eq("id", params.id).single();
+  const prevTechId = (before as { technician_id: string | null } | null)?.technician_id ?? null;
+
+  // Se o nome do cliente/técnico for editado, cria/reutiliza o registo e
+  // atualiza a FK — mantém as abas Clientes/Técnicos coerentes.
+  const cityForEntity = (typeof body.city === "string" ? body.city : null);
+  if (typeof body.customerName === "string") {
+    patch.customer_id = await upsertCustomerByName(admin, body.customerName, cityForEntity);
+  }
+  if (typeof body.technicianName === "string") {
+    const catId = typeof body.categoryId === "string" ? body.categoryId : null;
+    patch.technician_id = await upsertTechnicianByName(admin, body.technicianName, cityForEntity, catId);
+  }
+
   // Coerência valor/comissão: o valor do técnico não pode exceder o valor pago
   // (piquet_revenue é GERADA de total − técnico e clampava a 0 em silêncio).
   if ("technician_value" in patch || "total_customer_value" in patch) {
@@ -71,9 +89,15 @@ export const PUT = withStaff(async (req, { params }) => {
     }
   }
 
-  const admin = supabaseAdmin();
   const { data, error } = await admin.from("services").update(patch).eq("id", params.id).select(SELECT).single();
   if (error) return apiErr(error.message, 400);
   if (!data) return apiErr("Serviço não encontrado.", 404);
+
+  // Re-sincroniza as categorias do técnico novo e do antigo (se mudou), para
+  // não ficarem categorias antigas presas após editar a categoria do serviço.
+  const newTechId = (data as ServiceRow).technician_id ?? null;
+  const toSync = new Set([prevTechId, newTechId].filter(Boolean) as string[]);
+  for (const id of toSync) await syncTechnicianCategories(admin, id);
+
   return apiOk(rowToService(flatten(data as EmbeddedRow)));
 });

@@ -1,25 +1,28 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../../_lib/handler";
+import { deriveTechnicianPayouts } from "../../_lib/payouts";
 
-interface PayoutRow {
-  id: string; technician_name: string; services: number; amount_due: number;
-  period: string; status: string;
-}
-
-function toPayout(r: PayoutRow) {
-  return {
-    id: r.id, technicianName: r.technician_name, services: Number(r.services) || 0,
-    amountDue: Number(r.amount_due) || 0, period: r.period,
-    status: r.status as "pendente" | "processado",
-  };
-}
-
-/** GET /api/finance/payouts — pagamentos a técnicos (por valor devido). */
+/**
+ * GET /api/finance/payouts — pagamentos a técnicos REAIS, derivados dos
+ * serviços concluídos (technician_value somado por técnico × mês).
+ * "processado" vem de technician_payout_records; o resto está pendente.
+ * (Substituiu a leitura do seed technician_payouts a 2026-07-22.)
+ */
 export const GET = withStaff(async () => {
-  const { data, error } = await supabaseAdmin()
-    .from("technician_payouts")
-    .select("*")
-    .order("amount_due", { ascending: false });
+  const [payouts, { data: records, error }] = await Promise.all([
+    deriveTechnicianPayouts(),
+    supabaseAdmin().from("technician_payout_records").select("id, paid_at"),
+  ]);
   if (error) throw new Error(error.message);
-  return apiOk(((data ?? []) as PayoutRow[]).map(toPayout));
+  const paid = new Map(((records ?? []) as { id: string; paid_at: string }[]).map((r) => [r.id, r.paid_at]));
+
+  return apiOk(payouts.map((p) => ({
+    id: p.id,
+    technicianName: p.technicianName,
+    services: p.services,
+    amountDue: Math.round(p.amountDue * 100) / 100,
+    period: p.period,
+    status: paid.has(p.id) ? ("processado" as const) : ("pendente" as const),
+    paidAt: paid.get(p.id) ?? null,
+  })));
 });

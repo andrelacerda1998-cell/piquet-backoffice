@@ -54,6 +54,7 @@ export async function POST(req: Request) {
     city: clip(body.city, 100),
     message: clip(body.message, 2000),
     source: clip(body.source, 100) || "website",
+    stage: "nao_iniciado", // entra no CRM como "Não iniciado"
   };
   if (!lead.name && !lead.email && !lead.phone) {
     return NextResponse.json(

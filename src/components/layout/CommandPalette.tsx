@@ -3,21 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, NAV_VISIBLE } from "@/config/dashboard";
+import { NAV_ITEMS, NAV_VISIBLE, NAV_DEEPLINKS } from "@/config/dashboard";
 import { useUiStore, useAuthStore, useThemeStore } from "@/stores";
 import { canAccessRoute } from "@/lib/permissions";
 import {
   LayoutDashboard, Wrench, Euro, Landmark, Users, HardHat,
   MapPin, Megaphone, Headphones, Bell, Settings, Search, Moon, Sun, CornerDownLeft,
   Radio, BookOpen, Tag, Map, ShieldCheck, FileText,
-  MessageSquare, Target, ListChecks, Wand2, UserPlus,
+  MessageSquare, Target, ListChecks, Wand2, UserPlus, Code2, MonitorSmartphone, SlidersHorizontal,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Wrench, Euro, Landmark, Users, HardHat,
   MapPin, Megaphone, Headphones, Bell, Settings,
   Radio, BookOpen, Tag, Map, ShieldCheck, FileText,
-  MessageSquare, Target, ListChecks, Wand2, UserPlus,
+  MessageSquare, Target, ListChecks, Wand2, UserPlus, Code2, MonitorSmartphone, SlidersHorizontal,
 };
 
 type Command = {
@@ -61,16 +61,17 @@ export function CommandPalette() {
   const commands = useMemo<Command[]>(() => {
     // Apenas os módulos visíveis na navegação (mesma lista da sidebar).
     const byHref = Object.fromEntries(NAV_ITEMS.map((i) => [i.href, i]));
-    const navCmds: Command[] = NAV_VISIBLE
-      .map((href) => byHref[href])
-      .filter((i): i is (typeof NAV_ITEMS)[number] => !!i && (user ? canAccessRoute(user.role, i.href) : false))
-      .map((i) => ({
-        id: `nav:${i.href}`,
-        label: i.label,
-        hint: "Navegar",
-        Icon: iconMap[i.icon] ?? LayoutDashboard,
-        run: () => router.push(i.href),
-      }));
+    const toCmd = (hint: string) => (i: (typeof NAV_ITEMS)[number]): Command => ({
+      id: `nav:${i.href}`,
+      label: i.label,
+      hint,
+      Icon: iconMap[i.icon] ?? LayoutDashboard,
+      run: () => router.push(i.href),
+    });
+    const canSee = (i?: (typeof NAV_ITEMS)[number]): i is (typeof NAV_ITEMS)[number] =>
+      !!i && (user ? canAccessRoute(user.role, i.href.split("?")[0]) : false);
+    const navCmds: Command[] = NAV_VISIBLE.map((href) => byHref[href]).filter(canSee).map(toCmd("Navegar"));
+    const deepCmds: Command[] = NAV_DEEPLINKS.map((href) => byHref[href]).filter(canSee).map(toCmd("Separador"));
     const actionCmds: Command[] = [
       {
         id: "action:theme",
@@ -80,7 +81,7 @@ export function CommandPalette() {
         run: () => toggleTheme(),
       },
     ];
-    return [...navCmds, ...actionCmds];
+    return [...navCmds, ...deepCmds, ...actionCmds];
   }, [user, theme, router, toggleTheme]);
 
   const filtered = useMemo(() => {

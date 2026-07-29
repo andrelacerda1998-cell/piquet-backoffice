@@ -225,7 +225,8 @@ export interface EmployeeRow {
   annual_bonus: number; employer_social_security_rate: number; employee_social_security_rate: number;
   workers_compensation_insurance_monthly: number; health_insurance_monthly: number;
   equipment_annual_cost: number; software_annual_cost: number; training_annual_cost: number;
-  recruitment_cost: number; other_monthly_costs: number; other_annual_costs: number; notes: string | null;
+  recruitment_cost: number; other_monthly_costs: number; other_annual_costs: number;
+  monthly_company_cost: number | null; notes: string | null;
 }
 
 export function rowToEmployee(r: EmployeeRow): Employee {
@@ -243,7 +244,9 @@ export function rowToEmployee(r: EmployeeRow): Employee {
     healthInsuranceMonthly: Number(r.health_insurance_monthly) || 0, equipmentAnnualCost: Number(r.equipment_annual_cost) || 0,
     softwareAnnualCost: Number(r.software_annual_cost) || 0, trainingAnnualCost: Number(r.training_annual_cost) || 0,
     recruitmentCost: Number(r.recruitment_cost) || 0, otherMonthlyCosts: Number(r.other_monthly_costs) || 0,
-    otherAnnualCosts: Number(r.other_annual_costs) || 0, notes: r.notes ?? undefined,
+    otherAnnualCosts: Number(r.other_annual_costs) || 0,
+    monthlyCompanyCost: r.monthly_company_cost != null ? Number(r.monthly_company_cost) : null,
+    notes: r.notes ?? undefined,
   };
 }
 

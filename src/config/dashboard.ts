@@ -89,31 +89,43 @@ export const NAV_ITEMS = [
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
-  { href: "/objetivos", label: "Objetivos do ano", icon: "Target" },
-  { href: "/servicos-personalizados", label: "Pedidos personalizados", icon: "Wand2" },
+  { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
-  // Em preparação — fora do menu (sem integração de dados reais ainda), mas
-  // acessíveis por URL e por ⌘K. Voltam ao menu quando a fonte acender.
-  { href: "/suporte", label: "Suporte", icon: "Headphones" },
-  { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
-  { href: "/alertas", label: "Alertas", icon: "Bell" },
+  // Separadores dentro dos grupos acima (consolidação 2026-07-20). Fora do
+  // menu, mas acessíveis por ⌘K e por URL (deep-link ?tab=).
+  { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
+  { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
+  { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
+  { href: "/servicos?tab=qualidade", label: "Qualidade", icon: "ShieldCheck" },
+  { href: "/clientes?tab=suporte", label: "Suporte", icon: "Headphones" },
+  { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
+  { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
+  { href: "/chat?tab=tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
+  // Operacional próprio, ainda fora do menu.
   { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
-  { href: "/recrutamento", label: "Recrutamento", icon: "UserPlus" },
-  { href: "/impostos-rh", label: "Impostos e RH", icon: "Landmark" },
-  { href: "/tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
-  { href: "/relatorios", label: "Relatórios", icon: "FileText" },
+  { href: "/alertas", label: "Alertas", icon: "Bell" },
 ] as const;
 
-// Simplificação 2026-07-17: o menu mostra só o que é real ou operacional hoje.
-// Objetivos e Pedidos personalizados ficam visíveis por decisão do André.
-// O resto ("Em preparação", acima) sai da vista até ter dados reais — nada é
-// apagado: URL direto e ⌘K continuam a funcionar.
+// Consolidação 2026-07-20: o menu passa a 9 grupos; cada um agrega os ecrãs
+// relacionados em separadores (ex.: Técnicos inclui Recrutamento; Financeiro
+// inclui Impostos e RH; Equipa inclui Tarefas e Desenvolvimento). Nada é
+// apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
 export const NAV_PRIMARY: string[] = [
   "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/chat", "/desenvolvimento", "/objetivos", "/servicos-personalizados",
+  "/marketing", "/chat", "/desenvolvimento", "/tarefas", "/configuracao",
 ];
-export const NAV_SECONDARY: string[] = ["/configuracao"];
+// Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
+export const NAV_SECONDARY: string[] = [];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
+
+// Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
+export const NAV_DEEPLINKS: string[] = [
+  "/?tab=objetivos", "/?tab=relatorios",
+  "/servicos?tab=personalizados", "/servicos?tab=qualidade",
+  "/clientes?tab=suporte", "/tecnicos?tab=recrutamento",
+  "/financeiro?tab=impostos", "/chat?tab=tarefas",
+  "/despacho", "/alertas",
+];
 
 export const MARKETING_CHANNELS = [
   "Meta Ads", "Google Ads", "Instagram orgânico", "TikTok", "LinkedIn",

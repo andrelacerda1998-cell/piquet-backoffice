@@ -82,12 +82,14 @@ export async function fetchGoogleAdsInsights(since: string, until: string): Prom
 
   // v21 = versão atual em 2026-07 (a v18 já foi desligada — devolvia 404 em
   // HTML; as versões desta API reformam-se ao fim de ~1 ano).
+  // A v21 já não aceita `pageSize` (erro PAGE_SIZE_NOT_SUPPORTED): a página é
+  // fixa em 10 000 linhas. Chega para as métricas diárias por campanha.
   const res = await fetch(`https://googleads.googleapis.com/v21/customers/${customer}/googleAds:search`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ query, pageSize: 10000 }),
+    body: JSON.stringify({ query }),
   });
-  if (!res.ok) throw new Error(`Google Ads ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`Google Ads ${res.status}: ${(await res.text()).slice(0, 4000)}`);
   const json = (await res.json()) as { results?: GoogleAdsResultRow[] };
   return mapGoogleAdsRows(json.results ?? []);
 }

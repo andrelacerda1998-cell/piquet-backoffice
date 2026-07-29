@@ -2,38 +2,54 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../../_lib/handler";
 
 /**
- * GET /api/finance/unit-economics — LTV e CAC calculados das fontes REAIS.
+ * GET /api/finance/unit-economics — LTV, CAC e serviços/cliente das fontes REAIS.
  *
- * - CAC = investimento em anúncios (mês) ÷ novos clientes (mês).
- * - LTV = receita média da Piquet por cliente (piquet_revenue acumulado / nº).
+ * Como a tabela de clientes ainda está vazia (backend de reservas por ligar),
+ * os clientes são contados a partir dos SERVIÇOS concluídos registados: cada
+ * `customer_name` distinto é um cliente (um serviço sem nome conta como cliente
+ * próprio). Assim:
+ *   - CAC = investimento em anúncios (mês) ÷ clientes novos (mês)
+ *   - Serviços/cliente = serviços (mês) ÷ clientes novos (mês)
+ *   - LTV = comissão média da Piquet por cliente (todo o histórico)
  *
- * O investimento em anúncios já é real (Meta); os clientes ficam a 0 até o
- * backend de reservas ligar — por isso LTV/CAC ainda não são mensuráveis e o
- * endpoint fica FORA de REAL_DATA (selo "Sem integração"). Quando os clientes
- * reais fluírem, os números acendem sem mudar o cálculo.
+ * O investimento vem do Meta (real). "Clientes novos" = clientes servidos no
+ * mês (aproximação até haver histórico de registo por cliente).
  */
+
+interface SvcRow { id: string; customer_name: string | null; piquet_revenue: number; completed_at: string | null }
+
+/** Identidade do cliente: o nome, ou o id do serviço se for anónimo. */
+const identity = (r: SvcRow) => (r.customer_name?.trim() || r.id);
+
 export const GET = withStaff(async () => {
   const admin = supabaseAdmin();
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
-  const [adRes, newCustRes, custCountRes, custRevRes] = await Promise.all([
+  const [svcRes, adRes] = await Promise.all([
+    admin.from("services").select("id, customer_name, piquet_revenue, completed_at").eq("status", "concluido").limit(10000),
     admin.from("ad_metrics").select("spend").gte("date", monthStart.slice(0, 10)),
-    admin.from("customers").select("id", { count: "exact", head: true }).gte("registered_at", monthStart),
-    admin.from("customers").select("id", { count: "exact", head: true }),
-    admin.from("customers").select("piquet_revenue"),
   ]);
+  const services = (svcRes.data ?? []) as SvcRow[];
+  const adSpendMonth = (adRes.data ?? []).reduce((s, r) => s + (Number((r as { spend: number }).spend) || 0), 0);
 
-  const adSpend = (adRes.data ?? []).reduce((s, r) => s + (Number((r as { spend: number }).spend) || 0), 0);
-  const newCustomers = newCustRes.count ?? 0;
-  const totalCustomers = custCountRes.count ?? 0;
-  const totalRevenue = (custRevRes.data ?? []).reduce((s, r) => s + (Number((r as { piquet_revenue: number }).piquet_revenue) || 0), 0);
+  // Todo o histórico → LTV (comissão média por cliente).
+  const allCustomers = new Set(services.map(identity));
+  const totalRevenue = services.reduce((s, r) => s + (Number(r.piquet_revenue) || 0), 0);
+  const totalCustomers = allCustomers.size;
+
+  // Este mês → CAC e serviços/cliente.
+  const monthSvc = services.filter((r) => (r.completed_at ?? "") >= monthStart);
+  const newCustomers = new Set(monthSvc.map(identity)).size;
+  const servicesMonth = monthSvc.length;
 
   return apiOk({
-    cac: newCustomers > 0 ? adSpend / newCustomers : 0,
     ltv: totalCustomers > 0 ? totalRevenue / totalCustomers : 0,
-    adSpendMonth: adSpend,
+    cac: newCustomers > 0 ? adSpendMonth / newCustomers : 0,
+    servicesPerCustomer: newCustomers > 0 ? servicesMonth / newCustomers : 0,
+    adSpendMonth,
     newCustomersMonth: newCustomers,
+    servicesMonth,
     totalCustomers,
   });
 });

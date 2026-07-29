@@ -17,7 +17,7 @@ export const mockState: {
 
 function builder(result: Result): any {
   const b: any = {};
-  for (const m of ["select", "eq", "or", "ilike", "gte", "lte", "gt", "order", "range", "limit", "insert", "update"]) {
+  for (const m of ["select", "eq", "or", "ilike", "gte", "lte", "gt", "order", "range", "limit", "insert", "update", "upsert"]) {
     b[m] = () => b;
   }
   b.single = () => Promise.resolve(result);

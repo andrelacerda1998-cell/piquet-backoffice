@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
 import { Modal, Field } from "@/components/ui/Modal";
 import { useAsyncData } from "@/hooks/useDashboard";
 import {
@@ -41,13 +42,8 @@ export default function TeamPage() {
   const { data: baseMsgs, loading, error, refetch } = useAsyncData(() => getTeamMessages(), []);
   const { data: baseAgenda } = useAsyncData(() => getTeamMeetings(), []);
   const { data: baseTasks } = useAsyncData(() => getTeamTasks(), []);
-  const [tab, setTab] = useState("conversas");
-
-  // Deep-link `?tab=tarefas|agenda|conversas` (vindo da Visão executiva, ex.: "Prazos em risco").
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tab");
-    if (t && ["conversas", "tarefas", "agenda"].includes(t)) setTab(t);
-  }, []);
+  // Deep-link `?tab=conversas|tarefas|agenda`.
+  const [tab, setTab] = useTabParam("conversas");
 
   if (loading && !baseMsgs) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;

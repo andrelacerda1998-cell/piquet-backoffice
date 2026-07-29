@@ -137,6 +137,34 @@ export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {
   })).then((r) => r.data);
 }
 
+/* ---------------------- Funil da jornada na app (Mixpanel) ---------------------- */
+
+export interface FunnelStep {
+  event: string;
+  count: number;
+  stepConvRatio: number;    // vs. passo anterior (0–1)
+  overallConvRatio: number; // vs. 1.º passo (0–1)
+  dropOff: number;          // % que caiu do passo anterior (0–1)
+}
+export interface AppFunnel {
+  configured: boolean;
+  funnelId: string | null;
+  name: string | null;
+  from: string;
+  to: string;
+  steps: FunnelStep[];
+  error?: string;
+}
+
+/** Funil da app vindo do Mixpanel. Sem integração → `configured:false`. */
+export async function getAppFunnel(from?: string, to?: string): Promise<AppFunnel> {
+  const qs = new URLSearchParams();
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const path = `/product/funnel${qs.toString() ? `?${qs}` : ""}`;
+  return apiGet<AppFunnel>(path, () => ({ configured: false, funnelId: null, name: null, from: from ?? "", to: to ?? "", steps: [] })).then((r) => r.data);
+}
+
 /* ---------------------- Avaliações das apps nas lojas ---------------------- */
 
 export interface StoreRatingInfo {
@@ -385,6 +413,8 @@ export interface FeeConfig {
   value: number;
   unit: "%" | "€";
   description: string;
+  /** Taxa em vigor? (ausente em dados antigos = true) */
+  enabled?: boolean;
 }
 
 export const SEED_FEES: FeeConfig[] = [
@@ -393,7 +423,8 @@ export const SEED_FEES: FeeConfig[] = [
   { id: "fee_urgencia", label: "Acréscimo urgência", value: 20, unit: "%", description: "Serviços com resposta em <2h" },
   { id: "fee_noturno", label: "Acréscimo horário noturno", value: 15, unit: "%", description: "Serviços entre 20h e 8h" },
   { id: "fee_fds", label: "Acréscimo fim de semana", value: 10, unit: "%", description: "Sábados, domingos e feriados" },
-  { id: "fee_cancel_cliente", label: "Cancelamento do cliente (<24h)", value: 15, unit: "€", description: "Taxa cobrada ao cliente por cancelamento tardio" },
-  { id: "fee_cancel_tecnico", label: "Cancelamento do técnico", value: 20, unit: "€", description: "Penalização descontada ao técnico" },
+  // Cancelamentos em PERCENTAGEM do valor do serviço (pedido do André 2026-07-22).
+  { id: "fee_cancel_cliente", label: "Cancelamento do cliente (<24h)", value: 15, unit: "%", description: "Percentagem do valor do serviço cobrada ao cliente por cancelamento tardio" },
+  { id: "fee_cancel_tecnico", label: "Cancelamento do técnico", value: 20, unit: "%", description: "Percentagem do valor do serviço descontada ao técnico que cancela" },
   { id: "fee_km", label: "Valor por km (deslocação)", value: 0.4, unit: "€", description: "Acima de 15 km da zona base do técnico" },
 ];

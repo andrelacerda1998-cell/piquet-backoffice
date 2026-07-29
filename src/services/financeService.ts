@@ -262,7 +262,8 @@ export async function getTechnicianPayouts(): Promise<TechnicianPayout[]> {
 }
 
 export async function processTechnicianPayout(id: string): Promise<TechnicianPayout> {
-  return apiPut(`/finance/payouts/${id}/process`, {}, () => {
+  // O id derivado leva "|" — tem de ir escapado no path.
+  return apiPut(`/finance/payouts/${encodeURIComponent(id)}/process`, {}, () => {
     if (!payoutsCache) payoutsCache = buildTechnicianPayouts();
     const idx = payoutsCache.findIndex((p) => p.id === id);
     if (idx === -1) throw new Error("Pagamento não encontrado");
@@ -358,15 +359,17 @@ export async function getAppPayments(): Promise<AppPaymentsData> {
 export interface UnitEconomics {
   ltv: number;
   cac: number;
+  servicesPerCustomer: number;
   adSpendMonth: number;
   newCustomersMonth: number;
+  servicesMonth: number;
   totalCustomers: number;
 }
 
-/** LTV e CAC reais. Ficam a 0 até haver clientes reais (backend de reservas). */
+/** LTV, CAC e serviços/cliente reais (dos serviços concluídos + investimento). */
 export async function getUnitEconomics(): Promise<UnitEconomics> {
   return apiGet<UnitEconomics>("/finance/unit-economics", () => ({
-    ltv: 0, cac: 0, adSpendMonth: 0, newCustomersMonth: 0, totalCustomers: 0,
+    ltv: 0, cac: 0, servicesPerCustomer: 0, adSpendMonth: 0, newCustomersMonth: 0, servicesMonth: 0, totalCustomers: 0,
   })).then((r) => r.data);
 }
 
@@ -391,6 +394,15 @@ export async function getFinanceGmv(): Promise<GmvData> {
 /* ==================== FATURAS DE CUSTOS (empresa) ==================== */
 
 export type CompanyInvoiceStatus = "pendente" | "parcial" | "pago";
+export type InvoiceRecurrence = "nenhuma" | "mensal" | "trimestral" | "semestral" | "anual";
+
+export const INVOICE_RECURRENCE_LABELS: Record<InvoiceRecurrence, string> = {
+  nenhuma: "Sem repetição",
+  mensal: "Mensal",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
 
 export interface CompanyInvoice {
   id: string;
@@ -401,6 +413,7 @@ export interface CompanyInvoice {
   outstanding: number;
   issueDate: string | null;
   dueDate: string | null;
+  recurrence: InvoiceRecurrence;
   status: CompanyInvoiceStatus;
   overdue: boolean;
   source: "manual" | "outlook";
@@ -431,17 +444,100 @@ export async function getCompanyInvoices(): Promise<CompanyInvoicesData> {
 }
 
 export async function createCompanyInvoice(input: {
-  vendor: string; description?: string; amount: number; issueDate?: string; dueDate?: string;
+  vendor: string; description?: string; amount: number; issueDate?: string; dueDate?: string; recurrence?: InvoiceRecurrence;
 }): Promise<{ id: string }> {
   return apiPost<{ id: string }>("/finance/company-invoices", input, () => ({ id: `inv_${Date.now()}` })).then((r) => r.data);
 }
 
+/** `spawned` vem preenchido quando saldar uma fatura recorrente gerou a próxima. */
+export interface InvoiceUpdateResult {
+  id: string;
+  spawned: { id: string; dueDate: string | null } | null;
+}
+
 export async function updateCompanyInvoice(id: string, patch: {
-  amountPaid?: number; markPaid?: boolean; vendor?: string; description?: string; amount?: number; dueDate?: string;
-}): Promise<void> {
-  await apiPut(`/finance/company-invoices/${id}`, patch, () => null);
+  amountPaid?: number; markPaid?: boolean; vendor?: string; description?: string; amount?: number;
+  issueDate?: string; dueDate?: string; recurrence?: InvoiceRecurrence;
+}): Promise<InvoiceUpdateResult> {
+  return apiPut<InvoiceUpdateResult>(`/finance/company-invoices/${id}`, patch, () => ({ id, spawned: null })).then((r) => r.data);
 }
 
 export async function deleteCompanyInvoice(id: string): Promise<void> {
   await apiDelete(`/finance/company-invoices/${id}`, () => null);
+}
+
+// ------------------------- Planeamento financeiro mensal -------------------------
+
+export type BudgetKind = "custo" | "entrada";
+export type BudgetFrequency = "mensal" | "trimestral" | "semestral" | "anual" | "unica";
+export type BudgetCategory =
+  | "salarios" | "renda" | "software" | "servicos" | "marketing"
+  | "impostos" | "seguros" | "financiamento" | "comissoes" | "outros";
+
+export const BUDGET_FREQUENCY_LABELS: Record<BudgetFrequency, string> = {
+  mensal: "Mensal",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+  unica: "Única",
+};
+
+export const BUDGET_CATEGORY_LABELS: Record<BudgetCategory, string> = {
+  salarios: "Salários",
+  renda: "Renda",
+  software: "Software",
+  servicos: "Serviços",
+  marketing: "Marketing",
+  impostos: "Impostos",
+  seguros: "Seguros",
+  financiamento: "Financiamento",
+  comissoes: "Comissões",
+  outros: "Outros",
+};
+
+export interface BudgetItem {
+  id: string;
+  name: string;
+  kind: BudgetKind;
+  category: BudgetCategory;
+  amount: number;
+  frequency: BudgetFrequency;
+  startMonth: string; // "YYYY-MM"
+  active: boolean;
+  notes?: string;
+  createdAt: string;
+}
+
+export type BudgetItemInput = Pick<BudgetItem, "name" | "amount" | "startMonth"> &
+  Partial<Pick<BudgetItem, "kind" | "category" | "frequency" | "notes">>;
+export type BudgetItemPatch = Partial<
+  Pick<BudgetItem, "name" | "kind" | "category" | "amount" | "frequency" | "startMonth" | "active" | "notes">
+>;
+
+/** Linhas do orçamento (custos recorrentes + entradas previstas) — dados reais do André. */
+export async function getBudgetItems(): Promise<BudgetItem[]> {
+  return apiGet<BudgetItem[]>("/finance/budget", () => []).then((r) => r.data);
+}
+
+export async function createBudgetItem(input: BudgetItemInput): Promise<BudgetItem> {
+  return apiPost<BudgetItem>("/finance/budget", input, () => ({
+    id: `tmp_${Date.now()}`,
+    name: input.name,
+    kind: input.kind ?? "custo",
+    category: input.category ?? "outros",
+    amount: input.amount,
+    frequency: input.frequency ?? "mensal",
+    startMonth: input.startMonth,
+    active: true,
+    notes: input.notes,
+    createdAt: new Date().toISOString(),
+  })).then((r) => r.data);
+}
+
+export async function updateBudgetItem(id: string, patch: BudgetItemPatch): Promise<void> {
+  await apiPut(`/finance/budget/${id}`, patch, () => null);
+}
+
+export async function deleteBudgetItem(id: string): Promise<void> {
+  await apiDelete(`/finance/budget/${id}`, () => null);
 }

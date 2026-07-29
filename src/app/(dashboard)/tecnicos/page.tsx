@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
 import { AppTechniciansPanel } from "@/components/ui/AppTechniciansPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import RecrutamentoPage from "../recrutamento/page";
 import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -23,7 +25,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 export default function TechniciansPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
-  const [tab, setTab] = useState("visao");
+  const [tab, setTab] = useTabParam("visao");
   const [selected, setSelected] = useState<Technician | null>(null);
 
   const { data: metrics } = useAsyncData(() => getTechnicianMetrics(), []);
@@ -59,6 +61,7 @@ export default function TechniciansPage() {
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "aprovacoes", label: "Aprovações e KYC", count: pending.length },
+    { id: "recrutamento", label: "Recrutamento" },
     { id: "app", label: "Técnicos da app" },
   ];
 
@@ -261,6 +264,7 @@ export default function TechniciansPage() {
           </SubTabs>
         )}
 
+        {tab === "recrutamento" && <RecrutamentoPage />}
         {tab === "app" && <AppTechniciansPanel />}
       </div>
 

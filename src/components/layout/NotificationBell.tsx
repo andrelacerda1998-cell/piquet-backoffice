@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar } from "lucide-react";
+import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar, Megaphone } from "lucide-react";
 import { useNotificationStore, toast } from "@/stores";
 import { getInboxTickets, CHANNEL_LABEL } from "@/services/supportInboxService";
-import { getCustomRequests } from "@/services/extrasService";
+import { getCustomRequests, getLeads } from "@/services/extrasService";
 import { useLiveNotifications } from "@/hooks/useLiveNotifications";
 import type { AppNotification } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const KIND_ICON: Record<AppNotification["kind"], typeof Info> = {
   tarefa: ListChecks,
   reuniao: Calendar,
   sistema: Info,
+  lead: Megaphone,
 };
 const KIND_TONE: Record<AppNotification["kind"], string> = {
   ticket: "bg-info-light text-info",
@@ -23,6 +24,7 @@ const KIND_TONE: Record<AppNotification["kind"], string> = {
   tarefa: "bg-success-light text-success",
   reuniao: "bg-warning-light text-warning",
   sistema: "bg-surface-subtle text-text-muted",
+  lead: "bg-piquet/15 text-piquet-700",
 };
 
 // Intervalo de polling à lista de tickets (mock ou backend real via api.ts).
@@ -85,6 +87,27 @@ export function NotificationBell() {
         }));
         if (!firstRun.current && freshReq.length > 0) {
           toast(`${freshReq.length} novo(s) pedido(s) personalizado(s)`, "info");
+        }
+
+        // Leads novas do formulário da landing (piquetapp.com) — só as ainda
+        // "não iniciado" e recentes (7 dias), para não ressuscitar histórico.
+        const leads = await getLeads();
+        if (!alive) return;
+        const weekAgo = Date.now() - 7 * 864e5;
+        const novasLeads = leads
+          .filter((l) => l.stage === "nao_iniciado" && new Date(l.createdAt).getTime() > weekAgo)
+          .slice(0, 8);
+        const knownLeads = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
+        const freshLeads = novasLeads.filter((l) => !knownLeads.has(`lead:${l.id}`));
+        freshLeads.forEach((l) => addNotification({
+          kind: "lead",
+          title: "Nova lead do site",
+          body: `${l.name}${l.city ? ` · ${l.city}` : ""}${l.message ? ` — ${l.message}` : ""}`,
+          href: "/marketing?tab=crm",
+          dedupeKey: `lead:${l.id}`,
+        }));
+        if (!firstRun.current && freshLeads.length > 0) {
+          toast(`${freshLeads.length} nova(s) lead(s) do site piquetapp.com`, "info");
         }
 
         firstRun.current = false;

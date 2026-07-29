@@ -198,6 +198,8 @@ export interface Employee {
   recruitmentCost: number;
   otherMonthlyCosts: number;
   otherAnnualCosts: number;
+  /** Custo mensal p/ empresa definido à mão; quando > 0 substitui o cálculo automático. */
+  monthlyCompanyCost?: number | null;
   notes?: string;
 }
 

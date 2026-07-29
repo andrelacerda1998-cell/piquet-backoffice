@@ -95,6 +95,7 @@ const LIVE_EXACT = new Set<string>([
   "/product/growth",
   "/product/ratings",
   "/product/integrations-status",
+  "/product/funnel",
   // Fase 2 — Clientes
   "/customers",
   "/customers/metrics",
@@ -135,6 +136,8 @@ const LIVE_EXACT = new Set<string>([
   "/team/tasks",
   // Quadro de desenvolvimento (Kanban site + app)
   "/dev-tasks",
+  // Tarefas pessoais (pipeline Kanban)
+  "/tasks",
   // Fase 6 — Impostos (tax_obligations)
   "/tax/obligations",
   "/tax/summary",
@@ -150,6 +153,10 @@ const LIVE_EXACT = new Set<string>([
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)
   "/finance/company-invoices",
+  // Planeamento financeiro mensal (linhas de orçamento do André)
+  "/finance/budget",
+  // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
+  "/support/inbox",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -178,6 +185,19 @@ const REAL_DATA = new Set<string>([
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
   // registados à mão (POST /api/services) — dados reais do staff.
   "/services",
+  // Clientes e técnicos: seed apagado (0 linhas). Passam a preencher-se ao
+  // registar serviços — cada serviço cria/liga o cliente e o técnico (por FK),
+  // e as vistas *_enriched derivam as métricas. Tudo real ou vazio.
+  "/customers",
+  "/customers/metrics",
+  "/customers/by-location",
+  "/customers/by-source",
+  "/technicians",
+  "/technicians/metrics",
+  "/technicians/by-category",
+  "/technicians/by-location",
+  "/technicians/top",
+  "/technicians/coverage",
   "/marketing/campaigns",
   "/marketing/metrics",
   "/marketing/channels",
@@ -185,12 +205,24 @@ const REAL_DATA = new Set<string>([
   "/marketing/leads", // Formulário da landing → POST /api/leads → tabela leads.
   "/finance/app-payments",
   "/finance/gmv", // GMV real = Payshop cobrado + serviços concluídos.
+  "/finance/unit-economics", // LTV/CAC dos serviços + investimento em anúncios.
   "/dev-tasks",
+  "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
   "/product/integrations-status", // Saúde real das pipelines (cron_runs).
+  "/product/funnel", // Funil da app (Mixpanel); vazio/configured:false sem creds.
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
+  "/finance/budget", // Planeamento mensal — linhas escritas pelo André.
+  "/finance/payouts", // Derivado dos serviços concluídos (2026-07-22); seed fora.
+  // Colaboradores: seed apagado a 2026-07-22 (backup em _seed_backup_employees);
+  // a tabela só tem colaboradores registados à mão em Impostos e RH.
+  "/employees",
+  "/employees/dashboard",
+  "/employees/cost-by-role",
+  "/employees/salary-vs-cost",
+  "/employees/internal-vs-contractors",
   // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
   // o que resta foi escrito por pessoas, como o dev-tasks.
   "/team/messages",
@@ -209,7 +241,10 @@ export function isDemoEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (REAL_DATA.has(path)) return false;
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return false;
+  if (/^\/tasks\/[^/]+$/.test(path)) return false;
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return false;
+  if (/^\/finance\/budget\/[^/]+$/.test(path)) return false;
+  if (/^\/employees\/emp_[^/]+$/.test(path)) return false;
   return true;
 }
 
@@ -247,8 +282,14 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return true; // mudar estado de tarefa
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
+  if (/^\/tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa pessoal
   if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
   if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
+  if (/^\/finance\/budget\/[^/]+$/.test(path)) return true; // editar/apagar linha do orçamento
+  // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
+  if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
+  if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
+  if (/^\/support\/inbox\/[^/]+\/(reply|status)$/.test(path)) return true; // responder/mudar estado de ticket
   return false;
 }
 

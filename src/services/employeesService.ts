@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPost, apiPut } from "./api";
 import { mockData } from "@/mocks/data";
 import { paginateArray, sortArray } from "@/lib/filters";
 import {
@@ -13,6 +13,16 @@ import type {
 
 const employeesCache: Employee[] = [...mockData.employees];
 const taxCache: TaxObligation[] = [...mockData.taxObligations];
+
+/**
+ * Custo mensal efetivo p/ empresa: o manual (se definido) ganha ao calculado.
+ * Usar SEMPRE isto (e não averageMonthlyCost direto) onde o custo alimenta
+ * totais — Planeamento, dashboard de equipa, gráficos.
+ */
+export function effectiveMonthlyCost(employee: Employee, cost?: EmployeeCost): number {
+  if (employee.monthlyCompanyCost && employee.monthlyCompanyCost > 0) return employee.monthlyCompanyCost;
+  return (cost ?? computeEmployeeCost(employee)).averageMonthlyCost;
+}
 
 export function computeEmployeeCost(employee: Employee): EmployeeCost {
   const calc = calculateEmployeeAnnualCost({
@@ -106,11 +116,42 @@ export async function getEmployeeById(id: string) {
   }).then((r) => r.data);
 }
 
-export async function createEmployee(data: Omit<Employee, "id">) {
-  return apiGet("/employees", () => {
-    const emp = { ...data, id: `emp_${Date.now()}` };
+/** Campos do formulário "Adicionar colaborador"; o resto tem defaults PT na tabela. */
+export interface EmployeeInput {
+  fullName: string;
+  grossMonthlySalary: number;
+  startDate: string; // início do contrato, "YYYY-MM-DD"
+  jobTitle?: string;
+  department?: string;
+  contractType?: Employee["contractType"];
+  annualSalaryPayments?: number;
+  mealAllowanceMonthly?: number;
+  /** Custo mensal p/ empresa à mão; substitui o cálculo automático. */
+  monthlyCompanyCost?: number | null;
+  email?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export async function createEmployee(data: EmployeeInput) {
+  return apiPost<Employee & { cost: EmployeeCost }>("/employees", data, () => {
+    const emp: Employee = {
+      id: `emp_${Date.now()}`,
+      fullName: data.fullName, email: data.email ?? "", phone: data.phone ?? "",
+      jobTitle: data.jobTitle ?? "", department: data.department ?? "",
+      contractType: data.contractType ?? "sem_termo", employmentStatus: "ativo",
+      startDate: data.startDate, grossMonthlySalary: data.grossMonthlySalary,
+      annualSalaryPayments: data.annualSalaryPayments ?? 14,
+      mealAllowanceMonthly: data.mealAllowanceMonthly ?? 0, mealAllowanceMonths: 11,
+      fixedAllowancesMonthly: 0, variableCompensationMonthly: 0, annualBonus: 0,
+      employerSocialSecurityRate: 0.2375, employeeSocialSecurityRate: 0.11,
+      workersCompensationInsuranceMonthly: 0, healthInsuranceMonthly: 0,
+      equipmentAnnualCost: 0, softwareAnnualCost: 0, trainingAnnualCost: 0,
+      recruitmentCost: 0, otherMonthlyCosts: 0, otherAnnualCosts: 0,
+      monthlyCompanyCost: data.monthlyCompanyCost ?? null, notes: data.notes,
+    };
     employeesCache.push(emp);
-    return emp;
+    return { ...emp, cost: computeEmployeeCost(emp) };
   }).then((r) => r.data);
 }
 
