@@ -1,5 +1,4 @@
 import { apiGet, apiPut } from "./api";
-import { mockData } from "@/mocks/data";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -69,72 +68,62 @@ export async function restoreCustomer(id: number): Promise<RealCustomer> {
   }).then((r) => r.data);
 }
 
-export async function getCustomerMetrics() {
-  return apiGet("/customers/metrics", () => {
-    const customers = mockData.customers;
-    const active = customers.filter((c) => c.status === "ativo" || c.status === "recorrente");
-    const recurring = customers.filter((c) => c.status === "recorrente" || c.serviceCount >= 3);
-    const oneTime = customers.filter((c) => c.serviceCount === 1);
-    const inactive = customers.filter((c) => c.status === "inativo");
-    const withComplaints = customers.filter((c) => c.complaintCount > 0);
-    const totalRevenue = customers.reduce((s, c) => s + c.piquetRevenue, 0);
+/**
+ * Indicadores da aba "Visão geral" -- calculados no Laravel a partir de
+ * serviços reais concluídos (ver App\Http\Controllers\Api\Admin\
+ * CustomerController::metrics()). withComplaints fica sempre 0: não existe
+ * sistema de reclamações no Laravel nem no Filament.
+ */
+export interface CustomerMetrics {
+  registered: number;
+  newCustomers: number;
+  active: number;
+  recurring: number;
+  oneTime: number;
+  inactive: number;
+  repurchaseRate: number;
+  avgServicesPerCustomer: number;
+  avgRevenuePerCustomer: number;
+  estimatedLTV: number;
+  avgTimeToSecondService: number;
+  averageRating: number;
+  withComplaints: number;
+}
 
-    return {
-      registered: customers.length,
-      newCustomers: customers.filter((c) => {
-        const days = (Date.now() - new Date(c.registeredAt).getTime()) / 86400000;
-        return days <= 30;
-      }).length,
-      active: active.length,
-      recurring: recurring.length,
-      oneTime: oneTime.length,
-      inactive: inactive.length,
-      repurchaseRate: customers.length ? (recurring.length / customers.length) * 100 : 0,
-      avgServicesPerCustomer: customers.length ? customers.reduce((s, c) => s + c.serviceCount, 0) / customers.length : 0,
-      avgRevenuePerCustomer: customers.length ? totalRevenue / customers.length : 0,
-      estimatedLTV: customers.length ? totalRevenue / customers.length * 2.5 : 0,
-      avgTimeToSecondService: 45,
-      averageRating: customers.filter((c) => c.averageRating > 0).reduce((s, c) => s + c.averageRating, 0) / (customers.filter((c) => c.averageRating > 0).length || 1),
-      withComplaints: withComplaints.length,
-    };
-  }).then((r) => r.data);
+const ZERO_METRICS: CustomerMetrics = {
+  registered: 0, newCustomers: 0, active: 0, recurring: 0, oneTime: 0, inactive: 0,
+  repurchaseRate: 0, avgServicesPerCustomer: 0, avgRevenuePerCustomer: 0, estimatedLTV: 0,
+  avgTimeToSecondService: 0, averageRating: 0, withComplaints: 0,
+};
+
+export async function getCustomerMetrics(): Promise<CustomerMetrics> {
+  return apiGet<CustomerMetrics>("/customers/metrics", () => ZERO_METRICS).then((r) => r.data);
 }
 
 export async function getCustomersByLocation() {
-  return apiGet("/customers/by-location", () => {
-    const byCity: Record<string, number> = {};
-    mockData.customers.forEach((c) => {
-      byCity[c.city] = (byCity[c.city] ?? 0) + 1;
-    });
-    return Object.entries(byCity).map(([name, value]) => ({ name, value }));
-  }).then((r) => r.data);
+  return apiGet<Array<{ name: string; value: number }>>("/customers/by-location", () => []).then((r) => r.data);
 }
 
+/**
+ * Sem tracking de canal/origem de aquisição no Laravel -- devolve sempre
+ * vazio (o gráfico mostra "Sem dados" em vez de uma distribuição inventada).
+ */
 export async function getCustomersBySource() {
-  return apiGet("/customers/by-source", () => {
-    const bySource: Record<string, number> = {};
-    mockData.customers.forEach((c) => {
-      bySource[c.source] = (bySource[c.source] ?? 0) + 1;
-    });
-    return Object.entries(bySource).map(([name, value]) => ({ name, value }));
-  }).then((r) => r.data);
+  return apiGet<Array<{ name: string; value: number }>>("/customers/by-source", () => []).then((r) => r.data);
 }
 
+/**
+ * Retenção por coorte: sem análise de coortes no Laravel -- devolve sempre
+ * vazio (antes eram barras fictícias fixas 42/35/28%).
+ */
 export async function getRetentionData() {
-  return apiGet("/customers/retention", () => [
-    { name: "30 dias", value: 42 },
-    { name: "60 dias", value: 35 },
-    { name: "90 dias", value: 28 },
-  ]).then((r) => r.data);
+  return apiGet<Array<{ name: string; value: number }>>("/customers/retention", () => []).then((r) => r.data);
 }
 
+/**
+ * Novos vs recorrentes por mês (últimos 6 meses), calculado a partir de
+ * registos e serviços concluídos reais -- antes era Math.random().
+ */
 export async function getNewVsRecurringTrend() {
-  return apiGet("/customers/trend", () => {
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    return months.map((name) => ({
-      name,
-      novos: Math.round(30 + Math.random() * 20),
-      recorrentes: Math.round(50 + Math.random() * 30),
-    }));
-  }).then((r) => r.data);
+  return apiGet<Array<{ name: string; novos: number; recorrentes: number }>>("/customers/trend", () => []).then((r) => r.data);
 }

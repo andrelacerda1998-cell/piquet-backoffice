@@ -100,6 +100,8 @@ const LIVE_EXACT = new Set<string>([
   "/customers/metrics",
   "/customers/by-location",
   "/customers/by-source",
+  "/customers/trend",
+  "/customers/retention",
   // Fase 2 — Técnicos
   "/technicians",
   "/technicians/metrics",
@@ -183,10 +185,12 @@ const LIVE_DENY = new Set<string>([
  * o tráfego é quase todo de teste (65 de 68 encomendas abaixo de 10 €). É um
  * problema distinto do selo — ver a nota na aba "Pagamentos da app".
  *
- * Nota sobre `/customers`: passou a vir do Laravel (tabela `users` real da
- * produção), não do seed do Supabase — ver CustomerController no backend.
- * `/customers/metrics`, `/by-location` e `/by-source` continuam ligados ao
- * seed (ainda por migrar) e por isso ficam de fora.
+ * Nota sobre `/customers` e derivados: passaram a vir do Laravel (tabela
+ * `users` + `services` reais da produção), não do seed do Supabase — ver
+ * CustomerController no backend. `/customers/by-source` e `/customers/
+ * retention` devolvem sempre vazio (sem tracking de origem nem análise de
+ * coortes no Laravel) — "vazio" aqui é a verdade, não ficção, por isso contam
+ * como REAL_DATA na mesma.
  */
 const REAL_DATA = new Set<string>([
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
@@ -222,6 +226,11 @@ const REAL_DATA = new Set<string>([
   "/vendor-payments",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
   "/customers",
+  "/customers/metrics",
+  "/customers/by-location",
+  "/customers/by-source",
+  "/customers/trend",
+  "/customers/retention",
 ]);
 
 /**

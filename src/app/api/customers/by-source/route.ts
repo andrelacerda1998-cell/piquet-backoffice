@@ -1,14 +1,16 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { apiOk, withStaff } from "../../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
 
-/** GET /api/customers/by-source — contagem por origem. */
+/**
+ * GET /api/customers/by-source — sem tracking de canal/origem de aquisição no
+ * Laravel; devolve sempre vazio (ver CustomerController::bySource()).
+ */
 export const GET = withStaff(async () => {
-  const { data, error } = await supabaseAdmin().from("customers").select("source");
-  if (error) throw new Error(error.message);
-  const bySource: Record<string, number> = {};
-  for (const r of (data ?? []) as { source: string | null }[]) {
-    const s = r.source ?? "—";
-    bySource[s] = (bySource[s] ?? 0) + 1;
+  try {
+    const data = await laravelAdminRequest<Array<{ name: string; value: number }>>("/v1/admin/customers/by-source");
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler clientes por origem.", e instanceof ApiError ? e.status : 500);
   }
-  return apiOk(Object.entries(bySource).map(([name, value]) => ({ name, value })));
 });

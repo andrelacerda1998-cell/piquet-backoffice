@@ -4,7 +4,7 @@ import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
-import { AppCustomersPanel } from "@/components/ui/AppCustomersPanel";
+import { Modal, Field } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
@@ -13,7 +13,7 @@ import {
   getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend,
   blockCustomer, restoreCustomer, type RealCustomer,
 } from "@/services/customersService";
-import { getComplaints, type Complaint } from "@/services/extrasService";
+import { type Complaint } from "@/services/extrasService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -44,10 +44,30 @@ export default function CustomersPage() {
   const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
   const { data: retention } = useAsyncData(() => getRetentionData(), []);
   const { data: trend } = useAsyncData(() => getNewVsRecurringTrend(), []);
-  const { data: complaintsData } = useAsyncData(() => getComplaints(), []);
-  const [complaints, setComplaints] = usePersistentList<Complaint>("reclamacoes", complaintsData);
+  // Sem sistema de reclamações no Laravel nem no Filament -- lista de notas
+  // manuais do staff, guardada só no browser (sem pré-popular com dados
+  // fictícios; começa vazia e cresce só com o que a equipa registar aqui).
+  const [complaints, setComplaints] = usePersistentList<Complaint>("reclamacoes", []);
 
   const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
+
+  const [newComplaintOpen, setNewComplaintOpen] = useState(false);
+  const [newComplaint, setNewComplaint] = useState({ customerName: "", serviceName: "", category: "", city: "" });
+  const addComplaint = () => {
+    if (!newComplaint.customerName.trim()) { toast("Indica o nome do cliente.", "error"); return; }
+    setComplaints((prev) => [{
+      id: `c_${Date.now()}`,
+      customerName: newComplaint.customerName.trim(),
+      serviceName: newComplaint.serviceName.trim() || "—",
+      category: newComplaint.category.trim() || "—",
+      city: newComplaint.city.trim() || "—",
+      status: "aberta",
+      openedAt: new Date().toISOString().slice(0, 10),
+    }, ...prev]);
+    setNewComplaintOpen(false);
+    setNewComplaint({ customerName: "", serviceName: "", category: "", city: "" });
+    toast("Reclamação registada.");
+  };
 
   // Bloquear/Reativar = soft-delete real do User no Laravel (ver
   // customersService.ts) -- notifica ninguém (o Filament também não notifica
@@ -84,7 +104,6 @@ export default function CustomersPage() {
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
-    { id: "app", label: "Clientes da app" },
   ];
 
   const resolveComplaint = (id: string) => {
@@ -148,7 +167,7 @@ export default function CustomersPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Clientes <DemoBadge endpoint="/customers" /></h1>
-          <p className="text-text-secondary mt-1">{metrics?.registered ?? 752} clientes registados</p>
+          <p className="text-text-secondary mt-1">{metrics?.registered ?? 0} clientes registados</p>
         </div>
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -203,13 +222,17 @@ export default function CustomersPage() {
 
         {tab === "reclamacoes" && (
           <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-secondary">Notas manuais da equipa — sem sistema de reclamações no Laravel, guardado só neste browser.</p>
+              <button onClick={() => setNewComplaintOpen(true)} className="btn-primary text-sm py-2">Nova reclamação</button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <MetricCard title="Total" metric={buildMetricValue(complaints.length, complaints.length)} />
               <MetricCard title="Abertas" metric={buildMetricValue(complaints.filter((c) => c.status === "aberta").length, 5, true)} />
               <MetricCard title="Em análise" metric={buildMetricValue(complaints.filter((c) => c.status === "em_analise").length, 3, true)} />
               <MetricCard title="Resolvidas" metric={buildMetricValue(complaints.filter((c) => c.status === "resolvida").length, 8)} />
             </div>
-            <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem reclamações 🎉" />
+            <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem reclamações registadas." />
           </div>
         )}
 
@@ -244,8 +267,34 @@ export default function CustomersPage() {
           </SubTabs>
         )}
 
-        {tab === "app" && <AppCustomersPanel />}
       </div>
+
+      <Modal
+        open={newComplaintOpen}
+        onClose={() => setNewComplaintOpen(false)}
+        title="Nova reclamação"
+        subtitle="Nota manual — não fica ligada a nenhum serviço real."
+        size="sm"
+        footer={<>
+          <button onClick={() => setNewComplaintOpen(false)} className="btn-secondary text-sm py-2">Cancelar</button>
+          <button onClick={addComplaint} className="btn-primary text-sm py-2">Registar</button>
+        </>}
+      >
+        <div className="space-y-3">
+          <Field label="Cliente">
+            <input className="input-field" value={newComplaint.customerName} onChange={(e) => setNewComplaint((p) => ({ ...p, customerName: e.target.value }))} placeholder="Nome do cliente" />
+          </Field>
+          <Field label="Serviço">
+            <input className="input-field" value={newComplaint.serviceName} onChange={(e) => setNewComplaint((p) => ({ ...p, serviceName: e.target.value }))} placeholder="Ex.: Reparação de canalização" />
+          </Field>
+          <Field label="Categoria">
+            <input className="input-field" value={newComplaint.category} onChange={(e) => setNewComplaint((p) => ({ ...p, category: e.target.value }))} placeholder="Ex.: Canalização" />
+          </Field>
+          <Field label="Zona">
+            <input className="input-field" value={newComplaint.city} onChange={(e) => setNewComplaint((p) => ({ ...p, city: e.target.value }))} placeholder="Ex.: Lisboa" />
+          </Field>
+        </div>
+      </Modal>
     </RouteGuard>
   );
 }

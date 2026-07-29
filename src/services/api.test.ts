@@ -13,6 +13,11 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/customers")).toBe(true);
     expect(isLiveEndpoint("/customers/metrics")).toBe(true);
     expect(isLiveEndpoint("/customers/by-source")).toBe(true);
+    expect(isLiveEndpoint("/customers/by-location")).toBe(true);
+    expect(isLiveEndpoint("/customers/trend")).toBe(true);
+    expect(isLiveEndpoint("/customers/retention")).toBe(true);
+    expect(isLiveEndpoint("/customers/123/block")).toBe(true);
+    expect(isLiveEndpoint("/customers/123/restore")).toBe(true);
     expect(isLiveEndpoint("/technicians?page=1")).toBe(true);
     expect(isLiveEndpoint("/technicians/coverage")).toBe(true);
     expect(isLiveEndpoint("/technicians/top")).toBe(true);
@@ -63,8 +68,6 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
   it("mantém mock os endpoints ainda não migrados", () => {
     expect(isLiveEndpoint("/services/operational-metrics")).toBe(false); // partilha prefixo mas não migrado
     expect(isLiveEndpoint("/technicians/pending")).toBe(false); // KYC ainda não modelado
-    expect(isLiveEndpoint("/customers/retention")).toBe(false); // sintético
-    expect(isLiveEndpoint("/customers/trend")).toBe(false); // sintético
     expect(isLiveEndpoint("/finance/invoices")).toBe(false); // precisa faturação certificada
     expect(isLiveEndpoint("/finance/pending-payments")).toBe(false); // sintético
     expect(isLiveEndpoint("/marketing/funnel")).toBe(false); // sintético
@@ -123,7 +126,9 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/marketing/channels", "/marketing/creatives", "/marketing/leads",
                       "/finance/app-payments", "/product/growth", "/product/ratings",
                       "/product/integrations-status", "/dev-tasks", "/team/messages",
-                      "/team/tasks", "/team/agenda", "/team/meetings", "/customers"]) {
+                      "/team/tasks", "/team/agenda", "/team/meetings", "/customers",
+                      "/customers/metrics", "/customers/by-location", "/customers/by-source",
+                      "/customers/trend", "/customers/retention"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }
