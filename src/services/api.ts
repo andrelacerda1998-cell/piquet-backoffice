@@ -162,9 +162,12 @@ const LIVE_EXACT = new Set<string>([
   // Fase 10 — Pagamentos a vendors (idem, via Laravel)
   "/vendor-payments",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
-  // sem Zonas/AllowedZone e sem apagar, ver notas nos controllers)
+  // sem apagar, ver notas nos controllers)
   "/services-types",
   "/operation-areas",
+  // Fase 12 — Zonas (idem, via Laravel; sem apagar nem controlo de acesso,
+  // ver notas em AllowedZoneController)
+  "/allowed-zones",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -252,6 +255,9 @@ const REAL_DATA = new Set<string>([
   // reais do Laravel (ServicesTypeResource/OperationAreaResource migrados).
   "/services-types",
   "/operation-areas",
+  // Zonas — idem, tabela allowed_zone real do Laravel (AllowedZoneResource
+  // migrado, 2026-07-29).
+  "/allowed-zones",
 ]);
 
 /**
@@ -311,6 +317,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
+  if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
   return false;
 }
 
