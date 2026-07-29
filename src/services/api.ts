@@ -157,6 +157,8 @@ const LIVE_EXACT = new Set<string>([
   "/vouchers",
   // Fase 9 — Revisão de documentos KYC dos técnicos (idem, via Laravel)
   "/vendor-documents",
+  // Fase 10 — Pagamentos a vendors (idem, via Laravel)
+  "/vendor-payments",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -211,6 +213,8 @@ const REAL_DATA = new Set<string>([
   "/vouchers",
   // Documentos KYC dos técnicos — idem, tabela vendor_documents do Laravel.
   "/vendor-documents",
+  // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
+  "/vendor-payments",
 ]);
 
 /**
@@ -265,6 +269,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
   if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
   if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
+  if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
   return false;
 }
 
