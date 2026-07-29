@@ -65,6 +65,14 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/finance/refunds")).toBe(false); // sintético
   });
 
+  it("marca como migrados os endpoints da Fase 11 (Catálogo + Categorias)", () => {
+    expect(isLiveEndpoint("/services-types")).toBe(true);
+    expect(isLiveEndpoint("/services-types?search=torneira")).toBe(true);
+    expect(isLiveEndpoint("/services-types/12")).toBe(true); // editar
+    expect(isLiveEndpoint("/operation-areas")).toBe(true);
+    expect(isLiveEndpoint("/operation-areas/3")).toBe(true); // editar
+  });
+
   it("mantém mock os endpoints ainda não migrados", () => {
     expect(isLiveEndpoint("/services/operational-metrics")).toBe(false); // partilha prefixo mas não migrado
     expect(isLiveEndpoint("/technicians/pending")).toBe(false); // KYC ainda não modelado
@@ -132,7 +140,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/customers/metrics", "/customers/by-location", "/customers/by-source",
                       "/customers/trend", "/customers/retention", "/technicians",
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
-                      "/technicians/top", "/technicians/coverage"]) {
+                      "/technicians/top", "/technicians/coverage",
+                      "/services-types", "/operation-areas"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }
