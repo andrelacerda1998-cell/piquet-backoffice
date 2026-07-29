@@ -3,6 +3,20 @@ import { mockData } from "@/mocks/data";
 import { paginateArray, sortArray } from "@/lib/filters";
 import type { PaginatedResult, SortParams, Technician } from "@/types";
 
+/**
+ * Lista fictícia de técnicos (forma rica: categorias, cidade, avaliação,
+ * receita, ...) -- ainda usada por src/app/(dashboard)/servicos-
+ * personalizados/page.tsx (escolher técnico para um pedido personalizado) e
+ * src/app/(dashboard)/qualidade/page.tsx (técnicos com avaliação baixa), que
+ * não foram migradas nesta fatia.
+ *
+ * Endpoint deliberadamente DIFERENTE de "/technicians": esse passou a ser a
+ * lista real de vendors (App\Http\Controllers\Api\Admin\VendorController,
+ * ver vendorsService.ts), com uma forma completamente diferente (sem
+ * categorias/cidade/avaliação/receita). Reutilizar o mesmo endpoint faria
+ * este fetcher mock nunca correr em produção (isLiveEndpoint despacha para o
+ * Laravel) e as duas páginas acima receberiam dados na forma errada.
+ */
 export async function getTechnicians(
   page = 1,
   pageSize = 20,
@@ -11,7 +25,7 @@ export async function getTechnicians(
   status?: string
 ): Promise<PaginatedResult<Technician>> {
   return apiGet(
-    "/technicians",
+    "/technicians/legacy-mock",
     () => {
       let items = [...mockData.technicians];
       if (search) {
@@ -26,75 +40,12 @@ export async function getTechnicians(
   ).then((r) => r.data);
 }
 
-export async function getTechnicianMetrics() {
-  return apiGet("/technicians/metrics", () => {
-    const techs = mockData.technicians;
-    const approved = techs.filter((t) => ["aprovado", "disponivel", "ativo"].includes(t.status));
-    const active = techs.filter((t) => t.status === "ativo");
-    const inValidation = techs.filter((t) => t.status === "em_validacao");
-    const _incomplete = techs.filter((t) => t.status === "perfil_incompleto");
-    const suspended = techs.filter((t) => t.status === "suspenso");
-    const noServices = techs.filter((t) => t.servicesCompleted === 0 && approved.includes(t));
-    const docComplete = techs.filter((t) => t.documentationComplete);
-
-    return {
-      registered: techs.length,
-      docComplete: docComplete.length,
-      inValidation: inValidation.length,
-      approved: approved.length,
-      available: techs.filter((t) => (t.status as string) === "disponivel").length,
-      active: active.length,
-      noServices: noServices.length,
-      suspended: suspended.length,
-      profileCompletionRate: techs.length ? (docComplete.length / techs.length) * 100 : 0,
-      approvalRate: techs.length ? (approved.length / techs.length) * 100 : 0,
-      avgApprovalTime: 4.2,
-      avgTimeToFirstService: 12,
-    };
-  }).then((r) => r.data);
-}
-
-export async function getTechniciansByCategory() {
-  return apiGet("/technicians/by-category", () => {
-    const byCat: Record<string, number> = {};
-    mockData.technicians.forEach((t) => {
-      t.categories.forEach((c) => {
-        byCat[c] = (byCat[c] ?? 0) + 1;
-      });
-    });
-    return Object.entries(byCat).map(([name, value]) => ({ name, value }));
-  }).then((r) => r.data);
-}
-
-export async function getTechniciansByLocation() {
-  return apiGet("/technicians/by-location", () => {
-    const byCity: Record<string, number> = {};
-    mockData.technicians.forEach((t) => {
-      byCity[t.city] = (byCity[t.city] ?? 0) + 1;
-    });
-    return Object.entries(byCity).map(([name, value]) => ({ name, value }));
-  }).then((r) => r.data);
-}
-
-export async function getTopTechnicians(limit = 10) {
-  return apiGet("/technicians/top", () => {
-    return [...mockData.technicians]
-      .filter((t) => t.servicesCompleted > 0)
-      .sort((a, b) => b.piquetRevenue - a.piquetRevenue)
-      .slice(0, limit);
-  }).then((r) => r.data);
-}
-
-export async function getCoverageVsDemand() {
-  return apiGet("/technicians/coverage", () => {
-    const cities = ["Lisboa", "Amadora", "Loures", "Odivelas", "Sintra", "Cascais"];
-    return cities.map((city) => {
-      const demand = mockData.services.filter((s) => s.city === city).length;
-      const supply = mockData.technicians.filter((t) => t.city === city && ["aprovado", "ativo", "disponivel"].includes(t.status)).length;
-      return { name: city, procura: demand, oferta: supply, ratio: supply ? demand / supply : demand };
-    });
-  }).then((r) => r.data);
-}
+// getTechnicianMetrics/getTechniciansByCategory/getTechniciansByLocation/
+// getTopTechnicians/getCoverageVsDemand foram removidas (2026-07-29): eram
+// só usadas pela aba "Visão geral" de src/app/(dashboard)/tecnicos/page.tsx,
+// que passou a usar os equivalentes reais em vendorsService.ts
+// (getVendorMetrics/getVendorsByCategory/getVendorsByLocation/getTopVendors/
+// getVendorCoverage). Nenhum outro ficheiro as importava.
 
 export type DocStatus = "verificado" | "submetido" | "em_falta";
 export interface TechDocument { name: string; status: DocStatus }

@@ -5,31 +5,33 @@ import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians } from "@/services/techniciansService";
+import {
+  getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, type RealVendor, type TopVendor,
+} from "@/services/vendorsService";
 import {
   getVendorDocuments, approveVendorDocument, declineVendorDocument,
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
-import { getVendors, suspendVendor, restoreVendor, type RealVendor } from "@/services/vendorsService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import type { Technician } from "@/types";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [tab, setTab] = useState("visao");
-  const [selected, setSelected] = useState<Technician | null>(null);
 
-  const { data: metrics } = useAsyncData(() => getTechnicianMetrics(), []);
+  // Indicadores reais da Visão geral (App\Http\Controllers\Api\Admin\
+  // VendorController::metrics() e derivados) -- substituem os "estados"
+  // fictícios do mock (aprovado/disponivel/ativo/em_validacao/suspenso).
+  const { data: metrics } = useAsyncData(() => getVendorMetrics(), []);
   // Lista real de técnicos (App\Filament\Resources\VendorResource migrado)
   // -- sem sort do lado do servidor, tal como Clientes.
   const { data: vendors, loading, refetch: refetchVendors } = useAsyncData(
@@ -43,10 +45,10 @@ export default function TechniciansPage() {
     () => getVendors(1, 100, undefined, true),
     []
   );
-  const { data: byCategory } = useAsyncData(() => getTechniciansByCategory(), []);
-  const { data: byLocation } = useAsyncData(() => getTechniciansByLocation(), []);
-  const { data: coverage } = useAsyncData(() => getCoverageVsDemand(), []);
-  const { data: topTechs } = useAsyncData(() => getTopTechnicians(10), []);
+  const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
+  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
+  const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
+  const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
 
   // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
   // migrado). Contagem do separador vem sempre de "pending", independente do
@@ -122,24 +124,27 @@ export default function TechniciansPage() {
     { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
   ];
 
-  const topColumns: Column<Technician>[] = [
-    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "categories", label: "Categorias", render: (r) => r.categories.slice(0, 2).join(", ") },
-    { key: "city", label: "Zona" },
+  const topColumns: Column<TopVendor>[] = [
+    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "servicesCompleted", label: "Serviços" },
     { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
     { key: "piquetRevenue", label: "Receita gerada", render: (r) => formatCurrency(r.piquetRevenue) },
+    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
   ];
 
-  // Colunas do VendorResource::table() do Filament (nif/telefone/preço/zonas/
-  // elegibilidade/validação AT/estado) -- sem os campos fictícios que a lista
-  // mock tinha (categorias, avaliação, receita, serviços concluídos, ...).
+  // Colunas do VendorResource::table() do Filament (nif/telefone/preço/
+  // categorias/elegibilidade/validação AT/estado) -- sem os campos fictícios
+  // que a lista mock tinha (avaliação, receita, serviços concluídos, ...).
+  // NOTA: "operation_areas" são categorias/ofícios (ex.: "Canalização"), não
+  // zonas geográficas -- a geografia real são as zonas de cobertura
+  // (AllowedZone, ver aba "Cobertura" na Visão geral); rótulo corrigido de
+  // "Zonas" para "Categorias".
   const columns: Column<RealVendor>[] = [
     { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
     { key: "phone_number", label: "Contacto", render: (r) => r.phone_number ?? "—" },
     { key: "price_rate", label: "Preço/h", render: (r) => r.price_rate !== null ? formatCurrency(r.price_rate) : "—" },
-    { key: "operation_areas", label: "Zonas", render: (r) => r.operation_areas.length ? r.operation_areas.join(", ") : "—" },
+    { key: "operation_areas", label: "Categorias", render: (r) => r.operation_areas.length ? r.operation_areas.join(", ") : "—" },
     { key: "can_accept_service", label: "Elegível", render: (r) => r.can_accept_service ? "✓" : "—" },
     { key: "at_valid", label: "AT", render: (r) => r.at_valid ? "✓" : "⚠️" },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
@@ -163,13 +168,17 @@ export default function TechniciansPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Técnicos <DemoBadge endpoint="/technicians" /></h1>
-          <p className="text-text-secondary mt-1">{metrics?.registered ?? 382} técnicos registados</p>
+          <p className="text-text-secondary mt-1">{metrics?.registered ?? 0} técnicos registados</p>
         </div>
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "visao" && (
-          <SubTabs tabs={[{ id: "resumo", label: "Resumo" }, { id: "performance", label: "Performance" }]}>
+          <SubTabs tabs={[
+            { id: "resumo", label: "Resumo" },
+            { id: "categoria", label: "Por categoria" },
+            { id: "cobertura", label: "Cobertura" },
+          ]}>
             {(sub) => (
               <>
                 {sub === "resumo" && (
@@ -177,44 +186,34 @@ export default function TechniciansPage() {
                     {metrics && (
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                         <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 5)} />
-                        <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
-                        <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active - 2)} />
+                        <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible - 4)} />
+                        <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online - 2)} />
                         <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices + 1, true)} />
-                        <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate - 0.5)} format="percent" />
+                        <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate - 0.5)} format="percent" />
                         <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
                       </div>
                     )}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por categoria"><BarChartComponent data={byCategory ?? []} /></ChartCard>
-                      <ChartCard title="Técnicos por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                    </div>
-                    <ChartCard title="Procura vs oferta por zona" subtitle="Rácio de cobertura por localização">
-                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                    </ChartCard>
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
-                      <DataTable columns={topColumns} data={topTechs ?? []} keyField="id" />
+                      <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
                     </div>
                   </div>
                 )}
-                {sub === "performance" && (
+                {sub === "categoria" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <ChartCard title="Técnicos por categoria" subtitle="Áreas de operação em que estão registados"><BarChartComponent data={byCategory ?? []} /></ChartCard>
+                    <ChartCard title="Distribuição por categoria"><DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" /></ChartCard>
+                  </div>
+                )}
+                {sub === "cobertura" && (
                   <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Desempenho dos técnicos com serviços concluídos — aceitação, cancelamento, avaliação e receita gerada.</p>
-                    <DataTable
-                      columns={[
-                        { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                        { key: "city", label: "Zona" },
-                        { key: "servicesCompleted", label: "Serviços", sortable: true },
-                        { key: "acceptanceRate", label: "Taxa aceitação", render: (r: Technician) => <span className={cn(r.acceptanceRate < 70 && "text-warning font-medium")}>{formatPercent(r.acceptanceRate)}</span> },
-                        { key: "cancellationRate", label: "Cancelamento", render: (r: Technician) => <span className={cn(r.cancellationRate > 10 && "text-danger font-medium")}>{formatPercent(r.cancellationRate)}</span> },
-                        { key: "averageRating", label: "Avaliação", render: (r: Technician) => <span className={cn(r.averageRating < 4 && r.averageRating > 0 && "text-warning font-medium")}>{r.averageRating > 0 ? `${r.averageRating}★` : "—"}</span> },
-                        { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r: Technician) => formatCurrency(r.piquetRevenue) },
-                        { key: "amountReceived", label: "Recebido", render: (r: Technician) => formatCurrency(r.amountReceived) },
-                      ]}
-                      data={topTechs ?? []}
-                      keyField="id"
-                      onRowClick={setSelected}
-                    />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                      <ChartCard title="Distribuição por zona"><DonutChartComponent data={byLocation ?? []} centerLabel="Técnicos" /></ChartCard>
+                    </div>
+                    <ChartCard title="Procura vs oferta por zona" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
+                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
+                    </ChartCard>
                   </div>
                 )}
               </>
@@ -229,7 +228,7 @@ export default function TechniciansPage() {
                 <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete - 3)} />
                 <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
                 <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate - 1)} format="percent" />
-                <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
+                <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible - 4)} />
               </div>
             )}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -307,8 +306,6 @@ export default function TechniciansPage() {
           </SubTabs>
         )}
       </div>
-
-      {selected && <TechnicianDetailDrawer technician={selected} onClose={() => setSelected(null)} />}
 
       <Modal
         open={!!reviewDoc}

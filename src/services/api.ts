@@ -192,12 +192,10 @@ const LIVE_DENY = new Set<string>([
  * coortes no Laravel) — "vazio" aqui é a verdade, não ficção, por isso contam
  * como REAL_DATA na mesma.
  *
- * Nota sobre `/technicians`: idem, a lista em si passou a vir do Laravel
- * (tabela `vendors` real, ver VendorController no backend) — só a lista, não
- * os derivados. `/technicians/metrics`, `/by-category`, `/by-location`,
- * `/top` e `/coverage` continuam ligados à tabela `technicians` do Supabase
- * (seed fictício, os "382" mencionados acima) até uma fatia futura da "Visão
- * geral".
+ * Nota sobre `/technicians`: idem, passou a vir do Laravel (tabela `vendors`
+ * real, ver VendorController no backend) — lista E os derivados
+ * (`/metrics`, `/by-category`, `/by-location`, `/top`, `/coverage`), todos
+ * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
@@ -239,10 +237,13 @@ const REAL_DATA = new Set<string>([
   "/customers/trend",
   "/customers/retention",
   // Técnicos — idem, tabela vendors real do Laravel (VendorResource migrado).
-  // Só a lista em si: /technicians/metrics, /by-category, /by-location, /top
-  // e /coverage continuam ligados ao Supabase (seed fictício) até uma fatia
-  // futura da "Visão geral".
+  // Lista + Visão geral, todos reais agora (2026-07-29).
   "/technicians",
+  "/technicians/metrics",
+  "/technicians/by-category",
+  "/technicians/by-location",
+  "/technicians/top",
+  "/technicians/coverage",
 ]);
 
 /**

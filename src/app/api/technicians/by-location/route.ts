@@ -1,14 +1,17 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { apiOk, withStaff } from "../../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
 
-/** GET /api/technicians/by-location — contagem por cidade. */
+/**
+ * GET /api/technicians/by-location — contagem real de técnicos por zona de
+ * cobertura declarada (AllowedZone, App\Http\Controllers\Api\Admin\
+ * VendorController::byLocation()), não mais o campo `city` fictício do seed.
+ */
 export const GET = withStaff(async () => {
-  const { data, error } = await supabaseAdmin().from("technicians").select("city");
-  if (error) throw new Error(error.message);
-  const byCity: Record<string, number> = {};
-  for (const r of (data ?? []) as { city: string | null }[]) {
-    const c = r.city ?? "—";
-    byCity[c] = (byCity[c] ?? 0) + 1;
+  try {
+    const data = await laravelAdminRequest<Array<{ name: string; value: number }>>("/v1/admin/vendors/by-location");
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler os técnicos por localização.", e instanceof ApiError ? e.status : 500);
   }
-  return apiOk(Object.entries(byCity).map(([name, value]) => ({ name, value })));
 });

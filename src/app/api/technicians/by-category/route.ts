@@ -1,13 +1,17 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { apiOk, withStaff } from "../../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
 
-/** GET /api/technicians/by-category — contagem por categoria (array unnested em TS). */
+/**
+ * GET /api/technicians/by-category — contagem real de técnicos por área de
+ * operação (App\Http\Controllers\Api\Admin\VendorController::byCategory()),
+ * não mais a tabela `technicians` do seed do Supabase.
+ */
 export const GET = withStaff(async () => {
-  const { data, error } = await supabaseAdmin().from("technicians").select("categories");
-  if (error) throw new Error(error.message);
-  const byCat: Record<string, number> = {};
-  for (const r of (data ?? []) as { categories: string[] | null }[]) {
-    for (const c of r.categories ?? []) byCat[c] = (byCat[c] ?? 0) + 1;
+  try {
+    const data = await laravelAdminRequest<Array<{ name: string; value: number }>>("/v1/admin/vendors/by-category");
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler os técnicos por categoria.", e instanceof ApiError ? e.status : 500);
   }
-  return apiOk(Object.entries(byCat).map(([name, value]) => ({ name, value })));
 });
