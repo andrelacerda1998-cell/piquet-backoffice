@@ -66,8 +66,21 @@ export default function MarketingPage() {
 
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Lead", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "email", label: "Contacto", render: (r) => (
+      <span className="text-xs text-text-secondary">
+        {r.email || "—"}{r.phone ? <><br />{r.phone}</> : null}
+      </span>
+    ) },
     { key: "source", label: "Origem" },
     { key: "city", label: "Cidade" },
+    // Mensagem livre do formulário -- é onde costuma vir "que serviço"/"para
+    // quando", já que o formulário público não tem campos próprios para
+    // isso. Título com o texto completo para quando for maior que a coluna.
+    { key: "message", label: "Mensagem", render: (r) => (
+      <span className="text-xs text-text-secondary line-clamp-2 max-w-[220px] block" title={r.message ?? undefined}>
+        {r.message || "—"}
+      </span>
+    ) },
     { key: "value", label: "Valor estimado", render: (r) => formatCurrency(r.value) },
     { key: "stage", label: "Fase", render: (r) => <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", LEAD_TONE[r.stage])}>{r.stage}</span> },
     { key: "createdAt", label: "Entrada", sortable: true, render: (r) => formatDate(r.createdAt) },

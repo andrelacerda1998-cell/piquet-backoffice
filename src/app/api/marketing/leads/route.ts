@@ -25,6 +25,12 @@ export const GET = withStaff(async () => {
       id: r.id,
       // Nome pode vir vazio do formulário — cai para o contacto que existir.
       name: r.name || r.email || r.phone,
+      email: r.email || null,
+      phone: r.phone || null,
+      // Mensagem livre do formulário -- só aqui é que costuma vir o que a
+      // pessoa procura e para quando, já que o formulário público não tem
+      // campos estruturados para isso (ver supabase/migrations/leads.sql).
+      message: r.message || null,
       source: r.source || "website",
       city: r.city || "—",
       stage: (["novo", "contactado", "qualificado", "convertido", "perdido"].includes(r.stage)

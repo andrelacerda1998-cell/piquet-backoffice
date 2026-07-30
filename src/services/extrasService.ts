@@ -581,6 +581,12 @@ export async function getComplaints(): Promise<Complaint[]> {
 export interface Lead {
   id: string;
   name: string;
+  email: string | null;
+  phone: string | null;
+  // Mensagem livre do formulário -- o formulário público não tem campos
+  // estruturados para "que serviço"/"para quando", por isso se a pessoa
+  // deixou essa informação, só está aqui.
+  message: string | null;
   source: string;
   city: string;
   stage: "novo" | "contactado" | "qualificado" | "convertido" | "perdido";
@@ -594,9 +600,13 @@ export async function getLeads(): Promise<Lead[]> {
     const sources = ["Meta Ads", "Google Ads", "Instagram", "Referência", "Website"];
     const stages: Lead["stage"][] = ["novo", "contactado", "qualificado", "convertido", "perdido"];
     const cities = ["Lisboa", "Cascais", "Sintra", "Amadora", "Loures"];
+    const messages = ["Preciso de um canalizador para amanhã de manhã", "Orçamento para instalação de ar condicionado", null, "Fechadura arrombada, é urgente", null];
     return names.map((name, i) => ({
       id: `lead_${i + 1}`,
       name,
+      email: `${name.toLowerCase().replace(" ", ".")}@example.com`,
+      phone: `9${String(10000000 + i * 111111).slice(0, 8)}`,
+      message: messages[i % messages.length],
       source: sources[i % sources.length],
       city: cities[i % cities.length],
       stage: stages[i % stages.length],
