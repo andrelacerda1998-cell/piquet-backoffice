@@ -8,15 +8,16 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
-import {
-  SEED_ADMINS, ADMIN_ROLES, getActivityLog,
-  type Admin, type ActivityEntry,
-} from "@/services/backofficeService";
+import { SEED_ADMINS, ADMIN_ROLES, type Admin } from "@/services/backofficeService";
 import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
+import {
+  getDocuments, createDocument, updateDocument, type RequiredDocument,
+} from "@/services/documentsService";
+import { getAudits, type AuditEntry } from "@/services/auditsService";
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, ShieldCheck, FileCheck2 } from "lucide-react";
+import { Plus, ShieldCheck, FileCheck2, Pencil } from "lucide-react";
 import CatalogPage from "./_tabs/catalogo";
 import PricingPage from "./_tabs/precos";
 import ZonesPage from "./_tabs/zonas";
@@ -36,7 +37,7 @@ export default function ConfiguracaoPage() {
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Configurações <DemoBadge endpoint="/settings" /></h1>
+          <h1 className="text-2xl font-bold">Configurações</h1>
           <p className="text-text-secondary mt-1">Catálogo, preços, zonas, taxas, documentos e administradores</p>
         </div>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -134,6 +135,10 @@ function TaxasTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <h3 className="font-semibold">Taxas e comissões</h3>
+        <DemoBadge endpoint="/fee-settings" />
+      </div>
       <p className="text-sm text-text-secondary">
         Multiplicadores da tarifa base por período do dia, preço por km e comissão retida pela Piquet — aplicados ao cálculo de todos os serviços.
       </p>
@@ -193,48 +198,112 @@ function TaxasTab() {
 
 /* ------------------------------- Documentos -------------------------------- */
 
-interface RequiredDoc { id: string; name: string; required: boolean; appliesTo: string }
-
-const SEED_DOCS: RequiredDoc[] = [
-  { id: "doc_cc", name: "Cartão de Cidadão", required: true, appliesTo: "Todos os técnicos" },
-  { id: "doc_rc", name: "Registo Criminal", required: true, appliesTo: "Todos os técnicos" },
-  { id: "doc_dia", name: "Declaração de Início de Atividade", required: true, appliesTo: "Todos os técnicos" },
-  { id: "doc_at", name: "Subutilizador na Autoridade Tributária", required: true, appliesTo: "Todos os técnicos" },
-  { id: "doc_iban", name: "Comprovativo de IBAN", required: true, appliesTo: "Todos os técnicos" },
-  { id: "doc_cert", name: "Certificados profissionais", required: false, appliesTo: "Eletricidade, AVAC, Canalização" },
-  { id: "doc_seg", name: "Seguro de responsabilidade civil", required: false, appliesTo: "Categorias de risco" },
-];
-
+/**
+ * Documentos — migrado do Filament (DocumentResource) para o Laravel. Fatia
+ * "Lista + criar/editar, sem apagar" (decisão explícita, 2026-07-29).
+ * "appliesTo" (a que categorias se aplica um documento opcional) não existe
+ * no modelo real desta forma -- é o inverso, OperationArea.documents lista
+ * os documentos exigidos por categoria -- por isso não foi replicado aqui.
+ */
 function DocumentosTab() {
-  const [docs, setDocs] = usePersistentList<RequiredDoc>("required-docs", SEED_DOCS);
-  const toggle = (id: string) => {
-    setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, required: !d.required } : d)));
-    const d = docs.find((x) => x.id === id);
-    toast(`"${d?.name}" agora é ${d?.required ? "opcional" : "obrigatório"}.`);
+  const { data, loading, error, refetch } = useAsyncData(() => getDocuments(), []);
+  const docs = data?.items ?? [];
+
+  const [modal, setModal] = useState<{ open: boolean; editing: RequiredDocument | null; name: string; description: string; required: boolean }>({
+    open: false, editing: null, name: "", description: "", required: true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  const openNew = () => setModal({ open: true, editing: null, name: "", description: "", required: true });
+  const openEdit = (d: RequiredDocument) => setModal({ open: true, editing: d, name: d.name, description: d.description ?? "", required: d.required });
+  const close = () => setModal({ ...modal, open: false });
+
+  const save = async () => {
+    const name = modal.name.trim();
+    if (!name) { toast("Indica o nome do documento.", "error"); return; }
+    const input = { name, description: modal.description.trim() || null, required: modal.required };
+
+    setSaving(true);
+    try {
+      if (modal.editing) {
+        await updateDocument(modal.editing.id, input);
+        toast(`Documento "${name}" atualizado.`);
+      } else {
+        await createDocument(input);
+        toast(`Documento "${name}" criado.`);
+      }
+      close();
+      await refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao guardar o documento.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-secondary">Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os na aba Técnicos.</p>
-      <div className="space-y-2">
-        {docs.map((d) => (
-          <div key={d.id} className="card px-4 py-3 flex items-center gap-3">
-            <FileCheck2 className={cn("h-5 w-5 shrink-0", d.required ? "text-success" : "text-text-muted")} />
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-text-primary">{d.name}</p>
-              <p className="text-xs text-text-secondary">{d.appliesTo}</p>
+    <>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">Documentos</h3>
+              <DemoBadge endpoint="/documents" />
             </div>
-            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
-              d.required ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
-              {d.required ? "Obrigatório" : "Opcional"}
-            </span>
-            <button onClick={() => toggle(d.id)} className="text-xs text-piquet-600 hover:underline shrink-0">
-              Tornar {d.required ? "opcional" : "obrigatório"}
-            </button>
+            <p className="text-sm text-text-secondary mt-1">Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os na aba Técnicos.</p>
           </div>
-        ))}
+          <button onClick={openNew} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Novo documento</button>
+        </div>
+        <div className="space-y-2">
+          {docs.map((d) => (
+            <div key={d.id} className="card px-4 py-3 flex items-center gap-3">
+              <FileCheck2 className={cn("h-5 w-5 shrink-0", d.required ? "text-success" : "text-text-muted")} />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-text-primary">{d.name}</p>
+                {d.description && <p className="text-xs text-text-secondary">{d.description}</p>}
+              </div>
+              <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
+                d.required ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+                {d.required ? "Obrigatório" : "Opcional"}
+              </span>
+              <button onClick={() => openEdit(d)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline shrink-0">
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </button>
+            </div>
+          ))}
+          {docs.length === 0 && <p className="text-sm text-text-secondary">Ainda sem documentos.</p>}
+        </div>
       </div>
-    </div>
+
+      <Modal
+        open={modal.open}
+        onClose={close}
+        title={modal.editing ? "Editar documento" : "Novo documento"}
+        subtitle="Documento pedido aos técnicos"
+        footer={
+          <>
+            <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={save} disabled={saving} className="btn-primary text-sm">{modal.editing ? "Guardar" : "Criar documento"}</button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Nome do documento">
+            <input value={modal.name} onChange={(e) => setModal({ ...modal, name: e.target.value })} placeholder="Ex.: Certificado profissional" className="input-field" />
+          </Field>
+          <Field label="Descrição" hint="Opcional">
+            <input value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} className="input-field" />
+          </Field>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={modal.required} onChange={(e) => setModal({ ...modal, required: e.target.checked })} />
+            Obrigatório para todos os técnicos
+          </label>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -311,23 +380,43 @@ function AdminsTab() {
 
 /* -------------------------------- Atividade -------------------------------- */
 
+/**
+ * Atividade — feed real de auditoria (tabela `audits` do Laravel), filtrado a
+ * ações de staff (admin/super-admin). Sem equivalente direto no Filament (lá
+ * é por registo); este é um feed global, novo nesta fatia (2026-07-29).
+ *
+ * Limitação conhecida: pedidos feitos através desta API de admin (o
+ * backoffice Next.js) usam um token partilhado, não uma sessão por pessoa —
+ * por isso não têm um utilizador Laravel associado e não aparecem aqui com
+ * "quem" fez o quê. Só ações feitas através do Filament (sessão por admin)
+ * ficam com autor identificado. Isto resolve-se quando o backoffice tiver
+ * autenticação multi-utilizador própria (ver nota na aba Administradores).
+ */
 function AtividadeTab() {
-  const { data: log } = useAsyncData(() => getActivityLog(), []);
+  const { data, loading, error, refetch } = useAsyncData(() => getAudits(), []);
+  const log = data?.items ?? [];
 
-  const columns: Column<ActivityEntry>[] = [
-    { key: "at", label: "Quando", render: (r) => formatDateTime(r.at) },
+  const columns: Column<AuditEntry>[] = [
+    { key: "at", label: "Quando", render: (r) => (r.at ? formatDateTime(r.at) : "—") },
     { key: "who", label: "Quem", render: (r) => <span className="font-medium">{r.who}</span> },
     { key: "action", label: "Ação" },
     { key: "entity", label: "Entidade", render: (r) => <span className="font-mono text-xs">{r.entity}</span> },
-    { key: "change", label: "Alteração", render: (r) => r.oldValue || r.newValue
-      ? <span className="text-xs"><span className="text-text-muted line-through">{r.oldValue ?? "—"}</span> → <span className="font-medium">{r.newValue ?? "—"}</span></span>
+    { key: "change", label: "Alteração", render: (r) => r.old_value || r.new_value
+      ? <span className="text-xs"><span className="text-text-muted line-through">{r.old_value ?? "—"}</span> → <span className="font-medium">{r.new_value ?? "—"}</span></span>
       : <span className="text-text-muted text-xs">—</span> },
   ];
 
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-text-secondary">Registo de auditoria — quem fez o quê, quando, e o que mudou.</p>
-      <DataTable columns={columns} data={log ?? []} keyField="id" emptyMessage="Sem atividade registada" />
+      <div className="flex items-center gap-2">
+        <h3 className="font-semibold">Atividade</h3>
+        <DemoBadge endpoint="/audits" />
+      </div>
+      <p className="text-sm text-text-secondary">Registo de auditoria da equipa — quem fez o quê, quando, e o que mudou. Ações feitas fora do Filament (via esta API de admin) ainda não têm autor identificado — ver nota no código.</p>
+      <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
     </div>
   );
 }

@@ -79,6 +79,13 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/allowed-zones/7")).toBe(true); // editar
   });
 
+  it("marca como migrados os endpoints da Fase 13 (Documentos + Atividade)", () => {
+    expect(isLiveEndpoint("/documents")).toBe(true);
+    expect(isLiveEndpoint("/documents?search=cidadao")).toBe(true);
+    expect(isLiveEndpoint("/documents/4")).toBe(true); // editar
+    expect(isLiveEndpoint("/audits")).toBe(true);
+  });
+
   it("mantém mock os endpoints ainda não migrados", () => {
     expect(isLiveEndpoint("/services/operational-metrics")).toBe(false); // partilha prefixo mas não migrado
     expect(isLiveEndpoint("/technicians/pending")).toBe(false); // KYC ainda não modelado
@@ -147,7 +154,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/customers/trend", "/customers/retention", "/technicians",
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
                       "/technicians/top", "/technicians/coverage",
-                      "/services-types", "/operation-areas", "/allowed-zones"]) {
+                      "/services-types", "/operation-areas", "/allowed-zones",
+                      "/documents", "/audits"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

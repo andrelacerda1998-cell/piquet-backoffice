@@ -168,6 +168,10 @@ const LIVE_EXACT = new Set<string>([
   // Fase 12 — Zonas (idem, via Laravel; sem apagar nem controlo de acesso,
   // ver notas em AllowedZoneController)
   "/allowed-zones",
+  // Fase 13 — Documentos (idem, via Laravel; sem apagar) e Atividade
+  // (feed real de auditoria, só leitura, ver AuditController)
+  "/documents",
+  "/audits",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -258,6 +262,10 @@ const REAL_DATA = new Set<string>([
   // Zonas — idem, tabela allowed_zone real do Laravel (AllowedZoneResource
   // migrado, 2026-07-29).
   "/allowed-zones",
+  // Documentos — idem, tabela documents real do Laravel (DocumentResource
+  // migrado). Atividade — feed real da tabela audits (só staff).
+  "/documents",
+  "/audits",
 ]);
 
 /**
@@ -318,6 +326,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
   if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
+  if (/^\/documents\/[^/]+$/.test(path)) return true; // editar documento
   return false;
 }
 
