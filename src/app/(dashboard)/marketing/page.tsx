@@ -9,7 +9,7 @@ import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown } from "@/services/marketingService";
-import { getLeads, getScripts, type Lead } from "@/services/extrasService";
+import { getScripts } from "@/services/extrasService";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -46,14 +46,6 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
   sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
 };
 
-const LEAD_TONE: Record<Lead["stage"], string> = {
-  novo: "bg-info-light text-info",
-  contactado: "bg-warning-light text-warning",
-  qualificado: "bg-piquet/15 text-piquet-700",
-  convertido: "bg-success-light text-success",
-  perdido: "bg-danger-light text-danger",
-};
-
 export default function MarketingPage() {
   const filters = useFilters();
   const [tab, setTab] = useState("desempenho");
@@ -61,30 +53,7 @@ export default function MarketingPage() {
   const { data: campaigns } = useAsyncData(() => getCampaigns(), []);
   const { data: funnel } = useAsyncData(() => getMarketingFunnel(), []);
   const { data: creatives } = useAsyncData(() => getCreativesPerformance(), []);
-  const { data: leads } = useAsyncData(() => getLeads(), []);
   const { data: scripts } = useAsyncData(() => getScripts(), []);
-
-  const leadColumns: Column<Lead>[] = [
-    { key: "name", label: "Lead", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "email", label: "Contacto", render: (r) => (
-      <span className="text-xs text-text-secondary">
-        {r.email || "—"}{r.phone ? <><br />{r.phone}</> : null}
-      </span>
-    ) },
-    { key: "source", label: "Origem" },
-    { key: "city", label: "Cidade" },
-    // Mensagem livre do formulário -- é onde costuma vir "que serviço"/"para
-    // quando", já que o formulário público não tem campos próprios para
-    // isso. Título com o texto completo para quando for maior que a coluna.
-    { key: "message", label: "Mensagem", render: (r) => (
-      <span className="text-xs text-text-secondary line-clamp-2 max-w-[220px] block" title={r.message ?? undefined}>
-        {r.message || "—"}
-      </span>
-    ) },
-    { key: "value", label: "Valor estimado", render: (r) => formatCurrency(r.value) },
-    { key: "stage", label: "Fase", render: (r) => <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", LEAD_TONE[r.stage])}>{r.stage}</span> },
-    { key: "createdAt", label: "Entrada", sortable: true, render: (r) => formatDate(r.createdAt) },
-  ];
   const { data: channels } = useAsyncData(() => getChannelBreakdown(), []);
 
   const campaignColumns: Column<MarketingCampaign>[] = [
@@ -123,7 +92,6 @@ export default function MarketingPage() {
     { id: "desempenho", label: "Desempenho" },
     { id: "campanhas", label: "Campanhas", count: campaigns?.length },
     { id: "comunicacao", label: "Comunicação" },
-    { id: "crm", label: "CRM & Leads", count: leads?.length },
   ];
 
   return (
@@ -268,20 +236,6 @@ export default function MarketingPage() {
               </>
             )}
           </SubTabs>
-        )}
-
-        {tab === "crm" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {(["novo", "contactado", "qualificado", "convertido", "perdido"] as Lead["stage"][]).map((st) => (
-                <div key={st} className="card p-3">
-                  <p className="text-xs text-text-secondary capitalize">{st}</p>
-                  <p className="text-xl font-bold text-text-primary">{(leads ?? []).filter((l) => l.stage === st).length}</p>
-                </div>
-              ))}
-            </div>
-            <DataTable columns={leadColumns} data={leads ?? []} keyField="id" />
-          </div>
         )}
 
       </div>

@@ -616,6 +616,13 @@ export async function getLeads(): Promise<Lead[]> {
   }).then((r) => r.data);
 }
 
+/** Edita o valor estimado e/ou a fase de um lead (PUT /marketing/leads/:id). */
+export async function updateLead(id: string, patch: { value?: number; stage?: Lead["stage"] }): Promise<void> {
+  await apiPut(`/marketing/leads/${id}`, patch, () => {
+    throw new Error("Leads precisam do Supabase configurado.");
+  });
+}
+
 export interface MessageScript {
   id: string;
   title: string;

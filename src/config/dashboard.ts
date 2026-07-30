@@ -87,6 +87,7 @@ export const NAV_ITEMS = [
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
+  { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/objetivos", label: "Objetivos do ano", icon: "Target" },
@@ -110,7 +111,7 @@ export const NAV_ITEMS = [
 // apagado: URL direto e ⌘K continuam a funcionar.
 export const NAV_PRIMARY: string[] = [
   "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/chat", "/desenvolvimento", "/objetivos", "/servicos-personalizados",
+  "/marketing", "/leads", "/chat", "/desenvolvimento", "/objetivos", "/servicos-personalizados",
 ];
 export const NAV_SECONDARY: string[] = ["/configuracao"];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];

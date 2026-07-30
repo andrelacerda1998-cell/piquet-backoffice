@@ -86,6 +86,10 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/audits")).toBe(true);
   });
 
+  it("marca como migrado o endpoint de editar um lead (valor estimado/fase)", () => {
+    expect(isLiveEndpoint("/marketing/leads/abc-123")).toBe(true);
+  });
+
   it("mantém mock os endpoints ainda não migrados", () => {
     expect(isLiveEndpoint("/services/operational-metrics")).toBe(false); // partilha prefixo mas não migrado
     expect(isLiveEndpoint("/technicians/pending")).toBe(false); // KYC ainda não modelado

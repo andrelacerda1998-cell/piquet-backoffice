@@ -327,6 +327,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
   if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
   if (/^\/documents\/[^/]+$/.test(path)) return true; // editar documento
+  if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // editar valor/fase de um lead
   return false;
 }
 
