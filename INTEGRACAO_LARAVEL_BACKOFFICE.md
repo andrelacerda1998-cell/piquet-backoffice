@@ -143,3 +143,23 @@ Para cada endpoint que expuseres, eu:
 Sugestão de ordem: **Serviços → Clientes → Técnicos → Pagamentos**. Assim que
 os Serviços estiverem ligados, Clientes/Técnicos/GMV ganham logo dados reais por
 derivação.
+
+---
+
+## Estado: Serviços (Prioridade 1) — casca já pronta ✅
+
+Do lado do Next já está feito o adaptador, **dormente** até dizeres que o
+endpoint existe. Ficheiro: `src/app/api/_lib/laravelServices.ts`; ligado em
+`src/app/api/services/route.ts` atrás de um interruptor.
+
+**Para ligar, faltam 3 passos (rápidos):**
+
+1. **Expor** `GET /v1/admin/services` (formato acima).
+2. **Confirmar** duas coisas no ficheiro `laravelServices.ts`:
+   - os **nomes exatos dos campos** que devolves (ajusto `LaravelServiceRow` se forem diferentes);
+   - os **valores de `status`** do teu lado → preencho `LARAVEL_STATUS_MAP` (ex.: `finished → concluido`). Se já usares as mesmas chaves pt-PT, passam diretas.
+3. **Ligar o interruptor**: env var `LARAVEL_SERVICES_ENABLED=true` na Vercel.
+
+Enquanto o passo 3 não é dado, o `/api/services` continua a ler o Supabase
+(serviços manuais) — zero risco. Assim que ligares, verifico contra os dados
+reais e depois é só replicar o mesmo padrão para Clientes, Técnicos e Pagamentos.

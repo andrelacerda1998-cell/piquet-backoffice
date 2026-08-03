@@ -3,6 +3,7 @@ import { rowToService, serviceSortColumn, embedName, type ServiceRow } from "@/l
 import { getDateRangeFromPreset } from "@/lib/filters";
 import { apiOk, apiErr, withStaff } from "../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../_lib/entities";
+import { servicesFromLaravel, fetchLaravelServices } from "../_lib/laravelServices";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import type { PeriodPreset } from "@/types";
 
@@ -39,6 +40,15 @@ export const GET = withStaff(async (req) => {
   const period = q.get("period") as PeriodPreset | null;
   const sort = q.get("sort") ?? undefined;
   const dir = q.get("dir") === "asc" ? "asc" : "desc";
+
+  // Fonte real das reservas: quando LARAVEL_SERVICES_ENABLED estiver ligado,
+  // lê da API do Laravel; caso contrário, mantém-se o Supabase (serviços
+  // manuais) como hoje. Interruptor único, sem partir o que já funciona.
+  if (servicesFromLaravel()) {
+    const from = period && period !== "personalizado" ? getDateRangeFromPreset(period).start.toISOString().slice(0, 10) : undefined;
+    const to = period && period !== "personalizado" ? getDateRangeFromPreset(period).end.toISOString().slice(0, 10) : undefined;
+    return apiOk(await fetchLaravelServices({ page, pageSize, status, city, search, from, to }));
+  }
 
   const admin = supabaseAdmin();
   let query = admin
