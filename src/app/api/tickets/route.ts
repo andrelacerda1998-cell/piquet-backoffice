@@ -34,29 +34,39 @@ const STATUS_LABEL: Record<string, string> = {
   fechado: "Fechado",
 };
 
+/** uuid v4 — o único formato aceite como credencial de leitura. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * GET /api/tickets?ids=TK-1,TK-2 — estado atual dos tickets indicados.
- * A app só conhece os IDs que ela própria criou (guardados no dispositivo),
- * por isso isto expõe apenas o estado dos seus próprios pedidos — sem
- * enumeração de tickets de terceiros. Devolve o mínimo (sem dados de outros).
+ * GET /api/tickets?tokens=<uuid>,<uuid> — estado atual dos tickets indicados.
+ *
+ * Autorização por posse do token: cada ticket tem um `access_token` aleatório
+ * devolvido UMA vez, no POST que o criou, e guardado só no dispositivo do
+ * cliente. Sem sessão do backoffice, é o que substitui a autenticação aqui.
+ *
+ * O parâmetro `ids` foi REMOVIDO de propósito: o id é sequencial ("TK-1101",
+ * "TK-1102", …), portanto aceitá-lo permitia enumerar e ler tickets de outros
+ * clientes sem credenciais — confirmado na auditoria de 2026-08-03. Pedidos
+ * antigos que ainda enviem `ids` recebem lista vazia (falha fechada), nunca
+ * dados de terceiros.
  */
 export async function GET(req: Request) {
   if (!SUPABASE_ENABLED) {
     return NextResponse.json({ ok: false, error: "indisponível" }, { status: 503, headers: CORS });
   }
   const url = new URL(req.url);
-  const ids = (url.searchParams.get("ids") ?? "")
+  const tokens = (url.searchParams.get("tokens") ?? "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean)
+    .filter((s) => UUID_RE.test(s)) // descarta lixo antes de chegar à BD
     .slice(0, 50);
-  if (ids.length === 0) {
+  if (tokens.length === 0) {
     return NextResponse.json({ ok: true, tickets: [] }, { status: 200, headers: CORS });
   }
   const { data, error } = await supabaseAdmin()
     .from("support_tickets")
-    .select("id, subject, status, last_message_at, unread, messages")
-    .in("id", ids);
+    .select("id, subject, status, last_message_at, unread, messages, access_token")
+    .in("access_token", tokens);
   if (error) {
     return NextResponse.json({ ok: false, error: "erro" }, { status: 500, headers: CORS });
   }
@@ -67,6 +77,9 @@ export async function GET(req: Request) {
       | undefined;
     return {
       id: t.id,
+      // Devolvido para a app casar a resposta com o ticket que tem em memória
+      // (a app já o conhece — foi ela que o enviou no pedido).
+      access_token: t.access_token,
       subject: t.subject,
       status: t.status,
       status_label: STATUS_LABEL[t.status] ?? t.status,
@@ -135,10 +148,15 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAdmin()
     .from("support_tickets")
     .insert(ticket)
-    .select("id")
+    .select("id, access_token")
     .single();
   if (error) {
     return NextResponse.json({ ok: false, error: "erro ao guardar" }, { status: 500, headers: CORS });
   }
-  return NextResponse.json({ ok: true, ticket_id: data.id }, { status: 201, headers: CORS });
+  // O access_token é devolvido UMA só vez, aqui. É a credencial que a app guarda
+  // no dispositivo para poder consultar o estado deste ticket (ver GET).
+  return NextResponse.json(
+    { ok: true, ticket_id: data.id, access_token: data.access_token },
+    { status: 201, headers: CORS },
+  );
 }
