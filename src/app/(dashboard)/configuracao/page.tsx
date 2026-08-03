@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { DataTable, type Column } from "@/components/ui/DataTable";
+import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
-import { useAsyncData } from "@/hooks/useDashboard";
+import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { SEED_ADMINS, ADMIN_ROLES, type Admin } from "@/services/backofficeService";
 import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
@@ -14,6 +14,9 @@ import {
   getDocuments, createDocument, updateDocument, type RequiredDocument,
 } from "@/services/documentsService";
 import { getAudits, type AuditEntry } from "@/services/auditsService";
+import {
+  getSentNotifications, getSentNotificationTypes, type SentNotification,
+} from "@/services/sentNotificationsService";
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -65,12 +68,14 @@ export default function ConfiguracaoPage() {
             { id: "documentos", label: "Documentos" },
             { id: "admins", label: "Administradores" },
             { id: "atividade", label: "Atividade" },
+            { id: "notificacoes", label: "Notificações enviadas" },
           ]}>
             {(sub) => (
               <>
                 {sub === "documentos" && <DocumentosTab />}
                 {sub === "admins" && <AdminsTab />}
                 {sub === "atividade" && <AtividadeTab />}
+                {sub === "notificacoes" && <NotificacoesTab />}
               </>
             )}
           </SubTabs>
@@ -417,6 +422,123 @@ function AtividadeTab() {
       </div>
       <p className="text-sm text-text-secondary">Registo de auditoria da equipa — quem fez o quê, quando, e o que mudou. Ações feitas fora do Filament (via esta API de admin) ainda não têm autor identificado — ver nota no código.</p>
       <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
+    </div>
+  );
+}
+
+/* -------------------------- Notificações enviadas -------------------------- */
+
+/**
+ * Notificações enviadas — migrado do Filament (SentNotificationResource).
+ * Só leitura: histórico do que já foi mesmo enviado a clientes/técnicos
+ * (tabela `notifications`), distinto do tab "Push" em Marketing (que serve
+ * para CRIAR campanhas, não para consultar o que já saiu).
+ */
+function NotificacoesTab() {
+  const { page, setPage, pageSize, search, setSearch } = usePagination();
+  const debouncedSearch = useDebouncedValue(search);
+  const [type, setType] = useState("");
+  const [read, setRead] = useState<"" | "read" | "unread">("");
+  const [recipientType, setRecipientType] = useState<"" | "customer" | "vendor">("");
+  const [selected, setSelected] = useState<SentNotification | null>(null);
+
+  const { data: types } = useAsyncData(() => getSentNotificationTypes(), []);
+  const { data, loading, error, refetch } = useAsyncData(
+    () => getSentNotifications(page, pageSize, {
+      search: debouncedSearch || undefined,
+      type: type || undefined,
+      read: read || undefined,
+      recipientType: recipientType || undefined,
+    }),
+    [page, pageSize, debouncedSearch, type, read, recipientType]
+  );
+
+  const columns: Column<SentNotification>[] = [
+    { key: "recipient", label: "Destinatário", render: (r) => (
+      <div>
+        <p className="font-medium">{r.recipient?.name ?? "—"}</p>
+        {r.recipient_type && (
+          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+            r.recipient_type === "vendor" ? "bg-warning-light text-warning" : "bg-success-light text-success")}>
+            {r.recipient_type === "vendor" ? "Técnico" : "Cliente"}
+          </span>
+        )}
+      </div>
+    ) },
+    { key: "type", label: "Notificação", render: (r) => <span className="font-mono text-xs">{r.type}</span> },
+    { key: "title", label: "Título", render: (r) => <span className="line-clamp-1 max-w-[240px] block">{r.title}</span> },
+    { key: "read", label: "Estado", render: (r) => (
+      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+        r.read ? "bg-surface-subtle text-text-secondary" : "bg-success-light text-success")}>
+        {r.read ? "Lida" : "Não lida"}
+      </span>
+    ) },
+    { key: "created_at", label: "Enviada", render: (r) => (r.created_at ? formatDateTime(r.created_at) : "—") },
+  ];
+
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <h3 className="font-semibold">Notificações enviadas</h3>
+        <DemoBadge endpoint="/sent-notifications" />
+      </div>
+      <p className="text-sm text-text-secondary">Histórico do que já foi mesmo enviado a clientes e técnicos — clica numa linha para ver a mensagem completa.</p>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar destinatário..." />
+        <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="input-field text-sm max-w-[220px]">
+          <option value="">Todos os tipos</option>
+          {(types ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <select value={read} onChange={(e) => { setRead(e.target.value as typeof read); setPage(1); }} className="input-field text-sm max-w-[160px]">
+          <option value="">Todos os estados</option>
+          <option value="unread">Não lidas</option>
+          <option value="read">Lidas</option>
+        </select>
+        <select value={recipientType} onChange={(e) => { setRecipientType(e.target.value as typeof recipientType); setPage(1); }} className="input-field text-sm max-w-[160px]">
+          <option value="">Todos os destinatários</option>
+          <option value="customer">Clientes</option>
+          <option value="vendor">Técnicos</option>
+        </select>
+      </div>
+
+      <DataTable columns={columns} data={data?.data ?? []} keyField="id" onRowClick={setSelected} emptyMessage="Sem notificações enviadas" />
+      {data && <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />}
+
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.title ?? ""}
+        subtitle={selected ? `${selected.recipient?.name ?? "—"} · ${selected.type}` : undefined}
+        footer={<button onClick={() => setSelected(null)} className="btn-secondary text-sm">Fechar</button>}
+      >
+        {selected && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-text-secondary text-xs">Destinatário</p>
+                <p className="font-medium">{selected.recipient?.name ?? "—"} {selected.recipient_type && `(${selected.recipient_type === "vendor" ? "Técnico" : "Cliente"})`}</p>
+              </div>
+              <div>
+                <p className="text-text-secondary text-xs">Enviada em</p>
+                <p className="font-medium">{selected.created_at ? formatDateTime(selected.created_at) : "—"}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-text-secondary text-xs mb-1">Mensagem completa</p>
+              <p className="text-sm text-text-primary rounded-lg bg-surface-subtle px-3 py-2 whitespace-pre-wrap">
+                {selected.body || "Sem corpo de mensagem."}
+              </p>
+            </div>
+            <div className="text-xs text-text-secondary">
+              {selected.read ? `Lida em ${selected.read_at ? formatDateTime(selected.read_at) : "—"}` : "Ainda não foi lida."}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

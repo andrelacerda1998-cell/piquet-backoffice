@@ -172,6 +172,10 @@ const LIVE_EXACT = new Set<string>([
   // (feed real de auditoria, só leitura, ver AuditController)
   "/documents",
   "/audits",
+  // Fase 14 — Sent Notifications (idem, via Laravel; só leitura, ver
+  // SentNotificationController)
+  "/sent-notifications",
+  "/sent-notifications/types",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -266,6 +270,10 @@ const REAL_DATA = new Set<string>([
   // migrado). Atividade — feed real da tabela audits (só staff).
   "/documents",
   "/audits",
+  // Sent Notifications — idem, tabela notifications real do Laravel
+  // (SentNotificationResource migrado).
+  "/sent-notifications",
+  "/sent-notifications/types",
 ]);
 
 /**
