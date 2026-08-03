@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
@@ -44,6 +44,16 @@ export default function TechniciansPage() {
   // migrado). Contagem do separador vem sempre de "pending", independente do
   // filtro escolhido dentro do separador.
   const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
+  // Aviso por técnico: quais os técnicos com documentos por validar (não só o total).
+  const { data: pendingDocsList } = useAsyncData(() => getVendorDocuments("pending", 1, 100), []);
+  const pendingByVendor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of pendingDocsList?.items ?? []) {
+      const name = d.vendor_name?.trim() || "Técnico sem nome";
+      m.set(name, (m.get(name) ?? 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]); // mais pendentes primeiro
+  }, [pendingDocsList]);
   const [docStatus, setDocStatus] = useState<VendorDocumentStatus>("pending");
   const docsData = useAsyncData(() => getVendorDocuments(docStatus, 1, 50), [docStatus]);
   const [reviewDoc, setReviewDoc] = useState<VendorDocument | null>(null);
@@ -134,6 +144,36 @@ export default function TechniciansPage() {
           <h1 className="text-2xl font-bold">Técnicos <DemoBadge endpoint="/technicians" /></h1>
           <p className="text-text-secondary mt-1">{metrics?.registered ?? 382} técnicos registados</p>
         </div>
+
+        {/* Aviso: quais os técnicos com documentos por validar (não só o total). */}
+        {pendingByVendor.length > 0 && (
+          <div className="card border-l-4 border-l-warning bg-warning-light/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-text-primary">
+                  ⚠️ {pendingByVendor.length} técnico(s) com documentos por validar
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {pendingByVendor.slice(0, 12).map(([name, n]) => (
+                    <button
+                      key={name}
+                      onClick={() => setTab("aprovacoes")}
+                      title="Abrir a fila de aprovações KYC"
+                      className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-medium border border-surface-border hover:border-warning"
+                    >
+                      {name}
+                      <span className="text-warning font-bold">{n}</span>
+                    </button>
+                  ))}
+                  {pendingByVendor.length > 12 && (
+                    <span className="text-xs text-text-muted self-center">+{pendingByVendor.length - 12} …</span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setTab("aprovacoes")} className="btn-primary text-sm shrink-0">Rever documentos</button>
+            </div>
+          </div>
+        )}
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
