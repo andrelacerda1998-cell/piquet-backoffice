@@ -9,6 +9,7 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import ImpostosRhPage from "../impostos-rh/page";
 import { Modal, Field } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ChartCard, BarChartComponent, AreaChartComponent, CashFlowChart, DonutChartComponent } from "@/components/charts/Charts";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
@@ -232,9 +233,21 @@ export default function FinancePage() {
     try { await updateCompanyInvoice(inv.id, { amountPaid: paid }); toast("Pagamento registado."); refetchInvoices(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
+  // Remoção com confirmação (ConfirmDialog) — antes apagava direto ao clicar.
+  const [invToRemove, setInvToRemove] = useState<CompanyInvoice | null>(null);
   const removeInvoice = async (inv: CompanyInvoice) => {
     try { await deleteCompanyInvoice(inv.id); toast("Fatura removida."); refetchInvoices(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+  // Ação em massa: marcar como pagas as faturas selecionadas ainda não pagas.
+  const bulkMarkPaid = async (rows: CompanyInvoice[]) => {
+    const toPay = rows.filter((r) => r.status !== "pago");
+    if (toPay.length === 0) { toast("As faturas selecionadas já estão pagas.", "info"); return; }
+    try {
+      await Promise.all(toPay.map((r) => updateCompanyInvoice(r.id, { markPaid: true })));
+      toast(`${toPay.length} fatura(s) marcada(s) como paga(s).`);
+      refetchInvoices();
+    } catch (e) { toast(e instanceof Error ? e.message : "Erro ao marcar pagas.", "error"); }
   };
   const saveInvoice = async () => {
     if (!invForm.vendor.trim() || !(invForm.amount > 0)) { toast("Indica o fornecedor e o valor.", "error"); return; }
@@ -301,7 +314,7 @@ export default function FinancePage() {
         {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
         {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
         <button onClick={() => openInvoiceModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => removeInvoice(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+        <button onClick={() => setInvToRemove(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
       </div>
     ) },
   ];
@@ -523,7 +536,15 @@ export default function FinancePage() {
                 </div>
                 <button onClick={() => openInvoiceModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
               </div>
-              <DataTable columns={invoiceColumns} data={invoices} keyField="id" emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)." />
+              <DataTable
+                columns={invoiceColumns}
+                data={invoices}
+                keyField="id"
+                selectable
+                columnToggle
+                bulkActions={[{ label: "Marcar pagas", onClick: bulkMarkPaid }]}
+                emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)."
+              />
             </div>
           )}
 
@@ -921,6 +942,18 @@ export default function FinancePage() {
             </Field>
           </div>
         </Modal>
+
+        <ConfirmDialog
+          open={!!invToRemove}
+          onClose={() => setInvToRemove(null)}
+          onConfirm={async () => { if (invToRemove) { await removeInvoice(invToRemove); setInvToRemove(null); } }}
+          title="Remover fatura"
+          tone="danger"
+          confirmLabel="Remover fatura"
+          description={invToRemove && (
+            <>Vais remover a fatura de <b className="text-text-primary">{invToRemove.vendor}</b> ({formatCurrency(invToRemove.amount)}). Esta ação não pode ser anulada.</>
+          )}
+        />
       </PermissionGate>
     </RouteGuard>
   );
