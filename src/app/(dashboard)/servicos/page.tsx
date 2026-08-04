@@ -6,6 +6,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
 import ServicosPersonalizadosPage from "../servicos-personalizados/page";
 import QualidadePage from "../qualidade/page";
@@ -210,8 +211,9 @@ export default function ServicesPage() {
                 </button>
               ))}
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar serviços..." />
+              <FilterBar className="flex-1 min-w-[240px]" />
             </div>
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
               <>
