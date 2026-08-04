@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPut, apiDelete } from "./api";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -66,6 +66,38 @@ export async function restoreCustomer(id: number): Promise<RealCustomer> {
   return apiPut<RealCustomer>(`/customers/${id}/restore`, {}, () => {
     throw new Error("Reativar clientes precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
+}
+
+/**
+ * Métodos de pagamento guardados — migrado do Filament
+ * (PaymentMethodsRelationManager dentro do CustomerResource). Só listar +
+ * apagar: cartões/MBWay são geridos pelo Payshop via app, nunca por
+ * formulário manual no backoffice.
+ */
+export interface CustomerPaymentMethod {
+  id: number;
+  type: string;
+  brand: string | null;
+  brand_description: string | null;
+  last4: string | null;
+  phone_number: string | null;
+  holder: string | null;
+  expire_month: string | null;
+  expire_year: string | null;
+  created_at: string | null;
+}
+
+export async function getCustomerPaymentMethods(customerId: number): Promise<CustomerPaymentMethod[]> {
+  return apiGet<{ items: CustomerPaymentMethod[] }>(
+    `/customers/${customerId}/payment-methods`,
+    () => ({ items: [] })
+  ).then((r) => r.data.items);
+}
+
+export async function deleteCustomerPaymentMethod(customerId: number, methodId: number): Promise<void> {
+  await apiDelete(`/customers/${customerId}/payment-methods/${methodId}`, () => {
+    throw new Error("Remover métodos de pagamento precisa da API de admin do Laravel configurada.");
+  });
 }
 
 /**

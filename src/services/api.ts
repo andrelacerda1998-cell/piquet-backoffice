@@ -287,6 +287,9 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (REAL_DATA.has(path)) return false;
   if (/^\/dev-tasks\/[^/]+$/.test(path)) return false;
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return false;
+  // Métodos de pagamento do cliente — real (tabela payshop_payment_methods
+  // do Laravel), mas o path tem o id do cliente, não bate com REAL_DATA.
+  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
   return true;
 }
 
@@ -330,6 +333,8 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
   if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
   if (/^\/customers\/[^/]+\/(block|restore)$/.test(path)) return true; // bloquear/reativar cliente
+  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
+  if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
   if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria

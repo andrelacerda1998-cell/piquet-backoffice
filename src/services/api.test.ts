@@ -92,6 +92,11 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/sent-notifications/types")).toBe(true);
   });
 
+  it("marca como migrados os endpoints de Fase 15 (Métodos de pagamento do cliente)", () => {
+    expect(isLiveEndpoint("/customers/42/payment-methods")).toBe(true);
+    expect(isLiveEndpoint("/customers/42/payment-methods/7")).toBe(true); // apagar
+  });
+
   it("marca como migrado o endpoint de editar um lead (valor estimado/fase)", () => {
     expect(isLiveEndpoint("/marketing/leads/abc-123")).toBe(true);
   });
@@ -130,6 +135,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     expect(isDemoEndpoint("/team/messages")).toBe(false);
     expect(isDemoEndpoint("/team/tasks")).toBe(false);
     expect(isDemoEndpoint("/team/tasks/tt1/status")).toBe(false);
+    expect(isDemoEndpoint("/customers/42/payment-methods")).toBe(false); // payshop_payment_methods
   });
 
   it("trata como DEMO o que vem da BD mas foi escrito pelo seed", async () => {

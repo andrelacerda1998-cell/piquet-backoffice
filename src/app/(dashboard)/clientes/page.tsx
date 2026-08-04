@@ -11,8 +11,10 @@ import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashb
 import { usePersistentList } from "@/hooks/usePersistentList";
 import {
   getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend,
-  blockCustomer, restoreCustomer, type RealCustomer,
+  blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
+  type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
+import { CreditCard, Smartphone, Trash2 } from "lucide-react";
 import { type Complaint } from "@/services/extrasService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate } from "@/lib/formatters";
@@ -97,6 +99,30 @@ export default function CustomersPage() {
       toast(e instanceof Error ? e.message : "Não foi possível reativar o cliente.", "error");
     } finally {
       setActingId(null);
+    }
+  };
+
+  // Métodos de pagamento guardados — migrado do Filament
+  // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
+  // modal com os cartões/MBWay do cliente; sem criar/editar (só o Filament
+  // já não permitia isso na prática — o form estava comentado).
+  const [selectedCustomer, setSelectedCustomer] = useState<RealCustomer | null>(null);
+  const { data: paymentMethods, loading: paymentMethodsLoading, refetch: refetchPaymentMethods } = useAsyncData(
+    () => (selectedCustomer ? getCustomerPaymentMethods(selectedCustomer.id) : Promise.resolve([] as CustomerPaymentMethod[])),
+    [selectedCustomer]
+  );
+  const [deletingMethodId, setDeletingMethodId] = useState<number | null>(null);
+  const handleDeletePaymentMethod = async (method: CustomerPaymentMethod) => {
+    if (!selectedCustomer) return;
+    setDeletingMethodId(method.id);
+    try {
+      await deleteCustomerPaymentMethod(selectedCustomer.id, method.id);
+      toast("Método de pagamento removido.");
+      refetchPaymentMethods();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível remover o método de pagamento.", "error");
+    } finally {
+      setDeletingMethodId(null);
     }
   };
 
@@ -246,7 +272,8 @@ export default function CustomersPage() {
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
-                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} />
+                    <p className="text-xs text-text-muted">Clica numa linha para ver os métodos de pagamento guardados.</p>
+                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} onRowClick={setSelectedCustomer} />
                     {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
                   </div>
                 )}
@@ -294,6 +321,52 @@ export default function CustomersPage() {
             <input className="input-field" value={newComplaint.city} onChange={(e) => setNewComplaint((p) => ({ ...p, city: e.target.value }))} placeholder="Ex.: Lisboa" />
           </Field>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+        title={selectedCustomer?.name ?? "Cliente"}
+        subtitle="Métodos de pagamento guardados"
+        footer={<button onClick={() => setSelectedCustomer(null)} className="btn-secondary text-sm">Fechar</button>}
+      >
+        {paymentMethodsLoading ? (
+          <p className="text-sm text-text-secondary">A carregar…</p>
+        ) : (paymentMethods ?? []).length === 0 ? (
+          <p className="text-sm text-text-secondary">Sem métodos de pagamento guardados.</p>
+        ) : (
+          <div className="space-y-2">
+            {(paymentMethods ?? []).map((m) => (
+              <div key={m.id} className="card px-4 py-3 flex items-center gap-3">
+                {m.type === "mbway"
+                  ? <Smartphone className="h-5 w-5 shrink-0 text-text-secondary" />
+                  : <CreditCard className="h-5 w-5 shrink-0 text-text-secondary" />}
+                <div className="min-w-0 flex-1">
+                  {m.type === "mbway" ? (
+                    <p className="font-medium text-text-primary">MBWay · {m.phone_number ?? "—"}</p>
+                  ) : (
+                    <p className="font-medium text-text-primary">
+                      {(m.brand ?? "Cartão")}{m.brand_description ? ` ${m.brand_description}` : ""} · **** {m.last4 ?? "----"}
+                    </p>
+                  )}
+                  <p className="text-xs text-text-secondary">
+                    {m.holder && <>{m.holder} · </>}
+                    {m.expire_month && m.expire_year && <>Exp. {m.expire_month}/{m.expire_year} · </>}
+                    Guardado {m.created_at ? formatDate(m.created_at) : "—"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeletePaymentMethod(m)}
+                  disabled={deletingMethodId === m.id}
+                  className="text-danger hover:opacity-70 disabled:opacity-40 shrink-0"
+                  title="Remover"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
     </RouteGuard>
   );
