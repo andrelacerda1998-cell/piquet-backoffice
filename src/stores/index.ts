@@ -12,7 +12,10 @@ interface AuthState {
   logout: () => void;
 }
 
-const DEMO_USERS: Record<UserRole, User> = {
+// Login de demonstração (offline, sem Supabase) — só liderança. Os restantes
+// perfis (Operações, Financeiro…) vêm da coluna `role` da tabela staff em
+// produção; não se inventam nomes no ecrã de login.
+const DEMO_USERS: Partial<Record<UserRole, User>> = {
   ceo: { id: "u2", name: "André Lacerda", email: "andre@piquet.pt", role: "ceo", department: "Direção" },
   cto: { id: "u1", name: "Rodrigo Pacheco", email: "rodrigo@piquet.pt", role: "cto", department: "Tecnologia" },
 };
@@ -23,7 +26,7 @@ export const useAuthStore = create<AuthState>()(
       // Arranca DESLOGADO — o utilizador tem de passar pela página de login.
       user: null,
       isAuthenticated: false,
-      login: (role) => set({ user: DEMO_USERS[role], isAuthenticated: true }),
+      login: (role) => { const u = DEMO_USERS[role]; if (u) set({ user: u, isAuthenticated: true }); },
       setUser: (user) => set({ user, isAuthenticated: true }),
       logout: () => {
         clearAuthToken();

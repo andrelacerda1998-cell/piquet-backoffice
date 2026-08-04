@@ -4,7 +4,15 @@
 
 export type UserRole =
   | "ceo"
-  | "cto";
+  | "cto"
+  | "admin"
+  | "operacoes"
+  | "financeiro"
+  | "marketing"
+  | "suporte"
+  | "gestao_tecnicos"
+  | "developer"
+  | "colaborador";
 
 export type Permission =
   | "view_dashboard"

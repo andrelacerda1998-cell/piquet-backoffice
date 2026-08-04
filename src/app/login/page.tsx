@@ -7,7 +7,7 @@ import { USE_REAL_API } from "@/services/api";
 import { SUPABASE_AUTH_ENABLED } from "@/lib/supabase/client";
 import { login as apiLogin } from "@/services/authService";
 import { cn } from "@/lib/utils";
-import type { UserRole } from "@/types";
+import type { User, UserRole } from "@/types";
 import { ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -184,7 +184,7 @@ function DemoProfileSelector() {
       </span>
 
       <div className="mt-6 space-y-2">
-        {(Object.keys(DEMO_USERS) as UserRole[]).map((role) => (
+        {(Object.entries(DEMO_USERS) as [UserRole, User][]).map(([role, demoUser]) => (
           <button
             key={role}
             onClick={() => { setSelected(role); setError(null); }}
@@ -196,10 +196,10 @@ function DemoProfileSelector() {
           >
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-sm font-bold">
-                {DEMO_USERS[role].name.charAt(0)}
+                {demoUser.name.charAt(0)}
               </span>
               <div>
-                <p className="font-medium text-text-primary">{DEMO_USERS[role].name}</p>
+                <p className="font-medium text-text-primary">{demoUser.name}</p>
                 <p className="text-sm text-text-secondary">{ROLE_LABELS[role]}</p>
               </div>
             </div>
