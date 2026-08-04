@@ -157,6 +157,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/budget",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
   "/support/inbox",
+  // Pesquisa global de entidades (serviços, clientes, técnicos, faturas, leads, tickets)
+  "/search",
   // Fase 8 — Migração Filament: definições de taxas, lucro do sistema, vouchers
   // (via API de admin do Laravel, não Supabase — ver src/lib/laravelAdmin.ts)
   "/fee-settings",
@@ -222,6 +224,7 @@ const REAL_DATA = new Set<string>([
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
   "/finance/budget", // Planeamento mensal — linhas escritas pelo André.
+  "/search", // Pesquisa global de entidades — resultados reais das tabelas.
   "/finance/payouts", // Derivado dos serviços concluídos (2026-07-22); seed fora.
   // Colaboradores: seed apagado a 2026-07-22 (backup em _seed_backup_employees);
   // a tabela só tem colaboradores registados à mão em Impostos e RH.

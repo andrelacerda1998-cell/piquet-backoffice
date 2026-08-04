@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS, NAV_VISIBLE, NAV_DEEPLINKS } from "@/config/dashboard";
 import { useUiStore, useAuthStore, useThemeStore } from "@/stores";
 import { canAccessRoute } from "@/lib/permissions";
+import { searchEntities, type SearchType } from "@/services/searchService";
 import {
   LayoutDashboard, Wrench, Euro, Landmark, Users, HardHat,
   MapPin, Megaphone, Headphones, Bell, Settings, Search, Moon, Sun, CornerDownLeft,
@@ -23,9 +24,15 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 type Command = {
   id: string;
   label: string;
+  sublabel?: string;
   hint?: string;
   Icon: React.ComponentType<{ className?: string }>;
   run: () => void;
+};
+
+const TYPE_ICON: Record<SearchType, React.ComponentType<{ className?: string }>> = {
+  service: Wrench, customer: Users, technician: HardHat,
+  invoice: FileText, lead: Megaphone, ticket: Headphones,
 };
 
 export function CommandPalette() {
@@ -84,11 +91,39 @@ export function CommandPalette() {
     return [...navCmds, ...deepCmds, ...actionCmds];
   }, [user, theme, router, toggleTheme]);
 
-  const filtered = useMemo(() => {
+  const navFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
     return commands.filter((c) => c.label.toLowerCase().includes(q) || c.hint?.toLowerCase().includes(q));
   }, [commands, query]);
+
+  // Pesquisa de ENTIDADES no servidor (debounce) — serviços, clientes, etc.
+  const [entityCmds, setEntityCmds] = useState<Command[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setEntityCmds([]); setSearching(false); return; }
+    setSearching(true);
+    let alive = true;
+    const t = setTimeout(async () => {
+      try {
+        const results = await searchEntities(q);
+        if (!alive) return;
+        setEntityCmds(results.map((r) => ({
+          id: `ent:${r.type}:${r.id}`,
+          label: r.title,
+          sublabel: r.subtitle,
+          hint: r.typeLabel,
+          Icon: TYPE_ICON[r.type] ?? Search,
+          run: () => router.push(r.href),
+        })));
+      } catch { if (alive) setEntityCmds([]); }
+      finally { if (alive) setSearching(false); }
+    }, 220);
+    return () => { alive = false; clearTimeout(t); };
+  }, [query, router]);
+
+  const filtered = useMemo(() => [...navFiltered, ...entityCmds], [navFiltered, entityCmds]);
 
   useEffect(() => {
     setActive((a) => Math.min(a, Math.max(0, filtered.length - 1)));
@@ -125,7 +160,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActive(0); }}
-            placeholder="Procurar módulos e ações..."
+            placeholder="Procurar módulos, serviços, clientes, técnicos, faturas…"
             className="w-full bg-transparent py-3.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
           />
           <kbd className="hidden sm:block text-[10px] font-medium text-text-muted border border-surface-border rounded px-1.5 py-0.5">ESC</kbd>
@@ -133,7 +168,9 @@ export function CommandPalette() {
 
         <div className="max-h-80 overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-text-muted">Sem resultados para “{query}”.</p>
+            <p className="px-4 py-6 text-center text-sm text-text-muted">
+              {searching ? "A pesquisar…" : `Sem resultados para “${query}”.`}
+            </p>
           ) : (
             filtered.map((c, i) => (
               <button
@@ -146,11 +183,17 @@ export function CommandPalette() {
                 )}
               >
                 <c.Icon className={cn("h-4 w-4 shrink-0", i === active ? "text-piquet-600" : "text-text-muted")} />
-                <span className="flex-1 font-medium text-text-primary">{c.label}</span>
-                <span className="text-xs text-text-muted">{c.hint}</span>
-                {i === active && <CornerDownLeft className="h-3.5 w-3.5 text-text-muted" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-text-primary truncate">{c.label}</span>
+                  {c.sublabel && <span className="block text-xs text-text-muted truncate">{c.sublabel}</span>}
+                </span>
+                <span className="text-xs text-text-muted shrink-0">{c.hint}</span>
+                {i === active && <CornerDownLeft className="h-3.5 w-3.5 text-text-muted shrink-0" />}
               </button>
             ))
+          )}
+          {searching && filtered.length > 0 && (
+            <p className="px-4 py-1.5 text-center text-xs text-text-muted">A pesquisar entidades…</p>
           )}
         </div>
       </div>
