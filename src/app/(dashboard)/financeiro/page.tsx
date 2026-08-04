@@ -30,7 +30,7 @@ import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
@@ -274,11 +274,6 @@ export default function FinancePage() {
     }
   };
 
-  const invStatusTone: Record<CompanyInvoice["status"], string> = {
-    pendente: "bg-warning-light text-warning",
-    parcial: "bg-info-light text-info",
-    pago: "bg-success-light text-success",
-  };
   const invoiceColumns: Column<CompanyInvoice>[] = [
     { key: "vendor", label: "Fornecedor", sortable: true, render: (r) => (
       <div>
@@ -304,7 +299,7 @@ export default function FinancePage() {
       ? <span className={cn(r.overdue && "text-danger font-medium")}>{formatDate(r.dueDate)}{r.overdue && " ⚠️"}</span>
       : <span className="text-text-muted">—</span> },
     { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", invStatusTone[r.status])}>{r.status}</span>
+      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(r.status))}>{r.status}</span>
     ) },
     { key: "anexo", label: "Anexo", render: (r) => r.attachmentUrl
       ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">{r.attachmentName || "abrir"}</a>
@@ -430,7 +425,7 @@ export default function FinancePage() {
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
                           <p className="font-semibold text-sm">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
-                          <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full capitalize", invStatusTone[inv.status])}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
+                          <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full capitalize", getStatusColor(inv.status))}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
                         </div>
                         <button onClick={() => markInvoicePaid(inv)} className="text-xs text-success hover:underline whitespace-nowrap">Marcar paga</button>
                       </div>

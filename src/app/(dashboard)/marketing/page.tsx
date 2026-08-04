@@ -18,7 +18,7 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
-import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2 } from "lucide-react";
 import type { MarketingCampaign } from "@/types";
@@ -46,14 +46,6 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
   media: { label: "Média", tone: "bg-warning-light text-warning", hint: "ROAS 1×–1,5× — otimizar" },
   ma: { label: "Má", tone: "bg-danger-light text-danger", hint: "ROAS < 1× — dá prejuízo" },
   sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
-};
-
-const LEAD_TONE: Record<LeadStage, string> = {
-  nao_iniciado: "bg-info-light text-info",
-  orcamento_enviado: "bg-warning-light text-warning",
-  orcamento_aceite: "bg-piquet/15 text-piquet-700",
-  recusado: "bg-danger-light text-danger",
-  concluido: "bg-success-light text-success",
 };
 
 export default function MarketingPage() {
@@ -177,7 +169,7 @@ export default function MarketingPage() {
     ) : <span className="text-text-muted">—</span> },
     { key: "stage", label: "Estado", render: (r) => (
       <select value={r.stage} onChange={(e) => changeStage(r, e.target.value as LeadStage)}
-        className={cn("text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-piquet", LEAD_TONE[r.stage])}>
+        className={cn("text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-piquet", getStatusColor(r.stage))}>
         {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
     ) },

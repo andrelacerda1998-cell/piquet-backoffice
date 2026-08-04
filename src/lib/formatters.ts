@@ -88,30 +88,55 @@ export function getPeriodLabel(preset: string): string {
   return labels[preset] ?? preset;
 }
 
+/**
+ * Catálogo ÚNICO de estados do negócio → tom semântico. Fonte de verdade para
+ * as cores de estado em TODO o backoffice (serviços, leads, faturas,
+ * pagamentos, técnicos, clientes, prioridades, tickets…). Só tons do design
+ * system (theme-aware, funcionam em claro e escuro) — sem Tailwind cru.
+ */
+export type StatusTone = "success" | "warning" | "danger" | "info" | "active" | "neutral";
+
+const TONE_CLASS: Record<StatusTone, string> = {
+  success: "bg-success-light text-success",
+  warning: "bg-warning-light text-warning",
+  danger: "bg-danger-light text-danger",
+  info: "bg-info-light text-info",
+  active: "bg-piquet/15 text-piquet-700",
+  neutral: "bg-surface-subtle text-text-secondary",
+};
+
+const STATUS_TONE: Record<string, StatusTone> = {
+  // Serviços (ciclo de vida)
+  pedido_recebido: "info", a_procurar_tecnico: "warning", tecnico_encontrado: "info",
+  a_aguardar_orcamento: "warning", orcamento_enviado: "info", a_aguardar_pagamento: "warning",
+  pago: "success", agendado: "info", em_execucao: "active", concluido: "success",
+  cancelado_cliente: "danger", cancelado_tecnico: "danger", sem_tecnico_disponivel: "warning",
+  reembolsado: "warning", em_reclamacao: "warning",
+  // Leads / CRM (os `id` mantêm-se; rótulos são Novo/…/Executado/Cancelado)
+  nao_iniciado: "info", orcamento_aceite: "success", recusado: "danger",
+  // Faturas de custos
+  pendente: "warning", parcial: "info",
+  // Pagamentos
+  falhado: "danger",
+  // Técnicos / clientes / candidaturas
+  ativo: "success", aprovado: "success", resolvido: "success",
+  suspenso: "danger", bloqueado: "danger", inativo: "neutral",
+  em_analise: "info", registado: "info", perfil_incompleto: "warning",
+  contrato_terminado: "neutral", por_validar: "warning", entrevista: "info",
+  // Fiscal / faturação
+  vencido: "danger", estimado: "warning", emitida: "success", nao_emitida: "neutral",
+  // Prioridades
+  critica: "danger", alta: "warning", media: "info", baixa: "neutral",
+  // Genéricos
+  novo: "info", ativa: "success", pausada: "neutral", concluida: "success",
+};
+
+/** Tom semântico de um estado (para casos que precisam do tom, não da classe). */
+export function statusTone(status: string): StatusTone {
+  return STATUS_TONE[status] ?? "neutral";
+}
+
+/** Classe de cor (theme-aware) de um estado — fonte única. */
 export function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    concluido: "bg-success-light text-success",
-    pago: "bg-success-light text-success",
-    ativo: "bg-success-light text-success",
-    aprovado: "bg-success-light text-success",
-    resolvido: "bg-success-light text-success",
-    cancelado_cliente: "bg-danger-light text-danger",
-    cancelado_tecnico: "bg-danger-light text-danger",
-    reembolsado: "bg-danger-light text-danger",
-    vencido: "bg-danger-light text-danger",
-    critica: "bg-danger-light text-danger",
-    em_execucao: "bg-piquet-100 text-piquet-700",
-    agendado: "bg-blue-50 text-blue-700",
-    a_procurar_tecnico: "bg-warning-light text-warning",
-    sem_tecnico_disponivel: "bg-warning-light text-warning",
-    em_reclamacao: "bg-warning-light text-warning",
-    alta: "bg-warning-light text-warning",
-    media: "bg-yellow-50 text-yellow-700",
-    baixa: "bg-surface-subtle text-text-secondary",
-    novo: "bg-blue-50 text-blue-700",
-    em_analise: "bg-purple-50 text-purple-700",
-    estimado: "bg-yellow-50 text-yellow-700",
-    a_aguardar_pagamento: "bg-orange-50 text-orange-700",
-  };
-  return colors[status] ?? "bg-surface-subtle text-text-secondary";
+  return TONE_CLASS[statusTone(status)];
 }
