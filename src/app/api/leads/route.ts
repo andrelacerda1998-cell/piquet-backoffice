@@ -72,6 +72,20 @@ export async function POST(req: Request) {
     );
   }
 
+  // Anti-duplicação: o formulário/WhatsApp costuma disparar o POST duas vezes
+  // (submit + click-to-chat, ou duplo toque) — chegavam pares da MESMA pessoa e
+  // MESMO pedido com segundos de diferença. Se já existe uma lead igual (mesmo
+  // contacto + mesma mensagem) nos últimos 30 min, devolve sucesso sem gravar.
+  const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  let dupQ = supabaseAdmin().from("leads").select("id").gte("created_at", since).eq("message", lead.message);
+  dupQ = lead.phone ? dupQ.eq("phone", lead.phone)
+    : lead.email ? dupQ.eq("email", lead.email)
+    : dupQ.eq("name", lead.name);
+  const { data: dups } = await dupQ.limit(1);
+  if (dups && dups.length > 0) {
+    return NextResponse.json({ ok: true, duplicate: true }, { status: 200, headers: CORS });
+  }
+
   const { error } = await supabaseAdmin().from("leads").insert(lead);
   if (error) {
     return NextResponse.json({ ok: false, error: "erro ao guardar" }, { status: 500, headers: CORS });

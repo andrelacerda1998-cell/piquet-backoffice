@@ -65,6 +65,30 @@ export default function MarketingPage() {
   const [leadRows, setLeadRows] = useState<Lead[]>([]);
   useEffect(() => { setLeadRows(leads ?? []); }, [leads]);
 
+  // Filtro por mês (quantas leads por mês). "" = todos os meses.
+  const [leadMonth, setLeadMonth] = useState<string>("");
+  const leadMonths = Array.from(new Set(leadRows.map((l) => (l.createdAt || "").slice(0, 7)).filter(Boolean))).sort().reverse();
+  const filteredLeads = leadMonth ? leadRows.filter((l) => (l.createdAt || "").slice(0, 7) === leadMonth) : leadRows;
+
+  // Possíveis duplicados: mesma pessoa + mesmo pedido. Marca todas exceto a
+  // primeira do grupo (o formulário costuma disparar o POST duas vezes).
+  const leadKey = (l: Lead) => `${(l.phone || l.name || "").toLowerCase().trim()}|${(l.message || "").trim()}`;
+  const firstByKey = new Map<string, string>();
+  for (const l of leadRows) {
+    const k = leadKey(l);
+    const cur = firstByKey.get(k);
+    if (!cur || (l.createdAt || "") < cur) firstByKey.set(k, l.createdAt || "");
+  }
+  const keyCount = leadRows.reduce((m, l) => m.set(leadKey(l), (m.get(leadKey(l)) ?? 0) + 1), new Map<string, number>());
+  const isDuplicate = (l: Lead) => (keyCount.get(leadKey(l)) ?? 0) > 1 && (l.createdAt || "") !== firstByKey.get(leadKey(l));
+  const dupCount = filteredLeads.filter(isDuplicate).length;
+  const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split("-");
+    const name = MONTH_NAMES[Number(m) - 1] ?? ym;
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+  };
+
   // Editar pedido (dados + orçamento + valor do técnico + data + classificação + estado).
   // Modelo: escreve-se o orçamento e o valor do técnico; a margem é sempre orçamento − técnico.
   const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
@@ -163,6 +187,17 @@ export default function MarketingPage() {
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Contacto", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
     { key: "phone", label: "Telefone", render: (r) => r.phone || "—" },
+    { key: "createdAt", label: "Recebida", render: (r) => (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-secondary">
+        {r.createdAt ? formatDate(r.createdAt) : "—"}
+        {isDuplicate(r) && (
+          <span title="Mesmo contacto e pedido de outra lead — possível duplicado"
+            className="inline-flex items-center rounded-full bg-warning-light px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+            dup?
+          </span>
+        )}
+      </span>
+    ) },
     { key: "categoryId", label: "Categoria", render: (r) => {
       const name = categoryName(r.categoryId);
       return name
@@ -387,16 +422,34 @@ export default function MarketingPage() {
               </p>
               <button onClick={() => setShowLead(true)} className="btn-primary text-sm shrink-0">Registar pedido</button>
             </div>
+
+            {/* Filtro por mês + contagem de leads recebidas nesse período. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto">
+                <option value="">Todos os meses</option>
+                {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+              <span className="text-sm text-text-secondary">
+                <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "lead" : "leads"}
+                {leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
+              </span>
+              {dupCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">
+                  {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {LEAD_STAGES.map((s) => (
                 <div key={s.id} className="card p-3">
                   <p className="text-xs text-text-secondary">{s.label}</p>
-                  <p className="text-xl font-bold text-text-primary">{leadRows.filter((l) => l.stage === s.id).length}</p>
+                  <p className="text-xl font-bold text-text-primary tabular-nums">{filteredLeads.filter((l) => l.stage === s.id).length}</p>
                 </div>
               ))}
             </div>
-            <DataTable columns={leadColumns} data={leadRows} keyField="id"
-              emptyMessage="Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem." />
+            <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
+              emptyMessage={leadMonth ? "Sem pedidos neste mês." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
           </div>
         )}
 
