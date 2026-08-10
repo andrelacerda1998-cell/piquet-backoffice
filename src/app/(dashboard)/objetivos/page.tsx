@@ -13,6 +13,7 @@ import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { TrendingUp, Target, Plus, Pencil, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 function fmt(v: number, unit: AnnualGoal["unit"]) {
   if (unit === "currency") return formatCurrency(v);
@@ -103,16 +104,18 @@ export default function GoalsPage() {
   return (
     <RouteGuard route="/objetivos">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Objetivos do ano — {new Date().getFullYear()}</h1>
-            <p className="text-text-secondary mt-1">
+        <PageHeader
+          icon={Target}
+          eyebrow="Visão geral"
+          title={`Objetivos do ano — ${new Date().getFullYear()}`}
+          subtitle={
+            <>
               Cada objetivo segue uma métrica real do negócio, com evolução diária ·{" "}
               <span className="font-medium text-text-primary">{onTrack}/{goals.length}</span> no bom caminho
-            </p>
-          </div>
-          <button onClick={openNew} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Novo objetivo</button>
-        </div>
+            </>
+          }
+          actions={<button onClick={openNew} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Novo objetivo</button>}
+        />
 
         {goals.length === 0 ? (
           <div className="card p-10 text-center">

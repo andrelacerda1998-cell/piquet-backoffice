@@ -19,7 +19,8 @@ import { toast } from "@/stores";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import type { Employee, TaxObligation, ContractType } from "@/types";
-import { X, Plus, Calculator } from "lucide-react";
+import { X, Plus, Calculator, Landmark } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 type Tab = "fiscal" | "colaboradores" | "simulador";
@@ -204,10 +205,12 @@ export default function TaxHRPage() {
   return (
     <RouteGuard route="/impostos-rh">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Impostos e Recursos Humanos <DemoBadge endpoint="/tax/obligations" /></h1>
-          <p className="text-text-secondary mt-1">Gestão fiscal e equipa interna — valores estimados</p>
-        </div>
+        <PageHeader
+          icon={Landmark}
+          eyebrow="Financeiro"
+          title={<>Impostos e Recursos Humanos <DemoBadge endpoint="/tax/obligations" /></>}
+          subtitle="Gestão fiscal e equipa interna — valores estimados"
+        />
 
         <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as Tab)} />
 

@@ -16,7 +16,8 @@ import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { formatDate, formatDateTime } from "@/lib/formatters";
 import { downloadCsv, cn } from "@/lib/utils";
 import { toast } from "@/stores";
-import { FileText, Download, FileDown, Trash2 } from "lucide-react";
+import { FileText, Download, FileDown, Trash2, BarChart3 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
   { id: "mensal", label: "Relatório mensal completo" },
@@ -171,10 +172,12 @@ export default function ReportsPage() {
   return (
     <RouteGuard route="/relatorios">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Relatórios</h1>
-          <p className="text-text-secondary mt-1">Exporta os dados reais do negócio em CSV, por período</p>
-        </div>
+        <PageHeader
+          icon={BarChart3}
+          eyebrow="Visão geral"
+          title="Relatórios"
+          subtitle="Exporta os dados reais do negócio em CSV, por período"
+        />
 
         {/* Construtor */}
         <div className="card p-5">

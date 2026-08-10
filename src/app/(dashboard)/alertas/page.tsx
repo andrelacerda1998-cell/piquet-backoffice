@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Bell } from "lucide-react";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { PriorityBadge, AlertTypeBadge, StatusBadge } from "@/components/ui/StatusBadge";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -47,10 +49,12 @@ export default function AlertsPage() {
   return (
     <RouteGuard route="/alertas">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Alertas <DemoBadge endpoint="/alerts" /></h1>
-          <p className="text-text-secondary mt-1">Sistema central de alertas operacionais, financeiros e fiscais</p>
-        </div>
+        <PageHeader
+          icon={Bell}
+          eyebrow="Sistema"
+          title={<>Alertas <DemoBadge endpoint="/alerts" /></>}
+          subtitle="Sistema central de alertas operacionais, financeiros e fiscais"
+        />
 
         {counts && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

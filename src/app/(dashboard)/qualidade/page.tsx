@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ShieldCheck } from "lucide-react";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { ChartCard, AreaChartComponent, BarChartComponent } from "@/components/charts/Charts";
@@ -71,10 +73,12 @@ export default function QualityPage() {
   return (
     <RouteGuard route="/qualidade">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Qualidade <DemoBadge endpoint="/quality" /></h1>
-          <p className="text-text-secondary mt-1">Avaliações, reclamações e indicadores de confiança</p>
-        </div>
+        <PageHeader
+          icon={ShieldCheck}
+          eyebrow="Operação"
+          title={<>Qualidade <DemoBadge endpoint="/quality" /></>}
+          subtitle="Avaliações, reclamações e indicadores de confiança"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

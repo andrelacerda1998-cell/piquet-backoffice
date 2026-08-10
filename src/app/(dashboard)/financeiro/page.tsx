@@ -36,6 +36,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
 import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS: TabDef[] = [
   // Consolidado (2026-07-17): 8 → 5 abas. Tesouraria fundida no Resumo;
@@ -375,13 +376,13 @@ export default function FinancePage() {
     <RouteGuard route="/financeiro">
       <PermissionGate permission="view_finance">
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold">Financeiro</h1>
-              <p className="text-text-secondary mt-1">Receita, custos e tesouraria</p>
-            </div>
-            <MonthSelect />
-          </div>
+          <PageHeader
+            icon={Wallet}
+            eyebrow="Financeiro"
+            title="Financeiro"
+            subtitle="Receita, custos e tesouraria"
+            actions={<MonthSelect />}
+          />
 
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

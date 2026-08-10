@@ -24,7 +24,8 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS, DEFAULT_SETTINGS } from "@/config/dashboard";
 import { downloadCsv, cn } from "@/lib/utils";
 import { toast } from "@/stores";
-import { Plus } from "lucide-react";
+import { Plus, ClipboardList } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/formatters";
 import type { ServiceRequest, ServiceStatus } from "@/types";
@@ -184,18 +185,20 @@ export default function ServicesPage() {
   return (
     <RouteGuard route="/servicos">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Operações</h1>
-            <p className="text-text-secondary mt-1">Serviços, agendamentos, estados e incidentes</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={openNewService} className="btn-primary text-sm">
-              <Plus className="h-4 w-4" /> Registar serviço concluído
-            </button>
-            <ExportButton onExport={handleExport} />
-          </div>
-        </div>
+        <PageHeader
+          icon={ClipboardList}
+          eyebrow="Operação"
+          title="Operações"
+          subtitle="Serviços, agendamentos, estados e incidentes"
+          actions={
+            <>
+              <button onClick={openNewService} className="btn-primary text-sm">
+                <Plus className="h-4 w-4" /> Registar serviço concluído
+              </button>
+              <ExportButton onExport={handleExport} />
+            </>
+          }
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

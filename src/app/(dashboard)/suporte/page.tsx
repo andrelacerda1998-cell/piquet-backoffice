@@ -14,7 +14,8 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import { Scale, BookOpen } from "lucide-react";
+import { Scale, BookOpen, LifeBuoy } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const MED_TONE: Record<MediationCase["status"], string> = {
@@ -80,10 +81,12 @@ export default function SuportePage() {
   return (
     <RouteGuard route="/suporte">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Suporte <DemoBadge endpoint="/complaints" /></h1>
-          <p className="text-text-secondary mt-1">Caixa de entrada de tickets, reclamações e mediação de conflitos</p>
-        </div>
+        <PageHeader
+          icon={LifeBuoy}
+          eyebrow="Operação"
+          title={<>Suporte <DemoBadge endpoint="/complaints" /></>}
+          subtitle="Caixa de entrada de tickets, reclamações e mediação de conflitos"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

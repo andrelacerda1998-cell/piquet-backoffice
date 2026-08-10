@@ -15,7 +15,8 @@ import {
   getTasks, createTask, updateTask, deleteTask, TASK_COLUMNS, RECURRENCE_LABELS,
   type PersonalTask, type TaskStatus, type TaskPriority, type Recurrence,
 } from "@/services/tasksService";
-import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat } from "lucide-react";
+import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat, KanbanSquare } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const COLUMN_TONE: Record<TaskStatus, string> = {
   backlog: "border-surface-border",
@@ -209,13 +210,13 @@ export default function TarefasPage() {
   return (
     <RouteGuard route="/tarefas">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Tarefas</h1>
-            <p className="text-text-secondary mt-1">As tuas tarefas e iniciativas do negócio — arrasta os cartões entre colunas.</p>
-          </div>
-          <button onClick={() => openAdd("backlog")} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Nova tarefa</button>
-        </div>
+        <PageHeader
+          icon={KanbanSquare}
+          eyebrow="Equipa & ferramentas"
+          title="Tarefas"
+          subtitle="As tuas tarefas e iniciativas do negócio — arrasta os cartões entre colunas."
+          actions={<button onClick={() => openAdd("backlog")} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Nova tarefa</button>}
+        />
 
         <div className="grid grid-cols-3 gap-3 max-w-xl">
           <div className="card p-3 flex items-center gap-2.5">

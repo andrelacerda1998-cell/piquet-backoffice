@@ -14,7 +14,8 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import { X, Star, Clock, Send, Search, Check, Trash2 } from "lucide-react";
+import { X, Star, Clock, Send, Search, Check, Trash2, Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const STATUS: Record<CustomRequestStatus, { label: string; tone: string }> = {
@@ -102,10 +103,12 @@ export default function CustomRequestsPage() {
   return (
     <RouteGuard route="/servicos-personalizados">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Pedidos personalizados <DemoBadge endpoint="/custom-requests" /></h1>
-          <p className="text-text-secondary mt-1">Serviços complexos: define a duração e escolhe 3 técnicos (com preço fixo) para o cliente escolher na app.</p>
-        </div>
+        <PageHeader
+          icon={Sparkles}
+          eyebrow="Operação"
+          title={<>Pedidos personalizados <DemoBadge endpoint="/custom-requests" /></>}
+          subtitle="Serviços complexos: define a duração e escolhe 3 técnicos (com preço fixo) para o cliente escolher na app."
+        />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <MetricCard title="Novos" metric={buildMetricValue(count("novo"), count("novo") + 1, true)} />

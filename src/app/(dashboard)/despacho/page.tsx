@@ -10,6 +10,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDuration } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MapPin, Star, Radio, Zap, Radius } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function DispatchPage() {
@@ -21,16 +22,21 @@ export default function DispatchPage() {
   return (
     <RouteGuard route="/despacho">
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold">Despacho ao vivo <DemoBadge endpoint="/dispatch" /></h1>
-            <p className="text-text-secondary mt-0.5">Pedidos por atribuir e técnicos disponíveis em tempo real</p>
-          </div>
-        </div>
+        <PageHeader
+          icon={Radio}
+          eyebrow="Operação"
+          title={<>Despacho <DemoBadge endpoint="/dispatch" /></>}
+          subtitle="Pedidos por atribuir e técnicos disponíveis em tempo real"
+          actions={
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+              </span>
+              Ao vivo
+            </span>
+          }
+        />
 
         {data && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

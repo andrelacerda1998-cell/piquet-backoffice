@@ -15,7 +15,8 @@ import {
   DEV_SECTIONS, DEV_COLUMNS,
   type DevTask, type DevSection, type DevStatus, type DevPriority,
 } from "@/services/devService";
-import { Plus, Trash2, GripVertical, User, Pencil } from "lucide-react";
+import { Plus, Trash2, GripVertical, User, Pencil, Code2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const ASSIGNEES = ["Rodrigo Pacheco", "André Lacerda"];
 const COLUMN_TONE: Record<DevStatus, string> = {
@@ -71,10 +72,12 @@ export default function DevelopmentPage() {
   return (
     <RouteGuard route="/desenvolvimento">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Desenvolvimento</h1>
-          <p className="text-text-secondary mt-1">Quadro de tarefas do site e da app — arrasta os cartões entre colunas</p>
-        </div>
+        <PageHeader
+          icon={Code2}
+          eyebrow="Equipa & ferramentas"
+          title="Desenvolvimento"
+          subtitle="Quadro de tarefas do site e da app — arrasta os cartões entre colunas"
+        />
 
         <Tabs tabs={TABS} active={section} onChange={(id) => setSection(id as DevSection)} />
 

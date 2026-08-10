@@ -17,7 +17,8 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
   info: "bg-surface-subtle text-text-secondary",
@@ -145,10 +146,12 @@ export default function ProdutoPage() {
   return (
     <RouteGuard route="/produto">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Produto</h1>
-          <p className="text-text-secondary mt-1">App Cliente, App Profissional, bugs, logs e integrações</p>
-        </div>
+        <PageHeader
+          icon={LineChart}
+          eyebrow="Produto"
+          title="Produto"
+          subtitle="App Cliente, App Profissional, bugs, logs e integrações"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

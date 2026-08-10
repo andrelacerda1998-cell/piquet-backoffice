@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { HardHat } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
@@ -140,10 +142,12 @@ export default function TechniciansPage() {
   return (
     <RouteGuard route="/tecnicos">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Técnicos <DemoBadge endpoint="/technicians" /></h1>
-          <p className="text-text-secondary mt-1">{metrics?.registered ?? 382} técnicos registados</p>
-        </div>
+        <PageHeader
+          icon={HardHat}
+          eyebrow="Pessoas"
+          title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
+          subtitle={`${metrics?.registered ?? 382} técnicos registados`}
+        />
 
         {/* Aviso: quais os técnicos com documentos por validar (não só o total). */}
         {pendingByVendor.length > 0 && (

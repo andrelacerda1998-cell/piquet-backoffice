@@ -20,7 +20,8 @@ import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2 } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { MarketingCampaign } from "@/types";
 
 /**
@@ -227,10 +228,12 @@ export default function MarketingPage() {
   return (
     <RouteGuard route="/marketing">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Marketing</h1>
-          <p className="text-text-secondary mt-1">Campanhas, aquisição e ROAS</p>
-        </div>
+        <PageHeader
+          icon={Megaphone}
+          eyebrow="Crescimento"
+          title="Marketing"
+          subtitle="Campanhas, aquisição e ROAS"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

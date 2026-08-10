@@ -16,7 +16,8 @@ import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, ShieldCheck, FileCheck2 } from "lucide-react";
+import { Plus, ShieldCheck, FileCheck2, Settings } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import CatalogPage from "./_tabs/catalogo";
 import PricingPage from "./_tabs/precos";
 import ZonesPage from "./_tabs/zonas";
@@ -35,10 +36,12 @@ export default function ConfiguracaoPage() {
   return (
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Configurações <DemoBadge endpoint="/settings" /></h1>
-          <p className="text-text-secondary mt-1">Catálogo, preços, zonas, taxas, documentos e administradores</p>
-        </div>
+        <PageHeader
+          icon={Settings}
+          eyebrow="Sistema"
+          title={<>Configurações <DemoBadge endpoint="/settings" /></>}
+          subtitle="Catálogo, preços, zonas, taxas, documentos e administradores"
+        />
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "servicos" && (

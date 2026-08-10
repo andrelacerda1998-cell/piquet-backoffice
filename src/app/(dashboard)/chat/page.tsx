@@ -20,7 +20,8 @@ import { uploadChatImage } from "@/lib/uploadChatImage";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X } from "lucide-react";
+import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X, MessagesSquare } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 const EVENT_TONE: Record<TeamAgendaEvent["type"], string> = {
@@ -57,10 +58,12 @@ export default function TeamPage() {
   return (
     <RouteGuard route="/chat">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Equipa <DemoBadge endpoint="/team/messages" /></h1>
-          <p className="text-text-secondary mt-1">Conversas internas e agenda dos colaboradores</p>
-        </div>
+        <PageHeader
+          icon={MessagesSquare}
+          eyebrow="Equipa"
+          title={<>Equipa <DemoBadge endpoint="/team/messages" /></>}
+          subtitle="Conversas internas e agenda dos colaboradores"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

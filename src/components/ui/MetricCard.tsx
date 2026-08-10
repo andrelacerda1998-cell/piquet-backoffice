@@ -19,9 +19,17 @@ interface MetricCardProps {
    * os downloads são reais mas os registos vêm do seed).
    */
   demoEndpoint?: string;
+  /**
+   * Esconde a linha de variação "vs mês ant.". Usar em métricas de instante
+   * (CAC, LTV, rácios, avaliação) onde uma comparação mensal não tem sentido —
+   * evita mostrar um "+0,0%" fabricado.
+   */
+  hideDelta?: boolean;
+  /** Rótulo da comparação (por omissão "vs mês ant."). */
+  deltaLabel?: string;
 }
 
-export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint }: MetricCardProps) {
+export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint, hideDelta, deltaLabel = "vs mês ant." }: MetricCardProps) {
   if (loading) {
     return (
       <div className={cn("card p-4 animate-pulse", className)}>
@@ -54,13 +62,14 @@ export function MetricCard({ title, metric, format = "number", className, loadin
       </div>
       <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
       {/* Um zero sem história não tem tendência: esconder a seta em vez de
-          mostrar um "+0,0%" fabricado (assinatura dos dados zerados). */}
-      {(metric.value !== 0 || metric.changePercent !== 0 || metric.goal !== undefined) && (
+          mostrar um "+0,0%" fabricado (assinatura dos dados zerados). Métricas
+          de instante (hideDelta) nunca mostram variação mensal. */}
+      {((!hideDelta && (metric.value !== 0 || metric.changePercent !== 0)) || metric.goal !== undefined) && (
         <div className="flex items-center justify-between">
-          {(metric.value !== 0 || metric.changePercent !== 0) ? (
+          {(!hideDelta && (metric.value !== 0 || metric.changePercent !== 0)) ? (
             <span className="inline-flex items-baseline gap-1">
               <TrendIndicator value={metric.changePercent} trend={metric.trend} />
-              <span className="text-[10px] text-text-muted">vs mês ant.</span>
+              <span className="text-[10px] text-text-muted">{deltaLabel}</span>
             </span>
           ) : <span />}
           {metric.goal !== undefined && (

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Users } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CustomerDetailDrawer } from "@/components/ui/CustomerDetailDrawer";
@@ -108,10 +110,12 @@ export default function CustomersPage() {
   return (
     <RouteGuard route="/clientes">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Clientes <DemoBadge endpoint="/customers" /></h1>
-          <p className="text-text-secondary mt-1">{metrics?.registered ?? 752} clientes registados</p>
-        </div>
+        <PageHeader
+          icon={Users}
+          eyebrow="Pessoas"
+          title={<>Clientes <DemoBadge endpoint="/customers" /></>}
+          subtitle={`${metrics?.registered ?? 752} clientes registados`}
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
