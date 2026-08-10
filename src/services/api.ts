@@ -178,6 +178,8 @@ const LIVE_EXACT = new Set<string>([
   "/sent-notifications/types",
   // Fase 16 — Códigos SMS (idem, via Laravel; só leitura, ver SmsCodeController)
   "/sms-codes",
+  // Fase 17 — Cobertura por técnico (idem, via Laravel; só leitura, ver CoverageController)
+  "/coverage",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -279,6 +281,10 @@ const REAL_DATA = new Set<string>([
   // Códigos SMS — idem, tabela phone_number_validation_codes real do Laravel
   // (SmsCodeResource migrado).
   "/sms-codes",
+  // Cobertura por técnico — idem, tabelas allowed_zone/vendor_allowed_zones/
+  // survey_cities/vendor_city_votes reais do Laravel (CoverageController,
+  // sem equivalente direto no Filament).
+  "/coverage",
 ]);
 
 /**

@@ -102,6 +102,10 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/sms-codes?type=login")).toBe(true);
   });
 
+  it("marca como migrado o endpoint de Fase 17 (Cobertura por técnico)", () => {
+    expect(isLiveEndpoint("/coverage")).toBe(true);
+  });
+
   it("marca como migrado o endpoint de editar um lead (valor estimado/fase)", () => {
     expect(isLiveEndpoint("/marketing/leads/abc-123")).toBe(true);
   });
@@ -177,7 +181,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/technicians/top", "/technicians/coverage",
                       "/services-types", "/operation-areas", "/allowed-zones",
                       "/documents", "/audits", "/sent-notifications", "/sent-notifications/types",
-                      "/sms-codes"]) {
+                      "/sms-codes", "/coverage"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

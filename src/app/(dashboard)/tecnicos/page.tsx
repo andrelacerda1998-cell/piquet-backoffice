@@ -12,6 +12,7 @@ import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, type RealVendor, type TopVendor,
 } from "@/services/vendorsService";
+import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
   getVendorDocuments, approveVendorDocument, declineVendorDocument,
   type VendorDocument, type VendorDocumentStatus,
@@ -49,6 +50,13 @@ export default function TechniciansPage() {
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
+  // Cobertura por técnico — os técnicos declaram na própria app onde
+  // podem/querem atuar (POST /vendor/survey/vote); esta vista junta zonas já
+  // abertas com quem lá atua e cidades candidatas com quem manifestou
+  // interesse (App\Http\Controllers\Api\Admin\CoverageController, sem
+  // equivalente direto no Filament, pedido explícito do utilizador 2026-08-10).
+  const { data: technicianCoverage } = useAsyncData(() => getCoverage(), []);
+  const [selectedArea, setSelectedArea] = useState<{ label: string; technicians: CoverageTechnician[] } | null>(null);
 
   // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
   // migrado). Contagem do separador vem sempre de "pending", independente do
@@ -214,6 +222,52 @@ export default function TechniciansPage() {
                     <ChartCard title="Procura vs oferta por zona" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
                       <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
                     </ChartCard>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">Cobertura por técnico</h3>
+                        <DemoBadge endpoint="/coverage" />
+                      </div>
+                      <p className="text-sm text-text-secondary mt-1 mb-3">
+                        Cada técnico indica na própria app onde pode/quer atuar — clica numa área para ver quem a marcou.
+                      </p>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium mb-2">Zonas abertas</p>
+                          <DataTable<CoverageOpenZone>
+                            columns={[
+                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
+                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
+                              { key: "technicians", label: "Técnicos", render: (r) => r.technicians.length },
+                            ]}
+                            data={technicianCoverage?.open ?? []}
+                            keyField="id"
+                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
+                            emptyMessage="Sem zonas abertas"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium mb-2">Cidades candidatas</p>
+                          <DataTable<CoverageCandidateCity>
+                            columns={[
+                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
+                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
+                              { key: "active", label: "Aceita votos", render: (r) => (
+                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                                  r.active ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+                                  {r.active ? "Sim" : "Não"}
+                                </span>
+                              ) },
+                              { key: "technicians", label: "Interessados", render: (r) => r.technicians.length },
+                            ]}
+                            data={technicianCoverage?.candidate ?? []}
+                            keyField="id"
+                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
+                            emptyMessage="Sem cidades candidatas"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
@@ -344,6 +398,32 @@ export default function TechniciansPage() {
               <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={4} className="input-field" placeholder="Ex.: Documento ilegível, por favor envia uma foto mais nítida." />
             </Field>
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!selectedArea}
+        onClose={() => setSelectedArea(null)}
+        title={selectedArea?.label ?? ""}
+        subtitle={selectedArea ? `${selectedArea.technicians.length} técnico${selectedArea.technicians.length === 1 ? "" : "s"}` : undefined}
+        footer={<button onClick={() => setSelectedArea(null)} className="btn-secondary text-sm">Fechar</button>}
+      >
+        {selectedArea && (
+          selectedArea.technicians.length === 0 ? (
+            <p className="text-sm text-text-secondary">Ainda nenhum técnico marcou esta área.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedArea.technicians.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-2.5 rounded-lg bg-surface-subtle text-sm">
+                  <div>
+                    <p className="font-medium">{t.name ?? "—"}</p>
+                    <p className="text-text-secondary text-xs">{t.nif ?? "—"} · {t.phone_number ?? t.email ?? "—"}</p>
+                  </div>
+                  <StatusBadge status={t.status ?? "Offline"} />
+                </div>
+              ))}
+            </div>
+          )
         )}
       </Modal>
     </RouteGuard>
