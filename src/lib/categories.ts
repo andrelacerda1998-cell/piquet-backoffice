@@ -35,3 +35,15 @@ export function resolveCategoryId(input: unknown): string {
 export function categoryName(id: string): string {
   return DEFAULT_SETTINGS.categories.find((c) => c.id === id)?.name ?? "";
 }
+
+/**
+ * Deriva a categoria a partir da mensagem da lead, quando não veio no campo
+ * próprio. O formulário da landing escreve "Serviço: <categoria> · Urgência: …",
+ * por isso a categoria já lá está mesmo sem o campo `category` — extrai-se o
+ * "Serviço: X" e resolve-se para o id canónico ("" se não corresponder).
+ */
+export function categoryFromMessage(message: string | null | undefined): string {
+  if (!message) return "";
+  const m = message.match(/servi[çc]o:\s*([^·\n]+)/i);
+  return m ? resolveCategoryId(m[1]) : "";
+}

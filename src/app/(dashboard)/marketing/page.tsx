@@ -21,7 +21,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone, Search } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone, Search, MessageCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { MarketingCampaign } from "@/types";
 
@@ -49,6 +49,23 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
   ma: { label: "Má", tone: "bg-danger-light text-danger", hint: "ROAS < 1× — dá prejuízo" },
   sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
 };
+
+/**
+ * A landing escreve "Serviço: X · Urgência: Y\n<descrição>". Separa as partes
+ * para mostrar a descrição limpa (a categoria já vai na sua coluna) e assinalar
+ * as leads urgentes.
+ */
+function parseLeadMessage(message: string): { service: string; urgency: string; description: string; urgent: boolean } {
+  const service = message.match(/servi[çc]o:\s*([^·\n]+)/i)?.[1]?.trim() ?? "";
+  const urgency = message.match(/urg[êe]ncia:\s*([^\n·]+)/i)?.[1]?.trim() ?? "";
+  const nl = message.indexOf("\n");
+  const description = nl >= 0 ? message.slice(nl + 1).trim() : "";
+  const urgent = /urgente|hoje|emerg|imediat|agora/i.test(urgency);
+  return { service, urgency, description, urgent };
+}
+
+/** Link click-to-chat do WhatsApp a partir de um número (só dígitos). */
+const waHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
 
 export default function MarketingPage() {
   const filters = useFilters();
@@ -205,7 +222,9 @@ export default function MarketingPage() {
 
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Contacto", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "phone", label: "Telefone", render: (r) => r.phone || "—" },
+    { key: "phone", label: "Telefone", render: (r) => r.phone
+      ? <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-text-primary hover:text-piquet-700 hover:underline">{r.phone}</a>
+      : <span className="text-text-muted">—</span> },
     { key: "createdAt", label: "Recebida", render: (r) => (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-secondary">
         {r.createdAt ? formatDate(r.createdAt) : "—"}
@@ -223,7 +242,19 @@ export default function MarketingPage() {
         ? <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{name}</span>
         : <span className="text-text-muted">—</span>;
     } },
-    { key: "message", label: "Pedido", render: (r) => <span className="block max-w-[200px] truncate text-text-secondary" title={r.message}>{r.message || "—"}</span> },
+    { key: "message", label: "Pedido", render: (r) => {
+      const { service, urgency, description, urgent } = parseLeadMessage(r.message || "");
+      // Descrição livre; senão o serviço (só se a categoria não ficou preenchida, p/ não repetir).
+      const primary = description || (r.categoryId ? "" : service);
+      return (
+        <div className="flex items-center gap-1.5 max-w-[240px]">
+          {urgent && (
+            <span title={urgency} className="shrink-0 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>
+          )}
+          <span className="truncate text-text-secondary" title={r.message || undefined}>{primary || "—"}</span>
+        </div>
+      );
+    } },
     { key: "quoteValue", label: "Orçamento", render: (r) => r.quoteValue != null ? (
       <span>{formatCurrency(r.quoteValue)}
         {r.technicianValue != null && <span className="block text-xs text-text-muted">margem {formatCurrency(r.quoteValue - r.technicianValue)}</span>}
@@ -236,10 +267,18 @@ export default function MarketingPage() {
       </select>
     ) },
     { key: "acoes", label: "", render: (r) => (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-1.5">
+        {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1">✓ serviço</span>}
+        {r.phone && (
+          <a href={waHref(r.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+            title="Abrir conversa no WhatsApp"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-success hover:bg-success-light transition-colors">
+            <MessageCircle className="h-4 w-4" />
+          </a>
+        )}
         <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
-        {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success">✓ serviço</span>}
-        <button onClick={() => removeLead(r)} title="Eliminar pedido" className="text-text-muted hover:text-danger transition-colors">
+        <button onClick={() => removeLead(r)} title="Eliminar pedido"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>

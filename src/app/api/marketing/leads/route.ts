@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
-import { resolveCategoryId } from "@/lib/categories";
+import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 
 /**
  * GET /api/marketing/leads — leads reais recebidas do formulário da landing
@@ -41,7 +41,8 @@ function toLead(r: Row) {
     quoteValue: r.quote_value != null ? Number(r.quote_value) : null,
     technicianValue: r.technician_value != null ? Number(r.technician_value) : null,
     technicianName: r.technician_name || "",
-    categoryId: r.category_id || "",
+    // Categoria: o campo próprio, ou (fallback) extraída da mensagem "Serviço: X".
+    categoryId: r.category_id || categoryFromMessage(r.message),
     executionDate: r.execution_date || "",
     rating: r.rating != null ? Number(r.rating) : null,
     serviceId: r.service_id || null,
