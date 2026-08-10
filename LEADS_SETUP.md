@@ -114,6 +114,7 @@ para o pedido chegar mesmo com a navegação para o wa.me).
           name: txt('f-name'),
           city: txt('f-location'),
           message: msg,
+          category: opt('f-service'), // categoria já escolhida pelo cliente
           source: 'landing',
           website: hp ? hp.value : ''
         })
