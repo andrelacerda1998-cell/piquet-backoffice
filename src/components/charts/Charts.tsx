@@ -20,17 +20,25 @@ interface ChartCardProps {
   children: React.ReactNode;
   className?: string;
   action?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
-export function ChartCard({ title, subtitle, children, className, action }: ChartCardProps) {
+export function ChartCard({ title, subtitle, children, className, action, icon: Icon }: ChartCardProps) {
   return (
     <div className={cn("card p-4", className)}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="font-semibold text-text-primary">{title}</h3>
-          {subtitle && <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-2.5 min-w-0">
+          {Icon && (
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-piquet/12 text-piquet-700">
+              <Icon className="h-4 w-4" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-text-primary leading-tight">{title}</h3>
+            {subtitle && <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>}
+          </div>
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {children}
     </div>

@@ -13,7 +13,8 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const displayLabel = label ?? SERVICE_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(status), className)}>
+    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(status), className)}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
       {displayLabel}
     </span>
   );

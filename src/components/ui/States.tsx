@@ -27,9 +27,15 @@ export function AlertCard({ alert, onAction, compact }: AlertCardProps) {
     media: "text-yellow-600",
     baixa: "text-text-muted",
   }[alert.priority] ?? "text-text-muted";
+  const accent = {
+    critica: "border-l-danger",
+    alta: "border-l-warning",
+    media: "border-l-piquet",
+    baixa: "border-l-surface-strong",
+  }[alert.priority] ?? "border-l-surface-strong";
 
   return (
-    <div className={cn("card p-4 flex gap-3", compact && "p-3")}>
+    <div className={cn("card border-l-[3px] p-4 flex gap-3", accent, compact && "p-3")}>
       <Icon className={cn("h-5 w-5 shrink-0 mt-0.5", iconColor)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-1">
@@ -50,12 +56,17 @@ export function AlertCard({ alert, onAction, compact }: AlertCardProps) {
   );
 }
 
-export function EmptyState({ title, description, icon: Icon }: { title: string; description?: string; icon?: React.ComponentType<{ className?: string }> }) {
+export function EmptyState({ title, description, icon: Icon, action }: { title: string; description?: string; icon?: React.ComponentType<{ className?: string }>; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      {Icon && <Icon className="h-12 w-12 text-text-muted mb-4" />}
-      <p className="text-lg font-medium text-text-primary">{title}</p>
+      {Icon && (
+        <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-subtle text-text-muted">
+          <Icon className="h-6 w-6" />
+        </span>
+      )}
+      <p className="text-base font-semibold text-text-primary">{title}</p>
       {description && <p className="text-sm text-text-secondary mt-1 max-w-sm">{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
@@ -63,7 +74,10 @@ export function EmptyState({ title, description, icon: Icon }: { title: string; 
 export function LoadingState({ message = "A carregar..." }: { message?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <div className="h-8 w-8 border-2 border-piquet border-t-transparent rounded-full animate-spin mb-3" />
+      <div className="relative h-9 w-9 mb-3">
+        <div className="absolute inset-0 rounded-full border-2 border-surface-strong/40" />
+        <div className="absolute inset-0 rounded-full border-2 border-piquet border-t-transparent animate-spin" />
+      </div>
       <p className="text-sm text-text-secondary">{message}</p>
     </div>
   );

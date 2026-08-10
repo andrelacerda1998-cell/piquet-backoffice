@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, X } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal, X, Inbox } from "lucide-react";
 
 interface SearchInputProps {
   value: string;
@@ -170,18 +170,18 @@ export function DataTable<T extends object>({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-border bg-surface-muted/50">
+              <tr className="border-b border-surface-border bg-surface-muted/60">
                 {selectable && (
-                  <th className="px-4 py-3 w-10">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Selecionar tudo" />
+                  <th className="px-4 py-2.5 w-10">
+                    <input type="checkbox" className="accent-piquet" checked={allSelected} onChange={toggleAll} aria-label="Selecionar tudo" />
                   </th>
                 )}
                 {visibleColumns.map((col) => (
                   <th
                     key={col.key}
                     className={cn(
-                      "px-4 py-3 text-left font-medium text-text-secondary whitespace-nowrap",
-                      col.sortable && "cursor-pointer select-none hover:text-text-primary",
+                      "px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted whitespace-nowrap",
+                      col.sortable && "cursor-pointer select-none hover:text-text-primary transition-colors",
                       col.className
                     )}
                     onClick={() => col.sortable && onSort?.(col.key)}
@@ -190,7 +190,7 @@ export function DataTable<T extends object>({
                       {col.label}
                       {col.sortable && (
                         sortField === col.key
-                          ? sortDirection === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                          ? sortDirection === "asc" ? <ArrowUp className="h-3.5 w-3.5 text-piquet-600" /> : <ArrowDown className="h-3.5 w-3.5 text-piquet-600" />
                           : <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                       )}
                     </span>
@@ -201,8 +201,13 @@ export function DataTable<T extends object>({
             <tbody>
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={totalCols} className="px-4 py-12 text-center text-text-muted">
-                    {emptyMessage}
+                  <td colSpan={totalCols} className="px-4 py-14">
+                    <div className="flex flex-col items-center justify-center gap-2 text-center">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-subtle text-text-muted">
+                        <Inbox className="h-5 w-5" />
+                      </span>
+                      <p className="text-sm text-text-secondary">{emptyMessage}</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -213,14 +218,14 @@ export function DataTable<T extends object>({
                       key={key}
                       className={cn(
                         "border-b border-surface-border last:border-0 transition-colors",
-                        onRowClick && "cursor-pointer hover:bg-surface-muted/50",
+                        onRowClick && "cursor-pointer hover:bg-surface-muted",
                         selected.has(key) && "bg-piquet/5"
                       )}
                       onClick={() => onRowClick?.(row)}
                     >
                       {selectable && (
                         <td className="px-4 py-3 w-10" onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={selected.has(key)} onChange={() => toggleRow(key)} aria-label="Selecionar linha" />
+                          <input type="checkbox" className="accent-piquet" checked={selected.has(key)} onChange={() => toggleRow(key)} aria-label="Selecionar linha" />
                         </td>
                       )}
                       {visibleColumns.map((col) => (
@@ -252,23 +257,26 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
 
+  const navBtn = "flex h-8 w-8 items-center justify-center rounded-lg border border-surface-border text-text-secondary hover:bg-surface-muted hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent transition-colors";
   return (
     <div className="flex items-center justify-between px-2 py-3 text-sm">
       <span className="text-text-secondary">
-        {total > 0 ? `${start}–${end} de ${total}` : "0 resultados"}
+        {total > 0 ? <><b className="text-text-primary tabular-nums">{start}–{end}</b> de <span className="tabular-nums">{total}</span></> : "0 resultados"}
       </span>
-      <div className="flex items-center gap-1">
-        <button onClick={() => onPageChange(1)} disabled={page <= 1} className="p-1.5 rounded hover:bg-surface-muted disabled:opacity-40" aria-label="Primeira página">
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => onPageChange(1)} disabled={page <= 1} className={navBtn} aria-label="Primeira página">
           <ChevronsLeft className="h-4 w-4" />
         </button>
-        <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="p-1.5 rounded hover:bg-surface-muted disabled:opacity-40" aria-label="Página anterior">
+        <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className={navBtn} aria-label="Página anterior">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="px-3 text-text-secondary">{page} / {totalPages || 1}</span>
-        <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="p-1.5 rounded hover:bg-surface-muted disabled:opacity-40" aria-label="Página seguinte">
+        <span className="px-2.5 text-text-secondary tabular-nums">
+          <b className="text-text-primary">{page}</b> / {totalPages || 1}
+        </span>
+        <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className={navBtn} aria-label="Página seguinte">
           <ChevronRight className="h-4 w-4" />
         </button>
-        <button onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className="p-1.5 rounded hover:bg-surface-muted disabled:opacity-40" aria-label="Última página">
+        <button onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className={navBtn} aria-label="Última página">
           <ChevronsRight className="h-4 w-4" />
         </button>
       </div>
