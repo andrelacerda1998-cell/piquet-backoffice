@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { HardHat } from "lucide-react";
+import { DocumentPreview } from "@/components/ui/DocumentPreview";
+import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
@@ -63,6 +64,8 @@ export default function TechniciansPage() {
   const [expirationDate, setExpirationDate] = useState("");
   const [declineReason, setDeclineReason] = useState("");
   const [savingReview, setSavingReview] = useState(false);
+  // Pré-visualização inline do documento (ver sem descarregar).
+  const [previewDoc, setPreviewDoc] = useState<VendorDocument | null>(null);
 
   const openApprove = (doc: VendorDocument) => { setReviewDoc(doc); setReviewAction("approve"); setExpirationDate(""); };
   const openDecline = (doc: VendorDocument) => { setReviewDoc(doc); setReviewAction("decline"); setDeclineReason(""); };
@@ -268,7 +271,9 @@ export default function TechniciansPage() {
                 { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
                 { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
                 { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
-                  ? <a href={r.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">Ver ficheiro</a>
+                  ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
+                      <Eye className="h-3.5 w-3.5" /> Pré-visualizar
+                    </button>
                   : <span className="text-text-muted text-xs">—</span> },
                 { key: "estado_detalhe", label: "Detalhe", render: (r: VendorDocument) =>
                   r.status === "declined" && r.reason ? <span className="text-xs text-danger">{r.reason}</span>
@@ -366,11 +371,7 @@ export default function TechniciansPage() {
       >
         {reviewDoc && reviewAction === "approve" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && (
-              <a href={reviewDoc.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-piquet-600 hover:underline">
-                Ver ficheiro antes de aprovar →
-              </a>
-            )}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} heightClass="h-[40vh]" />}
             <Field label="Data de expiração" hint="Opcional">
               <input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="input-field" />
             </Field>
@@ -378,16 +379,35 @@ export default function TechniciansPage() {
         )}
         {reviewDoc && reviewAction === "decline" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && (
-              <a href={reviewDoc.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-piquet-600 hover:underline">
-                Ver ficheiro antes de recusar →
-              </a>
-            )}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} heightClass="h-[40vh]" />}
             <Field label="Motivo" hint="Obrigatório — vai no email para o técnico">
               <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={4} className="input-field" placeholder="Ex.: Documento ilegível, por favor envia uma foto mais nítida." />
             </Field>
           </div>
         )}
+      </Modal>
+
+      {/* Pré-visualização do documento — rever sem descarregar. */}
+      <Modal
+        open={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        size="xl"
+        title={previewDoc?.document_type ?? "Documento"}
+        subtitle={previewDoc ? `${previewDoc.vendor_name ?? "Técnico"}${previewDoc.created_at ? ` · enviado ${formatDateTime(previewDoc.created_at)}` : ""}` : undefined}
+        footer={
+          previewDoc?.status === "pending" ? (
+            <>
+              <button onClick={() => { const d = previewDoc; setPreviewDoc(null); if (d) openDecline(d); }} className="btn-secondary text-sm text-danger">Recusar</button>
+              <button onClick={() => { const d = previewDoc; setPreviewDoc(null); if (d) openApprove(d); }} className="btn-primary text-sm">Aprovar</button>
+            </>
+          ) : (
+            <button onClick={() => setPreviewDoc(null)} className="btn-secondary text-sm">Fechar</button>
+          )
+        }
+      >
+        {previewDoc?.file_url
+          ? <DocumentPreview url={previewDoc.file_url} />
+          : <p className="text-sm text-text-muted py-8 text-center">Este documento não tem ficheiro associado.</p>}
       </Modal>
     </RouteGuard>
   );
