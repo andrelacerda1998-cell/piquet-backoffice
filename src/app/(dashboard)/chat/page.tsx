@@ -9,8 +9,9 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import {
   getTeamMessages, sendTeamMessage, getTeamMeetings, createTeamMeeting,
   getTeamTasks, createTeamTask, updateTeamTaskStatus,
-  TEAM_MEMBERS, TEAM_CHANNELS, TEAM_AGENDA_DAYS, TEAM_DAY_LABEL,
-  type ChatMessage, type TeamAgendaEvent, type TeamTask,
+  getTeamChannels, createTeamChannel,
+  TEAM_MEMBERS, TEAM_AGENDA_DAYS, TEAM_DAY_LABEL,
+  type ChatMessage, type ChatChannel, type TeamAgendaEvent, type TeamTask,
 } from "@/services/extrasService";
 import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { useTeamChatRealtime } from "@/hooks/useTeamChatRealtime";
@@ -41,6 +42,7 @@ export default function TeamPage() {
   const { data: baseMsgs, loading, error, refetch } = useAsyncData(() => getTeamMessages(), []);
   const { data: baseAgenda } = useAsyncData(() => getTeamMeetings(), []);
   const { data: baseTasks } = useAsyncData(() => getTeamTasks(), []);
+  const { data: baseChannels } = useAsyncData(() => getTeamChannels(), []);
   const [tab, setTab] = useState("conversas");
 
   // Deep-link `?tab=tarefas|agenda|conversas` (vindo da Visão executiva, ex.: "Prazos em risco").
@@ -68,7 +70,7 @@ export default function TeamPage() {
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "conversas" && <Conversas base={baseMsgs ?? []} userName={user?.name ?? "Eu"} />}
+        {tab === "conversas" && <Conversas base={baseMsgs ?? []} channels={baseChannels ?? []} userName={user?.name ?? "Eu"} />}
         {tab === "tarefas" && <TarefasEquipa base={baseTasks ?? []} />}
         {tab === "agenda" && <AgendaEquipa base={baseAgenda ?? []} userName={user?.name ?? "Eu"} />}
       </div>
@@ -78,20 +80,47 @@ export default function TeamPage() {
 
 /* ------------------------------- Conversas ------------------------------- */
 
-function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }) {
+function Conversas({ base, channels, userName }: { base: ChatMessage[]; channels: ChatChannel[]; userName: string }) {
   const [active, setActive] = useState("geral");
   const [text, setText] = useState("");
   const [msgs, setMsgs] = useState<ChatMessage[]>(base);
+  const [chList, setChList] = useState<ChatChannel[]>(channels);
   const seeded = useRef(false);
+  const channelsSeeded = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [newChannelOpen, setNewChannelOpen] = useState(false);
+  const [newChannelName, setNewChannelName] = useState("");
+  const [creatingChannel, setCreatingChannel] = useState(false);
 
   // Semeia com o fetch inicial (uma vez). A partir daí o estado é mantido
   // localmente e alimentado pelo realtime + envios otimistas.
   useEffect(() => {
     if (!seeded.current && base.length) { setMsgs(base); seeded.current = true; }
   }, [base]);
+
+  useEffect(() => {
+    if (!channelsSeeded.current && channels.length) { setChList(channels); channelsSeeded.current = true; }
+  }, [channels]);
+
+  const createChannel = async () => {
+    const name = newChannelName.trim();
+    if (!name) { toast("Indica o nome do canal.", "error"); return; }
+    setCreatingChannel(true);
+    try {
+      const channel = await createTeamChannel(name);
+      setChList((prev) => (prev.some((c) => c.id === channel.id) ? prev : [...prev, channel]));
+      setActive(channel.id);
+      setNewChannelOpen(false);
+      setNewChannelName("");
+      toast(`Canal #${channel.name} criado.`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível criar o canal.", "error");
+    } finally {
+      setCreatingChannel(false);
+    }
+  };
 
   // Chat ao vivo: ouve inserts em team_messages e faz push instantâneo.
   useTeamChatRealtime(setMsgs);
@@ -104,7 +133,7 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
   const isDm = active.startsWith("dm:");
   const dmOtherId = isDm ? (active.slice(3).split("-").find((id) => id !== myMemberId) ?? active.slice(3)) : null;
   const member = TEAM_MEMBERS.find((m) => m.id === dmOtherId);
-  const activeChannel = TEAM_CHANNELS.find((c) => c.id === active);
+  const activeChannel = chList.find((c) => c.id === active);
 
   const messages = useMemo(
     () => msgs.filter((m) => m.threadId === active),
@@ -162,8 +191,13 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
       {/* Lista de canais e diretas */}
       <div className="card p-2 h-fit space-y-3">
         <div>
-          <p className="px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Canais</p>
-          {TEAM_CHANNELS.map((c) => (
+          <div className="flex items-center justify-between px-3 pt-1 pb-1.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Canais</p>
+            <button onClick={() => setNewChannelOpen(true)} className="text-text-muted hover:text-piquet-600" title="Criar canal" aria-label="Criar canal">
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {chList.map((c) => (
             <button key={c.id} onClick={() => setActive(c.id)}
               className={cn("w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                 active === c.id ? "bg-piquet/15 text-text-primary font-semibold" : "text-text-secondary hover:bg-surface-muted")}>
@@ -259,6 +293,30 @@ function Conversas({ base, userName }: { base: ChatMessage[]; userName: string }
           <img src={lightbox} alt="Imagem em tamanho grande" className="max-w-full max-h-full rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+
+      <Modal
+        open={newChannelOpen}
+        onClose={() => { setNewChannelOpen(false); setNewChannelName(""); }}
+        title="Criar canal"
+        subtitle="Fica visível para toda a equipa"
+        footer={<>
+          <button onClick={() => { setNewChannelOpen(false); setNewChannelName(""); }} className="btn-secondary text-sm">Cancelar</button>
+          <button onClick={createChannel} disabled={creatingChannel} className="btn-primary text-sm disabled:opacity-50">
+            {creatingChannel ? "A criar…" : "Criar"}
+          </button>
+        </>}
+      >
+        <Field label="Nome do canal">
+          <input
+            value={newChannelName}
+            onChange={(e) => setNewChannelName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") createChannel(); }}
+            className="input-field"
+            placeholder="Ex.: operações"
+            autoFocus
+          />
+        </Field>
+      </Modal>
     </div>
   );
 }

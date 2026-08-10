@@ -135,6 +135,8 @@ const LIVE_EXACT = new Set<string>([
   "/team/agenda",
   "/team/meetings",
   "/team/tasks",
+  // Canais de conversa — persistidos, criáveis pela equipa (2026-08-10).
+  "/team/channels",
   // Quadro de desenvolvimento (Kanban site + app)
   "/dev-tasks",
   // Fase 6 — Impostos (tax_obligations)
@@ -239,6 +241,7 @@ const REAL_DATA = new Set<string>([
   "/team/tasks",
   "/team/agenda",
   "/team/meetings",
+  "/team/channels", // Canais persistidos, criados pela própria equipa.
   // Definições de taxas, lucro do sistema e vouchers vêm agora do Laravel
   // (fonte de verdade da produção), não do seed do Supabase.
   "/fee-settings",

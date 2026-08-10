@@ -4,13 +4,18 @@ import { useEffect } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabaseBrowser, SUPABASE_AUTH_ENABLED } from "@/lib/supabase/client";
 import { useAuthStore, useNotificationStore, toast } from "@/stores";
-import { TEAM_CHANNELS } from "@/services/extrasService";
+import { getTeamChannels, type ChatChannel } from "@/services/extrasService";
 import { DEV_COLUMNS, DEV_SECTIONS } from "@/services/devService";
 
-function threadLabel(threadId: string) {
-  if (threadId.startsWith("dm:")) return "mensagem direta";
-  const c = TEAM_CHANNELS.find((x) => x.id === threadId);
-  return c ? `#${c.name}` : `#${threadId}`;
+// Canais são persistidos/criáveis (ver extrasService.getTeamChannels), não
+// mais uma lista fixa no código -- carregados uma vez ao arrancar o hook,
+// só para dar um nome bonito à notificação (cai para o slug se não encontrar).
+function makeThreadLabel(channels: ChatChannel[]) {
+  return (threadId: string) => {
+    if (threadId.startsWith("dm:")) return "mensagem direta";
+    const c = channels.find((x) => x.id === threadId);
+    return c ? `#${c.name}` : `#${threadId}`;
+  };
 }
 const statusLabel = (s: string) => DEV_COLUMNS.find((c) => c.id === s)?.label ?? s;
 const sectionLabel = (s: string) => DEV_SECTIONS.find((x) => x.id === s)?.label ?? s;
@@ -43,9 +48,12 @@ export function useLiveNotifications() {
       toast(toastMsg, "info");
     };
 
+    let threadLabel = makeThreadLabel([]);
+
     async function start() {
-      const { data } = await supabase.auth.getSession();
+      const [{ data }, channels] = await Promise.all([supabase.auth.getSession(), getTeamChannels().catch(() => [])]);
       if (cancelled) return;
+      threadLabel = makeThreadLabel(channels);
       myId = data.session?.user?.id ?? null;
       if (data.session?.access_token) await supabase.realtime.setAuth(data.session.access_token);
       if (cancelled) return;
