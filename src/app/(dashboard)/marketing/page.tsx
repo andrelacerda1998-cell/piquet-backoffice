@@ -12,6 +12,7 @@ import { useTabParam } from "@/hooks/useTabParam";
 import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown } from "@/services/marketingService";
 import { getLeads, getScripts, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
+import { categoryName } from "@/lib/categories";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -162,7 +163,13 @@ export default function MarketingPage() {
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Contacto", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
     { key: "phone", label: "Telefone", render: (r) => r.phone || "—" },
-    { key: "message", label: "Pedido", render: (r) => <span className="block max-w-[220px] truncate text-text-secondary" title={r.message}>{r.message || "—"}</span> },
+    { key: "categoryId", label: "Categoria", render: (r) => {
+      const name = categoryName(r.categoryId);
+      return name
+        ? <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{name}</span>
+        : <span className="text-text-muted">—</span>;
+    } },
+    { key: "message", label: "Pedido", render: (r) => <span className="block max-w-[200px] truncate text-text-secondary" title={r.message}>{r.message || "—"}</span> },
     { key: "quoteValue", label: "Orçamento", render: (r) => r.quoteValue != null ? (
       <span>{formatCurrency(r.quoteValue)}
         {r.technicianValue != null && <span className="block text-xs text-text-muted">margem {formatCurrency(r.quoteValue - r.technicianValue)}</span>}

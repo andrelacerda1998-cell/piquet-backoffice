@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { resolveCategoryId } from "@/lib/categories";
 
 /**
  * GET /api/marketing/leads — leads reais recebidas do formulário da landing
@@ -68,7 +69,8 @@ export const GET = withStaff(async () => {
  */
 export const POST = withStaff(async (req) => {
   const b = (await req.json()) as Record<string, unknown>;
-  const row = {
+  const categoryId = resolveCategoryId(b.category ?? b.categoryId ?? b.category_id ?? b.service);
+  const row: Record<string, string> = {
     name: clip(b.name, 200),
     phone: clip(b.phone, 50),
     city: clip(b.city, 100),
@@ -76,6 +78,7 @@ export const POST = withStaff(async (req) => {
     source: clip(b.source, 100) || "whatsapp",
     stage: "nao_iniciado",
   };
+  if (categoryId) row.category_id = categoryId;
   if (!row.name && !row.phone) return apiErr("Indica pelo menos o nome ou o telefone.", 400);
 
   const { data, error } = await supabaseAdmin()

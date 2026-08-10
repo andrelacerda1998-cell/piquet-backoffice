@@ -16,10 +16,33 @@ que avança: **Não iniciado → Orçamento enviado → Orçamento aceite → Re
 | `phone`   | ¹           | 50    |                                         |
 | `city`    | não         | 100   |                                         |
 | `message` | não         | 2000  |                                         |
+| `category`| não         | —     | categoria escolhida pelo cliente — ver abaixo |
 | `source`  | não         | 100   | default `website`; usar p.ex. `landing` |
 | `website` | —           | —     | **honeypot** — deixar SEMPRE vazio      |
 
 ¹ Pelo menos um de `name`/`email`/`phone` é obrigatório (senão HTTP 400).
+
+### Categoria do serviço
+
+Manda o que o cliente escolher no formulário em `category` (também aceite como
+`categoryId`, `category_id` ou `service`). O backoffice resolve **nome, slug ou
+id, com ou sem acentos** para a categoria canónica e mostra-a já preenchida no
+CRM. Valores reconhecidos (basta um por lead):
+
+| Categoria                | slug          |
+|--------------------------|---------------|
+| Assistência emergencial  | `emergencia`  |
+| Canalização              | `canalizacao` |
+| Eletricidade             | `eletricidade`|
+| AVAC                     | `avac`        |
+| Fechaduras e portas      | `fechaduras`  |
+| Instalações domésticas   | `instalacoes` |
+| Limpeza e manutenção     | `limpeza`     |
+| Montagem de mobiliário   | `mobiliario`  |
+
+Ex.: `"category": "Canalização"`, `"category": "canalizacao"` ou
+`"category": "cat_canalizacao"` — todos ficam como **Canalização**. Se não
+corresponder a nenhuma, a lead entra sem categoria (a equipa escolhe à mão).
 
 ## Snippet para o formulário
 
@@ -41,6 +64,7 @@ async function enviarLead(form) {
       phone: dados.phone,
       city: dados.city,
       message: dados.message,
+      category: dados.category, // categoria escolhida (nome, slug ou id)
       source: "landing",
       website: dados.website, // honeypot — vem vazio de humanos
     }),

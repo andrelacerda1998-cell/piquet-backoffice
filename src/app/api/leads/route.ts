@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
+import { resolveCategoryId } from "@/lib/categories";
 
 /**
  * POST /api/leads — receção PÚBLICA de leads do formulário da landing page
@@ -47,7 +48,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true }, { status: 200, headers: CORS });
   }
 
-  const lead = {
+  // Categoria escolhida pelo cliente no formulário — aceita nome, slug ou id
+  // (com/sem acentos), sob qualquer um destes campos. Resolve para o id canónico
+  // para o CRM já a mostrar preenchida; "" quando não corresponde a nenhuma.
+  const categoryId = resolveCategoryId(
+    body.category ?? body.categoryId ?? body.category_id ?? body.service ?? body.servico,
+  );
+
+  const lead: Record<string, string> = {
     name: clip(body.name, 200),
     email: clip(body.email, 200),
     phone: clip(body.phone, 50),
@@ -56,6 +64,7 @@ export async function POST(req: Request) {
     source: clip(body.source, 100) || "website",
     stage: "nao_iniciado", // entra no CRM como "Não iniciado"
   };
+  if (categoryId) lead.category_id = categoryId;
   if (!lead.name && !lead.email && !lead.phone) {
     return NextResponse.json(
       { ok: false, error: "Indica pelo menos nome, email ou telefone." },
