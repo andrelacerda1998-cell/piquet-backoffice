@@ -84,11 +84,14 @@ export default function MarketingPage() {
 
   // Filtros do CRM: pesquisa livre + mês + estado + categoria + origem.
   const [leadSearch, setLeadSearch] = useState("");
-  const [leadMonth, setLeadMonth] = useState<string>("");
+  // Por omissão mostra o mês atual (o trabalho do dia-a-dia); "" = todos.
+  const [leadMonth, setLeadMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [leadStage, setLeadStage] = useState<"" | LeadStage>("");
   const [leadCategory, setLeadCategory] = useState("");
   const [leadSource, setLeadSource] = useState("");
-  const leadMonths = Array.from(new Set(leadRows.map((l) => (l.createdAt || "").slice(0, 7)).filter(Boolean))).sort().reverse();
+  // O mês atual está sempre na lista (mesmo sem leads), por ser o valor por omissão.
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const leadMonths = Array.from(new Set([currentMonth, ...leadRows.map((l) => (l.createdAt || "").slice(0, 7))].filter(Boolean))).sort().reverse();
   const leadSources = Array.from(new Set(leadRows.map((l) => l.source).filter(Boolean))).sort();
 
   // Filtros exceto o estado — servem de base às contagens por estado (para se
@@ -103,8 +106,9 @@ export default function MarketingPage() {
   };
   const baseFiltered = leadRows.filter(matchesBase);
   const filteredLeads = leadStage ? baseFiltered.filter((l) => l.stage === leadStage) : baseFiltered;
-  const hasActiveFilters = !!(leadSearch || leadMonth || leadStage || leadCategory || leadSource);
-  const clearFilters = () => { setLeadSearch(""); setLeadMonth(""); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
+  // O mês atual é o estado por omissão — só conta como filtro se for outro mês.
+  const hasActiveFilters = !!(leadSearch || (leadMonth && leadMonth !== currentMonth) || leadStage || leadCategory || leadSource);
+  const clearFilters = () => { setLeadSearch(""); setLeadMonth(currentMonth); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
 
   // Possíveis duplicados: mesma pessoa + mesmo pedido. Marca todas exceto a
   // primeira do grupo (o formulário costuma disparar o POST duas vezes).
@@ -517,7 +521,7 @@ export default function MarketingPage() {
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="text-text-secondary">
                   <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "lead" : "leads"}
-                  {hasActiveFilters ? " (filtrado)" : " no total"}
+                  {hasActiveFilters ? " (filtrado)" : leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
                 </span>
                 {dupCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">

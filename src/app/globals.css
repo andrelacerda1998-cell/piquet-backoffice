@@ -58,6 +58,10 @@
 @layer base {
   html {
     @apply scroll-smooth;
+    /* Base 17px (em vez dos 16 do browser): sobe ligeiramente TODA a tipografia,
+       porque as classes Tailwind são em rem. A Open Sans tem altura-x maior que
+       a Inter, por isso o ganho de legibilidade é notório sem parecer "grande". */
+    font-size: 17px;
   }
   body {
     @apply bg-surface-muted text-text-primary antialiased;

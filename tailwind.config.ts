@@ -56,7 +56,7 @@ const config: Config = {
         card: "16px",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)", "Open Sans", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },
