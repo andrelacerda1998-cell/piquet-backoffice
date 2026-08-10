@@ -33,9 +33,11 @@ export const METRIC_DEFS: MetricDef[] = [
   { key: "downloads_total", label: "Downloads totais", unit: "number", period: "point", real: true },
   { key: "downloads_mes", label: "Downloads do mês", unit: "number", period: "month", real: true },
   { key: "novos_clientes_mes", label: "Novos clientes (mês)", unit: "number", period: "month", real: false },
+  { key: "novos_clientes_ano", label: "Novos clientes (ano)", unit: "number", period: "year", real: false },
   { key: "clientes_total", label: "Clientes totais", unit: "number", period: "point", real: false },
   { key: "tecnicos_ativos", label: "Técnicos ativos", unit: "number", period: "point", real: false },
   { key: "servicos_concluidos_mes", label: "Serviços concluídos (mês)", unit: "number", period: "month", real: false },
+  { key: "servicos_concluidos_ano", label: "Serviços concluídos (ano)", unit: "number", period: "year", real: false },
 ];
 
 const BY_KEY = new Map(METRIC_DEFS.map((m) => [m.key, m]));
@@ -180,8 +182,12 @@ export async function computeMetric(key: string): Promise<number> {
       return countRows("technicians", { eq: ["status", "ativo"] });
     case "novos_clientes_mes":
       return countRows("customers", { gte: ["registered_at", monthBounds(now).start] });
+    case "novos_clientes_ano":
+      return countRows("customers", { gte: ["registered_at", yearBounds(now).start] });
     case "servicos_concluidos_mes":
       return countRows("services", { eq: ["status", "concluido"], gte: ["completed_at", monthBounds(now).start] });
+    case "servicos_concluidos_ano":
+      return countRows("services", { eq: ["status", "concluido"], gte: ["completed_at", yearBounds(now).start] });
     default:
       return 0;
   }
