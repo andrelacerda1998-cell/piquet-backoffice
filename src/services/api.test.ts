@@ -97,6 +97,11 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/customers/42/payment-methods/7")).toBe(true); // apagar
   });
 
+  it("marca como migrado o endpoint de Fase 16 (Códigos SMS)", () => {
+    expect(isLiveEndpoint("/sms-codes")).toBe(true);
+    expect(isLiveEndpoint("/sms-codes?type=login")).toBe(true);
+  });
+
   it("marca como migrado o endpoint de editar um lead (valor estimado/fase)", () => {
     expect(isLiveEndpoint("/marketing/leads/abc-123")).toBe(true);
   });
@@ -171,7 +176,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
                       "/technicians/top", "/technicians/coverage",
                       "/services-types", "/operation-areas", "/allowed-zones",
-                      "/documents", "/audits", "/sent-notifications", "/sent-notifications/types"]) {
+                      "/documents", "/audits", "/sent-notifications", "/sent-notifications/types",
+                      "/sms-codes"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

@@ -176,6 +176,8 @@ const LIVE_EXACT = new Set<string>([
   // SentNotificationController)
   "/sent-notifications",
   "/sent-notifications/types",
+  // Fase 16 — Códigos SMS (idem, via Laravel; só leitura, ver SmsCodeController)
+  "/sms-codes",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -274,6 +276,9 @@ const REAL_DATA = new Set<string>([
   // (SentNotificationResource migrado).
   "/sent-notifications",
   "/sent-notifications/types",
+  // Códigos SMS — idem, tabela phone_number_validation_codes real do Laravel
+  // (SmsCodeResource migrado).
+  "/sms-codes",
 ]);
 
 /**
