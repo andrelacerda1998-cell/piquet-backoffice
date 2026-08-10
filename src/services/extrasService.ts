@@ -581,15 +581,15 @@ export async function getComplaints(): Promise<Complaint[]> {
 // Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
 export type LeadStage = "nao_iniciado" | "orcamento_enviado" | "orcamento_aceite" | "recusado" | "concluido";
 
-// Rótulos pedidos pelo André (2026-07): Novo / Orçamento enviado / Orçamento
-// aceite / Executado / Cancelado. Os `id` mantêm-se (a BD e a lógica de criar
-// serviço no "concluido" dependem deles); muda só o texto e a ordem.
+// Rótulos pedidos pelo André: Novo / Orçamento enviado / Aceite / Executado /
+// Recusado. Os `id` mantêm-se (a BD e a lógica de criar serviço no "concluido"
+// dependem deles); muda só o texto.
 export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
   { id: "nao_iniciado", label: "Novo" },
   { id: "orcamento_enviado", label: "Orçamento enviado" },
-  { id: "orcamento_aceite", label: "Orçamento aceite" },
+  { id: "orcamento_aceite", label: "Aceite" },
   { id: "concluido", label: "Executado" },
-  { id: "recusado", label: "Cancelado" },
+  { id: "recusado", label: "Recusado" },
 ];
 export const LEAD_STAGE_LABEL: Record<LeadStage, string> =
   Object.fromEntries(LEAD_STAGES.map((s) => [s.id, s.label])) as Record<LeadStage, string>;

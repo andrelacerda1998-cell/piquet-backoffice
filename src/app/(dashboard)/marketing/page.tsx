@@ -469,7 +469,7 @@ export default function MarketingPage() {
               {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-          <Field label="Valor do orçamento (€)">
+          <Field label="Valor do serviço (€)">
             <input type="number" step="0.01" min="0" value={editForm.quoteValue}
               onChange={(e) => {
                 const v = e.target.value;
@@ -501,7 +501,7 @@ export default function MarketingPage() {
           return (
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-piquet/10 border border-piquet/20 px-4 py-3">
               <div>
-                <p className="text-xs text-text-muted">Margem da Piquet (calculada automaticamente)</p>
+                <p className="text-xs text-text-muted">Comissão da Piquet (calculada automaticamente)</p>
                 <p className="text-xl font-bold text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
               </div>
               <p className="text-xs text-text-secondary text-right leading-relaxed">

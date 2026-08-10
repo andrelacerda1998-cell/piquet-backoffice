@@ -48,11 +48,12 @@ const config: Config = {
         },
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(28 26 23 / 0.05), 0 1px 3px 0 rgb(28 26 23 / 0.06)",
-        elevated: "0 8px 24px -6px rgb(28 26 23 / 0.14), 0 2px 6px -2px rgb(28 26 23 / 0.08)",
+        // Sombra de cartão com profundidade suave (mais premium, ainda discreta).
+        card: "0 1px 2px 0 rgb(28 26 23 / 0.04), 0 4px 12px -4px rgb(28 26 23 / 0.06)",
+        elevated: "0 12px 32px -8px rgb(28 26 23 / 0.16), 0 4px 10px -3px rgb(28 26 23 / 0.08)",
       },
       borderRadius: {
-        card: "14px",
+        card: "16px",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
