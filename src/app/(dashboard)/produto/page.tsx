@@ -17,7 +17,7 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart, TrendingUp, Minus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
@@ -31,6 +31,30 @@ const BUG_STATUS_LABEL: Record<Bug["status"], string> = {
 };
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+/**
+ * Downloads NOVOS de uma app no último mês: número real em destaque + % de
+ * crescimento face ao acumulado do mês anterior. Responde ao "quantos downloads
+ * novos, em nº e em %, por app".
+ */
+function NewDownloadsCard({ app, novos, pct, accent }: { app: string; novos: number; pct: number; accent: string }) {
+  return (
+    <div className="card p-4">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
+        <p className="text-sm font-medium text-text-secondary">{app}</p>
+      </div>
+      <p className="mt-2 text-3xl font-bold text-text-primary tabular-nums">+{formatNumber(novos)}</p>
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className={cn("inline-flex items-center gap-1 text-sm font-semibold", pct > 0 ? "text-success" : "text-text-muted")}>
+          {pct > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+          {pct > 0 ? "+" : ""}{formatNumber(Math.round(pct * 10) / 10)}%
+        </span>
+        <span className="text-xs text-text-muted">vs. mês anterior</span>
+      </div>
+    </div>
+  );
+}
 
 function RatingCard({ app, store, info }: { app: string; store: string; info: StoreRatingInfo | null }) {
   return (
@@ -112,6 +136,14 @@ export default function ProdutoPage() {
     Profissional: i === 0 ? 0 : Math.max(0, (d.Profissional ?? 0) - (dl[i - 1].Profissional ?? 0)),
   })).slice(1);
 
+  // Downloads NOVOS no último mês (nº real) + % de crescimento vs. total anterior.
+  const dlNewLast = dlMonthly[dlMonthly.length - 1];
+  const newCliente = dlNewLast?.Cliente ?? 0;
+  const newProfissional = dlNewLast?.Profissional ?? 0;
+  const newTotal = newCliente + newProfissional;
+  const growthPct = (novos: number, totalAnterior: number) => (totalAnterior > 0 ? (novos / totalAnterior) * 100 : 0);
+  const latestMonthLabel = dlLast?.name ?? "";
+
   const TABS: TabDef[] = [
     { id: "apps", label: "Apps" },
     { id: "bugs", label: "Bugs", count: (bugs ?? []).filter((b) => b.status !== "resolvido").length },
@@ -165,6 +197,18 @@ export default function ProdutoPage() {
               {/* Downloads (acima) vêm das lojas; estes registos vêm do seed. */}
               <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
               <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
+            </div>
+
+            {/* Downloads NOVOS no último mês, por app — número real + % de crescimento. */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">
+                Novos downloads{latestMonthLabel ? ` · ${latestMonthLabel}` : ""}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <NewDownloadsCard app="App Cliente" novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)} accent="#FAB347" />
+                <NewDownloadsCard app="App Profissional" novos={newProfissional} pct={growthPct(newProfissional, dlPrev?.Profissional ?? 0)} accent="#1C1A17" />
+                <NewDownloadsCard app="Total (as duas apps)" novos={newTotal} pct={growthPct(newTotal, dlTotalPrev)} accent="#1F9D6B" />
+              </div>
             </div>
 
             {/* Avaliações reais nas lojas (iTunes lookup + Google Play). */}
