@@ -21,7 +21,7 @@ import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone, Search } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { MarketingCampaign } from "@/types";
 
@@ -65,10 +65,29 @@ export default function MarketingPage() {
   const [leadRows, setLeadRows] = useState<Lead[]>([]);
   useEffect(() => { setLeadRows(leads ?? []); }, [leads]);
 
-  // Filtro por mês (quantas leads por mês). "" = todos os meses.
+  // Filtros do CRM: pesquisa livre + mês + estado + categoria + origem.
+  const [leadSearch, setLeadSearch] = useState("");
   const [leadMonth, setLeadMonth] = useState<string>("");
+  const [leadStage, setLeadStage] = useState<"" | LeadStage>("");
+  const [leadCategory, setLeadCategory] = useState("");
+  const [leadSource, setLeadSource] = useState("");
   const leadMonths = Array.from(new Set(leadRows.map((l) => (l.createdAt || "").slice(0, 7)).filter(Boolean))).sort().reverse();
-  const filteredLeads = leadMonth ? leadRows.filter((l) => (l.createdAt || "").slice(0, 7) === leadMonth) : leadRows;
+  const leadSources = Array.from(new Set(leadRows.map((l) => l.source).filter(Boolean))).sort();
+
+  // Filtros exceto o estado — servem de base às contagens por estado (para se
+  // ver a distribuição e clicar num estado para filtrar).
+  const q = leadSearch.trim().toLowerCase();
+  const matchesBase = (l: Lead) => {
+    if (leadMonth && (l.createdAt || "").slice(0, 7) !== leadMonth) return false;
+    if (leadCategory && l.categoryId !== leadCategory) return false;
+    if (leadSource && l.source !== leadSource) return false;
+    if (q && !`${l.name} ${l.phone} ${l.message} ${l.city}`.toLowerCase().includes(q)) return false;
+    return true;
+  };
+  const baseFiltered = leadRows.filter(matchesBase);
+  const filteredLeads = leadStage ? baseFiltered.filter((l) => l.stage === leadStage) : baseFiltered;
+  const hasActiveFilters = !!(leadSearch || leadMonth || leadStage || leadCategory || leadSource);
+  const clearFilters = () => { setLeadSearch(""); setLeadMonth(""); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
 
   // Possíveis duplicados: mesma pessoa + mesmo pedido. Marca todas exceto a
   // primeira do grupo (o formulário costuma disparar o POST duas vezes).
@@ -423,33 +442,66 @@ export default function MarketingPage() {
               <button onClick={() => setShowLead(true)} className="btn-primary text-sm shrink-0">Registar pedido</button>
             </div>
 
-            {/* Filtro por mês + contagem de leads recebidas nesse período. */}
-            <div className="flex flex-wrap items-center gap-3">
-              <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto">
-                <option value="">Todos os meses</option>
-                {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-              </select>
-              <span className="text-sm text-text-secondary">
-                <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "lead" : "leads"}
-                {leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
-              </span>
-              {dupCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">
-                  {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
+            {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}
+            <div className="card p-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, pedido…" className="input-field pl-9" aria-label="Pesquisar pedidos" />
+                </div>
+                <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto" aria-label="Filtrar por mês">
+                  <option value="">Todos os meses</option>
+                  {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                </select>
+                <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
+                  <option value="">Todos os estados</option>
+                  {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+                <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
+                  <option value="">Todas as categorias</option>
+                  {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {leadSources.length > 1 && (
+                  <select value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="input-field w-auto" aria-label="Filtrar por origem">
+                    <option value="">Todas as origens</option>
+                    {leadSources.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
+                  </select>
+                )}
+                {hasActiveFilters && (
+                  <button onClick={clearFilters} className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary">
+                    <Trash2 className="h-3.5 w-3.5" /> Limpar filtros
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="text-text-secondary">
+                  <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "lead" : "leads"}
+                  {hasActiveFilters ? " (filtrado)" : " no total"}
                 </span>
-              )}
+                {dupCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">
+                    {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
             </div>
 
+            {/* Cartões de estado — clicáveis para filtrar por esse estado. */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {LEAD_STAGES.map((s) => (
-                <div key={s.id} className="card p-3">
-                  <p className="text-xs text-text-secondary">{s.label}</p>
-                  <p className="text-xl font-bold text-text-primary tabular-nums">{filteredLeads.filter((l) => l.stage === s.id).length}</p>
-                </div>
-              ))}
+              {LEAD_STAGES.map((s) => {
+                const active = leadStage === s.id;
+                return (
+                  <button key={s.id} onClick={() => setLeadStage(active ? "" : s.id)}
+                    className={cn("card p-3 text-left transition-shadow hover:shadow-elevated",
+                      active && "ring-2 ring-piquet border-piquet")}>
+                    <p className="text-xs text-text-secondary">{s.label}</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">{baseFiltered.filter((l) => l.stage === s.id).length}</p>
+                  </button>
+                );
+              })}
             </div>
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
-              emptyMessage={leadMonth ? "Sem pedidos neste mês." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
+              emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
           </div>
         )}
 
