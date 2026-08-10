@@ -221,10 +221,19 @@ export default function MarketingPage() {
   };
 
   const leadColumns: Column<Lead>[] = [
-    { key: "name", label: "Contacto", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "phone", label: "Telefone", render: (r) => r.phone
-      ? <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-text-primary hover:text-piquet-700 hover:underline">{r.phone}</a>
-      : <span className="text-text-muted">—</span> },
+    { key: "name", label: "Contacto", sortable: true, render: (r) => (
+      <div className="min-w-0">
+        <p className="font-medium text-text-primary truncate">{r.name}</p>
+        {r.phone && (
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-piquet-700 hover:underline">{r.phone}</a>
+            <a href={waHref(r.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Abrir conversa no WhatsApp" className="text-success hover:text-success/80">
+              <MessageCircle className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        )}
+      </div>
+    ) },
     { key: "createdAt", label: "Recebida", render: (r) => (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-secondary">
         {r.createdAt ? formatDate(r.createdAt) : "—"}
@@ -236,27 +245,27 @@ export default function MarketingPage() {
         )}
       </span>
     ) },
-    { key: "categoryId", label: "Categoria", render: (r) => {
-      const name = categoryName(r.categoryId);
-      return name
-        ? <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{name}</span>
-        : <span className="text-text-muted">—</span>;
-    } },
     { key: "message", label: "Pedido", render: (r) => {
       const { service, urgency, description, urgent } = parseLeadMessage(r.message || "");
+      const catName = categoryName(r.categoryId);
       // Descrição livre; senão o serviço (só se a categoria não ficou preenchida, p/ não repetir).
       const primary = description || (r.categoryId ? "" : service);
       return (
-        <div className="flex items-center gap-1.5 max-w-[240px]">
-          {urgent && (
-            <span title={urgency} className="shrink-0 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>
+        <div className="max-w-[300px]">
+          {(catName || urgent) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
+              {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>}
+            </div>
           )}
-          <span className="truncate text-text-secondary" title={r.message || undefined}>{primary || "—"}</span>
+          {primary
+            ? <p className={cn("truncate text-sm text-text-secondary", (catName || urgent) && "mt-0.5")} title={r.message || undefined}>{primary}</p>
+            : (!catName && !urgent) && <span className="text-text-muted">—</span>}
         </div>
       );
     } },
     { key: "quoteValue", label: "Orçamento", render: (r) => r.quoteValue != null ? (
-      <span>{formatCurrency(r.quoteValue)}
+      <span className="whitespace-nowrap">{formatCurrency(r.quoteValue)}
         {r.technicianValue != null && <span className="block text-xs text-text-muted">margem {formatCurrency(r.quoteValue - r.technicianValue)}</span>}
       </span>
     ) : <span className="text-text-muted">—</span> },
@@ -269,13 +278,6 @@ export default function MarketingPage() {
     { key: "acoes", label: "", render: (r) => (
       <div className="flex items-center justify-end gap-1.5">
         {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1">✓ serviço</span>}
-        {r.phone && (
-          <a href={waHref(r.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-            title="Abrir conversa no WhatsApp"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-success hover:bg-success-light transition-colors">
-            <MessageCircle className="h-4 w-4" />
-          </a>
-        )}
         <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
         <button onClick={() => removeLead(r)} title="Eliminar pedido"
           className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
