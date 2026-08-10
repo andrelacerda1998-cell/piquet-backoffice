@@ -20,7 +20,7 @@ import { toast } from "@/stores";
 import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
+import { cn, downloadCsv } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Trash2, Megaphone, Search, MessageCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { MarketingCampaign } from "@/types";
@@ -105,7 +105,15 @@ export default function MarketingPage() {
     return true;
   };
   const baseFiltered = leadRows.filter(matchesBase);
-  const filteredLeads = leadStage ? baseFiltered.filter((l) => l.stage === leadStage) : baseFiltered;
+  // Urgentes primeiro (o que precisa de resposta hoje), depois as mais recentes.
+  const byUrgencyThenDate = (a: Lead, b: Lead) => {
+    const ua = parseLeadMessage(a.message || "").urgent ? 1 : 0;
+    const ub = parseLeadMessage(b.message || "").urgent ? 1 : 0;
+    if (ua !== ub) return ub - ua;
+    return (b.createdAt || "").localeCompare(a.createdAt || "");
+  };
+  const filteredLeads = (leadStage ? baseFiltered.filter((l) => l.stage === leadStage) : baseFiltered)
+    .slice().sort(byUrgencyThenDate);
   // O mês atual é o estado por omissão — só conta como filtro se for outro mês.
   const hasActiveFilters = !!(leadSearch || (leadMonth && leadMonth !== currentMonth) || leadStage || leadCategory || leadSource);
   const clearFilters = () => { setLeadSearch(""); setLeadMonth(currentMonth); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
@@ -122,6 +130,45 @@ export default function MarketingPage() {
   const keyCount = leadRows.reduce((m, l) => m.set(leadKey(l), (m.get(leadKey(l)) ?? 0) + 1), new Map<string, number>());
   const isDuplicate = (l: Lead) => (keyCount.get(leadKey(l)) ?? 0) > 1 && (l.createdAt || "") !== firstByKey.get(leadKey(l));
   const dupCount = filteredLeads.filter(isDuplicate).length;
+
+  // Números do CRM para o período filtrado — o que interessa a quem trabalha as
+  // leads: quanto vale o pipeline, quanto fica para a Piquet, e o que falta responder.
+  const crm = (() => {
+    const total = filteredLeads.length;
+    const executadas = filteredLeads.filter((l) => l.stage === "concluido");
+    const porResponder = filteredLeads.filter((l) => l.stage === "nao_iniciado").length;
+    const pipeline = filteredLeads.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
+    const comissao = filteredLeads.reduce(
+      (acc, l) => acc + (l.quoteValue != null ? l.quoteValue - (l.technicianValue ?? 0) : 0), 0);
+    const ganho = executadas.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
+    return {
+      total, porResponder, pipeline, comissao, ganho,
+      executadas: executadas.length,
+      conversao: total ? (executadas.length / total) * 100 : 0,
+    };
+  })();
+
+  /** Exporta as leads visíveis (respeita os filtros) para CSV. */
+  const exportLeads = () => {
+    if (filteredLeads.length === 0) { toast("Sem pedidos para exportar.", "error"); return; }
+    downloadCsv(
+      `crm-leads-${leadMonth || "todos"}.csv`,
+      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Estado", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
+      filteredLeads.map((l) => [
+        l.createdAt ? formatDate(l.createdAt) : "",
+        l.name, l.phone || "", l.city || "",
+        categoryName(l.categoryId) || "",
+        (l.message || "").replace(/\n/g, " · "),
+        LEAD_STAGE_LABEL[l.stage] ?? l.stage,
+        l.quoteValue != null ? String(l.quoteValue) : "",
+        l.technicianValue != null ? String(l.technicianValue) : "",
+        l.quoteValue != null ? String(Math.round((l.quoteValue - (l.technicianValue ?? 0)) * 100) / 100) : "",
+        l.source || "",
+      ]),
+    );
+    toast(`${filteredLeads.length} pedido(s) exportado(s).`);
+  };
+
   const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const monthLabel = (ym: string) => {
     const [y, m] = ym.split("-");
@@ -484,7 +531,34 @@ export default function MarketingPage() {
                 Pedidos de serviço recebidos do formulário da landing (piquetapp.com) e do WhatsApp.
                 Muda o estado de cada pedido à medida que avança.
               </p>
-              <button onClick={() => setShowLead(true)} className="btn-primary text-sm shrink-0">Registar pedido</button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={exportLeads} className="btn-secondary text-sm">Exportar CSV</button>
+                <button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar pedido</button>
+              </div>
+            </div>
+
+            {/* Números do período filtrado — valor do pipeline e o que falta responder. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="card p-4">
+                <p className="text-xs text-text-secondary">Valor em pipeline</p>
+                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">soma dos orçamentos</p>
+              </div>
+              <div className="card p-4">
+                <p className="text-xs text-text-secondary">Comissão prevista</p>
+                <p className="mt-1 text-2xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">orçamento − técnico</p>
+              </div>
+              <div className="card p-4">
+                <p className="text-xs text-text-secondary">Taxa de conversão</p>
+                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">{crm.executadas} de {crm.total} executadas</p>
+              </div>
+              <div className={cn("card p-4", crm.porResponder > 0 && "border-l-[3px] border-l-warning")}>
+                <p className="text-xs text-text-secondary">Por responder</p>
+                <p className={cn("mt-1 text-2xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>{crm.porResponder}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
+              </div>
             </div>
 
             {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}

@@ -13,10 +13,11 @@ import { getServices } from "@/services/dashboardService";
 import { getLeads, LEAD_STAGE_LABEL } from "@/services/extrasService";
 import { getCompanyInvoices, getTechnicianPayouts, getFinanceGmv } from "@/services/financeService";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
-import { formatDate, formatDateTime } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatCurrency, formatNumber } from "@/lib/formatters";
 import { downloadCsv, cn } from "@/lib/utils";
+import { useAsyncData } from "@/hooks/useDashboard";
 import { toast } from "@/stores";
-import { FileText, Download, FileDown, Trash2, BarChart3 } from "lucide-react";
+import { FileText, Download, FileDown, Trash2, BarChart3, Wrench, Wallet, Megaphone, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
@@ -66,12 +67,116 @@ const inRange = (dateIso: string | null | undefined, from: string, to: string) =
 
 const eur = (v: number) => v.toFixed(2).replace(".", ",");
 
+/** Números do mês, agrupados pelas secções do relatório. */
+export interface ReportSummary {
+  operacoes: { concluidos: number; cancelados: number; volume: number; ticketMedio: number };
+  financeiro: { gmv: number; comissao: number; porPagar: number; aTecnicos: number };
+  marketing: { leads: number; executadas: number; conversao: number; pipeline: number };
+  qualidade: { avaliados: number; media: number; reclamacoes: number };
+}
+
+const EMPTY_SUMMARY: ReportSummary = {
+  operacoes: { concluidos: 0, cancelados: 0, volume: 0, ticketMedio: 0 },
+  financeiro: { gmv: 0, comissao: 0, porPagar: 0, aTecnicos: 0 },
+  marketing: { leads: 0, executadas: 0, conversao: 0, pipeline: 0 },
+  qualidade: { avaliados: 0, media: 0, reclamacoes: 0 },
+};
+
+/** Calcula o resumo do período a partir das mesmas fontes reais do CSV. */
+async function computeSummary(from: string, to: string): Promise<ReportSummary> {
+  const [svc, gmv, inv, payouts, leads] = await Promise.all([
+    getServices({ period: "este_ano" }, 1, 500),
+    getFinanceGmv(),
+    getCompanyInvoices(),
+    getTechnicianPayouts(),
+    getLeads(),
+  ]);
+
+  const noPeriodo = svc.data.filter((s) => inRange(s.completedAt ?? s.requestedAt, from, to));
+  const concluidos = noPeriodo.filter((s) => s.status === "concluido");
+  const volume = concluidos.reduce((acc, s) => acc + s.totalCustomerValue, 0);
+  const avaliados = noPeriodo.filter((s) => !!s.rating);
+  const leadsPeriodo = leads.filter((l) => inRange(l.createdAt, from, to));
+  const executadas = leadsPeriodo.filter((l) => l.stage === "concluido");
+
+  return {
+    operacoes: {
+      concluidos: concluidos.length,
+      cancelados: noPeriodo.filter((s) => s.status.startsWith("cancelado")).length,
+      volume,
+      ticketMedio: concluidos.length ? volume / concluidos.length : 0,
+    },
+    financeiro: {
+      gmv: gmv.month.gmv,
+      comissao: gmv.month.commission,
+      porPagar: inv.invoices
+        .filter((i) => i.status !== "pago")
+        .reduce((acc, i) => acc + (i.status === "parcial" ? i.outstanding : i.amount), 0),
+      aTecnicos: payouts
+        .filter((p) => p.period >= from.slice(0, 7) && p.period <= to.slice(0, 7))
+        .reduce((acc, p) => acc + p.amountDue, 0),
+    },
+    marketing: {
+      leads: leadsPeriodo.length,
+      executadas: executadas.length,
+      conversao: leadsPeriodo.length ? (executadas.length / leadsPeriodo.length) * 100 : 0,
+      pipeline: leadsPeriodo.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0),
+    },
+    qualidade: {
+      avaliados: avaliados.length,
+      media: avaliados.length ? avaliados.reduce((acc, s) => acc + (s.rating ?? 0), 0) / avaliados.length : 0,
+      reclamacoes: noPeriodo.filter((s) => s.hasComplaint).length,
+    },
+  };
+}
+
+/** Um número do relatório, com rótulo e nota de contexto. */
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "good" | "bad" }) {
+  return (
+    <div>
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p className={cn("text-2xl font-bold tabular-nums mt-0.5",
+        tone === "good" ? "text-success" : tone === "bad" ? "text-danger" : "text-text-primary")}>{value}</p>
+      {hint && <p className="text-[11px] text-text-muted mt-0.5">{hint}</p>}
+    </div>
+  );
+}
+
+/** Bloco de uma secção do relatório (cabeçalho com ícone + grelha de números). */
+function ReportSection({ title, subtitle, icon: Icon, accent, children }: {
+  title: string; subtitle: string; icon: React.ComponentType<{ className?: string }>; accent: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-start gap-3 border-b border-surface-border px-5 py-3.5">
+        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", accent)}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <div>
+          <h3 className="font-semibold text-text-primary leading-tight">{title}</h3>
+          <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-5 py-4">{children}</div>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const [reports, setReports] = usePersistentList<LocalReport>("generated-reports", []);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("mensal");
   const [type, setType] = useState<ReportType>("Operacional");
   const [period, setPeriod] = useState<PeriodId>("este_mes");
   const [generating, setGenerating] = useState(false);
+
+  // Pré-visualização do relatório mensal: os mesmos dados do CSV, mas legíveis
+  // no ecrã e organizados por secção.
+  const { from: sumFrom, to: sumTo, label: periodLabel } = periodRange(period);
+  const { data: summary, loading: loadingSummary } = useAsyncData(
+    () => computeSummary(sumFrom, sumTo),
+    [sumFrom, sumTo],
+  );
+  const s = summary ?? EMPTY_SUMMARY;
 
   const generate = async () => {
     const effectiveType: ReportType = tab === "mensal" ? "Completo" : type;
@@ -220,6 +325,47 @@ export default function ReportsPage() {
             </p>
           </div>
         </div>
+
+        {/* Pré-visualização do relatório mensal, secção a secção. */}
+        {tab === "mensal" && (
+          <div className="space-y-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-lg font-bold text-text-primary">
+                Relatório de {periodLabel.toLowerCase()}
+                <span className="ml-2 text-sm font-normal text-text-muted">{formatDate(sumFrom)} — {formatDate(sumTo)}</span>
+              </h2>
+              {loadingSummary && <span className="text-xs text-text-muted">a calcular…</span>}
+            </div>
+
+            <ReportSection title="Operações" subtitle="Serviços executados no período" icon={Wrench} accent="bg-piquet/15 text-piquet-700">
+              <Stat label="Serviços concluídos" value={formatNumber(s.operacoes.concluidos)} />
+              <Stat label="Volume faturado" value={formatCurrency(s.operacoes.volume)} hint="pago pelos clientes" />
+              <Stat label="Ticket médio" value={formatCurrency(s.operacoes.ticketMedio)} hint="por serviço concluído" />
+              <Stat label="Cancelados" value={formatNumber(s.operacoes.cancelados)} tone={s.operacoes.cancelados > 0 ? "bad" : undefined} />
+            </ReportSection>
+
+            <ReportSection title="Financeiro" subtitle="Receita da Piquet e compromissos" icon={Wallet} accent="bg-success-light text-success">
+              <Stat label="GMV do mês" value={formatCurrency(s.financeiro.gmv)} hint="Payshop + serviços" />
+              <Stat label="Comissão Piquet" value={formatCurrency(s.financeiro.comissao)} tone="good" />
+              <Stat label="Faturas por pagar" value={formatCurrency(s.financeiro.porPagar)} tone={s.financeiro.porPagar > 0 ? "bad" : undefined} />
+              <Stat label="A pagar a técnicos" value={formatCurrency(s.financeiro.aTecnicos)} hint="no período" />
+            </ReportSection>
+
+            <ReportSection title="Marketing" subtitle="Pedidos recebidos e conversão" icon={Megaphone} accent="bg-info-light text-info">
+              <Stat label="Leads recebidas" value={formatNumber(s.marketing.leads)} />
+              <Stat label="Executadas" value={formatNumber(s.marketing.executadas)} tone={s.marketing.executadas > 0 ? "good" : undefined} />
+              <Stat label="Taxa de conversão" value={`${formatNumber(Math.round(s.marketing.conversao * 10) / 10)}%`} hint="executadas ÷ recebidas" />
+              <Stat label="Valor em pipeline" value={formatCurrency(s.marketing.pipeline)} hint="orçamentos registados" />
+            </ReportSection>
+
+            <ReportSection title="Qualidade" subtitle="Satisfação e incidentes" icon={Star} accent="bg-warning-light text-warning">
+              <Stat label="Serviços avaliados" value={formatNumber(s.qualidade.avaliados)} />
+              <Stat label="Avaliação média" value={s.qualidade.media ? `${(Math.round(s.qualidade.media * 10) / 10).toString().replace(".", ",")}★` : "—"} />
+              <Stat label="Reclamações" value={formatNumber(s.qualidade.reclamacoes)} tone={s.qualidade.reclamacoes > 0 ? "bad" : undefined} />
+              <Stat label="Sem reclamação" value={s.qualidade.avaliados ? `${Math.round(((s.qualidade.avaliados - s.qualidade.reclamacoes) / s.qualidade.avaliados) * 100)}%` : "—"} />
+            </ReportSection>
+          </div>
+        )}
 
         {/* Histórico */}
         <div>
