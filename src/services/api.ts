@@ -20,7 +20,7 @@ export type { QueryParams };
  * o `fetcher` é ignorado e o resultado vem do endpoint real.
  */
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const MOCK_DELAY = Number(process.env.NEXT_PUBLIC_MOCK_DELAY ?? 300);
 
 /** `true` quando há um backend real configurado. */
@@ -52,7 +52,7 @@ export function clearAuthToken(): void {
  * do trabalho. `getSession()` devolve sempre um token válido, renovando-o se
  * já tiver expirado. A cópia continua a ser escrita para o modo REST simples.
  */
-async function currentToken(): Promise<string | null> {
+export async function currentToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   try {
     const { SUPABASE_AUTH_ENABLED, supabaseBrowser } = await import("@/lib/supabase/client");

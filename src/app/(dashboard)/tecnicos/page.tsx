@@ -275,10 +275,6 @@ export default function TechniciansPage() {
                       <Eye className="h-3.5 w-3.5" /> Pré-visualizar
                     </button>
                   : <span className="text-text-muted text-xs">—</span> },
-                { key: "estado_detalhe", label: "Detalhe", render: (r: VendorDocument) =>
-                  r.status === "declined" && r.reason ? <span className="text-xs text-danger">{r.reason}</span>
-                  : r.status === "approved" && r.expiration_date ? <span className="text-xs text-text-muted">Expira {formatDate(r.expiration_date)}</span>
-                  : <span className="text-text-muted text-xs">—</span> },
                 { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
                   <div className="flex items-center gap-3 justify-end">
                     <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
@@ -371,7 +367,7 @@ export default function TechniciansPage() {
       >
         {reviewDoc && reviewAction === "approve" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} heightClass="h-[40vh]" />}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[40vh]" />}
             <Field label="Data de expiração" hint="Opcional">
               <input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="input-field" />
             </Field>
@@ -379,7 +375,7 @@ export default function TechniciansPage() {
         )}
         {reviewDoc && reviewAction === "decline" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} heightClass="h-[40vh]" />}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[40vh]" />}
             <Field label="Motivo" hint="Obrigatório — vai no email para o técnico">
               <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={4} className="input-field" placeholder="Ex.: Documento ilegível, por favor envia uma foto mais nítida." />
             </Field>
@@ -406,7 +402,7 @@ export default function TechniciansPage() {
         }
       >
         {previewDoc?.file_url
-          ? <DocumentPreview url={previewDoc.file_url} />
+          ? <DocumentPreview url={previewDoc.file_url} docId={previewDoc.id} />
           : <p className="text-sm text-text-muted py-8 text-center">Este documento não tem ficheiro associado.</p>}
       </Modal>
     </RouteGuard>
