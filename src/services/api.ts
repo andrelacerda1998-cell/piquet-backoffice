@@ -145,8 +145,6 @@ const LIVE_EXACT = new Set<string>([
   // Fase 6 — Impostos (tax_obligations)
   "/tax/obligations",
   "/tax/summary",
-  // Fase 7 — Pagamentos a técnicos
-  "/finance/payouts",
   // Pagamentos da app (Payshop Online Payments / Paylands)
   "/finance/app-payments",
   // GMV real (Payshop cobrado + serviços concluídos)
@@ -262,7 +260,6 @@ const REAL_DATA = new Set<string>([
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
   "/finance/budget", // Planeamento mensal — linhas escritas pelo André.
   "/search", // Pesquisa global de entidades — resultados reais das tabelas.
-  "/finance/payouts", // Derivado dos serviços concluídos (2026-07-22); seed fora.
   // Colaboradores: seed apagado a 2026-07-22 (backup em _seed_backup_employees);
   // a tabela só tem colaboradores registados à mão em Impostos e RH.
   "/employees",

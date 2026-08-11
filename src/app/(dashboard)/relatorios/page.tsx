@@ -11,7 +11,8 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { getServices } from "@/services/dashboardService";
 import { getLeads, LEAD_STAGE_LABEL } from "@/services/extrasService";
-import { getCompanyInvoices, getTechnicianPayouts, getFinanceGmv } from "@/services/financeService";
+import { getCompanyInvoices, getFinanceGmv } from "@/services/financeService";
+import { getVendorPayments } from "@/services/vendorPaymentsService";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { formatDate, formatDateTime, formatCurrency, formatNumber } from "@/lib/formatters";
 import { downloadCsv, cn } from "@/lib/utils";
@@ -84,11 +85,11 @@ const EMPTY_SUMMARY: ReportSummary = {
 
 /** Calcula o resumo do período a partir das mesmas fontes reais do CSV. */
 async function computeSummary(from: string, to: string): Promise<ReportSummary> {
-  const [svc, gmv, inv, payouts, leads] = await Promise.all([
+  const [svc, gmv, inv, vendorPayments, leads] = await Promise.all([
     getServices({ period: "este_ano" }, 1, 500),
     getFinanceGmv(),
     getCompanyInvoices(),
-    getTechnicianPayouts(),
+    getVendorPayments(),
     getLeads(),
   ]);
 
@@ -112,9 +113,9 @@ async function computeSummary(from: string, to: string): Promise<ReportSummary> 
       porPagar: inv.invoices
         .filter((i) => i.status !== "pago")
         .reduce((acc, i) => acc + (i.status === "parcial" ? i.outstanding : i.amount), 0),
-      aTecnicos: payouts
-        .filter((p) => p.period >= from.slice(0, 7) && p.period <= to.slice(0, 7))
-        .reduce((acc, p) => acc + p.amountDue, 0),
+      // Saldo em aberto a técnicos (real, ledger Laravel) — não é filtrado por
+      // período porque a fonte real só expõe o saldo atual, não o histórico.
+      aTecnicos: vendorPayments.items.reduce((acc, v) => acc + v.balance, 0),
     },
     marketing: {
       leads: leadsPeriodo.length,
@@ -207,14 +208,16 @@ export default function ReportsPage() {
       }
 
       if (wantFin) {
-        const [gmv, inv, payouts] = await Promise.all([getFinanceGmv(), getCompanyInvoices(), getTechnicianPayouts()]);
+        const [gmv, inv, vendorPayments] = await Promise.all([getFinanceGmv(), getCompanyInvoices(), getVendorPayments()]);
         rows.push(["Financeiro", formatDate(to), "GMV do mês (cobrado)", "Payshop + serviços concluídos", "real", eur(gmv.month.gmv)]);
         rows.push(["Financeiro", formatDate(to), "Comissão Piquet do mês", "", "real", eur(gmv.month.commission)]);
         for (const f of inv.invoices.filter((i) => inRange(i.dueDate ?? i.issueDate, from, to) || i.status !== "pago")) {
           rows.push(["Faturas a pagar", f.dueDate ? formatDate(f.dueDate) : "—", f.vendor, f.description || "", f.status, eur(f.status === "parcial" ? f.outstanding : f.amount)]);
         }
-        for (const p of payouts.filter((p) => p.period >= from.slice(0, 7) && p.period <= to.slice(0, 7))) {
-          rows.push(["Pagamentos a técnicos", p.period, p.technicianName, `${p.services} serviço(s)`, p.status, eur(p.amountDue)]);
+        // Saldo em aberto por técnico (ledger Laravel real) — não tem histórico
+        // por período, por isso listamos o saldo atual em vez de repetir por mês.
+        for (const v of vendorPayments.items.filter((v) => v.balance > 0)) {
+          rows.push(["Pagamentos a técnicos", formatDate(to), v.vendor_name ?? "—", v.iban ?? "—", "saldo em aberto", eur(v.balance)]);
         }
       }
 
@@ -348,7 +351,7 @@ export default function ReportsPage() {
               <Stat label="GMV do mês" value={formatCurrency(s.financeiro.gmv)} hint="Payshop + serviços" />
               <Stat label="Comissão Piquet" value={formatCurrency(s.financeiro.comissao)} tone="good" />
               <Stat label="Faturas por pagar" value={formatCurrency(s.financeiro.porPagar)} tone={s.financeiro.porPagar > 0 ? "bad" : undefined} />
-              <Stat label="A pagar a técnicos" value={formatCurrency(s.financeiro.aTecnicos)} hint="no período" />
+              <Stat label="A pagar a técnicos" value={formatCurrency(s.financeiro.aTecnicos)} hint="saldo em aberto" />
             </ReportSection>
 
             <ReportSection title="Marketing" subtitle="Pedidos recebidos e conversão" icon={Megaphone} accent="bg-info-light text-info">

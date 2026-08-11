@@ -12,7 +12,6 @@ import { createClient } from "@supabase/supabase-js";
 import { mockData } from "../src/mocks/data";
 import { DEFAULT_SETTINGS } from "../src/config/dashboard";
 import { TEAM_SEED_MESSAGES, TEAM_SEED_AGENDA, TEAM_SEED_TASKS } from "../src/services/extrasService";
-import { buildTechnicianPayouts } from "../src/services/financeService";
 import type { Customer, Technician, ServiceRequest, Employee, TaxObligation, MarketingCampaign } from "../src/types";
 
 config({ path: ".env.local" });
@@ -147,15 +146,6 @@ async function main() {
     TEAM_SEED_TASKS.map((t) => ({
       id: t.id, title: t.title, assignee: t.assignee, department: t.department,
       priority: t.priority, status: t.status, due: t.due,
-    }))
-  );
-
-  await upsert(
-    "technician_payouts",
-    buildTechnicianPayouts().map((p) => ({
-      id: p.id, technician_name: p.technicianName, services: p.services,
-      amount_due: p.amountDue, period: p.period, status: p.status,
-      processed_at: p.status === "processado" ? "2026-07-01T10:00:00" : null,
     }))
   );
 
