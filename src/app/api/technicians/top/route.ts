@@ -1,16 +1,19 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { rowToTechnician, type TechnicianRow } from "@/lib/supabase/adapters";
-import { apiOk, withStaff } from "../../_lib/handler";
+import { apiOk, apiErr, withStaff } from "../../_lib/handler";
+import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { ApiError } from "@/services/http";
+import type { TopVendor } from "@/services/vendorsService";
 
-/** GET /api/technicians/top?limit=10 — por receita Piquet, só com serviços concluídos. */
+/**
+ * GET /api/technicians/top?limit=10 — top técnicos por receita gerada
+ * (App\Http\Controllers\Api\Admin\VendorController::top()), só sobre
+ * serviços concluídos reais. Não mais a vista `technicians_enriched`.
+ */
 export const GET = withStaff(async (req) => {
-  const limit = Math.min(50, Math.max(1, Number(new URL(req.url).searchParams.get("limit") ?? 10)));
-  const { data, error } = await supabaseAdmin()
-    .from("technicians_enriched")
-    .select("*")
-    .gt("services_completed", 0)
-    .order("piquet_revenue", { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(error.message);
-  return apiOk(((data ?? []) as TechnicianRow[]).map(rowToTechnician));
+  const qs = new URL(req.url).search;
+  try {
+    const data = await laravelAdminRequest<TopVendor[]>(`/v1/admin/vendors/top${qs}`);
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao ler os melhores técnicos.", e instanceof ApiError ? e.status : 500);
+  }
 });

@@ -16,11 +16,11 @@ import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import {
   getFinanceSummary, getRevenueVsCosts, getCashFlowForecast,
   getOperationalResult,
-  getTechnicianPayouts, processTechnicianPayout, getAppPayments, getFinanceGmv,
+  getAppPayments, getFinanceGmv,
   getCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, deleteCompanyInvoice,
   getBudgetItems, createBudgetItem, updateBudgetItem, deleteBudgetItem,
   BUDGET_FREQUENCY_LABELS, BUDGET_CATEGORY_LABELS, INVOICE_RECURRENCE_LABELS,
-  type TechnicianPayout, type AppPayment, type PaymentState, type CompanyInvoice,
+  type AppPayment, type PaymentState, type CompanyInvoice,
   type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
   type InvoiceRecurrence,
 } from "@/services/financeService";
@@ -29,6 +29,7 @@ import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService"
 import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
+import { getVendorPayments, payVendor, type VendorPayment } from "@/services/vendorPaymentsService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -87,14 +88,27 @@ export default function FinancePage() {
   const { data: revenueVsCosts } = useAsyncData(() => getRevenueVsCosts(filters), [filters]);
   const { data: cashFlow } = useAsyncData(() => getCashFlowForecast(cashFlowScenario), [cashFlowScenario]);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
-  const { data: payouts, refetch: refetchPayouts } = useAsyncData(() => getTechnicianPayouts(), []);
-  const payoutPending = useMemo(() => (payouts ?? []).filter((p) => p.status === "pendente"), [payouts]);
-  const payoutDone = useMemo(() => (payouts ?? []).filter((p) => p.status === "processado"), [payouts]);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay } = useAsyncData(() => getAppPayments(), []);
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
-  // Lucro do sistema (wallet, via API Laravel) — filtros de data próprios.
+  const { data: vendorPayments, loading: vendorPaymentsLoading, refetch: refetchVendorPayments } = useAsyncData(() => getVendorPayments(), []);
+  const [payingId, setPayingId] = useState<number | null>(null);
+  const payVendorNow = async (v: VendorPayment) => {
+    if (!confirm(`Marcar ${formatCurrency(v.balance)} como pago a ${v.vendor_name ?? "este vendor"}? Isto envia-lhe uma notificação e zera o saldo — a transferência bancária tens de a fazer tu, com o IBAN acima.`)) return;
+    setPayingId(v.id);
+    try {
+      await payVendor(v.id);
+      toast(`${formatCurrency(v.balance)} marcados como pagos a ${v.vendor_name ?? "vendor"}.`);
+      refetchVendorPayments();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível processar o pagamento.", "error");
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  // Lucro do sistema (wallet) — filtros de data próprios, não os globais do resto da página.
   const [profitPage, setProfitPage] = useState(1);
   const [profitFrom, setProfitFrom] = useState("");
   const [profitTo, setProfitTo] = useState("");
@@ -344,21 +358,6 @@ export default function FinancePage() {
         <button onClick={() => removeBudgetItem(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
       </div>
     ) },
-  ];
-
-  const payoutColumns: Column<TechnicianPayout>[] = [
-    { key: "technicianName", label: "Técnico", render: (r) => <span className="font-medium">{r.technicianName}</span> },
-    { key: "period", label: "Período" },
-    { key: "services", label: "Serviços" },
-    { key: "amountDue", label: "A pagar", render: (r) => <span className="font-semibold">{formatCurrency(r.amountDue)}</span> },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", r.status === "processado" ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
-        {r.status === "processado" ? "Processado" : "Pendente"}
-      </span>
-    ) },
-    { key: "actions", label: "", render: (r) => r.status === "pendente" ? (
-      <button onClick={async () => { try { await processTechnicianPayout(r.id); toast(`Pagamento de ${formatCurrency(r.amountDue)} a ${r.technicianName} processado.`); refetchPayouts(); } catch { toast("Falha ao processar pagamento.", "error"); } }} className="btn-primary text-xs py-1">Processar</button>
-    ) : <span className="text-text-muted text-xs">—</span> },
   ];
 
   const systemProfitColumns: Column<SystemProfitTransaction>[] = [
@@ -671,19 +670,39 @@ export default function FinancePage() {
               técnico por técnico × mês); "Processar" grava o registo do pagamento. */}
           {tab === "pagamentos" && (
             <div className="space-y-6">
+              <p className="text-sm text-text-secondary max-w-2xl">
+                Saldo por pagar a cada vendor (ledger interno). &ldquo;Pagar&rdquo; notifica o vendor e zera o saldo — a
+                transferência bancária em si é feita manualmente pelo admin com o IBAN abaixo <DemoBadge endpoint="/vendor-payments" />
+              </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* previous = current: valores atuais reais, sem comparação fabricada. */}
-                <MetricCard title="Por pagar a técnicos" metric={buildMetricValue(payoutPending.reduce((a, p) => a + p.amountDue, 0), payoutPending.reduce((a, p) => a + p.amountDue, 0))} format="currency" />
-                <MetricCard title="Pagamentos pendentes" metric={buildMetricValue(payoutPending.length, payoutPending.length)} />
-                <MetricCard title="Já processado" metric={buildMetricValue(payoutDone.reduce((a, p) => a + p.amountDue, 0), payoutDone.reduce((a, p) => a + p.amountDue, 0))} format="currency" />
-                <MetricCard title="Serviços cobertos" metric={buildMetricValue((payouts ?? []).reduce((a, p) => a + p.services, 0), (payouts ?? []).reduce((a, p) => a + p.services, 0))} />
+                <MetricCard title="Vendors com saldo" metric={buildMetricValue(vendorPayments?.items.length ?? 0, vendorPayments?.items.length ?? 0)} />
+                <MetricCard title="Total por pagar" metric={buildMetricValue((vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0), (vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0))} format="currency" />
               </div>
               <div>
-                <div className="mb-3">
-                  <h2 className="font-semibold">Pagamentos a técnicos</h2>
-                  <p className="text-xs text-text-secondary">Derivados dos serviços concluídos em Operações (valor do técnico, por técnico e mês)</p>
-                </div>
-                <DataTable columns={payoutColumns} data={payouts ?? []} keyField="id" emptyMessage="Sem pagamentos — aparecem ao registar serviços concluídos em Operações." />
+                <h2 className="font-semibold mb-3">Pagamentos a vendors</h2>
+                <DataTable
+                  columns={[
+                    { key: "vendor_name", label: "Vendor", render: (r: VendorPayment) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
+                    { key: "iban", label: "IBAN", render: (r: VendorPayment) => r.iban
+                      ? <span className="font-mono text-xs">{r.iban}</span>
+                      : <span className="text-text-muted text-xs">Sem IBAN</span> },
+                    { key: "balance", label: "Saldo", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                    { key: "acao", label: "", render: (r: VendorPayment) => (
+                      <button
+                        disabled={!r.iban || payingId === r.id}
+                        onClick={() => payVendorNow(r)}
+                        className="btn-primary text-xs py-1 disabled:opacity-50"
+                        title={r.iban ? undefined : "Sem IBAN registado — não é possível transferir."}
+                      >
+                        {payingId === r.id ? "A pagar…" : "Pagar"}
+                      </button>
+                    ) },
+                  ]}
+                  data={vendorPayments?.items ?? []}
+                  keyField="id"
+                  loading={vendorPaymentsLoading}
+                  emptyMessage="Sem vendors com saldo por pagar 🎉"
+                />
               </div>
             </div>
           )}

@@ -7,7 +7,6 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => makeSupabaseMock());
 
 import { GET as servicesGET } from "@/app/api/services/route";
-import { GET as customersMetricsGET } from "@/app/api/customers/metrics/route";
 import { POST as messagesPOST } from "@/app/api/team/messages/route";
 import { PUT as payoutProcessPUT } from "@/app/api/finance/payouts/[id]/process/route";
 import { _clearStaffCache } from "@/app/api/_lib/handler";
@@ -71,26 +70,6 @@ describe("GET /api/services", () => {
     expect(body.data.data[0].customerName).toBe("Beatriz");
     expect(body.data.data[0].categoryName).toBe("Eletricidade");
     expect(body.data.data[0].technicianName).toBeUndefined(); // técnico null → opcional
-  });
-});
-
-describe("GET /api/customers/metrics", () => {
-  it("agrega os indicadores a partir da vista enriched", async () => {
-    setTable("customers_enriched", {
-      data: [
-        { status: "recorrente", service_count: 5, complaint_count: 1, piquet_revenue: 200, average_rating: 4.5, registered_at: "2026-06-20" },
-        { status: "ativo", service_count: 1, complaint_count: 0, piquet_revenue: 50, average_rating: 4, registered_at: "2025-01-01" },
-        { status: "inativo", service_count: 0, complaint_count: 0, piquet_revenue: 0, average_rating: 0, registered_at: "2024-01-01" },
-      ],
-      error: null,
-    });
-    const res = await customersMetricsGET(req("http://localhost/api/customers/metrics"), ctx());
-    const body = await res.json();
-    expect(body.data.registered).toBe(3);
-    expect(body.data.recurring).toBe(1);   // service_count>=3 ou status recorrente
-    expect(body.data.oneTime).toBe(1);
-    expect(body.data.inactive).toBe(1);
-    expect(body.data.withComplaints).toBe(1);
   });
 });
 

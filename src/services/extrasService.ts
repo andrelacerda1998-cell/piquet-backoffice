@@ -265,40 +265,44 @@ export async function getReports(): Promise<GeneratedReport[]> {
 export interface ChatChannel { id: string; name: string; unread: number }
 export interface ChatMessage { id: string; threadId: string; author: string; initials: string; text: string; time: string; own?: boolean; imageUrl?: string }
 
-/** Colaboradores internos (equipa do backoffice) — para mensagens diretas e agenda. */
+/**
+ * Colaboradores internos (equipa do backoffice) — para mensagens diretas e
+ * agenda. Só as duas pessoas reais (rpacheco/André, ver tabela `staff` no
+ * Supabase); a lista tinha 5 colegas fictícios que nunca existiram, removidos
+ * a pedido do utilizador (2026-08-10).
+ */
 export interface TeamMember { id: string; name: string; role: string; department: string; initials: string }
 export const TEAM_MEMBERS: TeamMember[] = [
   { id: "u2", name: "André Lacerda", role: "CEO", department: "Direção", initials: "AL" },
   { id: "u1", name: "Rodrigo Pacheco", role: "CTO", department: "Tecnologia", initials: "RP" },
-  { id: "u3", name: "Maria Santos", role: "Operações", department: "Operações", initials: "MS" },
-  { id: "u4", name: "Pedro Oliveira", role: "Financeiro", department: "Financeiro", initials: "PO" },
-  { id: "u5", name: "Sofia Ferreira", role: "Recursos Humanos", department: "RH", initials: "SF" },
-  { id: "u6", name: "Carlos Mendes", role: "Marketing", department: "Marketing", initials: "CM" },
-  { id: "u7", name: "Inês Rodrigues", role: "Suporte", department: "Suporte", initials: "IR" },
 ];
 
-/** Canais de conversa (estruturais). */
-export const TEAM_CHANNELS: ChatChannel[] = [
-  { id: "geral", name: "geral", unread: 0 },
-  { id: "operacoes", name: "operações", unread: 3 },
-  { id: "suporte", name: "suporte", unread: 0 },
-  { id: "marketing", name: "marketing", unread: 1 },
-  { id: "direcao", name: "direção", unread: 0 },
-];
+/**
+ * Canais de conversa — persistidos em `team_channels` (Supabase), criáveis
+ * pela própria equipa (ver getTeamChannels/createTeamChannel). Antes era uma
+ * lista fixa no código com canais fictícios ("operações", "suporte",
+ * "marketing", "direção") que nunca tiveram conteúdo real; removidos a
+ * pedido do utilizador (2026-08-10) — fica só "geral" como ponto de partida,
+ * e a equipa cria os que precisar.
+ */
+const DEMO_CHANNELS: ChatChannel[] = [{ id: "geral", name: "geral", unread: 0 }];
 
-/** Mensagens semente (canais + diretas via threadId `dm:<memberId>`). */
+export async function getTeamChannels(): Promise<ChatChannel[]> {
+  return apiGet("/team/channels", () => DEMO_CHANNELS).then((r) => r.data);
+}
+
+export async function createTeamChannel(name: string): Promise<ChatChannel> {
+  return apiPost("/team/channels", { name }, () => {
+    const channel: ChatChannel = { id: name.trim().toLowerCase().replace(/\s+/g, "-"), name: name.trim(), unread: 0 };
+    DEMO_CHANNELS.push(channel);
+    return channel;
+  }).then((r) => r.data);
+}
+
+/** Mensagens semente (modo demo — só "geral", equipa real de 2 pessoas). */
 export const TEAM_SEED_MESSAGES: ChatMessage[] = [
-  { id: "m1", threadId: "geral", author: "Mariana Quintela", initials: "MQ", text: "Bom dia equipa! Semana forte de pedidos em Lisboa.", time: "09:02" },
-  { id: "m2", threadId: "geral", author: "Ana Silva", initials: "AS", text: "Boa! Vamos reforçar o despacho na zona de Cascais.", time: "09:05", own: true },
-  { id: "m3", threadId: "geral", author: "Tiago Nogueira", initials: "TN", text: "Deploy da nova versão da app às 14h, sem downtime previsto.", time: "09:12" },
-  { id: "m4", threadId: "operacoes", author: "Mariana Quintela", initials: "MQ", text: "3 pedidos sem técnico em Sintra — alguém disponível?", time: "08:48" },
-  { id: "m5", threadId: "operacoes", author: "Rui Ferreira", initials: "RF", text: "Vou apanhar o de canalização.", time: "08:51" },
-  { id: "m6", threadId: "suporte", author: "Sofia Antunes", initials: "SA", text: "SLA em 94% esta semana 👏", time: "10:20" },
-  { id: "m7", threadId: "marketing", author: "Beatriz Lemos", initials: "BL", text: "Campanha VERAO25 com ROAS 3,2× — a escalar orçamento.", time: "11:00" },
-  { id: "m8", threadId: "direcao", author: "João Costa", initials: "JC", text: "Reunião de fecho mensal amanhã às 16h.", time: "16:30" },
-  { id: "d1", threadId: "dm:u1-u3", author: "Maria Santos", initials: "MS", text: "Consegues aprovar o reforço de técnicos para Cascais?", time: "09:10" },
-  { id: "d2", threadId: "dm:u1-u4", author: "Pedro Oliveira", initials: "PO", text: "Fecho do mês pronto para revisão quando puderes.", time: "08:30" },
-  { id: "d3", threadId: "dm:u1-u6", author: "Carlos Mendes", initials: "CM", text: "Proposta de orçamento para julho no canal de marketing.", time: "11:05" },
+  { id: "m1", threadId: "geral", author: "André Lacerda", initials: "AL", text: "Bom dia! Semana forte de pedidos em Lisboa.", time: "09:02" },
+  { id: "m2", threadId: "geral", author: "Rodrigo Pacheco", initials: "RP", text: "Boa! Vamos reforçar o despacho na zona de Cascais.", time: "09:05", own: true },
 ];
 
 /** Agenda da equipa interna — reuniões e blocos, por colaborador. */

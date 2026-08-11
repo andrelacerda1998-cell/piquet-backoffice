@@ -101,6 +101,8 @@ const LIVE_EXACT = new Set<string>([
   "/customers/metrics",
   "/customers/by-location",
   "/customers/by-source",
+  "/customers/trend",
+  "/customers/retention",
   // Fase 2 — Técnicos
   "/technicians",
   "/technicians/metrics",
@@ -134,6 +136,8 @@ const LIVE_EXACT = new Set<string>([
   "/team/agenda",
   "/team/meetings",
   "/team/tasks",
+  // Canais de conversa — persistidos, criáveis pela equipa (2026-08-10).
+  "/team/channels",
   // Quadro de desenvolvimento (Kanban site + app)
   "/dev-tasks",
   // Tarefas pessoais (pipeline Kanban)
@@ -166,6 +170,27 @@ const LIVE_EXACT = new Set<string>([
   "/vouchers",
   // Fase 9 — Revisão de documentos KYC dos técnicos (idem, via Laravel)
   "/vendor-documents",
+  // Fase 10 — Pagamentos a vendors (idem, via Laravel)
+  "/vendor-payments",
+  // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
+  // sem apagar, ver notas nos controllers)
+  "/services-types",
+  "/operation-areas",
+  // Fase 12 — Zonas (idem, via Laravel; sem apagar nem controlo de acesso,
+  // ver notas em AllowedZoneController)
+  "/allowed-zones",
+  // Fase 13 — Documentos (idem, via Laravel; sem apagar) e Atividade
+  // (feed real de auditoria, só leitura, ver AuditController)
+  "/documents",
+  "/audits",
+  // Fase 14 — Sent Notifications (idem, via Laravel; só leitura, ver
+  // SentNotificationController)
+  "/sent-notifications",
+  "/sent-notifications/types",
+  // Fase 16 — Códigos SMS (idem, via Laravel; só leitura, ver SmsCodeController)
+  "/sms-codes",
+  // Fase 17 — Cobertura por técnico (idem, via Laravel; só leitura, ver CoverageController)
+  "/coverage",
 ]);
 // Rotas mock que partilham prefixo com rotas migradas e NÃO devem ir a real.
 const LIVE_DENY = new Set<string>([
@@ -189,6 +214,18 @@ const LIVE_DENY = new Set<string>([
  * Nota sobre `/finance/app-payments`: os dados são reais (API do Payshop) mas
  * o tráfego é quase todo de teste (65 de 68 encomendas abaixo de 10 €). É um
  * problema distinto do selo — ver a nota na aba "Pagamentos da app".
+ *
+ * Nota sobre `/customers` e derivados: passaram a vir do Laravel (tabela
+ * `users` + `services` reais da produção), não do seed do Supabase — ver
+ * CustomerController no backend. `/customers/by-source` e `/customers/
+ * retention` devolvem sempre vazio (sem tracking de origem nem análise de
+ * coortes no Laravel) — "vazio" aqui é a verdade, não ficção, por isso contam
+ * como REAL_DATA na mesma.
+ *
+ * Nota sobre `/technicians`: idem, passou a vir do Laravel (tabela `vendors`
+ * real, ver VendorController no backend) — lista E os derivados
+ * (`/metrics`, `/by-category`, `/by-location`, `/top`, `/coverage`), todos
+ * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
@@ -239,6 +276,7 @@ const REAL_DATA = new Set<string>([
   "/team/tasks",
   "/team/agenda",
   "/team/meetings",
+  "/team/channels", // Canais persistidos, criados pela própria equipa.
   // Definições de taxas, lucro do sistema e vouchers vêm agora do Laravel
   // (fonte de verdade da produção), não do seed do Supabase.
   "/fee-settings",
@@ -246,6 +284,35 @@ const REAL_DATA = new Set<string>([
   "/vouchers",
   // Documentos KYC dos técnicos — idem, tabela vendor_documents do Laravel.
   "/vendor-documents",
+  // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
+  "/vendor-payments",
+  // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
+  "/customers/trend",
+  "/customers/retention",
+  // Técnicos — idem, tabela vendors real do Laravel (VendorResource migrado).
+  // Lista + Visão geral, todos reais agora (2026-07-29).
+  // Catálogo + Categorias — idem, tabelas services_types/operation_areas
+  // reais do Laravel (ServicesTypeResource/OperationAreaResource migrados).
+  "/services-types",
+  "/operation-areas",
+  // Zonas — idem, tabela allowed_zone real do Laravel (AllowedZoneResource
+  // migrado, 2026-07-29).
+  "/allowed-zones",
+  // Documentos — idem, tabela documents real do Laravel (DocumentResource
+  // migrado). Atividade — feed real da tabela audits (só staff).
+  "/documents",
+  "/audits",
+  // Sent Notifications — idem, tabela notifications real do Laravel
+  // (SentNotificationResource migrado).
+  "/sent-notifications",
+  "/sent-notifications/types",
+  // Códigos SMS — idem, tabela phone_number_validation_codes real do Laravel
+  // (SmsCodeResource migrado).
+  "/sms-codes",
+  // Cobertura por técnico — idem, tabelas allowed_zone/vendor_allowed_zones/
+  // survey_cities/vendor_city_votes reais do Laravel (CoverageController,
+  // sem equivalente direto no Filament).
+  "/coverage",
 ]);
 
 /**
@@ -262,6 +329,9 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return false;
   if (/^\/finance\/budget\/[^/]+$/.test(path)) return false;
   if (/^\/employees\/emp_[^/]+$/.test(path)) return false;
+  // Métodos de pagamento do cliente — real (tabela payshop_payment_methods
+  // do Laravel), mas o path tem o id do cliente, não bate com REAL_DATA.
+  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
   return true;
 }
 
@@ -309,6 +379,16 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/support\/inbox\/[^/]+\/(reply|status)$/.test(path)) return true; // responder/mudar estado de ticket
   if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
   if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
+  if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
+  if (/^\/customers\/[^/]+\/(block|restore)$/.test(path)) return true; // bloquear/reativar cliente
+  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
+  if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
+  if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
+  if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
+  if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
+  if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
+  if (/^\/documents\/[^/]+$/.test(path)) return true; // editar documento
+  if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // editar valor/fase de um lead
   return false;
 }
 

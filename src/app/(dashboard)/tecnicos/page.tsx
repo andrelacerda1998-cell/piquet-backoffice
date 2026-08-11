@@ -8,40 +8,58 @@ import { DocumentPreview } from "@/components/ui/DocumentPreview";
 import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { TechnicianDetailDrawer } from "@/components/ui/TechnicianDetailDrawer";
-import { AppTechniciansPanel } from "@/components/ui/AppTechniciansPanel";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, HeatMapGrid } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { getTechnicians, getTechnicianMetrics, getTechniciansByCategory, getTechniciansByLocation, getCoverageVsDemand, getTopTechnicians } from "@/services/techniciansService";
+import {
+  getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, type RealVendor, type TopVendor,
+} from "@/services/vendorsService";
+import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
   getVendorDocuments, approveVendorDocument, declineVendorDocument,
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import type { Technician } from "@/types";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 export default function TechniciansPage() {
-  const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
+  const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [tab, setTab] = useState("visao");
-  const [selected, setSelected] = useState<Technician | null>(null);
 
-  const { data: metrics } = useAsyncData(() => getTechnicianMetrics(), []);
-  const { data: technicians, loading } = useAsyncData(
-    () => getTechnicians(page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch),
-    [page, pageSize, sortField, sortDirection, debouncedSearch]
+  // Indicadores reais da Visão geral (App\Http\Controllers\Api\Admin\
+  // VendorController::metrics() e derivados) -- substituem os "estados"
+  // fictícios do mock (aprovado/disponivel/ativo/em_validacao/suspenso).
+  const { data: metrics } = useAsyncData(() => getVendorMetrics(), []);
+  // Lista real de técnicos (App\Filament\Resources\VendorResource migrado)
+  // -- sem sort do lado do servidor, tal como Clientes.
+  const { data: vendors, loading, refetch: refetchVendors } = useAsyncData(
+    () => getVendors(page, pageSize, debouncedSearch || undefined),
+    [page, pageSize, debouncedSearch]
   );
-  const { data: byCategory } = useAsyncData(() => getTechniciansByCategory(), []);
-  const { data: byLocation } = useAsyncData(() => getTechniciansByLocation(), []);
-  const { data: coverage } = useAsyncData(() => getCoverageVsDemand(), []);
-  const { data: topTechs } = useAsyncData(() => getTopTechnicians(10), []);
+  // Técnicos suspensos (soft-delete real) -- separado do "Todos", tal como o
+  // Filament faz com o TrashedFilter, para o separador "Suspensões" e a
+  // contagem no TabDef não dependerem da paginação da lista principal.
+  const { data: suspendedVendors, loading: suspendedLoading, refetch: refetchSuspended } = useAsyncData(
+    () => getVendors(1, 100, undefined, true),
+    []
+  );
+  const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
+  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
+  const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
+  const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
+  // Cobertura por técnico — os técnicos declaram na própria app onde
+  // podem/querem atuar (POST /vendor/survey/vote); esta vista junta zonas já
+  // abertas com quem lá atua e cidades candidatas com quem manifestou
+  // interesse (App\Http\Controllers\Api\Admin\CoverageController, sem
+  // equivalente direto no Filament, pedido explícito do utilizador 2026-08-10).
+  const { data: technicianCoverage } = useAsyncData(() => getCoverage(), []);
+  const [selectedArea, setSelectedArea] = useState<{ label: string; technicians: CoverageTechnician[] } | null>(null);
 
   // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
   // migrado). Contagem do separador vem sempre de "pending", independente do
@@ -92,54 +110,80 @@ export default function TechniciansPage() {
     }
   };
 
-  // Suspensões manuais (persistidas) + suspensos da base.
-  interface Suspension { id: string; name: string; city: string; reason: string; at: string }
-  const [suspensions, setSuspensions] = usePersistentList<Suspension>("suspensoes-manuais", []);
-  const { data: suspendedBase } = useAsyncData(() => getTechnicians(1, 50, undefined, undefined, "suspenso"), []);
-  const suspend = (t: Technician) => {
-    if (suspensions.some((s) => s.id === t.id)) { toast("Técnico já está suspenso.", "info"); return; }
-    setSuspensions((prev) => [{ id: t.id, name: t.name, city: t.city, reason: "Suspensão manual pelo backoffice", at: new Date().toISOString().slice(0, 10) }, ...prev]);
-    toast(`Técnico ${t.name} suspenso.`, "error");
+  // Suspender/Reativar = soft-delete real do Vendor no Laravel (ver
+  // vendorsService.ts) -- SEM a restrição de super-admin que o Filament tem
+  // (decisão explícita, ver nota no VendorController do backend).
+  const [actingId, setActingId] = useState<number | null>(null);
+  const handleSuspend = async (v: RealVendor) => {
+    setActingId(v.id);
+    try {
+      await suspendVendor(v.id);
+      toast(`Técnico ${v.name ?? v.id} suspenso.`, "error");
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível suspender o técnico.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
-  const reactivate = (id: string) => {
-    const s = suspensions.find((x) => x.id === id);
-    setSuspensions((prev) => prev.filter((x) => x.id !== id));
-    toast(`Técnico ${s?.name} reativado.`);
+  const handleRestore = async (v: RealVendor) => {
+    setActingId(v.id);
+    try {
+      await restoreVendor(v.id);
+      toast(`Técnico ${v.name ?? v.id} reativado.`);
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível reativar o técnico.", "error");
+    } finally {
+      setActingId(null);
+    }
   };
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
-    { id: "app", label: "Técnicos da app" },
   ];
 
-  const topColumns: Column<Technician>[] = [
-    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "categories", label: "Categorias", render: (r) => r.categories.slice(0, 2).join(", ") },
-    { key: "city", label: "Zona" },
+  const topColumns: Column<TopVendor>[] = [
+    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "servicesCompleted", label: "Serviços" },
     { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
     { key: "piquetRevenue", label: "Receita gerada", render: (r) => formatCurrency(r.piquetRevenue) },
+    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
   ];
 
-  const columns: Column<Technician>[] = [
-    { key: "name", label: "Nome", sortable: true },
-    { key: "categories", label: "Categorias", render: (r) => r.categories.join(", ") },
-    { key: "city", label: "Localização", sortable: true },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} /> },
-    { key: "documentationComplete", label: "Documentação", render: (r) => r.documentationComplete ? "✓" : "⚠️" },
-    { key: "registeredAt", label: "Registo", render: (r) => formatDate(r.registeredAt) },
-    { key: "servicesCompleted", label: "Serviços", sortable: true },
-    { key: "acceptanceRate", label: "Aceitação", render: (r) => formatPercent(r.acceptanceRate) },
-    { key: "cancellationRate", label: "Cancelamento", render: (r) => formatPercent(r.cancellationRate) },
-    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
-    { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
-    { key: "lastActivityAt", label: "Última atividade", render: (r) => r.lastActivityAt ? formatDate(r.lastActivityAt) : "—" },
-    { key: "acao", label: "", render: (r) => suspensions.some((s) => s.id === r.id)
-      ? <button onClick={(e) => { e.stopPropagation(); reactivate(r.id); }} className="text-xs text-success hover:underline">Reativar</button>
-      : <button onClick={(e) => { e.stopPropagation(); suspend(r); }} className="text-xs text-danger hover:underline">Suspender</button> },
+  // Colunas do VendorResource::table() do Filament (nif/telefone/preço/
+  // categorias/elegibilidade/validação AT/estado) -- sem os campos fictícios
+  // que a lista mock tinha (avaliação, receita, serviços concluídos, ...).
+  // NOTA: "operation_areas" são categorias/ofícios (ex.: "Canalização"), não
+  // zonas geográficas -- a geografia real são as zonas de cobertura
+  // (AllowedZone, ver aba "Cobertura" na Visão geral); rótulo corrigido de
+  // "Zonas" para "Categorias".
+  const columns: Column<RealVendor>[] = [
+    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
+    { key: "phone_number", label: "Contacto", render: (r) => r.phone_number ?? "—" },
+    { key: "price_rate", label: "Preço/h", render: (r) => r.price_rate !== null ? formatCurrency(r.price_rate) : "—" },
+    { key: "operation_areas", label: "Categorias", render: (r) => r.operation_areas.length ? r.operation_areas.join(", ") : "—" },
+    { key: "can_accept_service", label: "Elegível", render: (r) => r.can_accept_service ? "✓" : "—" },
+    { key: "at_valid", label: "AT", render: (r) => r.at_valid ? "✓" : "⚠️" },
+    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
+    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleSuspend(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+    ) },
+  ];
+
+  const suspendedColumns: Column<RealVendor>[] = [
+    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
+    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
+    { key: "suspended_at", label: "Suspenso em", render: (r) => r.suspended_at ? formatDate(r.suspended_at) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+    ) },
   ];
 
   return (
@@ -149,7 +193,7 @@ export default function TechniciansPage() {
           icon={HardHat}
           eyebrow="Pessoas"
           title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
-          subtitle={`${metrics?.registered ?? 382} técnicos registados`}
+          subtitle={`${metrics?.registered ?? 0} técnicos registados`}
         />
 
         {/* Aviso: quais os técnicos com documentos por validar (não só o total). */}
@@ -185,7 +229,11 @@ export default function TechniciansPage() {
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "visao" && (
-          <SubTabs tabs={[{ id: "resumo", label: "Resumo" }, { id: "performance", label: "Performance" }]}>
+          <SubTabs tabs={[
+            { id: "resumo", label: "Resumo" },
+            { id: "categoria", label: "Por categoria" },
+            { id: "cobertura", label: "Cobertura" },
+          ]}>
             {(sub) => (
               <>
                 {sub === "resumo" && (
@@ -193,44 +241,80 @@ export default function TechniciansPage() {
                     {metrics && (
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                         <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved)} hideDelta />
-                        <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
+                        <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
+                        <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
                         <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
-                        <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
+                        <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
                         <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
                       </div>
                     )}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por categoria"><BarChartComponent data={byCategory ?? []} /></ChartCard>
-                      <ChartCard title="Técnicos por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                    </div>
-                    <ChartCard title="Procura vs oferta por zona" subtitle="Rácio de cobertura por localização">
-                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                    </ChartCard>
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
-                      <DataTable columns={topColumns} data={topTechs ?? []} keyField="id" />
+                      <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
                     </div>
                   </div>
                 )}
-                {sub === "performance" && (
+                {sub === "categoria" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <ChartCard title="Técnicos por categoria" subtitle="Áreas de operação em que estão registados"><BarChartComponent data={byCategory ?? []} /></ChartCard>
+                    <ChartCard title="Distribuição por categoria"><DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" /></ChartCard>
+                  </div>
+                )}
+                {sub === "cobertura" && (
                   <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Desempenho dos técnicos com serviços concluídos — aceitação, cancelamento, avaliação e receita gerada.</p>
-                    <DataTable
-                      columns={[
-                        { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                        { key: "city", label: "Zona" },
-                        { key: "servicesCompleted", label: "Serviços", sortable: true },
-                        { key: "acceptanceRate", label: "Taxa aceitação", render: (r: Technician) => <span className={cn(r.acceptanceRate < 70 && "text-warning font-medium")}>{formatPercent(r.acceptanceRate)}</span> },
-                        { key: "cancellationRate", label: "Cancelamento", render: (r: Technician) => <span className={cn(r.cancellationRate > 10 && "text-danger font-medium")}>{formatPercent(r.cancellationRate)}</span> },
-                        { key: "averageRating", label: "Avaliação", render: (r: Technician) => <span className={cn(r.averageRating < 4 && r.averageRating > 0 && "text-warning font-medium")}>{r.averageRating > 0 ? `${r.averageRating}★` : "—"}</span> },
-                        { key: "piquetRevenue", label: "Receita gerada", sortable: true, render: (r: Technician) => formatCurrency(r.piquetRevenue) },
-                        { key: "amountReceived", label: "Recebido", render: (r: Technician) => formatCurrency(r.amountReceived) },
-                      ]}
-                      data={topTechs ?? []}
-                      keyField="id"
-                      onRowClick={setSelected}
-                    />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                      <ChartCard title="Distribuição por zona"><DonutChartComponent data={byLocation ?? []} centerLabel="Técnicos" /></ChartCard>
+                    </div>
+                    <ChartCard title="Procura vs oferta por zona" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
+                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
+                    </ChartCard>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">Cobertura por técnico</h3>
+                        <DemoBadge endpoint="/coverage" />
+                      </div>
+                      <p className="text-sm text-text-secondary mt-1 mb-3">
+                        Cada técnico indica na própria app onde pode/quer atuar — clica numa área para ver quem a marcou.
+                      </p>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium mb-2">Zonas abertas</p>
+                          <DataTable<CoverageOpenZone>
+                            columns={[
+                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
+                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
+                              { key: "technicians", label: "Técnicos", render: (r) => r.technicians.length },
+                            ]}
+                            data={technicianCoverage?.open ?? []}
+                            keyField="id"
+                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
+                            emptyMessage="Sem zonas abertas"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium mb-2">Cidades candidatas</p>
+                          <DataTable<CoverageCandidateCity>
+                            columns={[
+                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
+                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
+                              { key: "active", label: "Aceita votos", render: (r) => (
+                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                                  r.active ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+                                  {r.active ? "Sim" : "Não"}
+                                </span>
+                              ) },
+                              { key: "technicians", label: "Interessados", render: (r) => r.technicians.length },
+                            ]}
+                            data={technicianCoverage?.candidate ?? []}
+                            keyField="id"
+                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
+                            emptyMessage="Sem cidades candidatas"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
@@ -245,7 +329,7 @@ export default function TechniciansPage() {
                 <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
                 <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
                 <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate)} hideDelta format="percent" />
-                <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved)} hideDelta />
+                <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
               </div>
             )}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -293,63 +377,34 @@ export default function TechniciansPage() {
         {tab === "lista" && (
           <SubTabs tabs={[
             { id: "todos", label: "Todos" },
-            { id: "suspensoes", label: "Suspensões", count: suspensions.length + (suspendedBase?.data.length ?? 0) },
+            { id: "suspensoes", label: "Suspensões", count: suspendedVendors?.total ?? 0 },
           ]}>
             {(sub) => (
               <>
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                    <DataTable columns={columns} data={technicians?.data ?? []} keyField="id" sortField={sortField} sortDirection={sortDirection} onSort={handleSort} onRowClick={setSelected} loading={loading} />
-                    {technicians && <Pagination page={page} totalPages={technicians.totalPages} total={technicians.total} pageSize={pageSize} onPageChange={setPage} />}
+                    <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading} />
+                    {vendors && <Pagination page={page} totalPages={vendors.totalPages} total={vendors.total} pageSize={pageSize} onPageChange={setPage} />}
                   </div>
                 )}
                 {sub === "suspensoes" && (
                   <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Técnicos suspensos ou bloqueados — sem acesso a novos serviços até reativação.</p>
-                    {suspensions.length > 0 && (
-                      <div>
-                        <h2 className="font-semibold mb-2 text-sm">Suspensões manuais</h2>
-                        <DataTable
-                          columns={[
-                            { key: "name", label: "Técnico", render: (r: Suspension) => <span className="font-medium">{r.name}</span> },
-                            { key: "city", label: "Zona" },
-                            { key: "reason", label: "Motivo" },
-                            { key: "at", label: "Suspenso em" },
-                            { key: "acao", label: "", render: (r: Suspension) => <button onClick={() => reactivate(r.id)} className="text-xs text-success hover:underline">Reativar</button> },
-                          ]}
-                          data={suspensions}
-                          keyField="id"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="font-semibold mb-2 text-sm">Suspensos na base</h2>
-                      <DataTable
-                        columns={[
-                          { key: "name", label: "Técnico", render: (r: Technician) => <span className="font-medium">{r.name}</span> },
-                          { key: "city", label: "Zona" },
-                          { key: "categories", label: "Categorias", render: (r: Technician) => r.categories.slice(0, 2).join(", ") },
-                          { key: "registeredAt", label: "Registo", render: (r: Technician) => formatDate(r.registeredAt) },
-                          { key: "status", label: "Estado", render: (r: Technician) => <StatusBadge status={r.status} /> },
-                        ]}
-                        data={suspendedBase?.data ?? []}
-                        keyField="id"
-                        onRowClick={setSelected}
-                        emptyMessage="Sem técnicos suspensos na base"
-                      />
-                    </div>
+                    <p className="text-sm text-text-secondary">Técnicos suspensos — sem acesso a novos serviços até reativação.</p>
+                    <DataTable
+                      columns={suspendedColumns}
+                      data={suspendedVendors?.data ?? []}
+                      keyField="id"
+                      loading={suspendedLoading}
+                      emptyMessage="Sem técnicos suspensos 🎉"
+                    />
                   </div>
                 )}
               </>
             )}
           </SubTabs>
         )}
-
-        {tab === "app" && <AppTechniciansPanel />}
       </div>
-
-      {selected && <TechnicianDetailDrawer technician={selected} onClose={() => setSelected(null)} />}
 
       <Modal
         open={!!reviewDoc}
@@ -404,6 +459,32 @@ export default function TechniciansPage() {
         {previewDoc?.file_url
           ? <DocumentPreview url={previewDoc.file_url} docId={previewDoc.id} />
           : <p className="text-sm text-text-muted py-8 text-center">Este documento não tem ficheiro associado.</p>}
+      </Modal>
+
+      <Modal
+        open={!!selectedArea}
+        onClose={() => setSelectedArea(null)}
+        title={selectedArea?.label ?? ""}
+        subtitle={selectedArea ? `${selectedArea.technicians.length} técnico${selectedArea.technicians.length === 1 ? "" : "s"}` : undefined}
+        footer={<button onClick={() => setSelectedArea(null)} className="btn-secondary text-sm">Fechar</button>}
+      >
+        {selectedArea && (
+          selectedArea.technicians.length === 0 ? (
+            <p className="text-sm text-text-secondary">Ainda nenhum técnico marcou esta área.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedArea.technicians.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-2.5 rounded-lg bg-surface-subtle text-sm">
+                  <div>
+                    <p className="font-medium">{t.name ?? "—"}</p>
+                    <p className="text-text-secondary text-xs">{t.nif ?? "—"} · {t.phone_number ?? t.email ?? "—"}</p>
+                  </div>
+                  <StatusBadge status={t.status ?? "Offline"} />
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </Modal>
     </RouteGuard>
   );

@@ -13,6 +13,11 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/customers")).toBe(true);
     expect(isLiveEndpoint("/customers/metrics")).toBe(true);
     expect(isLiveEndpoint("/customers/by-source")).toBe(true);
+    expect(isLiveEndpoint("/customers/by-location")).toBe(true);
+    expect(isLiveEndpoint("/customers/trend")).toBe(true);
+    expect(isLiveEndpoint("/customers/retention")).toBe(true);
+    expect(isLiveEndpoint("/customers/123/block")).toBe(true);
+    expect(isLiveEndpoint("/customers/123/restore")).toBe(true);
     expect(isLiveEndpoint("/technicians?page=1")).toBe(true);
     expect(isLiveEndpoint("/technicians/coverage")).toBe(true);
     expect(isLiveEndpoint("/technicians/top")).toBe(true);
@@ -60,11 +65,54 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/finance/refunds")).toBe(false); // sintético
   });
 
+  it("marca como migrados os endpoints da Fase 11 (Catálogo + Categorias)", () => {
+    expect(isLiveEndpoint("/services-types")).toBe(true);
+    expect(isLiveEndpoint("/services-types?search=torneira")).toBe(true);
+    expect(isLiveEndpoint("/services-types/12")).toBe(true); // editar
+    expect(isLiveEndpoint("/operation-areas")).toBe(true);
+    expect(isLiveEndpoint("/operation-areas/3")).toBe(true); // editar
+  });
+
+  it("marca como migrados os endpoints da Fase 12 (Zonas)", () => {
+    expect(isLiveEndpoint("/allowed-zones")).toBe(true);
+    expect(isLiveEndpoint("/allowed-zones?search=lisboa")).toBe(true);
+    expect(isLiveEndpoint("/allowed-zones/7")).toBe(true); // editar
+  });
+
+  it("marca como migrados os endpoints da Fase 13 (Documentos + Atividade)", () => {
+    expect(isLiveEndpoint("/documents")).toBe(true);
+    expect(isLiveEndpoint("/documents?search=cidadao")).toBe(true);
+    expect(isLiveEndpoint("/documents/4")).toBe(true); // editar
+    expect(isLiveEndpoint("/audits")).toBe(true);
+  });
+
+  it("marca como migrado o endpoint de Fase 14 (Sent Notifications)", () => {
+    expect(isLiveEndpoint("/sent-notifications")).toBe(true);
+    expect(isLiveEndpoint("/sent-notifications?read=unread")).toBe(true);
+    expect(isLiveEndpoint("/sent-notifications/types")).toBe(true);
+  });
+
+  it("marca como migrados os endpoints de Fase 15 (Métodos de pagamento do cliente)", () => {
+    expect(isLiveEndpoint("/customers/42/payment-methods")).toBe(true);
+    expect(isLiveEndpoint("/customers/42/payment-methods/7")).toBe(true); // apagar
+  });
+
+  it("marca como migrado o endpoint de Fase 16 (Códigos SMS)", () => {
+    expect(isLiveEndpoint("/sms-codes")).toBe(true);
+    expect(isLiveEndpoint("/sms-codes?type=login")).toBe(true);
+  });
+
+  it("marca como migrado o endpoint de Fase 17 (Cobertura por técnico)", () => {
+    expect(isLiveEndpoint("/coverage")).toBe(true);
+  });
+
+  it("marca como migrado o endpoint de editar um lead (valor estimado/fase)", () => {
+    expect(isLiveEndpoint("/marketing/leads/abc-123")).toBe(true);
+  });
+
   it("mantém mock os endpoints ainda não migrados", () => {
     expect(isLiveEndpoint("/services/operational-metrics")).toBe(false); // partilha prefixo mas não migrado
     expect(isLiveEndpoint("/technicians/pending")).toBe(false); // KYC ainda não modelado
-    expect(isLiveEndpoint("/customers/retention")).toBe(false); // sintético
-    expect(isLiveEndpoint("/customers/trend")).toBe(false); // sintético
     expect(isLiveEndpoint("/finance/invoices")).toBe(false); // precisa faturação certificada
     expect(isLiveEndpoint("/finance/pending-payments")).toBe(false); // sintético
     expect(isLiveEndpoint("/marketing/funnel")).toBe(false); // sintético
@@ -96,6 +144,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     expect(isDemoEndpoint("/team/messages")).toBe(false);
     expect(isDemoEndpoint("/team/tasks")).toBe(false);
     expect(isDemoEndpoint("/team/tasks/tt1/status")).toBe(false);
+    expect(isDemoEndpoint("/customers/42/payment-methods")).toBe(false); // payshop_payment_methods
   });
 
   it("trata como DEMO o que vem da BD mas foi escrito pelo seed", async () => {
@@ -123,9 +172,16 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/marketing/campaigns", "/marketing/metrics",
                       "/marketing/channels", "/marketing/creatives", "/marketing/leads",
                       "/finance/app-payments", "/product/growth", "/product/ratings",
-                      "/product/integrations-status", "/product/funnel", "/dev-tasks", "/tasks", "/team/messages",
-                      "/team/tasks", "/team/agenda", "/team/meetings",
-                      "/finance/budget", "/employees", "/employees/dashboard", "/finance/payouts"]) {
+                      "/product/integrations-status", "/product/funnel", "/dev-tasks", "/tasks",
+                      "/team/messages", "/team/tasks", "/team/agenda", "/team/meetings", "/team/channels",
+                      "/finance/budget", "/employees", "/employees/dashboard", "/finance/payouts",
+                      "/customers", "/customers/metrics", "/customers/by-location", "/customers/by-source",
+                      "/customers/trend", "/customers/retention", "/technicians",
+                      "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
+                      "/technicians/top", "/technicians/coverage",
+                      "/services-types", "/operation-areas", "/allowed-zones",
+                      "/documents", "/audits", "/sent-notifications", "/sent-notifications/types",
+                      "/sms-codes", "/coverage", "/vendor-payments"]) {
       expect(isDemoEndpoint(ep), `${ep} devia ser REAL`).toBe(false);
       expect(isLiveEndpoint(ep), `${ep} é REAL_DATA mas não está em LIVE_EXACT`).toBe(true);
     }

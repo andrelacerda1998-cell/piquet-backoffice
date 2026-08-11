@@ -1,0 +1,145 @@
+import { apiGet, apiPut } from "./api";
+import type { PaginatedResult } from "@/types";
+
+/**
+ * Técnicos reais — migrado do Filament (App\Filament\Resources\VendorResource)
+ * para a API de admin do Laravel. Ver src/lib/laravelAdmin.ts e
+ * App\Http\Controllers\Api\Admin\VendorController no backend.
+ *
+ * Forma mínima (id, nome, nif, contacto, preço/h, zonas, elegibilidade,
+ * validação AT, estado, suspenso_em, criado_em) -- não os campos fictícios do
+ * antigo `Technician` (categorias, avaliação, receita, serviços concluídos,
+ * ...). Ver `Technician` em src/types para essa forma antiga (ainda usada
+ * apenas pelo `TechnicianDetailDrawer`, que já não é alimentado por dados
+ * reais nesta página).
+ */
+export interface RealVendor {
+  id: number;
+  name: string | null;
+  nif: string | null;
+  phone_number: string | null;
+  price_rate: number | null;
+  operation_areas: string[];
+  can_accept_service: boolean;
+  at_valid: boolean;
+  at_validated_at: string | null;
+  status: string | null;
+  suspended_at: string | null;
+  created_at: string | null;
+}
+
+interface VendorsApiData {
+  items: RealVendor[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
+
+export async function getVendors(
+  page = 1,
+  pageSize = 20,
+  search?: string,
+  suspendedOnly = false
+): Promise<PaginatedResult<RealVendor>> {
+  const raw = await apiGet<VendorsApiData>(
+    "/technicians",
+    () => ({ items: [], meta: { current_page: 1, last_page: 1, per_page: pageSize, total: 0 } }),
+    { page, per_page: pageSize, search, suspended: suspendedOnly ? 1 : undefined }
+  ).then((r) => r.data);
+
+  return {
+    data: raw.items,
+    total: raw.meta.total,
+    page: raw.meta.current_page,
+    pageSize: raw.meta.per_page,
+    totalPages: raw.meta.last_page,
+  };
+}
+
+/**
+ * Suspender/Reativar = soft-delete real do Vendor no Laravel. NOTA: no
+ * Filament, só o super-admin pode mutar um vendor (o IBAN redireciona
+ * payouts); a API de admin usa um token único partilhado por todo o staff
+ * com acesso ao backoffice, por isso esta ação aqui NÃO tem essa restrição
+ * -- decisão explícita (ver VendorController no backend).
+ */
+export async function suspendVendor(id: number): Promise<RealVendor> {
+  return apiPut<RealVendor>(`/technicians/${id}/suspend`, {}, () => {
+    throw new Error("Suspender técnicos precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+export async function restoreVendor(id: number): Promise<RealVendor> {
+  return apiPut<RealVendor>(`/technicians/${id}/restore`, {}, () => {
+    throw new Error("Reativar técnicos precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+/**
+ * Indicadores da aba "Visão geral" -- calculados no Laravel a partir de
+ * dados reais (App\Http\Controllers\Api\Admin\VendorController::metrics()).
+ * Substituem os "estados" fictícios do mock (aprovado/disponivel/ativo/
+ * em_validacao/suspenso) por sinais reais: "eligible" = pode aceitar serviço
+ * (Vendor::canAcceptService), "online" = StatusVendor::ONLINE. Sem
+ * avgApprovalTime: não há timestamp de quando um documento foi revisto no
+ * Laravel, sem sinal fiável (decisão explícita, mesmo princípio de "vazio em
+ * vez de inventar" já aplicado em CustomerMetrics).
+ */
+export interface VendorMetrics {
+  registered: number;
+  newThisMonth: number;
+  eligible: number;
+  online: number;
+  docComplete: number;
+  inValidation: number;
+  noServices: number;
+  approvalRate: number;
+  profileCompletionRate: number;
+  avgTimeToFirstService: number;
+}
+
+const ZERO_VENDOR_METRICS: VendorMetrics = {
+  registered: 0, newThisMonth: 0, eligible: 0, online: 0, docComplete: 0,
+  inValidation: 0, noServices: 0, approvalRate: 0, profileCompletionRate: 0,
+  avgTimeToFirstService: 0,
+};
+
+export async function getVendorMetrics(): Promise<VendorMetrics> {
+  return apiGet<VendorMetrics>("/technicians/metrics", () => ZERO_VENDOR_METRICS).then((r) => r.data);
+}
+
+/**
+ * Técnicos por categoria -- conta cada vendor nas áreas de operação
+ * (qualificação/oferta registada) para que está registado, não trabalho
+ * realmente feito.
+ */
+export async function getVendorsByCategory() {
+  return apiGet<Array<{ name: string; value: number }>>("/technicians/by-category", () => []).then((r) => r.data);
+}
+
+/**
+ * Técnicos por localização -- zonas de cobertura declaradas (AllowedZone),
+ * não a morada fiscal/de agendamentos.
+ */
+export async function getVendorsByLocation() {
+  return apiGet<Array<{ name: string; value: number }>>("/technicians/by-location", () => []).then((r) => r.data);
+}
+
+export interface TopVendor {
+  id: number;
+  name: string | null;
+  servicesCompleted: number;
+  averageRating: number;
+  piquetRevenue: number;
+  amountReceived: number;
+}
+
+export async function getTopVendors(limit = 10) {
+  return apiGet<TopVendor[]>("/technicians/top", () => [], { limit }).then((r) => r.data);
+}
+
+/**
+ * Procura vs oferta por zona -- oferta = zonas de cobertura declaradas
+ * (AllowedZone); procura = pedidos de serviço reais nessa cidade.
+ */
+export async function getVendorCoverage() {
+  return apiGet<Array<{ name: string; procura: number; oferta: number; ratio: number }>>("/technicians/coverage", () => []).then((r) => r.data);
+}

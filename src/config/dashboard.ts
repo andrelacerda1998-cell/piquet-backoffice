@@ -87,6 +87,7 @@ export const NAV_ITEMS = [
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
+  { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
@@ -112,7 +113,7 @@ export const NAV_ITEMS = [
 // apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
 export const NAV_PRIMARY: string[] = [
   "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/chat", "/desenvolvimento", "/tarefas", "/configuracao",
+  "/marketing", "/leads", "/chat", "/desenvolvimento", "/tarefas", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
