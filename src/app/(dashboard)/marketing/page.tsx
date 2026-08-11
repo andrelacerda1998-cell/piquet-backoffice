@@ -86,7 +86,9 @@ export default function MarketingPage() {
   const [leadSearch, setLeadSearch] = useState("");
   // Por omissão mostra o mês atual (o trabalho do dia-a-dia); "" = todos.
   const [leadMonth, setLeadMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
-  const [leadStage, setLeadStage] = useState<"" | LeadStage>("");
+  // Estado: "" = ativos (esconde recusados, que só sujam a lista de trabalho);
+  // "todos" = inclui recusados; ou um estado concreto.
+  const [leadStage, setLeadStage] = useState<"" | "todos" | LeadStage>("");
   const [leadCategory, setLeadCategory] = useState("");
   const [leadSource, setLeadSource] = useState("");
   // O mês atual está sempre na lista (mesmo sem leads), por ser o valor por omissão.
@@ -112,8 +114,15 @@ export default function MarketingPage() {
     if (ua !== ub) return ub - ua;
     return (b.createdAt || "").localeCompare(a.createdAt || "");
   };
-  const filteredLeads = (leadStage ? baseFiltered.filter((l) => l.stage === leadStage) : baseFiltered)
-    .slice().sort(byUrgencyThenDate);
+  // Por omissão os recusados ficam ocultos (o pedido está fechado); aparecem ao
+  // escolher "Recusado" ou "Todos (inclui recusados)" no filtro de estado.
+  const byStage = leadStage === ""
+    ? baseFiltered.filter((l) => l.stage !== "recusado")
+    : leadStage === "todos"
+      ? baseFiltered
+      : baseFiltered.filter((l) => l.stage === leadStage);
+  const filteredLeads = byStage.slice().sort(byUrgencyThenDate);
+  const hiddenRefused = leadStage === "" ? baseFiltered.filter((l) => l.stage === "recusado").length : 0;
   // O mês atual é o estado por omissão — só conta como filtro se for outro mês.
   const hasActiveFilters = !!(leadSearch || (leadMonth && leadMonth !== currentMonth) || leadStage || leadCategory || leadSource);
   const clearFilters = () => { setLeadSearch(""); setLeadMonth(currentMonth); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
@@ -131,14 +140,17 @@ export default function MarketingPage() {
   const isDuplicate = (l: Lead) => (keyCount.get(leadKey(l)) ?? 0) > 1 && (l.createdAt || "") !== firstByKey.get(leadKey(l));
   const dupCount = filteredLeads.filter(isDuplicate).length;
 
-  // Números do CRM para o período filtrado — o que interessa a quem trabalha as
-  // leads: quanto vale o pipeline, quanto fica para a Piquet, e o que falta responder.
+  // Números do CRM do período. Deliberadamente calculados sobre TODAS as leads
+  // (baseFiltered), incluindo as recusadas: esconder recusadas da lista é uma
+  // ajuda de trabalho, mas tirá-las do denominador inflacionaria a conversão.
   const crm = (() => {
-    const total = filteredLeads.length;
-    const executadas = filteredLeads.filter((l) => l.stage === "concluido");
-    const porResponder = filteredLeads.filter((l) => l.stage === "nao_iniciado").length;
-    const pipeline = filteredLeads.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
-    const comissao = filteredLeads.reduce(
+    const total = baseFiltered.length;
+    const executadas = baseFiltered.filter((l) => l.stage === "concluido");
+    const porResponder = baseFiltered.filter((l) => l.stage === "nao_iniciado").length;
+    // Pipeline = só o que ainda pode fechar (recusados já não valem nada).
+    const emAberto = baseFiltered.filter((l) => l.stage !== "recusado");
+    const pipeline = emAberto.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
+    const comissao = emAberto.reduce(
       (acc, l) => acc + (l.quoteValue != null ? l.quoteValue - (l.technicianValue ?? 0) : 0), 0);
     const ganho = executadas.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
     return {
@@ -572,8 +584,9 @@ export default function MarketingPage() {
                   <option value="">Todos os meses</option>
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
-                <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
-                  <option value="">Todos os estados</option>
+                <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | "todos" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
+                  <option value="">Em aberto (sem recusados)</option>
+                  <option value="todos">Todos (inclui recusados)</option>
                   {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
                 <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
@@ -601,6 +614,12 @@ export default function MarketingPage() {
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">
                     {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
                   </span>
+                )}
+                {hiddenRefused > 0 && (
+                  <button onClick={() => setLeadStage("todos")}
+                    className="text-xs text-text-muted hover:text-text-primary underline decoration-dotted underline-offset-2">
+                    +{hiddenRefused} recusado{hiddenRefused === 1 ? "" : "s"} oculto{hiddenRefused === 1 ? "" : "s"} — mostrar
+                  </button>
                 )}
               </div>
             </div>
