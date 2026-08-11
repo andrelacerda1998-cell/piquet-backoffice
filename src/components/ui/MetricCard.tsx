@@ -61,12 +61,13 @@ export function MetricCard({ title, metric, format = "number", className, loadin
         )}
       </div>
       <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
-      {/* Um zero sem história não tem tendência: esconder a seta em vez de
-          mostrar um "+0,0%" fabricado (assinatura dos dados zerados). Métricas
-          de instante (hideDelta) nunca mostram variação mensal. */}
-      {((!hideDelta && (metric.value !== 0 || metric.changePercent !== 0)) || metric.goal !== undefined) && (
+      {/* Só se mostra variação quando ela EXISTE: sem histórico real (anterior
+          igual ao atual, ou zero sem história) não há nada a comparar — mostrar
+          "0,0%" seria fabricar uma tendência. `hideDelta` força o mesmo nas
+          métricas de instante (CAC, LTV, rácios, avaliação). */}
+      {((!hideDelta && metric.changePercent !== 0) || metric.goal !== undefined) && (
         <div className="flex items-center justify-between">
-          {(!hideDelta && (metric.value !== 0 || metric.changePercent !== 0)) ? (
+          {(!hideDelta && metric.changePercent !== 0) ? (
             <span className="inline-flex items-baseline gap-1">
               <TrendIndicator value={metric.changePercent} trend={metric.trend} />
               <span className="text-[10px] text-text-muted">{deltaLabel}</span>

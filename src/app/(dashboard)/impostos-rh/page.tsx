@@ -218,13 +218,13 @@ export default function TaxHRPage() {
           <>
             {taxSummary && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <MetricCard title="Previstos (mês)" metric={buildMetricValue(taxSummary.estimatedThisMonth, taxSummary.estimatedThisMonth * 0.95, true)} format="currency" />
-                <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth * 0.9)} format="currency" />
-                <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending * 1.05, true)} format="currency" />
-                <MetricCard title="IVA estimado" metric={buildMetricValue(taxSummary.ivaEstimado, taxSummary.ivaEstimado * 0.95, true)} format="currency" />
+                <MetricCard title="Previstos (mês)" metric={buildMetricValue(taxSummary.estimatedThisMonth, taxSummary.estimatedThisMonth)} hideDelta format="currency" />
+                <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth)} hideDelta format="currency" />
+                <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending)} hideDelta format="currency" />
+                <MetricCard title="IVA estimado" metric={buildMetricValue(taxSummary.ivaEstimado, taxSummary.ivaEstimado)} hideDelta format="currency" />
                 {/* REAL: TSU da entidade derivada da folha atual dos colaboradores (não do seed fiscal). */}
                 <MetricCard title="TSU equipa (mensal)" metric={buildMetricValue(teamDashboard?.socialSecurityMonthly ?? 0, teamDashboard?.socialSecurityMonthly ?? 0)} format="currency" />
-                <MetricCard title="Vencidas" metric={buildMetricValue(taxSummary.overdueCount, 0, true)} />
+                <MetricCard title="Vencidas" metric={buildMetricValue(taxSummary.overdueCount, taxSummary.overdueCount)} hideDelta />
               </div>
             )}
 

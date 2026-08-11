@@ -86,10 +86,10 @@ export default function QualityPage() {
           <div className="space-y-6">
             {data && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <MetricCard title="Avaliação média" metric={buildMetricValue(data.kpis.avgRating, 4.5, false, 4.5)} />
-                <MetricCard title="NPS" metric={buildMetricValue(data.kpis.nps, 58)} />
-                <MetricCard title="Taxa de reclamação" metric={buildMetricValue(data.kpis.complaintRate, 3, true)} format="percent" />
-                <MetricCard title="Técnicos verificados" metric={buildMetricValue(data.kpis.verifiedTechnicians, data.kpis.verifiedTechnicians * 0.95)} />
+                <MetricCard title="Avaliação média" metric={buildMetricValue(data.kpis.avgRating, data.kpis.avgRating)} hideDelta />
+                <MetricCard title="NPS" metric={buildMetricValue(data.kpis.nps, data.kpis.nps)} hideDelta />
+                <MetricCard title="Taxa de reclamação" metric={buildMetricValue(data.kpis.complaintRate, data.kpis.complaintRate)} hideDelta format="percent" />
+                <MetricCard title="Técnicos verificados" metric={buildMetricValue(data.kpis.verifiedTechnicians, data.kpis.verifiedTechnicians)} hideDelta />
               </div>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -110,9 +110,9 @@ export default function QualityPage() {
         {tab === "baixa" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <MetricCard title="Abaixo de 4★" metric={buildMetricValue(lowRated.length, lowRated.length + 2, true)} />
-              <MetricCard title="Abaixo de 3★" metric={buildMetricValue(below3, below3 + 1, true)} />
-              <MetricCard title="Com reclamações" metric={buildMetricValue(complaints.length, complaints.length + 1, true)} />
+              <MetricCard title="Abaixo de 4★" metric={buildMetricValue(lowRated.length, lowRated.length)} hideDelta />
+              <MetricCard title="Abaixo de 3★" metric={buildMetricValue(below3, below3)} hideDelta />
+              <MetricCard title="Com reclamações" metric={buildMetricValue(complaints.length, complaints.length)} hideDelta />
             </div>
             <p className="text-sm text-text-secondary">Técnicos com avaliação abaixo de 4 estrelas — candidatos a formação, acompanhamento ou suspensão.</p>
             <DataTable columns={lowRatedColumns} data={lowRated} keyField="id" emptyMessage="Nenhum técnico abaixo de 4★ 🎉" />
@@ -122,10 +122,10 @@ export default function QualityPage() {
         {tab === "indicadores" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard title="Taxa de resolução" metric={buildMetricValue(resolutionRate, resolutionRate - 4)} format="percent" />
-              <MetricCard title="Tempo médio de resolução (h)" metric={buildMetricValue(26, 31, true, undefined, "Horas até fechar a reclamação")} />
-              <MetricCard title="Serviços reabertos" metric={buildMetricValue(4, 6, true)} />
-              <MetricCard title="Reclamações no período" metric={buildMetricValue(complaints.length, complaints.length + 2, true)} />
+              <MetricCard title="Taxa de resolução" metric={buildMetricValue(resolutionRate, resolutionRate)} hideDelta format="percent" />
+              <MetricCard title="Tempo médio de resolução (h)" metric={buildMetricValue(26, 26, false, undefined, "Horas até fechar a reclamação")} hideDelta />
+              <MetricCard title="Serviços reabertos" metric={buildMetricValue(4, 4)} hideDelta />
+              <MetricCard title="Reclamações no período" metric={buildMetricValue(complaints.length, complaints.length)} hideDelta />
             </div>
             <ChartCard title="Motivos de reclamação mais comuns" subtitle="% do total de reclamações">
               <BarChartComponent data={COMPLAINT_REASONS} />

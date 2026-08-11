@@ -131,12 +131,12 @@ export default function CustomersPage() {
                   <div className="space-y-6">
                     {metrics && (
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 20)} />
-                        <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers - 5)} />
-                        <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active - 10)} />
-                        <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring - 8)} />
-                        <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate - 2)} format="percent" />
-                        <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV * 0.95)} format="currency" />
+                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
+                        <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
+                        <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
+                        <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
+                        <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
+                        <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
                       </div>
                     )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -171,9 +171,9 @@ export default function CustomersPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <MetricCard title="Total" metric={buildMetricValue(complaints.length, complaints.length)} />
-              <MetricCard title="Abertas" metric={buildMetricValue(complaints.filter((c) => c.status === "aberta").length, 5, true)} />
-              <MetricCard title="Em análise" metric={buildMetricValue(complaints.filter((c) => c.status === "em_analise").length, 3, true)} />
-              <MetricCard title="Resolvidas" metric={buildMetricValue(complaints.filter((c) => c.status === "resolvida").length, 8)} />
+              <MetricCard title="Abertas" metric={buildMetricValue(complaints.filter((c) => c.status === "aberta").length, complaints.filter((c) => c.status === "aberta").length)} hideDelta />
+              <MetricCard title="Em análise" metric={buildMetricValue(complaints.filter((c) => c.status === "em_analise").length, complaints.filter((c) => c.status === "em_analise").length)} hideDelta />
+              <MetricCard title="Resolvidas" metric={buildMetricValue(complaints.filter((c) => c.status === "resolvida").length, complaints.filter((c) => c.status === "resolvida").length)} hideDelta />
             </div>
             <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem reclamações 🎉" />
           </div>

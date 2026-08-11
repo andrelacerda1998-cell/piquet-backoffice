@@ -290,12 +290,12 @@ export default function ProdutoPage() {
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 <DemoBadge endpoint="/product/metrics" className="col-span-full" />
-                <MetricCard title="DAU" metric={buildMetricValue(metrics.dau, metrics.dau * 0.95)} />
-                <MetricCard title="MAU" metric={buildMetricValue(metrics.mau, metrics.mau * 0.92)} />
-                <MetricCard title="Novos registos" metric={buildMetricValue(metrics.newRegistrations, metrics.newRegistrations * 0.88)} />
-                <MetricCard title="Taxa conclusão" metric={buildMetricValue(metrics.completionRate, metrics.completionRate * 0.95)} format="percent" />
-                <MetricCard title="Falhas pagamento" metric={buildMetricValue(metrics.paymentFailures, metrics.paymentFailures * 1.2, true)} />
-                <MetricCard title="Erros app" metric={buildMetricValue(metrics.appErrors, metrics.appErrors * 1.1, true)} />
+                <MetricCard title="DAU" metric={buildMetricValue(metrics.dau, metrics.dau)} hideDelta />
+                <MetricCard title="MAU" metric={buildMetricValue(metrics.mau, metrics.mau)} hideDelta />
+                <MetricCard title="Novos registos" metric={buildMetricValue(metrics.newRegistrations, metrics.newRegistrations)} hideDelta />
+                <MetricCard title="Taxa conclusão" metric={buildMetricValue(metrics.completionRate, metrics.completionRate)} hideDelta format="percent" />
+                <MetricCard title="Falhas pagamento" metric={buildMetricValue(metrics.paymentFailures, metrics.paymentFailures)} hideDelta />
+                <MetricCard title="Erros app" metric={buildMetricValue(metrics.appErrors, metrics.appErrors)} hideDelta />
               </div>
             )}
           </div>

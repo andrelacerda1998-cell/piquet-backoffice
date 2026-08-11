@@ -111,10 +111,10 @@ export default function CustomRequestsPage() {
         />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricCard title="Novos" metric={buildMetricValue(count("novo"), count("novo") + 1, true)} />
-          <MetricCard title="Em análise" metric={buildMetricValue(count("em_analise"), 2)} />
-          <MetricCard title="Opções enviadas" metric={buildMetricValue(count("opcoes_enviadas"), 2)} />
-          <MetricCard title="Agendados" metric={buildMetricValue(count("agendado"), 1)} />
+          <MetricCard title="Novos" metric={buildMetricValue(count("novo"), count("novo"))} hideDelta />
+          <MetricCard title="Em análise" metric={buildMetricValue(count("em_analise"), count("em_analise"))} hideDelta />
+          <MetricCard title="Opções enviadas" metric={buildMetricValue(count("opcoes_enviadas"), count("opcoes_enviadas"))} hideDelta />
+          <MetricCard title="Agendados" metric={buildMetricValue(count("agendado"), count("agendado"))} hideDelta />
         </div>
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />

@@ -269,12 +269,12 @@ export default function ServicesPage() {
           <div className="space-y-6">
             <DemoBadge endpoint="/services/operational-metrics" />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <MetricCard title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, 32, true)} />
-              <MetricCard title="Tempo encontrar técnico" metric={buildMetricValue(opMetrics.avgTechnicianFindTime, 100, true)} />
-              <MetricCard title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, 65)} format="percent" />
-              <MetricCard title="Taxa cancelamento" metric={buildMetricValue(opMetrics.cancellationRate, 8, true)} format="percent" />
-              <MetricCard title="Sem técnico" metric={buildMetricValue(opMetrics.noTechnicianRate, 3, true)} format="percent" />
-              <MetricCard title="Em atraso" metric={buildMetricValue(opMetrics.overdueServices, 15, true)} />
+              <MetricCard title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, opMetrics.avgResponseTime)} hideDelta />
+              <MetricCard title="Tempo encontrar técnico" metric={buildMetricValue(opMetrics.avgTechnicianFindTime, opMetrics.avgTechnicianFindTime)} hideDelta />
+              <MetricCard title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, opMetrics.completionRate)} hideDelta format="percent" />
+              <MetricCard title="Taxa cancelamento" metric={buildMetricValue(opMetrics.cancellationRate, opMetrics.cancellationRate)} hideDelta format="percent" />
+              <MetricCard title="Sem técnico" metric={buildMetricValue(opMetrics.noTechnicianRate, opMetrics.noTechnicianRate)} hideDelta format="percent" />
+              <MetricCard title="Em atraso" metric={buildMetricValue(opMetrics.overdueServices, opMetrics.overdueServices)} hideDelta />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard title="Estados dos serviços">

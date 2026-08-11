@@ -136,10 +136,10 @@ export default function RecruitmentPage() {
         />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricCard title="Candidaturas" metric={buildMetricValue(candidates.length, candidates.length * 0.9)} />
-          <MetricCard title="KYC por validar" metric={buildMetricValue(pendingKyc, pendingKyc + 1, true)} />
+          <MetricCard title="Candidaturas" metric={buildMetricValue(candidates.length, candidates.length)} hideDelta />
+          <MetricCard title="KYC por validar" metric={buildMetricValue(pendingKyc, pendingKyc)} hideDelta />
           <MetricCard title="Vagas abertas" metric={buildMetricValue(openPositions, openPositions)} />
-          <MetricCard title="Tarefas abertas" metric={buildMetricValue(tasks.filter((t) => t.status !== "concluida").length, 5, true)} />
+          <MetricCard title="Tarefas abertas" metric={buildMetricValue(tasks.filter((t) => t.status !== "concluida").length, tasks.filter((t) => t.status !== "concluida").length)} hideDelta />
         </div>
 
         <Tabs

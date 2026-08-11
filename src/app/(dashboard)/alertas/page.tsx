@@ -58,7 +58,7 @@ export default function AlertsPage() {
 
         {counts && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <MetricCard title="Total abertos" metric={buildMetricValue(counts.total, counts.total + 3, true)} />
+            <MetricCard title="Total abertos" metric={buildMetricValue(counts.total, counts.total)} hideDelta />
             <MetricCard title="Críticos" metric={buildMetricValue(counts.critica, counts.critica, true)} />
             <MetricCard title="Alta prioridade" metric={buildMetricValue(counts.alta, counts.alta, true)} />
             <MetricCard title="Operacionais" metric={buildMetricValue(counts.operacional, counts.operacional, true)} />

@@ -40,10 +40,10 @@ export default function DispatchPage() {
 
         {data && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <MetricCard title="Pedidos em espera" metric={buildMetricValue(data.kpis.waiting, data.kpis.waiting * 0.9, true)} />
-            <MetricCard title="Técnicos disponíveis" metric={buildMetricValue(data.kpis.available, data.kpis.available * 0.95)} />
-            <MetricCard title="Tempo médio atribuição" metric={buildMetricValue(data.kpis.avgAssignMin, 15, true)} />
-            <MetricCard title="Auto-despacho" metric={buildMetricValue(data.kpis.autoDispatchRate, 70)} format="percent" />
+            <MetricCard title="Pedidos em espera" metric={buildMetricValue(data.kpis.waiting, data.kpis.waiting)} hideDelta />
+            <MetricCard title="Técnicos disponíveis" metric={buildMetricValue(data.kpis.available, data.kpis.available)} hideDelta />
+            <MetricCard title="Tempo médio atribuição" metric={buildMetricValue(data.kpis.avgAssignMin, data.kpis.avgAssignMin)} hideDelta />
+            <MetricCard title="Auto-despacho" metric={buildMetricValue(data.kpis.autoDispatchRate, data.kpis.autoDispatchRate)} hideDelta format="percent" />
           </div>
         )}
 

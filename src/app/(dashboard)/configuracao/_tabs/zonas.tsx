@@ -88,10 +88,10 @@ function ZonasContent() {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricCard title="Zonas ativas" metric={buildMetricValue(activeZones.length, zones.length)} />
-          <MetricCard title="Cobertura média" metric={buildMetricValue(coverageAvg, 82)} format="percent" />
-          <MetricCard title="Pedidos totais" metric={buildMetricValue(totalRequests, totalRequests * 0.92)} />
-          <MetricCard title="Receita total" metric={buildMetricValue(totalRevenue, totalRevenue * 0.9)} format="currency" />
+          <MetricCard title="Zonas ativas" metric={buildMetricValue(activeZones.length, activeZones.length)} hideDelta />
+          <MetricCard title="Cobertura média" metric={buildMetricValue(coverageAvg, coverageAvg)} hideDelta format="percent" />
+          <MetricCard title="Pedidos totais" metric={buildMetricValue(totalRequests, totalRequests)} hideDelta />
+          <MetricCard title="Receita total" metric={buildMetricValue(totalRevenue, totalRevenue)} hideDelta format="currency" />
         </div>
 
         <ChartCard title="Serviços por cidade" subtitle="Top zonas por volume de pedidos">

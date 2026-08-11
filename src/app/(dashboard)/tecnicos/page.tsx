@@ -192,12 +192,12 @@ export default function TechniciansPage() {
                   <div className="space-y-6">
                     {metrics && (
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered - 5)} />
-                        <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
-                        <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active - 2)} />
-                        <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices + 1, true)} />
-                        <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate - 0.5)} format="percent" />
-                        <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
+                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
+                        <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved)} hideDelta />
+                        <MetricCard title="Ativos (30 dias)" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
+                        <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
+                        <MetricCard title="Taxa aprovação" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
+                        <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
                       </div>
                     )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -242,10 +242,10 @@ export default function TechniciansPage() {
           <div className="space-y-4">
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete - 3)} />
-                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation + 2)} />
-                <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate - 1)} format="percent" />
-                <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved - 4)} />
+                <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
+                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
+                <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate)} hideDelta format="percent" />
+                <MetricCard title="Aprovados" metric={buildMetricValue(metrics.approved, metrics.approved)} hideDelta />
               </div>
             )}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

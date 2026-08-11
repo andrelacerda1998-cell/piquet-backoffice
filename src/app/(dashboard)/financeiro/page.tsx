@@ -446,12 +446,12 @@ export default function FinancePage() {
               </div>
               {summary && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue * 0.92)} format="currency" />
-                  <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue * 0.95, false, undefined, "Valor total − valor técnico")} format="currency" />
-                  <MetricCard title="Receita s/ IVA" metric={buildMetricValue(summary.piquetRevenueWithoutVat, summary.piquetRevenueWithoutVat * 0.95)} format="currency" />
-                  <MetricCard title="IVA" metric={buildMetricValue(summary.vat, summary.vat * 0.95)} format="currency" />
-                  <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult * 0.9)} format="currency" />
-                  <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, (summary.runwayMonths ?? 0) * 0.95)} />
+                  <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
+                  <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
+                  <MetricCard title="Receita s/ IVA" metric={buildMetricValue(summary.piquetRevenueWithoutVat, summary.piquetRevenueWithoutVat)} hideDelta format="currency" />
+                  <MetricCard title="IVA" metric={buildMetricValue(summary.vat, summary.vat)} hideDelta format="currency" />
+                  <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
+                  <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta />
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -475,10 +475,10 @@ export default function FinancePage() {
                 <h2 className="font-semibold mb-3">Tesouraria</h2>
                 {summary && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance * 0.98)} format="currency" />
-                    <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance, summary.projectedBalance * 0.95)} format="currency" />
-                    <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate * 1.05, true)} format="currency" />
-                    <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, (summary.runwayMonths ?? 0) * 0.95)} />
+                    <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance)} hideDelta format="currency" />
+                    <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance, summary.projectedBalance)} hideDelta format="currency" />
+                    <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate)} hideDelta format="currency" />
+                    <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta />
                   </div>
                 )}
                 <div className="mt-4">
