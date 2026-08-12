@@ -22,7 +22,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
-import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument } from "@/lib/vendorDocs";
+import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -214,7 +214,10 @@ export default function TechniciansPage() {
         return <span title={`${d.label}: ${ui.label}`} className={cn("font-bold", ui.tone)}>{ui.symbol}</span>;
       },
     })),
-    { key: "at_valid", label: "AT", render: (r) => r.at_valid ? "✓" : "⚠️" },
+    { key: "at_valid", label: "AT", render: (r) => {
+      const ui = AT_STATE_UI[atValidationState(r)];
+      return <span title={`Subutilizador AT — ${ui.label}: ${ui.hint}`} className={cn("font-bold", ui.tone)}>{ui.symbol}</span>;
+    } },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
     { key: "acao", label: "", render: (r) => (
       <div className="flex items-center justify-end gap-3">
@@ -570,29 +573,41 @@ export default function TechniciansPage() {
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT (Portal das Finanças)</p>
                 <div className="rounded-xl border border-surface-border p-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={cn("font-medium", profileVendor.at_valid ? "text-success" : "text-warning")}>
-                        {profileVendor.at_valid ? "✓ Validado" : "• Por validar"}
-                      </p>
-                      <p className="text-xs text-text-secondary">
-                        {atUser(profileVendor)
-                          ? <>Subutilizador <span className="font-mono text-text-primary">{atUser(profileVendor)}</span></>
-                          : "O backend ainda não envia o número do subutilizador."}
-                        {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
-                        {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {profileVendor.at_valid ? (
-                        <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
-                          className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
-                      ) : (
-                        <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, true)}
-                          className="btn-primary text-xs py-1 disabled:opacity-50">{atSaving ? "A gravar…" : "Validar"}</button>
-                      )}
-                    </div>
-                  </div>
+                  {(() => {
+                    const at = atValidationState(profileVendor);
+                    const ui = AT_STATE_UI[at];
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={cn("font-medium", ui.tone)}>{ui.symbol} {ui.label}</p>
+                            <p className="text-xs text-text-secondary">
+                              {atUser(profileVendor)
+                                ? <>Subutilizador <span className="font-mono text-text-primary">{atUser(profileVendor)}</span></>
+                                : "O backend ainda não envia o número do subutilizador."}
+                              {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
+                              {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {at === "validado" ? (
+                              <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
+                                className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
+                            ) : (
+                              <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, true)}
+                                className="btn-primary text-xs py-1 disabled:opacity-50">{atSaving ? "A gravar…" : "Validar"}</button>
+                            )}
+                          </div>
+                        </div>
+                        {at === "por_confirmar" && (
+                          <p className="rounded-lg bg-warning-light/50 px-3 py-2 text-[11px] text-warning">
+                            O registo vem marcado como válido, mas <b>não há data de validação</b> — provavelmente ninguém
+                            conferiu o subutilizador. {!profileVendor.can_accept_service && "Este técnico também não pode aceitar serviços."}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                   {!atUser(profileVendor) && (
                     <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
                       Para conferires o acesso antes de validar, o backend tem de passar a enviar o identificador do

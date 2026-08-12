@@ -66,6 +66,31 @@ export function missingCount(states: Record<RequiredDocKey, DocState> | undefine
   return REQUIRED_DOCS.filter((d) => states[d.key] !== "aprovado").length;
 }
 
+/**
+ * Estado REAL da validação do subutilizador AT.
+ *
+ * Porque não basta o `at_valid`: nos dados de produção (100 técnicos, 12/08/2026)
+ * 48 tinham `at_valid = true`, mas só **11** tinham `at_validated_at` — e desses
+ * 37 sem data, NENHUM podia aceitar serviço e só 7 tinham sequer NIF. Ou seja,
+ * a flag vem ligada de origem no registo; não é prova de que alguém conferiu o
+ * subutilizador. Só a data (e o poder aceitar serviço) o é.
+ *
+ * Por isso: "validado" exige `at_validated_at`. Com a flag ligada mas sem data,
+ * o estado é "por confirmar" — não se mente com um ✓.
+ */
+export type AtState = "validado" | "por_confirmar" | "por_validar";
+
+export function atValidationState(v: { at_valid: boolean; at_validated_at: string | null }): AtState {
+  if (v.at_validated_at) return "validado";
+  return v.at_valid ? "por_confirmar" : "por_validar";
+}
+
+export const AT_STATE_UI: Record<AtState, { symbol: string; tone: string; label: string; hint: string }> = {
+  validado: { symbol: "✓", tone: "text-success", label: "Validado", hint: "Subutilizador conferido — há registo da data de validação." },
+  por_confirmar: { symbol: "?", tone: "text-warning", label: "Por confirmar", hint: "O registo marca como válido, mas não há data de validação — provavelmente ninguém conferiu o subutilizador." },
+  por_validar: { symbol: "—", tone: "text-text-muted", label: "Por validar", hint: "Sem subutilizador AT validado." },
+};
+
 /** Aparência de cada estado na tabela (símbolo + tom + descrição). */
 export const DOC_STATE_UI: Record<DocState, { symbol: string; tone: string; label: string }> = {
   aprovado: { symbol: "✓", tone: "text-success", label: "Aprovado" },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyDocument, indexDocsByVendor, missingCount } from "./vendorDocs";
+import { classifyDocument, indexDocsByVendor, missingCount, atValidationState } from "./vendorDocs";
 import type { VendorDocument } from "@/services/vendorDocumentsService";
 
 const doc = (o: Partial<VendorDocument>): VendorDocument => ({
@@ -56,5 +56,19 @@ describe("indexDocsByVendor — estado por técnico", () => {
     ]);
     expect(missingCount(idx.get(5))).toBe(2);
     expect(missingCount(undefined)).toBe(3);
+  });
+});
+
+describe("atValidationState — a flag do backend não é prova de validação", () => {
+  it("só é 'validado' quando há data de validação", () => {
+    expect(atValidationState({ at_valid: true, at_validated_at: "2026-07-03" })).toBe("validado");
+  });
+
+  it("flag ligada mas sem data é 'por confirmar' — o caso dos 37 técnicos em produção", () => {
+    expect(atValidationState({ at_valid: true, at_validated_at: null })).toBe("por_confirmar");
+  });
+
+  it("sem flag e sem data é 'por validar'", () => {
+    expect(atValidationState({ at_valid: false, at_validated_at: null })).toBe("por_validar");
   });
 });

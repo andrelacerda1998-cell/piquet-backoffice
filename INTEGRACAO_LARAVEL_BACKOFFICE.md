@@ -175,6 +175,28 @@ que ele dá à Piquet para emitir faturas em nome dele). O ecrã já está feito
 há rota para gravar a validação. Sem o número, quem valida está a carregar num
 botão às cegas.
 
+### 0. O `at_valid` não é fiável — medido em produção (12/08/2026)
+
+Numa amostra de **100 técnicos** da API real:
+
+| | técnicos |
+|---|---|
+| `at_valid = true` **com** `at_validated_at` | **11** |
+| `at_valid = true` **sem** `at_validated_at` | **37** ← problema |
+| `at_valid = false` | 52 |
+
+Dos 37 com a flag ligada e sem data, **nenhum** podia aceitar serviço e só 7
+tinham NIF preenchido. Conclusão: **a flag vem ligada de origem no registo**, não
+por alguém ter conferido o subutilizador. O backoffice mostrava ✓ a 48 técnicos
+quando só 11 estavam mesmo validados.
+
+Enquanto não for corrigido no backend, o backoffice passou a tratar como
+validado **apenas quem tem `at_validated_at`**; a flag ligada sem data aparece
+como "Por confirmar" (?), nunca como ✓.
+
+**Pedido:** que o `at_valid` deixe de vir `true` por omissão — deve ser `false`
+até haver validação efetiva, e passar a `true` só quando se grava a data.
+
 ### 1. Acrescentar campos ao `GET /v1/admin/vendors`
 
 ```jsonc
