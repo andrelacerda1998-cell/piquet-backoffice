@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyDocument, indexDocsByVendor, missingCount, atValidationState } from "./vendorDocs";
+import { classifyDocument, indexDocsByVendor, missingCount, atValidationState, atFlagWithoutProof } from "./vendorDocs";
 import type { VendorDocument } from "@/services/vendorDocumentsService";
 
 const doc = (o: Partial<VendorDocument>): VendorDocument => ({
@@ -64,8 +64,9 @@ describe("atValidationState — a flag do backend não é prova de validação",
     expect(atValidationState({ at_valid: true, at_validated_at: "2026-07-03" })).toBe("validado");
   });
 
-  it("flag ligada mas sem data é 'por confirmar' — o caso dos 37 técnicos em produção", () => {
-    expect(atValidationState({ at_valid: true, at_validated_at: null })).toBe("por_confirmar");
+  it("flag ligada mas sem data continua 'por validar' — o caso dos 37 técnicos em produção", () => {
+    expect(atValidationState({ at_valid: true, at_validated_at: null })).toBe("por_validar");
+    expect(atFlagWithoutProof({ at_valid: true, at_validated_at: null })).toBe(true);
   });
 
   it("sem flag e sem data é 'por validar'", () => {

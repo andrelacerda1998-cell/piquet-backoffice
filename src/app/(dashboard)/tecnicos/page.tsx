@@ -22,7 +22,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
-import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
+import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, atFlagWithoutProof, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -91,6 +91,29 @@ export default function TechniciansPage() {
   }, []);
   const docsByVendor = useMemo(() => indexDocsByVendor(allDocs ?? []), [allDocs]);
   const docsOfVendor = (vendorId: number) => (allDocs ?? []).filter((d) => d.vendor_id === vendorId);
+
+  // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
+  // filtrar só a página daria contas erradas — com filtro ativo carregamos a
+  // lista toda de uma vez e filtramos aqui.
+  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar">("");
+  const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
+    () => (atFilter ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
+    [atFilter, debouncedSearch]
+  );
+  const atFiltered = useMemo(() => {
+    const list = allVendors?.data ?? [];
+    if (!atFilter) return [];
+    return list.filter((v) => atValidationState(v) === (atFilter === "validada" ? "validado" : "por_validar"));
+  }, [allVendors, atFilter]);
+  const atCounts = useMemo(() => {
+    const list = allVendors?.data ?? [];
+    return {
+      validada: list.filter((v) => atValidationState(v) === "validado").length,
+      por_validar: list.filter((v) => atValidationState(v) === "por_validar").length,
+      total: allVendors?.total ?? 0,
+      carregados: list.length,
+    };
+  }, [allVendors]);
 
   // Perfil do técnico (documentos entregues, em falta e por validar).
   const [profileVendor, setProfileVendor] = useState<RealVendor | null>(null);
@@ -433,10 +456,48 @@ export default function TechniciansPage() {
               <>
                 {sub === "todos" && (
                   <div className="space-y-4">
-                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                    <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading}
-                      onRowClick={(r) => setProfileVendor(r)} />
-                    {vendors && <Pagination page={page} totalPages={vendors.totalPages} total={vendors.total} pageSize={pageSize} onPageChange={setPage} />}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {([
+                          { id: "", label: "Todos" },
+                          { id: "validada", label: "AT validada" },
+                          { id: "por_validar", label: "AT por validar" },
+                        ] as const).map((f) => (
+                          <button key={f.id} onClick={() => setAtFilter(f.id)}
+                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                              atFilter === f.id
+                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
+                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
+                            {f.label}
+                            {f.id && atFilter && (
+                              <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
+                                {f.id === "validada" ? atCounts.validada : atCounts.por_validar}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {atFilter ? (
+                      <>
+                        <p className="text-sm text-text-secondary">
+                          <b className="text-text-primary tabular-nums">{atFiltered.length}</b>{" "}
+                          {atFilter === "validada" ? "com a AT validada" : "com a AT por validar"}
+                          {atCounts.carregados > 0 && ` · de ${atCounts.carregados} técnicos`}
+                        </p>
+                        <DataTable columns={columns} data={atFiltered} keyField="id" loading={allVendorsLoading}
+                          onRowClick={(r) => setProfileVendor(r)}
+                          emptyMessage={atFilter === "validada" ? "Nenhum técnico com a AT validada." : "Nenhum técnico com a AT por validar 🎉"} />
+                      </>
+                    ) : (
+                      <>
+                        <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading}
+                          onRowClick={(r) => setProfileVendor(r)} />
+                        {vendors && <Pagination page={page} totalPages={vendors.totalPages} total={vendors.total} pageSize={pageSize} onPageChange={setPage} />}
+                      </>
+                    )}
                   </div>
                 )}
                 {sub === "suspensoes" && (
@@ -599,7 +660,7 @@ export default function TechniciansPage() {
                             )}
                           </div>
                         </div>
-                        {at === "por_confirmar" && (
+                        {atFlagWithoutProof(profileVendor) && (
                           <p className="rounded-lg bg-warning-light/50 px-3 py-2 text-[11px] text-warning">
                             O registo vem marcado como válido, mas <b>não há data de validação</b> — provavelmente ninguém
                             conferiu o subutilizador. {!profileVendor.can_accept_service && "Este técnico também não pode aceitar serviços."}
