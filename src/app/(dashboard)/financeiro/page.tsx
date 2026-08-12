@@ -183,6 +183,17 @@ export default function FinancePage() {
     });
   const totalOutstanding = openInvoices.reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
 
+  // Vista da lista de faturas. Uma fatura paga sai da frente assim que é
+  // marcada — o trabalho é pagar o que falta —, mas fica acessível em "Pagas"
+  // para corrigir marcações erradas.
+  const [invoiceView, setInvoiceView] = useState<"abertas" | "pagas" | "todas">("abertas");
+  const paidInvoices = useMemo(() => invoices.filter((i) => i.status === "pago"), [invoices]);
+  const visibleInvoices = useMemo(() => (
+    invoiceView === "pagas" ? paidInvoices
+      : invoiceView === "todas" ? invoices
+      : invoices.filter((i) => i.status !== "pago")
+  ), [invoiceView, invoices, paidInvoices]);
+
   // Projeção 12 meses: linhas do orçamento + faturas reais a pagar + equipa
   // (colaboradores de Impostos e RH, custo mensal desde o início do contrato).
   const planTeam = useMemo(
@@ -239,6 +250,18 @@ export default function FinancePage() {
       refetchInvoices();
     }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
+  };
+  /**
+   * Desfaz uma marcação de pagamento (engano ao clicar, ou pagamento que afinal
+   * não saiu). Volta a "pendente" pondo o valor pago a zero.
+   */
+  const [invToReopen, setInvToReopen] = useState<CompanyInvoice | null>(null);
+  const reopenInvoice = async (inv: CompanyInvoice) => {
+    try {
+      await updateCompanyInvoice(inv.id, { amountPaid: 0 });
+      toast(`"${inv.vendor}" voltou a pendente.`);
+      refetchInvoices();
+    } catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
   const registerPartial = async (inv: CompanyInvoice) => {
     const val = window.prompt(`Valor já pago desta fatura (total ${formatCurrency(inv.amount)}):`, String(inv.amountPaid || ""));
@@ -323,6 +346,8 @@ export default function FinancePage() {
       <div className="flex items-center gap-2 justify-end">
         {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
         {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
+        {/* Corrigir uma marcação errada: volta a pendente. */}
+        {r.status === "pago" && <button onClick={() => setInvToReopen(r)} className="text-xs text-warning hover:underline">Reabrir</button>}
         <button onClick={() => openInvoiceModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
         <button onClick={() => setInvToRemove(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
       </div>
@@ -531,14 +556,41 @@ export default function FinancePage() {
                 </div>
                 <button onClick={() => openInvoiceModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
               </div>
+
+              {/* Uma fatura paga sai da lista de trabalho; fica em "Pagas" para
+                  se poder corrigir uma marcação errada. */}
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  { id: "abertas", label: "Por pagar", count: invoices.length - paidInvoices.length },
+                  { id: "pagas", label: "Pagas", count: paidInvoices.length },
+                  { id: "todas", label: "Todas", count: invoices.length },
+                ] as const).map((v) => (
+                  <button key={v.id} onClick={() => setInvoiceView(v.id)}
+                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                      invoiceView === v.id
+                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
+                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
+                    {v.label}
+                    <span className={cn("tabular-nums text-xs", invoiceView === v.id ? "opacity-80" : "text-text-muted")}>{v.count}</span>
+                  </button>
+                ))}
+                {invoiceView === "pagas" && (
+                  <span className="text-xs text-text-muted">Marcada por engano? Usa &ldquo;Reabrir&rdquo; para voltar a pendente.</span>
+                )}
+              </div>
+
               <DataTable
                 columns={invoiceColumns}
-                data={invoices}
+                data={visibleInvoices}
                 keyField="id"
                 selectable
                 columnToggle
-                bulkActions={[{ label: "Marcar pagas", onClick: bulkMarkPaid }]}
-                emptyMessage="Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)."
+                bulkActions={invoiceView === "pagas" ? [] : [{ label: "Marcar pagas", onClick: bulkMarkPaid }]}
+                emptyMessage={
+                  invoiceView === "pagas" ? "Ainda não marcaste nenhuma fatura como paga."
+                    : invoiceView === "abertas" ? "Sem faturas por pagar 🎉"
+                    : "Sem faturas — regista uma ou liga o Outlook (ver OUTLOOK_INVOICES_SETUP.md)."
+                }
               />
             </div>
           )}
@@ -967,6 +1019,27 @@ export default function FinancePage() {
           confirmLabel="Remover fatura"
           description={invToRemove && (
             <>Vais remover a fatura de <b className="text-text-primary">{invToRemove.vendor}</b> ({formatCurrency(invToRemove.amount)}). Esta ação não pode ser anulada.</>
+          )}
+        />
+
+        {/* Desfazer uma marcação de pagamento errada. */}
+        <ConfirmDialog
+          open={!!invToReopen}
+          onClose={() => setInvToReopen(null)}
+          onConfirm={async () => { if (invToReopen) { await reopenInvoice(invToReopen); setInvToReopen(null); } }}
+          title="Reabrir fatura"
+          confirmLabel="Reabrir"
+          description={invToReopen && (
+            <>
+              A fatura de <b className="text-text-primary">{invToReopen.vendor}</b> ({formatCurrency(invToReopen.amount)}) volta a
+              <b className="text-text-primary"> pendente</b> e reaparece na lista de faturas por pagar.
+              {invToReopen.recurrence !== "nenhuma" && (
+                <span className="mt-2 block text-warning">
+                  Atenção: esta fatura é {INVOICE_RECURRENCE_LABELS[invToReopen.recurrence]?.toLowerCase()} — ao ser marcada como paga
+                  pode já ter gerado a fatura seguinte, que continua na lista. Confirma se precisas de a remover.
+                </span>
+              )}
+            </>
           )}
         />
       </PermissionGate>
