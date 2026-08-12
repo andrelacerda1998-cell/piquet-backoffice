@@ -63,6 +63,31 @@ export default function TechniciansPage() {
   const { data: technicianCoverage } = useAsyncData(() => getCoverage(), []);
   const [selectedArea, setSelectedArea] = useState<{ label: string; technicians: CoverageTechnician[] } | null>(null);
 
+  // Cobertura: o que interessa decidir — onde falta gente e onde abrir a seguir.
+  const zonasAbertasOrdenadas = useMemo(() =>
+    [...(technicianCoverage?.open ?? [])].sort((a, b) => a.technicians.length - b.technicians.length),
+  [technicianCoverage]);
+  const candidatasOrdenadas = useMemo(() =>
+    [...(technicianCoverage?.candidate ?? [])].sort((a, b) => b.technicians.length - a.technicians.length),
+  [technicianCoverage]);
+  const zonasEmFalta = useMemo(() =>
+    [...(coverage ?? [])]
+      .filter((z) => z.procura > 0 && (z.oferta === 0 || z.procura > z.oferta))
+      .sort((a, b) => (a.oferta === 0 ? -1 : b.oferta === 0 ? 1 : b.procura - a.procura))
+      .slice(0, 8),
+  [coverage]);
+  const coberturaResumo = useMemo(() => {
+    const abertas = technicianCoverage?.open ?? [];
+    const distintos = new Set<number>();
+    for (const z of abertas) for (const t of z.technicians) distintos.add(t.id);
+    return {
+      zonasAbertas: abertas.length,
+      zonasSemTecnicos: abertas.filter((z) => z.technicians.length === 0).length,
+      candidatas: (technicianCoverage?.candidate ?? []).length,
+      tecnicosDistintos: distintos.size,
+    };
+  }, [technicianCoverage]);
+
   // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
   // migrado). Contagem do separador vem sempre de "pending", independente do
   // filtro escolhido dentro do separador.
@@ -334,59 +359,110 @@ export default function TechniciansPage() {
                   </div>
                 )}
                 {sub === "cobertura" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                      <ChartCard title="Distribuição por zona"><DonutChartComponent data={byLocation ?? []} centerLabel="Técnicos" /></ChartCard>
+                  <div className="space-y-5">
+                    {/* O que decide: onde falta gente e onde vale a pena abrir. */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <MetricCard title="Zonas abertas" metric={buildMetricValue(coberturaResumo.zonasAbertas, coberturaResumo.zonasAbertas)} hideDelta />
+                      <MetricCard title="Zonas sem técnicos" metric={buildMetricValue(coberturaResumo.zonasSemTecnicos, coberturaResumo.zonasSemTecnicos)} hideDelta />
+                      <MetricCard title="Cidades candidatas" metric={buildMetricValue(coberturaResumo.candidatas, coberturaResumo.candidatas)} hideDelta />
+                      <MetricCard title="Técnicos a cobrir zonas" metric={buildMetricValue(coberturaResumo.tecnicosDistintos, coberturaResumo.tecnicosDistintos)} hideDelta />
                     </div>
-                    <ChartCard title="Procura vs oferta por zona" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
-                      <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                    </ChartCard>
 
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Onde falta gente — procura acima da oferta, o mais urgente primeiro. */}
+                      <div className="card overflow-hidden">
+                        <div className="border-b border-surface-border px-4 py-3">
+                          <h3 className="font-semibold text-text-primary">Onde falta gente</h3>
+                          <p className="text-xs text-text-secondary mt-0.5">Zonas com mais pedidos do que técnicos a cobri-las</p>
+                        </div>
+                        <div className="p-4 space-y-2.5">
+                          {zonasEmFalta.length === 0 ? (
+                            <p className="text-sm text-text-muted py-4 text-center">Sem dados de procura por zona.</p>
+                          ) : zonasEmFalta.map((z) => (
+                            <div key={z.name}>
+                              <div className="flex items-baseline justify-between text-sm">
+                                <span className="font-medium text-text-primary">{z.name}</span>
+                                <span className="text-text-secondary tabular-nums">
+                                  {z.procura} pedido{z.procura === 1 ? "" : "s"} · {z.oferta} técnico{z.oferta === 1 ? "" : "s"}
+                                </span>
+                              </div>
+                              <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                                <div className={cn("h-full rounded-full", z.oferta === 0 ? "bg-danger" : z.ratio > 2 ? "bg-warning" : "bg-piquet")}
+                                  style={{ width: `${Math.min(100, (z.procura / Math.max(1, zonasEmFalta[0].procura)) * 100)}%` }} />
+                              </div>
+                              {z.oferta === 0 && <p className="text-[11px] text-danger mt-0.5">Nenhum técnico cobre esta zona</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Onde abrir a seguir — candidatas por interesse declarado. */}
+                      <div className="card overflow-hidden">
+                        <div className="flex items-start justify-between gap-2 border-b border-surface-border px-4 py-3">
+                          <div>
+                            <h3 className="font-semibold text-text-primary">Onde abrir a seguir</h3>
+                            <p className="text-xs text-text-secondary mt-0.5">Cidades candidatas, por técnicos interessados</p>
+                          </div>
+                          <DemoBadge endpoint="/coverage" />
+                        </div>
+                        <div className="p-4 space-y-2.5">
+                          {candidatasOrdenadas.length === 0 ? (
+                            <p className="text-sm text-text-muted py-4 text-center">Sem cidades candidatas.</p>
+                          ) : candidatasOrdenadas.slice(0, 8).map((c) => (
+                            <button key={c.id} onClick={() => setSelectedArea({ label: c.city, technicians: c.technicians })}
+                              className="w-full text-left group">
+                              <div className="flex items-baseline justify-between text-sm">
+                                <span className="font-medium text-text-primary group-hover:text-piquet-700 transition-colors">
+                                  {c.city}
+                                  {c.district && <span className="text-text-muted font-normal"> · {c.district}</span>}
+                                  {!c.active && <span className="ml-1.5 text-[10px] rounded bg-surface-subtle px-1 py-0.5 text-text-muted">fechada a votos</span>}
+                                </span>
+                                <span className="text-text-secondary tabular-nums">{c.technicians.length}</span>
+                              </div>
+                              <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                                <div className="h-full rounded-full bg-piquet"
+                                  style={{ width: `${Math.min(100, (c.technicians.length / Math.max(1, candidatasOrdenadas[0].technicians.length)) * 100)}%` }} />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Zonas já abertas — quem as cobre. */}
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">Cobertura por técnico</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">Zonas abertas</h3>
                         <DemoBadge endpoint="/coverage" />
                       </div>
-                      <p className="text-sm text-text-secondary mt-1 mb-3">
-                        Cada técnico indica na própria app onde pode/quer atuar — clica numa área para ver quem a marcou.
+                      <p className="text-sm text-text-secondary mb-3">
+                        Cada técnico indica na própria app onde pode atuar — clica numa zona para ver quem a marcou.
                       </p>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium mb-2">Zonas abertas</p>
-                          <DataTable<CoverageOpenZone>
-                            columns={[
-                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
-                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
-                              { key: "technicians", label: "Técnicos", render: (r) => r.technicians.length },
-                            ]}
-                            data={technicianCoverage?.open ?? []}
-                            keyField="id"
-                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
-                            emptyMessage="Sem zonas abertas"
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium mb-2">Cidades candidatas</p>
-                          <DataTable<CoverageCandidateCity>
-                            columns={[
-                              { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
-                              { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
-                              { key: "active", label: "Aceita votos", render: (r) => (
-                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                                  r.active ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
-                                  {r.active ? "Sim" : "Não"}
-                                </span>
-                              ) },
-                              { key: "technicians", label: "Interessados", render: (r) => r.technicians.length },
-                            ]}
-                            data={technicianCoverage?.candidate ?? []}
-                            keyField="id"
-                            onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
-                            emptyMessage="Sem cidades candidatas"
-                          />
-                        </div>
-                      </div>
+                      <DataTable<CoverageOpenZone>
+                        columns={[
+                          { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
+                          { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
+                          { key: "technicians", label: "Técnicos", render: (r) => (
+                            <span className={cn("tabular-nums font-medium", r.technicians.length === 0 && "text-danger")}>
+                              {r.technicians.length}
+                            </span>
+                          ) },
+                          { key: "estado", label: "", render: (r) => r.technicians.length === 0
+                            ? <span className="text-xs text-danger">sem cobertura</span>
+                            : <span className="text-xs text-text-muted">ver técnicos →</span> },
+                        ]}
+                        data={zonasAbertasOrdenadas}
+                        keyField="id"
+                        onRowClick={(r) => setSelectedArea({ label: r.city, technicians: r.technicians })}
+                        emptyMessage="Sem zonas abertas"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                      <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
+                        <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
+                      </ChartCard>
                     </div>
                   </div>
                 )}

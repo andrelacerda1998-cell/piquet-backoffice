@@ -15,7 +15,7 @@ import { getCompanyInvoices, getFinanceGmv } from "@/services/financeService";
 import { getVendorPayments } from "@/services/vendorPaymentsService";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { formatDate, formatDateTime, formatCurrency, formatNumber } from "@/lib/formatters";
-import { downloadCsv, cn } from "@/lib/utils";
+import { downloadCsv, downloadReportCsv, cn, type CsvSection } from "@/lib/utils";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { toast } from "@/stores";
 import { FileText, Download, FileDown, Trash2, BarChart3, Wrench, Wallet, Megaphone, Star } from "lucide-react";
@@ -184,63 +184,156 @@ export default function ReportsPage() {
     const { from, to, label } = periodRange(period);
     setGenerating(true);
     try {
-      const headers = ["Secção", "Data", "Descrição", "Detalhe", "Estado", "Valor (€)"];
-      const rows: string[][] = [];
-
       const wantOps = effectiveType === "Operacional" || effectiveType === "Qualidade" || effectiveType === "Completo";
       const wantFin = effectiveType === "Financeiro" || effectiveType === "Completo";
       const wantMkt = effectiveType === "Marketing" || effectiveType === "Completo";
+      const wantQual = effectiveType === "Qualidade" || effectiveType === "Completo";
+
+      const sections: CsvSection[] = [];
+      // Guardado à parte para o histórico poder voltar a exportar o mesmo ficheiro.
+      const flat: string[][] = [];
+      const push = (sec: CsvSection) => {
+        sections.push(sec);
+        for (const r of sec.rows) flat.push([sec.title, ...r]);
+      };
+
+      const sum = await computeSummary(from, to);
+
+      // 1) Resumo — os números do período, para não ser preciso somar à mão.
+      push({
+        title: "Resumo do período",
+        headers: ["Indicador", "Valor"],
+        rows: [
+          ["Serviços concluídos", String(sum.operacoes.concluidos)],
+          ["Volume faturado (€)", eur(sum.operacoes.volume)],
+          ["Ticket médio (€)", eur(sum.operacoes.ticketMedio)],
+          ["Serviços cancelados", String(sum.operacoes.cancelados)],
+          ["GMV do mês (€)", eur(sum.financeiro.gmv)],
+          ["Comissão Piquet (€)", eur(sum.financeiro.comissao)],
+          ["Faturas por pagar (€)", eur(sum.financeiro.porPagar)],
+          ["Saldo a técnicos (€)", eur(sum.financeiro.aTecnicos)],
+          ["Leads recebidas", String(sum.marketing.leads)],
+          ["Leads executadas", String(sum.marketing.executadas)],
+          ["Taxa de conversão (%)", eur(sum.marketing.conversao)],
+          ["Avaliação média", sum.qualidade.media ? eur(sum.qualidade.media) : "—"],
+          ["Reclamações", String(sum.qualidade.reclamacoes)],
+        ],
+      });
 
       if (wantOps) {
         const svc = await getServices({ period: "este_ano" }, 1, 500);
-        const list = svc.data.filter((s) => inRange(s.completedAt ?? s.requestedAt, from, to));
-        for (const s of list) {
-          if (effectiveType === "Qualidade" && !s.rating) continue;
-          rows.push([
-            effectiveType === "Qualidade" ? "Qualidade" : "Serviços",
-            formatDate(s.completedAt ?? s.requestedAt),
-            `${s.serviceName || s.categoryName} — ${s.customerName}`,
-            `Técnico: ${s.technicianName ?? "—"}${s.rating ? ` · Avaliação ${s.rating}★` : ""}${s.hasComplaint ? " · RECLAMAÇÃO" : ""}`,
-            SERVICE_STATUS_LABELS[s.status] ?? s.status,
-            eur(s.totalCustomerValue),
-          ]);
-        }
+        const list = svc.data.filter((x) => inRange(x.completedAt ?? x.requestedAt, from, to));
+        const rows = list.map((x) => [
+          formatDate(x.completedAt ?? x.requestedAt),
+          x.serviceName || x.categoryName,
+          x.customerName ?? "—",
+          x.technicianName ?? "—",
+          x.city ?? "—",
+          SERVICE_STATUS_LABELS[x.status] ?? x.status,
+          eur(x.totalCustomerValue),
+          eur(x.technicianValue),
+          eur(x.piquetRevenue),
+        ]);
+        push({
+          title: "Operações — serviços",
+          headers: ["Data", "Serviço", "Cliente", "Técnico", "Cidade", "Estado", "Valor cliente (€)", "Valor técnico (€)", "Comissão Piquet (€)"],
+          rows,
+          total: ["TOTAL", "", "", "", "", String(rows.length),
+            eur(list.reduce((a, x) => a + x.totalCustomerValue, 0)),
+            eur(list.reduce((a, x) => a + x.technicianValue, 0)),
+            eur(list.reduce((a, x) => a + x.piquetRevenue, 0))],
+          emptyNote: "Sem serviços no período.",
+        });
       }
 
       if (wantFin) {
         const [gmv, inv, vendorPayments] = await Promise.all([getFinanceGmv(), getCompanyInvoices(), getVendorPayments()]);
-        rows.push(["Financeiro", formatDate(to), "GMV do mês (cobrado)", "Payshop + serviços concluídos", "real", eur(gmv.month.gmv)]);
-        rows.push(["Financeiro", formatDate(to), "Comissão Piquet do mês", "", "real", eur(gmv.month.commission)]);
-        for (const f of inv.invoices.filter((i) => inRange(i.dueDate ?? i.issueDate, from, to) || i.status !== "pago")) {
-          rows.push(["Faturas a pagar", f.dueDate ? formatDate(f.dueDate) : "—", f.vendor, f.description || "", f.status, eur(f.status === "parcial" ? f.outstanding : f.amount)]);
-        }
-        // Saldo em aberto por técnico (ledger Laravel real) — não tem histórico
-        // por período, por isso listamos o saldo atual em vez de repetir por mês.
-        for (const v of vendorPayments.items.filter((v) => v.balance > 0)) {
-          rows.push(["Pagamentos a técnicos", formatDate(to), v.vendor_name ?? "—", v.iban ?? "—", "saldo em aberto", eur(v.balance)]);
-        }
+
+        push({
+          title: "Financeiro — receita",
+          headers: ["Indicador", "Período", "Valor (€)"],
+          rows: [
+            ["GMV (Payshop + serviços concluídos)", "mês", eur(gmv.month.gmv)],
+            ["Comissão da Piquet", "mês", eur(gmv.month.commission)],
+            ["GMV acumulado", "ano", eur(gmv.year.gmv)],
+            ["Comissão acumulada", "ano", eur(gmv.year.commission)],
+          ],
+        });
+
+        const porPagar = inv.invoices.filter((f) => f.status !== "pago");
+        push({
+          title: "Financeiro — faturas por pagar",
+          headers: ["Vencimento", "Fornecedor", "Descrição", "Estado", "Valor (€)", "Por pagar (€)"],
+          rows: porPagar.map((f) => [
+            f.dueDate ? formatDate(f.dueDate) : "—",
+            f.vendor, f.description || "", f.status,
+            eur(f.amount), eur(f.status === "parcial" ? f.outstanding : f.amount),
+          ]),
+          total: ["TOTAL", "", "", String(porPagar.length), "",
+            eur(porPagar.reduce((a, f) => a + (f.status === "parcial" ? f.outstanding : f.amount), 0))],
+          emptyNote: "Sem faturas por pagar 🎉",
+        });
+
+        const saldos = vendorPayments.items.filter((v) => v.balance > 0);
+        push({
+          title: "Financeiro — a pagar a técnicos (saldo atual)",
+          headers: ["Técnico", "IBAN", "Saldo (€)"],
+          rows: saldos.map((v) => [v.vendor_name ?? "—", v.iban ?? "—", eur(v.balance)]),
+          total: ["TOTAL", String(saldos.length), eur(saldos.reduce((a, v) => a + v.balance, 0))],
+          emptyNote: "Sem saldos em aberto.",
+        });
       }
 
       if (wantMkt) {
-        const leads = await getLeads();
-        for (const l of leads.filter((l) => inRange(l.createdAt, from, to))) {
-          rows.push([
-            "Leads", formatDate(l.createdAt), `${l.name} (${l.city || "—"})`,
-            l.quoteValue ? `Orçamento ${eur(l.quoteValue)} €${l.technicianValue != null ? ` · técnico ${eur(l.technicianValue)} €` : ""}` : (l.message || ""),
+        const leads = (await getLeads()).filter((l) => inRange(l.createdAt, from, to));
+        push({
+          title: "Marketing — pedidos recebidos (CRM)",
+          headers: ["Recebida", "Contacto", "Telefone", "Cidade", "Origem", "Estado", "Orçamento (€)", "Técnico (€)", "Comissão (€)"],
+          rows: leads.map((l) => [
+            l.createdAt ? formatDate(l.createdAt) : "—",
+            l.name, l.phone || "", l.city || "—", l.source || "—",
             LEAD_STAGE_LABEL[l.stage] ?? l.stage,
             l.quoteValue != null ? eur(l.quoteValue) : "",
-          ]);
-        }
+            l.technicianValue != null ? eur(l.technicianValue) : "",
+            l.quoteValue != null ? eur(l.quoteValue - (l.technicianValue ?? 0)) : "",
+          ]),
+          total: ["TOTAL", String(leads.length), "", "", "", "", 
+            eur(leads.reduce((a, l) => a + (l.quoteValue ?? 0), 0)), "",
+            eur(leads.reduce((a, l) => a + (l.quoteValue != null ? l.quoteValue - (l.technicianValue ?? 0) : 0), 0))],
+          emptyNote: "Sem pedidos no período.",
+        });
       }
 
-      if (rows.length === 0) {
+      if (wantQual) {
+        const svc = await getServices({ period: "este_ano" }, 1, 500);
+        const avaliados = svc.data.filter((x) => inRange(x.completedAt ?? x.requestedAt, from, to) && (x.rating || x.hasComplaint));
+        push({
+          title: "Qualidade — avaliações e reclamações",
+          headers: ["Data", "Serviço", "Cliente", "Técnico", "Avaliação", "Reclamação"],
+          rows: avaliados.map((x) => [
+            formatDate(x.completedAt ?? x.requestedAt),
+            x.serviceName || x.categoryName, x.customerName ?? "—", x.technicianName ?? "—",
+            x.rating ? `${x.rating}` : "—",
+            x.hasComplaint ? "SIM" : "não",
+          ]),
+          emptyNote: "Sem avaliações nem reclamações no período.",
+        });
+      }
+
+      if (flat.length === 0) {
         toast("Sem dados no período escolhido — nada para exportar.", "error");
         return;
       }
 
       const name = `${effectiveType} — ${label}`;
       const filename = `relatorio-${effectiveType.toLowerCase()}-${from}-a-${to}.csv`;
-      downloadCsv(filename, headers, rows);
+      downloadReportCsv(filename, {
+        title: `Relatório ${effectiveType.toLowerCase()} — Piquet`,
+        subtitle: `Período: ${formatDate(from)} a ${formatDate(to)} (${label})`,
+        lines: [`Gerado em: ${formatDateTime(new Date().toISOString())}`],
+      }, sections);
+      const headers = ["Secção", "Coluna 1", "Coluna 2", "Coluna 3", "Coluna 4", "Coluna 5"];
+      const rows = flat;
       const entry: LocalReport = {
         id: `rep_${Date.now()}`,
         name, type: effectiveType, period: label, format: "CSV",

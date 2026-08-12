@@ -17,8 +17,8 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart, TrendingUp, Minus } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
   info: "bg-surface-subtle text-text-secondary",
@@ -33,49 +33,49 @@ const BUG_STATUS_LABEL: Record<Bug["status"], string> = {
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 /**
- * Downloads NOVOS de uma app no último mês: número real em destaque + % de
- * crescimento face ao acumulado do mês anterior. Responde ao "quantos downloads
- * novos, em nº e em %, por app".
+ * Uma app, tudo o que interessa saber dela: instalações acumuladas, quantas
+ * entraram no último mês (nº real + %) e como está avaliada nas lojas. Antes
+ * isto estava espalhado por oito cartões que repetiam os mesmos números.
  */
-function NewDownloadsCard({ app, novos, pct, accent }: { app: string; novos: number; pct: number; accent: string }) {
+function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay }: {
+  app: string; accent: string; total: number; novos: number; pct: number;
+  appStore: StoreRatingInfo | null; googlePlay: StoreRatingInfo | null;
+}) {
+  const notas = [appStore, googlePlay].filter(Boolean) as StoreRatingInfo[];
+  const media = notas.length ? notas.reduce((s, r) => s + r.rating, 0) / notas.length : 0;
+  const avaliacoes = notas.reduce((s, r) => s + (r.count ?? 0), 0);
   return (
-    <div className="card p-4">
-      <div className="flex items-center gap-2">
+    <div className="card overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-surface-border px-5 py-3">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
-        <p className="text-sm font-medium text-text-secondary">{app}</p>
+        <p className="font-semibold text-text-primary">{app}</p>
       </div>
-      <p className="mt-2 text-3xl font-bold text-text-primary tabular-nums">+{formatNumber(novos)}</p>
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className={cn("inline-flex items-center gap-1 text-sm font-semibold", pct > 0 ? "text-success" : "text-text-muted")}>
-          {pct > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-          {pct > 0 ? "+" : ""}{formatNumber(Math.round(pct * 10) / 10)}%
-        </span>
-        <span className="text-xs text-text-muted">vs. mês anterior</span>
+      <div className="grid grid-cols-3 gap-3 px-5 py-4">
+        <div>
+          <p className="text-xs text-text-secondary">Instalações</p>
+          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">{formatNumber(total)}</p>
+          <p className="text-[11px] text-text-muted">acumuladas</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-secondary">Novas no mês</p>
+          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">+{formatNumber(novos)}</p>
+          <p className={cn("text-[11px] font-medium", pct > 0 ? "text-success" : "text-text-muted")}>
+            {pct > 0 ? "+" : ""}{formatNumber(Math.round(pct * 10) / 10)}% vs. mês anterior
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-text-secondary">Avaliação</p>
+          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5 inline-flex items-center gap-1">
+            {media ? (Math.round(media * 10) / 10).toString().replace(".", ",") : "—"}
+            {media > 0 && <Star className="h-4 w-4 fill-piquet-500 text-piquet-500" />}
+          </p>
+          <p className="text-[11px] text-text-muted">{avaliacoes > 0 ? `${formatNumber(avaliacoes)} avaliações` : "nas duas lojas"}</p>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function RatingCard({ app, store, info }: { app: string; store: string; info: StoreRatingInfo | null }) {
-  return (
-    <div className="card p-4">
-      <p className="text-sm text-text-secondary font-medium">{app}</p>
-      <p className="text-[11px] text-text-muted mb-2">{store}</p>
-      {info ? (
-        <>
-          <p className="text-2xl font-bold text-text-primary inline-flex items-center gap-1.5">
-            {info.rating.toFixed(1)}
-            <Star className="h-5 w-5 fill-piquet-500 text-piquet-500" />
-          </p>
-          <p className="text-xs text-text-muted mt-1">
-            {info.count !== null
-              ? `${info.count} ${info.count === 1 ? "avaliação" : "avaliações"}`
-              : "média oficial da consola"}
-          </p>
-        </>
-      ) : (
-        <p className="text-sm text-text-muted mt-1">Sem avaliações públicas</p>
-      )}
+      <div className="flex items-center gap-4 border-t border-surface-border px-5 py-2 text-[11px] text-text-muted">
+        <span>App Store {appStore ? `${appStore.rating.toFixed(1)}★` : "—"}</span>
+        <span>Google Play {googlePlay ? `${googlePlay.rating.toFixed(1)}★` : "—"}</span>
+      </div>
     </div>
   );
 }
@@ -189,40 +189,29 @@ export default function ProdutoPage() {
 
         {tab === "apps" && (
           <div className="space-y-6">
-            {/* Downloads totais por app + crescimento mensal */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <MetricCard title="Downloads totais" metric={buildMetricValue(dlTotalLast, dlTotalPrev, false, undefined, "As duas apps somadas — crescimento vs mês anterior")} />
-              <MetricCard title="App Cliente" metric={buildMetricValue(dlLast?.Cliente ?? 0, dlPrev?.Cliente ?? 0, false, undefined, "Instalações acumuladas")} />
-              <MetricCard title="App Profissional" metric={buildMetricValue(dlLast?.Profissional ?? 0, dlPrev?.Profissional ?? 0, false, undefined, "Instalações acumuladas")} />
-              {/* Downloads (acima) vêm das lojas; estes registos vêm do seed. */}
-              <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" metric={buildMetricValue(regLast?.Clientes ?? 0, regPrev?.Clientes ?? 0)} />
-              <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" metric={buildMetricValue(regLast?.Técnicos ?? 0, regPrev?.Técnicos ?? 0)} />
-            </div>
-
-            {/* Downloads NOVOS no último mês, por app — número real + % de crescimento. */}
+            {/* Uma linha por app: instalações, novas do mês e avaliação juntas. */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">
-                Novos downloads{latestMonthLabel ? ` · ${latestMonthLabel}` : ""}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <NewDownloadsCard app="App Cliente" novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)} accent="#FAB347" />
-                <NewDownloadsCard app="App Profissional" novos={newProfissional} pct={growthPct(newProfissional, dlPrev?.Profissional ?? 0)} accent="#1C1A17" />
-                <NewDownloadsCard app="Total (as duas apps)" novos={newTotal} pct={growthPct(newTotal, dlTotalPrev)} accent="#1F9D6B" />
+              <SectionHeader title={`Adoção das apps${latestMonthLabel ? ` · ${latestMonthLabel}` : ""}`} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <AppAdoptionCard app="App Cliente" accent="#FAB347"
+                  total={dlLast?.Cliente ?? 0} novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)}
+                  appStore={ratings?.cliente.appStore ?? null} googlePlay={ratings?.cliente.googlePlay ?? null} />
+                <AppAdoptionCard app="App Profissional" accent="#1C1A17"
+                  total={dlLast?.Profissional ?? 0} novos={newProfissional} pct={growthPct(newProfissional, dlPrev?.Profissional ?? 0)}
+                  appStore={ratings?.profissional.appStore ?? null} googlePlay={ratings?.profissional.googlePlay ?? null} />
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+                <MetricCard title="Instalações totais" hideDelta
+                  metric={buildMetricValue(dlTotalLast, dlTotalLast, false, undefined, "As duas apps somadas")} />
+                <MetricCard title="Novas no mês (total)" hideDelta
+                  metric={buildMetricValue(newTotal, newTotal, false, undefined, "Novas instalações das duas apps no último mês")} />
+                <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" hideDelta
+                  metric={buildMetricValue(regLast?.Clientes ?? 0, regLast?.Clientes ?? 0)} />
+                <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" hideDelta
+                  metric={buildMetricValue(regLast?.Técnicos ?? 0, regLast?.Técnicos ?? 0)} />
               </div>
             </div>
 
-            {/* Avaliações reais nas lojas (iTunes lookup + Google Play). */}
-            {ratings && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Avaliações nas lojas</p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <RatingCard app="App Cliente" store="App Store" info={ratings.cliente.appStore} />
-                  <RatingCard app="App Cliente" store="Google Play" info={ratings.cliente.googlePlay} />
-                  <RatingCard app="App Profissional" store="App Store" info={ratings.profissional.appStore} />
-                  <RatingCard app="App Profissional" store="Google Play" info={ratings.profissional.googlePlay} />
-                </div>
-              </div>
-            )}
             <ChartCard title="Crescimento mensal de downloads" subtitle="Novas instalações em cada mês, por app">
               <BarChartComponent
                 data={dlMonthly}

@@ -37,6 +37,9 @@ export const GET = withStaff(async (req) => {
   const categoryId = q.get("categoryId")?.trim();
   const city = q.get("city")?.trim();
   const status = q.get("status")?.trim();
+  // Grupos de estado do ecrã (Pendentes, Agendamentos, Em curso, …) chegam em
+  // `statuses`. Estava a ser ignorado — os separadores não filtravam nada.
+  const statuses = (q.get("statuses") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const period = q.get("period") as PeriodPreset | null;
   const sort = q.get("sort") ?? undefined;
   const dir = q.get("dir") === "asc" ? "asc" : "desc";
@@ -61,7 +64,21 @@ export const GET = withStaff(async (req) => {
   if (categoryId) query = query.eq("category_id", categoryId);
   if (city) query = query.eq("city", city);
   if (status) query = query.eq("status", status);
-  if (search) query = query.ilike("service_name", `%${search}%`);
+  if (statuses.length) query = query.in("status", statuses);
+  // Pesquisa: serviço, cidade e — o que mais se procura — o nome do cliente.
+  // Como o nome vive na tabela `customers`, resolvem-se primeiro os ids que
+  // batem e incluem-se no mesmo OR, mantendo a paginação do lado do servidor.
+  if (search) {
+    const { data: custs } = await admin
+      .from("customers")
+      .select("id")
+      .ilike("name", `%${search}%`)
+      .limit(200);
+    const ids = ((custs ?? []) as Array<{ id: string }>).map((c) => c.id);
+    const parts = [`service_name.ilike.%${search}%`, `city.ilike.%${search}%`];
+    if (ids.length) parts.push(`customer_id.in.(${ids.join(",")})`);
+    query = query.or(parts.join(","));
+  }
   if (period && period !== "personalizado") {
     const { start, end } = getDateRangeFromPreset(period);
     query = query.gte("requested_at", start.toISOString()).lte("requested_at", end.toISOString());
