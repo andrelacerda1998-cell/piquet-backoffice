@@ -163,3 +163,48 @@ endpoint existe. Ficheiro: `src/app/api/_lib/laravelServices.ts`; ligado em
 Enquanto o passo 3 não é dado, o `/api/services` continua a ler o Supabase
 (serviços manuais) — zero risco. Assim que ligares, verifico contra os dados
 reais e depois é só replicar o mesmo padrão para Clientes, Técnicos e Pagamentos.
+
+---
+
+## Subutilizador AT (Portal das Finanças) — falta no backend ⚠️
+
+O backoffice precisa de **validar o subutilizador AT** de cada técnico (o acesso
+que ele dá à Piquet para emitir faturas em nome dele). O ecrã já está feito
+(perfil do técnico → "Subutilizador AT"), mas hoje só consegue mostrar
+`at_valid` (sim/não): **o `VendorController` não envia o identificador**, e não
+há rota para gravar a validação. Sem o número, quem valida está a carregar num
+botão às cegas.
+
+### 1. Acrescentar campos ao `GET /v1/admin/vendors`
+
+```jsonc
+{
+  "id": 12,
+  "at_valid": true,
+  "at_validated_at": "2026-07-20",
+  "at_username": "212345678/1",   // ← identificador do subutilizador
+  "at_validated_by": "André Lacerda" // ← opcional: quem validou
+}
+```
+
+O backoffice já aceita `at_username`, `at_user` ou `at_subuser` — usa o nome que
+tiveres na base de dados, não é preciso renomear nada.
+
+> **A senha do subutilizador não deve ser enviada.** O backoffice não a mostra
+> nem a guarda; para conferir o acesso basta o identificador.
+
+### 2. Criar `PUT /v1/admin/vendors/{id}/at-validation`
+
+```jsonc
+// body
+{ "valid": true }   // ou false, para retirar a validação
+
+// resposta
+{ "data": { "id": 12, "at_valid": true, "at_validated_at": "2026-08-11" } }
+```
+
+Deve gravar também **quem** validou (o staff autenticado), para haver rasto.
+
+Enquanto a rota não existir, o botão "Validar" devolve uma mensagem explícita
+("O backend ainda não tem a rota de validação AT…") em vez de fingir que gravou.
+Assim que existir, funciona sem mais alterações do lado do Next.

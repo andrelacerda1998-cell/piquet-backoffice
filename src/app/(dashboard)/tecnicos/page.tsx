@@ -13,7 +13,8 @@ import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, type RealVendor, type TopVendor,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation,
+  type RealVendor, type TopVendor,
 } from "@/services/vendorsService";
 import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
@@ -93,6 +94,24 @@ export default function TechniciansPage() {
 
   // Perfil do técnico (documentos entregues, em falta e por validar).
   const [profileVendor, setProfileVendor] = useState<RealVendor | null>(null);
+
+  // Subutilizador AT: o backend pode enviá-lo com nomes diferentes (ou ainda
+  // não o enviar de todo) — aceitamos qualquer um.
+  const atUser = (v: RealVendor) => v.at_username || v.at_user || v.at_subuser || null;
+  const [atSaving, setAtSaving] = useState(false);
+  const setAtValidation = async (v: RealVendor, valid: boolean) => {
+    setAtSaving(true);
+    try {
+      await setVendorAtValidation(v.id, valid);
+      toast(valid ? `Subutilizador AT de ${v.name ?? "técnico"} validado.` : "Validação AT retirada.");
+      setProfileVendor({ ...v, at_valid: valid });
+      refetchVendors();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível gravar a validação AT.", "error");
+    } finally {
+      setAtSaving(false);
+    }
+  };
   const [reviewDoc, setReviewDoc] = useState<VendorDocument | null>(null);
   const [reviewAction, setReviewAction] = useState<"approve" | "decline" | null>(null);
   const [expirationDate, setExpirationDate] = useState("");
@@ -546,12 +565,50 @@ export default function TechniciansPage() {
                 </div>
               )}
 
+              {/* Subutilizador do Portal das Finanças — o acesso que permite à
+                  Piquet faturar em nome do técnico. */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT (Portal das Finanças)</p>
+                <div className="rounded-xl border border-surface-border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={cn("font-medium", profileVendor.at_valid ? "text-success" : "text-warning")}>
+                        {profileVendor.at_valid ? "✓ Validado" : "• Por validar"}
+                      </p>
+                      <p className="text-xs text-text-secondary">
+                        {atUser(profileVendor)
+                          ? <>Subutilizador <span className="font-mono text-text-primary">{atUser(profileVendor)}</span></>
+                          : "O backend ainda não envia o número do subutilizador."}
+                        {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
+                        {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {profileVendor.at_valid ? (
+                        <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
+                          className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
+                      ) : (
+                        <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, true)}
+                          className="btn-primary text-xs py-1 disabled:opacity-50">{atSaving ? "A gravar…" : "Validar"}</button>
+                      )}
+                    </div>
+                  </div>
+                  {!atUser(profileVendor) && (
+                    <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
+                      Para conferires o acesso antes de validar, o backend tem de passar a enviar o identificador do
+                      subutilizador (e quem/quando validou) no <span className="font-mono">VendorController</span>.
+                      A senha nunca deve vir para aqui.
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Dados do técnico */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-xs text-text-muted">Preço/h</p><p className="text-text-primary">{profileVendor.price_rate !== null ? formatCurrency(profileVendor.price_rate) : "—"}</p></div>
                 <div><p className="text-xs text-text-muted">Categorias</p><p className="text-text-primary">{profileVendor.operation_areas.length ? profileVendor.operation_areas.join(", ") : "—"}</p></div>
-                <div><p className="text-xs text-text-muted">Validação AT</p><p className="text-text-primary">{profileVendor.at_valid ? "Válida" : "Por validar"}</p></div>
                 <div><p className="text-xs text-text-muted">Pode aceitar serviço</p><p className="text-text-primary">{profileVendor.can_accept_service ? "Sim" : "Não"}</p></div>
+                <div><p className="text-xs text-text-muted">Registado</p><p className="text-text-primary">{profileVendor.created_at ? formatDate(profileVendor.created_at) : "—"}</p></div>
               </div>
             </div>
           );

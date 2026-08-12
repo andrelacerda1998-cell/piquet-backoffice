@@ -23,6 +23,19 @@ export interface RealVendor {
   can_accept_service: boolean;
   at_valid: boolean;
   at_validated_at: string | null;
+  /**
+   * Subutilizador do Portal das Finanças (o acesso que o técnico dá à Piquet
+   * para emitir faturas em nome dele).
+   *
+   * Opcionais porque o VendorController ainda NÃO os expõe — só manda o
+   * `at_valid`. Ficam aqui prontos: assim que o backend os enviar (com
+   * qualquer um destes nomes), aparecem no perfil sem mais alterações. Nunca
+   * pedimos nem guardamos a senha — só o identificador e quem/quando validou.
+   */
+  at_username?: string | null;
+  at_user?: string | null;
+  at_subuser?: string | null;
+  at_validated_by?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
@@ -71,6 +84,18 @@ export async function restoreVendor(id: number): Promise<RealVendor> {
   return apiPut<RealVendor>(`/technicians/${id}/restore`, {}, () => {
     throw new Error("Reativar técnicos precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
+}
+
+/**
+ * Marca o subutilizador AT do técnico como validado (ou retira a validação).
+ * Depende de `PUT /v1/admin/vendors/{id}/at-validation` no Laravel — enquanto
+ * essa rota não existir, o erro devolvido diz-o de forma explícita, em vez de
+ * fingir que gravou.
+ */
+export async function setVendorAtValidation(id: number, valid: boolean): Promise<void> {
+  await apiPut(`/technicians/${id}/at-validation`, { valid }, () => {
+    throw new Error("Validar o subutilizador AT precisa da API de admin do Laravel configurada.");
+  });
 }
 
 /**
