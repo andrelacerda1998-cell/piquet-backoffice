@@ -145,6 +145,8 @@ const LIVE_EXACT = new Set<string>([
   // Fase 6 — Impostos (tax_obligations)
   "/tax/obligations",
   "/tax/summary",
+  // IVA a entregar/recuperar — calculado da comissão real + faturas de custo
+  "/tax/vat",
   // Pagamentos da app (Payshop Online Payments / Paylands)
   "/finance/app-payments",
   // GMV real (Payshop cobrado + serviços concluídos)
@@ -155,6 +157,7 @@ const LIVE_EXACT = new Set<string>([
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)
   "/finance/company-invoices",
+  "/tax/vat",
   // Planeamento financeiro mensal (linhas de orçamento do André)
   "/finance/budget",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)

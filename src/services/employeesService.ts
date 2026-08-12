@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { paginateArray, sortArray } from "@/lib/filters";
 import {
@@ -166,6 +166,15 @@ export async function updateEmployee(id: string, data: Partial<Employee>) {
 
 export async function deactivateEmployee(id: string) {
   return updateEmployee(id, { employmentStatus: "inativo", endDate: new Date().toISOString() });
+}
+
+/**
+ * Apaga um colaborador em definitivo. É para registos ERRADOS — quem saiu da
+ * empresa deve ser desativado (`deactivateEmployee`), para o histórico de
+ * custos dos meses em que cá esteve continuar a bater certo no planeamento.
+ */
+export async function deleteEmployee(id: string): Promise<void> {
+  await apiDelete(`/employees/${id}`, () => null);
 }
 
 export async function getTeamDashboard() {
@@ -399,3 +408,38 @@ export async function getEmployeeCountEvolution() {
 }
 
 export { employeesCache, taxCache };
+
+/* ------------------------------ IVA (real) ------------------------------ */
+
+export interface VatPeriod {
+  label: string;
+  comissao: number;
+  custos: number;
+  faturasContadas: number;
+  liquidado: number;
+  dedutivel: number;
+  aEntregar: number;
+  aPagar: boolean;
+}
+
+export interface VatSummary {
+  taxaIva: number;
+  trimestre: VatPeriod;
+  mes: VatPeriod;
+}
+
+const ZERO_VAT_PERIOD = (label: string): VatPeriod => ({
+  label, comissao: 0, custos: 0, faturasContadas: 0, liquidado: 0, dedutivel: 0, aEntregar: 0, aPagar: true,
+});
+
+/**
+ * IVA a pagar (ou a recuperar) calculado das fontes reais: comissão cobrada e
+ * faturas de custo registadas. Ver src/app/api/tax/vat/route.ts.
+ */
+export async function getVatSummary(): Promise<VatSummary> {
+  return apiGet<VatSummary>("/tax/vat", () => ({
+    taxaIva: 0.23,
+    trimestre: ZERO_VAT_PERIOD("trimestre atual"),
+    mes: ZERO_VAT_PERIOD("mês atual"),
+  })).then((r) => r.data);
+}

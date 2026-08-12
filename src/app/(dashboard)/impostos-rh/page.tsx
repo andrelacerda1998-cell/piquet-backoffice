@@ -11,13 +11,15 @@ import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashb
 import {
   getEmployees, getTeamDashboard, getTaxObligations, getTaxSummary,
   markTaxObligationPaid, simulateHiring,
-  computeEmployeeCost, deactivateEmployee, createEmployee, updateEmployee, effectiveMonthlyCost,
+  computeEmployeeCost, deactivateEmployee, deleteEmployee, createEmployee, updateEmployee, effectiveMonthlyCost, getVatSummary,
   getTeamCostEvolution, getCostByDepartmentChart,
 } from "@/services/employeesService";
 import { Modal, Field } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/stores";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import type { Employee, TaxObligation, ContractType } from "@/types";
 import { X, Plus, Calculator, Landmark } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -67,12 +69,32 @@ export default function TaxHRPage() {
   const debouncedSearch = useDebouncedValue(search);
 
   const { data: taxSummary } = useAsyncData(() => getTaxSummary(), []);
+  // IVA a entregar/recuperar — calculado da comissão real e das faturas de custo.
+  const { data: vat } = useAsyncData(() => getVatSummary(), []);
   const { data: obligations } = useAsyncData(() => getTaxObligations(), []);
   const { data: teamDashboard, refetch: refetchDashboard } = useAsyncData(() => getTeamDashboard(), []);
   const { data: employees, loading, refetch } = useAsyncData(
     () => getEmployees(page, pageSize, undefined, debouncedSearch),
     [page, pageSize, debouncedSearch]
   );
+
+  // Sair da empresa (desativar, guarda o histórico) vs. registo errado (eliminar).
+  const [empToDeactivate, setEmpToDeactivate] = useState<Employee | null>(null);
+  const [empToDelete, setEmpToDelete] = useState<Employee | null>(null);
+  const doDeactivate = async (emp: Employee) => {
+    try {
+      await deactivateEmployee(emp.id);
+      toast(`${emp.fullName} desativado — o histórico de custos mantém-se.`);
+      refetch(); refetchDashboard();
+    } catch (e) { toast(e instanceof Error ? e.message : "Não foi possível desativar.", "error"); }
+  };
+  const doDelete = async (emp: Employee) => {
+    try {
+      await deleteEmployee(emp.id);
+      toast(`${emp.fullName} eliminado.`);
+      refetch(); refetchDashboard();
+    } catch (e) { toast(e instanceof Error ? e.message : "Não foi possível eliminar.", "error"); }
+  };
 
   const saveEmployee = async () => {
     if (!empForm.fullName.trim() || !(empForm.grossMonthlySalary > 0) || !empForm.startDate) {
@@ -194,6 +216,19 @@ export default function TaxHRPage() {
         {formatCurrency(r.monthlyCompanyCost != null && r.monthlyCompanyCost > 0 ? r.monthlyCompanyCost * 12 : r.cost.totalAnnualCost)}
       </PermissionGate>
     )},
+    { key: "acoes", label: "", render: (r) => (
+      <PermissionGate permission="manage_employees">
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={(e) => { e.stopPropagation(); openEmpModal(r); }} className="text-xs text-piquet-600 hover:underline">Editar</button>
+          {/* Saiu da empresa → desativar (mantém o histórico de custos). */}
+          {r.employmentStatus === "ativo" && (
+            <button onClick={(e) => { e.stopPropagation(); setEmpToDeactivate(r); }} className="text-xs text-warning hover:underline">Desativar</button>
+          )}
+          {/* Registo errado → eliminar de vez. */}
+          <button onClick={(e) => { e.stopPropagation(); setEmpToDelete(r); }} className="text-xs text-text-muted hover:text-danger">Eliminar</button>
+        </div>
+      </PermissionGate>
+    )},
   ];
 
   const tabs: { id: Tab; label: string }[] = [
@@ -221,21 +256,56 @@ export default function TaxHRPage() {
                 <MetricCard title="Previstos (mês)" metric={buildMetricValue(taxSummary.estimatedThisMonth, taxSummary.estimatedThisMonth)} hideDelta format="currency" />
                 <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth)} hideDelta format="currency" />
                 <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending)} hideDelta format="currency" />
-                <MetricCard title="IVA estimado" metric={buildMetricValue(taxSummary.ivaEstimado, taxSummary.ivaEstimado)} hideDelta format="currency" />
+                {/* IVA REAL do trimestre (comissão cobrada − faturas de custo),
+                    não o valor fixo que vinha do resumo fiscal. */}
+                <MetricCard title={vat?.trimestre.aPagar === false ? "IVA a recuperar (trim.)" : "IVA a entregar (trim.)"}
+                  metric={buildMetricValue(Math.abs(vat?.trimestre.aEntregar ?? 0), Math.abs(vat?.trimestre.aEntregar ?? 0))} hideDelta format="currency" />
                 {/* REAL: TSU da entidade derivada da folha atual dos colaboradores (não do seed fiscal). */}
                 <MetricCard title="TSU equipa (mensal)" metric={buildMetricValue(teamDashboard?.socialSecurityMonthly ?? 0, teamDashboard?.socialSecurityMonthly ?? 0)} format="currency" />
                 <MetricCard title="Vencidas" metric={buildMetricValue(taxSummary.overdueCount, taxSummary.overdueCount)} hideDelta />
               </div>
             )}
 
-            <div className="card p-4">
-              <p className="text-sm font-medium mb-2">{taxSummary?.ivaLabel ?? "IVA"}</p>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div><span className="text-text-secondary">Liquidado:</span> {formatCurrency(taxSummary?.ivaLiquidado ?? 0)}</div>
-                <div><span className="text-text-secondary">Dedutível:</span> {formatCurrency(taxSummary?.ivaDedutivel ?? 0)}</div>
-                <div><span className="text-text-secondary">Estimado:</span> {formatCurrency(taxSummary?.ivaEstimado ?? 0)}</div>
+            {/* IVA calculado dos dados reais: comissão cobrada (liquidado) e
+                faturas de custo registadas (dedutível). */}
+            {vat && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {[vat.trimestre, vat.mes].map((p, i) => (
+                  <div key={i} className="card overflow-hidden">
+                    <div className="flex items-baseline justify-between border-b border-surface-border px-4 py-3">
+                      <p className="font-semibold text-text-primary capitalize">{p.label}</p>
+                      <span className="text-xs text-text-muted">{i === 0 ? "período de entrega" : "no mês"}</span>
+                    </div>
+                    <div className="px-4 py-4">
+                      <p className="text-xs text-text-secondary">{p.aPagar ? "IVA a entregar ao Estado" : "IVA a recuperar / reportar"}</p>
+                      <p className={cn("text-3xl font-bold tabular-nums mt-0.5", p.aPagar ? "text-text-primary" : "text-success")}>
+                        {formatCurrency(Math.abs(p.aEntregar))}
+                      </p>
+
+                      <div className="mt-4 space-y-1.5 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">IVA liquidado <span className="text-text-muted">(na comissão de {formatCurrency(p.comissao)})</span></span>
+                          <span className="tabular-nums font-medium">{formatCurrency(p.liquidado)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">IVA dedutível <span className="text-text-muted">({p.faturasContadas} fatura{p.faturasContadas === 1 ? "" : "s"} de custo)</span></span>
+                          <span className="tabular-nums font-medium">− {formatCurrency(p.dedutivel)}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-surface-border pt-1.5">
+                          <span className="font-medium text-text-primary">{p.aPagar ? "A entregar" : "A recuperar"}</span>
+                          <span className={cn("tabular-nums font-bold", p.aPagar ? "text-text-primary" : "text-success")}>{formatCurrency(Math.abs(p.aEntregar))}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
+            <p className="text-xs text-text-muted">
+              Calculado a {Math.round((vat?.taxaIva ?? 0.23) * 100)}%: o IVA liquidado sai da comissão efetivamente cobrada;
+              o dedutível é uma <b>estimativa</b> sobre as faturas de custo registadas — despesas isentas
+              (salários, seguros, alguns serviços) não têm IVA a deduzir, por isso confirma com a contabilidade antes de entregar.
+            </p>
 
             <div className="flex gap-2 mb-3">
               <button onClick={() => setCalendarView("lista")} className={`text-sm px-3 py-1 rounded ${calendarView === "lista" ? "bg-piquet" : "bg-surface-muted"}`}>Lista</button>
@@ -375,6 +445,35 @@ export default function TaxHRPage() {
           </div>
         </Modal>
       </div>
+
+      {/* Saiu da empresa: fica inativo, mas o custo dos meses passados continua
+          a contar no planeamento financeiro. */}
+      <ConfirmDialog
+        open={!!empToDeactivate}
+        onClose={() => setEmpToDeactivate(null)}
+        onConfirm={async () => { if (empToDeactivate) { await doDeactivate(empToDeactivate); setEmpToDeactivate(null); } }}
+        title="Desativar colaborador"
+        confirmLabel="Desativar"
+        description={empToDeactivate && (
+          <><b className="text-text-primary">{empToDeactivate.fullName}</b> passa a inativo e deixa de contar para os
+          custos futuros. O histórico dos meses em que cá esteve mantém-se — é o que deves usar quando alguém sai da empresa.</>
+        )}
+      />
+
+      {/* Registo errado: apaga mesmo. */}
+      <ConfirmDialog
+        open={!!empToDelete}
+        onClose={() => setEmpToDelete(null)}
+        onConfirm={async () => { if (empToDelete) { await doDelete(empToDelete); setEmpToDelete(null); } }}
+        title="Eliminar colaborador"
+        tone="danger"
+        confirmLabel="Eliminar definitivamente"
+        description={empToDelete && (
+          <>Vais apagar <b className="text-text-primary">{empToDelete.fullName}</b> e todo o seu histórico de custos.
+          Esta ação não pode ser anulada. Se a pessoa apenas saiu da empresa, usa <b className="text-text-primary">Desativar</b>,
+          para o planeamento dos meses passados continuar correto.</>
+        )}
+      />
     </RouteGuard>
   );
 }
