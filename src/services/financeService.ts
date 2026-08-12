@@ -218,60 +218,6 @@ export async function getOperationalResult(): Promise<ChartDataPoint[]> {
   }).then((r) => r.data);
 }
 
-export interface TechnicianPayout {
-  id: string;
-  technicianName: string;
-  services: number;
-  amountDue: number;
-  period: string;
-  status: "pendente" | "processado";
-}
-
-/** Deriva os payouts dos serviços (technician_value). Usado no seed e no demo. */
-export function buildTechnicianPayouts(): TechnicianPayout[] {
-  const byTech = new Map<string, { services: number; amount: number }>();
-  for (const s of mockData.services) {
-    if (!s.technicianName) continue;
-    if (!["concluido", "pago"].includes(s.status)) continue;
-    const cur = byTech.get(s.technicianName) ?? { services: 0, amount: 0 };
-    cur.services += 1;
-    cur.amount += s.technicianValue;
-    byTech.set(s.technicianName, cur);
-  }
-  return [...byTech.entries()]
-    .sort((a, b) => b[1].amount - a[1].amount)
-    .slice(0, 15)
-    .map(([technicianName, v], i) => ({
-      id: `payout_${i + 1}`,
-      technicianName,
-      services: v.services,
-      amountDue: Math.round(v.amount * 100) / 100,
-      period: "Junho 2026",
-      status: (i % 4 === 0 ? "processado" : "pendente") as "pendente" | "processado",
-    }));
-}
-
-// Cache de sessão (demo): o estado "processado" persiste dentro da sessão.
-let payoutsCache: TechnicianPayout[] | null = null;
-
-export async function getTechnicianPayouts(): Promise<TechnicianPayout[]> {
-  return apiGet("/finance/payouts", () => {
-    if (!payoutsCache) payoutsCache = buildTechnicianPayouts();
-    return payoutsCache;
-  }).then((r) => r.data);
-}
-
-export async function processTechnicianPayout(id: string): Promise<TechnicianPayout> {
-  // O id derivado leva "|" — tem de ir escapado no path.
-  return apiPut(`/finance/payouts/${encodeURIComponent(id)}/process`, {}, () => {
-    if (!payoutsCache) payoutsCache = buildTechnicianPayouts();
-    const idx = payoutsCache.findIndex((p) => p.id === id);
-    if (idx === -1) throw new Error("Pagamento não encontrado");
-    payoutsCache[idx] = { ...payoutsCache[idx], status: "processado" };
-    return payoutsCache[idx];
-  }).then((r) => r.data);
-}
-
 export interface Invoice {
   id: string;
   number: string;

@@ -59,8 +59,8 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
   });
 
   it("marca como migrados os endpoints da Fase 7 (Pagamentos a técnicos)", () => {
-    expect(isLiveEndpoint("/finance/payouts")).toBe(true);
-    expect(isLiveEndpoint("/finance/payouts/payout_1/process")).toBe(true);
+    expect(isLiveEndpoint("/vendor-payments")).toBe(true);
+    expect(isLiveEndpoint("/vendor-payments/7/pay")).toBe(true);
     expect(isLiveEndpoint("/finance/pending-payments")).toBe(false); // sintético
     expect(isLiveEndpoint("/finance/refunds")).toBe(false); // sintético
   });
@@ -153,7 +153,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // preenchidas de uma vez pelo seed. (/services saiu desta lista a
     // 2026-07-17, /customers+/technicians a 2026-07-20 e /employees a
     // 2026-07-22: o seed foi apagado e passam a ser dados reais ou vazios.)
-    // (/finance/payouts saiu a 2026-07-22: passou a derivar dos serviços concluídos.)
+    // (/finance/payouts foi retirado a 2026-08-11: a página Relatórios passou
+    // a usar o saldo real do /vendor-payments, ledger Laravel.)
     for (const ep of ["/finance/summary", "/tax/obligations"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
@@ -174,7 +175,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/finance/app-payments", "/product/growth", "/product/ratings",
                       "/product/integrations-status", "/product/funnel", "/dev-tasks", "/tasks",
                       "/team/messages", "/team/tasks", "/team/agenda", "/team/meetings", "/team/channels",
-                      "/finance/budget", "/employees", "/employees/dashboard", "/finance/payouts",
+                      "/finance/budget", "/employees", "/employees/dashboard",
                       "/customers", "/customers/metrics", "/customers/by-location", "/customers/by-source",
                       "/customers/trend", "/customers/retention", "/technicians",
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
