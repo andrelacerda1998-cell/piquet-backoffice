@@ -21,6 +21,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
+import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -77,6 +78,21 @@ export default function TechniciansPage() {
   }, [pendingDocsList]);
   const [docStatus, setDocStatus] = useState<VendorDocumentStatus>("pending");
   const docsData = useAsyncData(() => getVendorDocuments(docStatus, 1, 50), [docStatus]);
+
+  // Todos os documentos (os três estados) para saber, por técnico, o que já
+  // entregou e o que falta — alimenta as colunas de KYC e o perfil.
+  const { data: allDocs, refetch: refetchAllDocs } = useAsyncData(async () => {
+    const pages = await Promise.all(
+      (["pending", "approved", "declined"] as VendorDocumentStatus[])
+        .map((s) => getVendorDocuments(s, 1, 200).catch(() => ({ items: [] as VendorDocument[], meta: { current_page: 1, last_page: 1, per_page: 200, total: 0 } }))),
+    );
+    return pages.flatMap((p) => p.items);
+  }, []);
+  const docsByVendor = useMemo(() => indexDocsByVendor(allDocs ?? []), [allDocs]);
+  const docsOfVendor = (vendorId: number) => (allDocs ?? []).filter((d) => d.vendor_id === vendorId);
+
+  // Perfil do técnico (documentos entregues, em falta e por validar).
+  const [profileVendor, setProfileVendor] = useState<RealVendor | null>(null);
   const [reviewDoc, setReviewDoc] = useState<VendorDocument | null>(null);
   const [reviewAction, setReviewAction] = useState<"approve" | "decline" | null>(null);
   const [expirationDate, setExpirationDate] = useState("");
@@ -103,6 +119,7 @@ export default function TechniciansPage() {
       }
       closeReview();
       docsData.refetch();
+      refetchAllDocs();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível processar o documento.", "error");
     } finally {
@@ -167,13 +184,24 @@ export default function TechniciansPage() {
     { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
     { key: "phone_number", label: "Contacto", render: (r) => r.phone_number ?? "—" },
     { key: "price_rate", label: "Preço/h", render: (r) => r.price_rate !== null ? formatCurrency(r.price_rate) : "—" },
-    { key: "operation_areas", label: "Categorias", render: (r) => r.operation_areas.length ? r.operation_areas.join(", ") : "—" },
-    { key: "can_accept_service", label: "Elegível", render: (r) => r.can_accept_service ? "✓" : "—" },
+    // Os três documentos obrigatórios, cada um na sua coluna: vê-se de relance
+    // o que falta a cada técnico, sem abrir o perfil.
+    ...REQUIRED_DOCS.map((d) => ({
+      key: `doc_${d.key}`,
+      label: d.short,
+      render: (r: RealVendor) => {
+        const st = docsByVendor.get(r.id)?.[d.key] ?? "em_falta";
+        const ui = DOC_STATE_UI[st];
+        return <span title={`${d.label}: ${ui.label}`} className={cn("font-bold", ui.tone)}>{ui.symbol}</span>;
+      },
+    })),
     { key: "at_valid", label: "AT", render: (r) => r.at_valid ? "✓" : "⚠️" },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
-    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
     { key: "acao", label: "", render: (r) => (
-      <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleSuspend(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+      <div className="flex items-center justify-end gap-3">
+        <button onClick={(e) => { e.stopPropagation(); setProfileVendor(r); }} className="btn-secondary text-xs py-1">Ver perfil</button>
+        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleSuspend(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+      </div>
     ) },
   ];
 
@@ -384,7 +412,8 @@ export default function TechniciansPage() {
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                    <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading} />
+                    <DataTable columns={columns} data={vendors?.data ?? []} keyField="id" loading={loading}
+                      onRowClick={(r) => setProfileVendor(r)} />
                     {vendors && <Pagination page={page} totalPages={vendors.totalPages} total={vendors.total} pageSize={pageSize} onPageChange={setPage} />}
                   </div>
                 )}
@@ -436,6 +465,97 @@ export default function TechniciansPage() {
             </Field>
           </div>
         )}
+      </Modal>
+
+      {/* Perfil do técnico — o que entregou, o que falta e o que está por validar. */}
+      <Modal
+        open={!!profileVendor}
+        onClose={() => setProfileVendor(null)}
+        size="lg"
+        title={profileVendor?.name ?? "Técnico"}
+        subtitle={profileVendor ? [profileVendor.nif && `NIF ${profileVendor.nif}`, profileVendor.phone_number, profileVendor.created_at && `registado ${formatDate(profileVendor.created_at)}`].filter(Boolean).join(" · ") : undefined}
+        footer={<button onClick={() => setProfileVendor(null)} className="btn-secondary text-sm">Fechar</button>}
+      >
+        {profileVendor && (() => {
+          const states = docsByVendor.get(profileVendor.id);
+          const emFalta = missingCount(states);
+          const meus = docsOfVendor(profileVendor.id);
+          return (
+            <div className="space-y-5">
+              {/* Resumo do KYC */}
+              <div className={cn("rounded-xl border p-3 text-sm",
+                emFalta === 0 ? "border-success/30 bg-success-light/40 text-success" : "border-warning/30 bg-warning-light/40 text-warning")}>
+                {emFalta === 0
+                  ? "✓ Documentação completa — os três documentos obrigatórios estão aprovados."
+                  : `⚠️ Falta${emFalta === 1 ? "" : "m"} ${emFalta} de ${REQUIRED_DOCS.length} documento${emFalta === 1 ? "" : "s"} por aprovar.`}
+              </div>
+
+              {/* Os três obrigatórios, com o documento entregue (se houver) */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Documentos obrigatórios</p>
+                {REQUIRED_DOCS.map((req) => {
+                  const st = states?.[req.key] ?? "em_falta";
+                  const ui = DOC_STATE_UI[st];
+                  const doc = meus.find((d) => classifyDocument(d.document_type) === req.key);
+                  return (
+                    <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary">{req.label}</p>
+                        <p className={cn("text-xs", ui.tone)}>
+                          {ui.symbol} {ui.label}
+                          {doc?.created_at && st !== "em_falta" && ` · enviado ${formatDate(doc.created_at)}`}
+                          {doc?.reason && st === "recusado" && ` · ${doc.reason}`}
+                          {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {doc?.file_url && (
+                          <button onClick={() => { setProfileVendor(null); setPreviewDoc(doc); }} className="btn-secondary text-xs py-1">
+                            <Eye className="h-3.5 w-3.5" /> Ver
+                          </button>
+                        )}
+                        {doc && doc.status === "pending" && (
+                          <>
+                            <button onClick={() => { setProfileVendor(null); openApprove(doc); }} className="text-xs text-success hover:underline">Aprovar</button>
+                            <button onClick={() => { setProfileVendor(null); openDecline(doc); }} className="text-xs text-danger hover:underline">Recusar</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Outros documentos que o técnico tenha enviado */}
+              {meus.filter((d) => !classifyDocument(d.document_type)).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Outros documentos</p>
+                  {meus.filter((d) => !classifyDocument(d.document_type)).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary truncate">{d.document_type ?? "Documento"}</p>
+                        <p className="text-xs text-text-secondary">{DOC_STATE_UI[d.status === "approved" ? "aprovado" : d.status === "declined" ? "recusado" : "pendente"].label}</p>
+                      </div>
+                      {d.file_url && (
+                        <button onClick={() => { setProfileVendor(null); setPreviewDoc(d); }} className="btn-secondary text-xs py-1 shrink-0">
+                          <Eye className="h-3.5 w-3.5" /> Ver
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Dados do técnico */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><p className="text-xs text-text-muted">Preço/h</p><p className="text-text-primary">{profileVendor.price_rate !== null ? formatCurrency(profileVendor.price_rate) : "—"}</p></div>
+                <div><p className="text-xs text-text-muted">Categorias</p><p className="text-text-primary">{profileVendor.operation_areas.length ? profileVendor.operation_areas.join(", ") : "—"}</p></div>
+                <div><p className="text-xs text-text-muted">Validação AT</p><p className="text-text-primary">{profileVendor.at_valid ? "Válida" : "Por validar"}</p></div>
+                <div><p className="text-xs text-text-muted">Pode aceitar serviço</p><p className="text-text-primary">{profileVendor.can_accept_service ? "Sim" : "Não"}</p></div>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Pré-visualização do documento — rever sem descarregar. */}
