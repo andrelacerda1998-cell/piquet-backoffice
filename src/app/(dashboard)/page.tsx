@@ -8,8 +8,9 @@ import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getFinanceGmv, getUnitEconomics } from "@/services/financeService";
-import { getGoals } from "@/services/extrasService";
+import { getGoals, getLeads } from "@/services/extrasService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
+import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
 import type { MetricValue } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -20,7 +21,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight } from "lucide-react";
+import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2 } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -90,6 +91,8 @@ export default function OverviewPage() {
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
+  const { data: leads } = useAsyncData(() => getLeads(), []);
+  const { data: pendingDocs } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
   const [tab, setTab] = useTabParam("resumo");
 
   if (loading && !gmvData) return <LoadingState />;
@@ -115,6 +118,12 @@ export default function OverviewPage() {
   const storeRating = cliRatings.length
     ? Math.round((cliRatings.reduce((s, r) => s + r.rating, 0) / cliRatings.length) * 10) / 10
     : 0;
+
+  // O que está à espera de alguém: leads por responder (e quantas urgentes) e
+  // documentos KYC por validar. É o primeiro que se quer ver ao abrir o dia.
+  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "nao_iniciado");
+  const leadsUrgentes = leadsPorResponder.filter((l) => /urg[êe]ncia:\s*(urgente|hoje|emerg|imediat|agora)/i.test(l.message || "")).length;
+  const kycPendentes = pendingDocs?.meta.total ?? 0;
 
   const goals = goalsData?.goals ?? [];
   const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
@@ -150,6 +159,45 @@ export default function OverviewPage() {
 
         {tab === "resumo" && (
         <div className="space-y-8">
+        {/* ---------- À espera de resposta ---------- */}
+        {(leadsPorResponder.length > 0 || kycPendentes > 0) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {leadsPorResponder.length > 0 && (
+              <Link href="/leads"
+                className="card border-l-[3px] border-l-warning p-4 flex items-center gap-3 hover:shadow-elevated transition-shadow group">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-light text-warning">
+                  <Headphones className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary">
+                    {leadsPorResponder.length} lead{leadsPorResponder.length === 1 ? "" : "s"} por responder
+                    {leadsUrgentes > 0 && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger align-middle">
+                        {leadsUrgentes} urgente{leadsUrgentes === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-text-secondary">Pedidos recebidos que ainda ninguém contactou.</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0 group-hover:text-piquet-700 transition-colors" />
+              </Link>
+            )}
+            {kycPendentes > 0 && (
+              <Link href="/tecnicos?tab=aprovacoes"
+                className="card border-l-[3px] border-l-piquet p-4 flex items-center gap-3 hover:shadow-elevated transition-shadow group">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700">
+                  <FileCheck2 className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary">{kycPendentes} documento{kycPendentes === 1 ? "" : "s"} por validar</p>
+                  <p className="text-sm text-text-secondary">Técnicos à espera de aprovação para poderem trabalhar.</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0 group-hover:text-piquet-700 transition-colors" />
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* ---------- Indicadores-chave (reais) ---------- */}
         <div>
           <SectionHeader title="Indicadores-chave" />

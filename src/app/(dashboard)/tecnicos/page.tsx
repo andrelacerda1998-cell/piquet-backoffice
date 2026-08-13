@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
+import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation,
@@ -32,7 +33,8 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
-  const [tab, setTab] = useState("visao");
+  // ?tab=aprovacoes — deep-link vindo dos avisos da Visão executiva.
+  const [tab, setTab] = useTabParam("visao");
 
   // Indicadores reais da Visão geral (App\Http\Controllers\Api\Admin\
   // VendorController::metrics() e derivados) -- substituem os "estados"
