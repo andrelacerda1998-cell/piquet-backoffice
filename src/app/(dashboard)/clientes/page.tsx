@@ -108,6 +108,28 @@ export default function CustomersPage() {
     }
   };
 
+  // Filtro "pode pedir serviços". Como a lista é paginada pelo servidor,
+  // filtrar só a página daria contagens erradas — com filtro ativo carrega-se
+  // a lista completa e conta-se sobre o total.
+  const [reqFilter, setReqFilter] = useState<"" | "pode" | "nao_pode">("");
+  const { data: allCustomers, loading: allCustomersLoading } = useAsyncData(
+    () => (reqFilter ? getCustomers(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
+    [reqFilter, debouncedSearch]
+  );
+  const reqFiltered = useMemo(() => {
+    const list = allCustomers?.data ?? [];
+    if (!reqFilter) return [];
+    return list.filter((c) => (reqFilter === "pode" ? c.can_request_service : !c.can_request_service));
+  }, [allCustomers, reqFilter]);
+  const reqCounts = useMemo(() => {
+    const list = allCustomers?.data ?? [];
+    return {
+      pode: list.filter((c) => c.can_request_service).length,
+      nao_pode: list.filter((c) => !c.can_request_service).length,
+      carregados: list.length,
+    };
+  }, [allCustomers]);
+
   // Métodos de pagamento guardados — migrado do Filament
   // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
   // modal com os cartões/MBWay do cliente; sem criar/editar (só o Filament
@@ -203,7 +225,12 @@ export default function CustomersPage() {
         {r.phone_number && !r.phone_verified && <span title="Telefone não verificado" className="text-warning">⚠</span>}
       </span>
     ) },
-    { key: "can_request_service", label: "Elegível", render: (r) => r.can_request_service ? "✓" : "—" },
+    { key: "can_request_service", label: "Pode pedir", render: (r) => (
+      <span title={r.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
+        className={cn("font-bold", r.can_request_service ? "text-success" : "text-text-muted")}>
+        {r.can_request_service ? "✓" : "—"}
+      </span>
+    ) },
     { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
     { key: "acao", label: "", render: (r) => r.blocked_at
       ? <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleRestore(r); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
@@ -304,10 +331,50 @@ export default function CustomersPage() {
               <>
                 {sub === "todos" && (
                   <div className="space-y-4">
-                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
-                    <p className="text-xs text-text-muted">Clica numa linha para ver os métodos de pagamento guardados.</p>
-                    <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} onRowClick={setSelectedCustomer} />
-                    {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {([
+                          { id: "", label: "Todos" },
+                          { id: "pode", label: "Podem pedir serviços" },
+                          { id: "nao_pode", label: "Não podem" },
+                        ] as const).map((f) => (
+                          <button key={f.id} onClick={() => setReqFilter(f.id)}
+                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                              reqFilter === f.id
+                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
+                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
+                            {f.label}
+                            {f.id && reqFilter && (
+                              <span className={cn("tabular-nums text-xs", reqFilter === f.id ? "opacity-80" : "text-text-muted")}>
+                                {f.id === "pode" ? reqCounts.pode : reqCounts.nao_pode}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-muted">Clica numa linha para abrir o perfil do cliente.</p>
+
+                    {reqFilter ? (
+                      <>
+                        <p className="text-sm text-text-secondary">
+                          <b className="text-text-primary tabular-nums">{reqFiltered.length}</b>{" "}
+                          {reqFiltered.length === 1
+                            ? (reqFilter === "pode" ? "pode pedir serviços" : "não pode pedir serviços")
+                            : (reqFilter === "pode" ? "podem pedir serviços" : "não podem pedir serviços")}
+                          {reqCounts.carregados > 0 && ` · de ${reqCounts.carregados} clientes`}
+                        </p>
+                        <DataTable columns={columns} data={reqFiltered} keyField="id" loading={allCustomersLoading}
+                          onRowClick={setSelectedCustomer}
+                          emptyMessage={reqFilter === "pode" ? "Nenhum cliente pode pedir serviços." : "Todos os clientes podem pedir serviços 🎉"} />
+                      </>
+                    ) : (
+                      <>
+                        <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} onRowClick={setSelectedCustomer} />
+                        {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
+                      </>
+                    )}
                   </div>
                 )}
                 {sub === "bloqueados" && (
