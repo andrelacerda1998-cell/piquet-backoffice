@@ -70,6 +70,14 @@ export default function TechniciansPage() {
   const candidatasOrdenadas = useMemo(() =>
     [...(technicianCoverage?.candidate ?? [])].sort((a, b) => b.technicians.length - a.technicians.length),
   [technicianCoverage]);
+  // A "oferta" vem das zonas que os técnicos declaram na app. Se ninguém
+  // declarou, vem tudo a zero — o que NÃO significa que não haja técnicos na
+  // zona, significa que não está medido. Distinguir os dois casos evita
+  // afirmar "nenhum técnico cobre esta zona" quando não sabemos.
+  const coberturaPorMedir = useMemo(() => {
+    const zonas = coverage ?? [];
+    return zonas.length > 0 && zonas.every((z) => z.oferta === 0);
+  }, [coverage]);
   const zonasEmFalta = useMemo(() =>
     [...(coverage ?? [])]
       .filter((z) => z.procura > 0 && (z.oferta === 0 || z.procura > z.oferta))
@@ -360,10 +368,25 @@ export default function TechniciansPage() {
                 )}
                 {sub === "cobertura" && (
                   <div className="space-y-5">
+                    {/* Sem cobertura declarada não se pode falar de oferta —
+                        dizê-lo em vez de mostrar zeros que parecem factos. */}
+                    {coberturaPorMedir && (
+                      <div className="card border-l-[3px] border-l-warning p-4">
+                        <p className="font-semibold text-text-primary">Cobertura por medir</p>
+                        <p className="text-sm text-text-secondary mt-1">
+                          Nenhum técnico declarou zonas na app, por isso a &ldquo;oferta&rdquo; aparece a zero em todas as cidades —
+                          <b className="text-text-primary"> isso não quer dizer que não haja técnicos lá</b>, quer dizer que não está medido.
+                          A procura abaixo é real. Para saber quem cobre cada zona, o backend precisa de expor a morada/cidade
+                          de cada técnico (ver INTEGRACAO_LARAVEL_BACKOFFICE.md).
+                        </p>
+                      </div>
+                    )}
+
                     {/* O que decide: onde falta gente e onde vale a pena abrir. */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                       <MetricCard title="Zonas abertas" metric={buildMetricValue(coberturaResumo.zonasAbertas, coberturaResumo.zonasAbertas)} hideDelta />
-                      <MetricCard title="Zonas sem técnicos" metric={buildMetricValue(coberturaResumo.zonasSemTecnicos, coberturaResumo.zonasSemTecnicos)} hideDelta />
+                      <MetricCard title={coberturaPorMedir ? "Zonas por medir" : "Zonas sem técnicos"}
+                        metric={buildMetricValue(coberturaResumo.zonasSemTecnicos, coberturaResumo.zonasSemTecnicos)} hideDelta />
                       <MetricCard title="Cidades candidatas" metric={buildMetricValue(coberturaResumo.candidatas, coberturaResumo.candidatas)} hideDelta />
                       <MetricCard title="Técnicos a cobrir zonas" metric={buildMetricValue(coberturaResumo.tecnicosDistintos, coberturaResumo.tecnicosDistintos)} hideDelta />
                     </div>
@@ -372,8 +395,14 @@ export default function TechniciansPage() {
                       {/* Onde falta gente — procura acima da oferta, o mais urgente primeiro. */}
                       <div className="card overflow-hidden">
                         <div className="border-b border-surface-border px-4 py-3">
-                          <h3 className="font-semibold text-text-primary">Onde falta gente</h3>
-                          <p className="text-xs text-text-secondary mt-0.5">Zonas com mais pedidos do que técnicos a cobri-las</p>
+                          <h3 className="font-semibold text-text-primary">
+                            {coberturaPorMedir ? "Onde há mais procura" : "Onde falta gente"}
+                          </h3>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            {coberturaPorMedir
+                              ? "Pedidos de serviço por cidade (dados reais)"
+                              : "Zonas com mais pedidos do que técnicos a cobri-las"}
+                          </p>
                         </div>
                         <div className="p-4 space-y-2.5">
                           {zonasEmFalta.length === 0 ? (
@@ -383,14 +412,17 @@ export default function TechniciansPage() {
                               <div className="flex items-baseline justify-between text-sm">
                                 <span className="font-medium text-text-primary">{z.name}</span>
                                 <span className="text-text-secondary tabular-nums">
-                                  {z.procura} pedido{z.procura === 1 ? "" : "s"} · {z.oferta} técnico{z.oferta === 1 ? "" : "s"}
+                                  {z.procura} pedido{z.procura === 1 ? "" : "s"}
+                                  {!coberturaPorMedir && ` · ${z.oferta} técnico${z.oferta === 1 ? "" : "s"}`}
                                 </span>
                               </div>
                               <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
                                 <div className={cn("h-full rounded-full", z.oferta === 0 ? "bg-danger" : z.ratio > 2 ? "bg-warning" : "bg-piquet")}
                                   style={{ width: `${Math.min(100, (z.procura / Math.max(1, zonasEmFalta[0].procura)) * 100)}%` }} />
                               </div>
-                              {z.oferta === 0 && <p className="text-[11px] text-danger mt-0.5">Nenhum técnico cobre esta zona</p>}
+                              {z.oferta === 0 && !coberturaPorMedir && (
+                                <p className="text-[11px] text-danger mt-0.5">Nenhum técnico cobre esta zona</p>
+                              )}
                             </div>
                           ))}
                         </div>

@@ -230,3 +230,51 @@ Deve gravar também **quem** validou (o staff autenticado), para haver rasto.
 Enquanto a rota não existir, o botão "Validar" devolve uma mensagem explícita
 ("O backend ainda não tem a rota de validação AT…") em vez de fingir que gravou.
 Assim que existir, funciona sem mais alterações do lado do Next.
+
+---
+
+## Cobertura por zona — falta a morada do técnico ⚠️
+
+Medido na API real (13/08/2026): **a `oferta` vem a zero em todas as cidades**,
+enquanto a procura é real e substancial:
+
+| Cidade | Pedidos | Oferta reportada |
+|---|---|---|
+| Costa de Caparica | 106 | 0 |
+| Almada | 77 | 0 |
+| Torres Vedras | 25 | 0 |
+| Lisboa | 16 | 0 |
+
+A causa: a `oferta` é calculada a partir das **zonas que os técnicos declaram na
+app** (`AllowedZone` / survey vote) — e **ninguém declarou** (as 14 zonas abertas
+têm 0 técnicos, as 12 candidatas têm 0 interessados). Com 443 técnicos
+registados e serviços a acontecer nessas cidades, o número não descreve a
+realidade: não é "não há técnicos", é "não está medido".
+
+O backoffice deixou de afirmar "nenhum técnico cobre esta zona" — passa a dizer
+que a cobertura está por medir. Mas a estatística útil continua por fazer.
+
+### O que falta expor
+
+**1. Morada / cidade do técnico** no `GET /v1/admin/vendors`:
+
+```jsonc
+{
+  "id": 443,
+  "name": "Liber Bravo",
+  "city": "Almada",           // ← o que permite contar técnicos por zona
+  "district": "Setúbal",      // opcional
+  "postal_code": "2800-000"   // opcional
+}
+```
+
+Com isto, o backoffice calcula sozinho quantos técnicos há por cidade e cruza
+com a procura — sem depender de os técnicos declararem nada na app.
+
+**2. Em alternativa (melhor ainda):** que a `oferta` no
+`GET /v1/admin/vendors/coverage` passe a contar os técnicos que **já executaram
+serviços** naquela cidade. É evidência de facto, não uma declaração — e responde
+diretamente a "quem consigo mandar a Almada amanhã?".
+
+As duas podem coexistir: morada = onde vive; serviços executados = onde trabalha
+mesmo.
