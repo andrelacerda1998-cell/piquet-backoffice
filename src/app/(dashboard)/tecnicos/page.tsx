@@ -19,7 +19,7 @@ import {
 } from "@/services/vendorsService";
 import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
-  getVendorDocuments, approveVendorDocument, declineVendorDocument,
+  getVendorDocuments, getAllVendorDocuments, approveVendorDocument, declineVendorDocument,
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -117,13 +117,20 @@ export default function TechniciansPage() {
 
   // Todos os documentos (os três estados) para saber, por técnico, o que já
   // entregou e o que falta — alimenta as colunas de KYC e o perfil.
-  const { data: allDocs, refetch: refetchAllDocs } = useAsyncData(async () => {
-    const pages = await Promise.all(
-      (["pending", "approved", "declined"] as VendorDocumentStatus[])
-        .map((s) => getVendorDocuments(s, 1, 200).catch(() => ({ items: [] as VendorDocument[], meta: { current_page: 1, last_page: 1, per_page: 200, total: 0 } }))),
+  // Percorre TODAS as páginas de cada estado: há centenas de documentos e o
+  // backend limita a 100 por página — sem isto, os técnicos validados há mais
+  // tempo apareciam sem documentos nenhuns.
+  const { data: allDocsResult, refetch: refetchAllDocs } = useAsyncData(async () => {
+    const parts = await Promise.all(
+      (["pending", "approved", "declined"] as VendorDocumentStatus[]).map((s) => getAllVendorDocuments(s)),
     );
-    return pages.flatMap((p) => p.items);
+    return {
+      items: parts.flatMap((p) => p.items),
+      falharam: parts.reduce((a, p) => a + p.falharam, 0),
+    };
   }, []);
+  const allDocs = allDocsResult?.items;
+  const docsIncompletos = allDocsResult?.falharam ?? 0;
   const docsByVendor = useMemo(() => indexDocsByVendor(allDocs ?? []), [allDocs]);
   const docsOfVendor = (vendorId: number) => (allDocs ?? []).filter((d) => d.vendor_id === vendorId);
 
@@ -515,6 +522,16 @@ export default function TechniciansPage() {
                 <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
               </div>
             )}
+            {docsIncompletos > 0 && (
+              <div className="card border-l-[3px] border-l-warning p-4">
+                <p className="font-semibold text-text-primary">Lista incompleta</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  O backend não conseguiu devolver cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos
+                  (erro do servidor em algumas páginas). Os estados mostrados nas colunas e nos perfis podem estar
+                  incompletos para esses técnicos — não quer dizer que não tenham entregado.
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <p className="text-sm text-text-secondary max-w-2xl">
                 Documentos enviados pelos técnicos, à espera de revisão. Aprovar ou recusar notifica o técnico a sério (email + push) <DemoBadge endpoint="/vendor-documents" />
@@ -682,6 +699,13 @@ export default function TechniciansPage() {
                   ? "✓ Documentação completa — os três documentos obrigatórios estão aprovados."
                   : `⚠️ Falta${emFalta === 1 ? "" : "m"} ${emFalta} de ${REQUIRED_DOCS.length} documento${emFalta === 1 ? "" : "s"} por aprovar.`}
               </div>
+
+              {docsIncompletos > 0 && (
+                <p className="rounded-lg bg-warning-light/50 px-3 py-2 text-[11px] text-warning">
+                  Nota: o backend falhou a devolver ~{docsIncompletos} documentos. Se este técnico aparecer sem
+                  documentos, pode ser essa a razão.
+                </p>
+              )}
 
               {/* Os três obrigatórios, com o documento entregue (se houver) */}
               <div className="space-y-2">

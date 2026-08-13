@@ -278,3 +278,49 @@ diretamente a "quem consigo mandar a Almada amanhã?".
 
 As duas podem coexistir: morada = onde vive; serviços executados = onde trabalha
 mesmo.
+
+---
+
+## BUG: `GET /v1/admin/vendor-documents` rebenta em certas páginas 🐛
+
+Sintoma no backoffice: **técnicos validados há mais tempo apareciam sem
+documentos**. Duas causas — uma minha (já corrigida), outra do backend.
+
+### Medição (13/08/2026, API de produção)
+
+```
+status=approved  → total = 449 documentos
+per_page=20  → OK          per_page=25  → "Server Error"
+per_page=50  → "Server Error"   per_page=100 → "Server Error"
+```
+
+Com `per_page=20`, algumas páginas falham e outras não:
+
+```
+página 1 → OK      página 2 → Server Error     página 3,4,5 → OK
+página 6 → Server Error
+```
+
+Reduzindo a granularidade, o erro isola-se em documentos concretos: as posições
+21 e 22 respondem (ids 484 e 486, "Wilgner macedo"), e as **23, 24 e 25 dão
+erro** — os ids em falta nessa janela são os **481, 482 e 483**.
+
+Falha em ~0,4 s, portanto **não é timeout**: são registos que o serializador não
+consegue processar (ficheiro em falta no disco? `document_type` nulo? URL
+assinado a rebentar?). O mesmo acontece com `status=declined`.
+
+### O que já foi feito do lado do backoffice
+
+- Passou a percorrer **todas** as páginas (antes lia só as primeiras 100 de 449 —
+  daí faltarem os mais antigos);
+- Quando uma página rebenta, tenta em pedaços de 10 para salvar o que der;
+- O que não vier é contado e o ecrã avisa que a lista está incompleta, em vez de
+  mostrar "sem documentos" (que seria falso).
+
+### O que falta do lado do Laravel
+
+1. Descobrir porque é que os documentos **481, 482, 483** (e outros) rebentam —
+   um `try/catch` por registo no controller já evitaria deitar a página inteira
+   abaixo.
+2. Confirmar o limite real de `per_page` (aceita 100 em `pending`, mas rebenta
+   em `approved`) — se o limite for menor, devolver erro claro em vez de 500.
