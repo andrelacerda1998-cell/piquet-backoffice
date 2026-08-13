@@ -309,6 +309,18 @@ Falha em ~0,4 s, portanto **não é timeout**: são registos que o serializador 
 consegue processar (ficheiro em falta no disco? `document_type` nulo? URL
 assinado a rebentar?). O mesmo acontece com `status=declined`.
 
+### Impacto real medido
+
+Com páginas de 20 e recuperação em pedaços de 5, o backoffice consegue ler
+**399 dos 449** documentos aprovados — **50 continuam inacessíveis** porque o
+backend rebenta neles. Exemplo concreto: o técnico **Nuno Santos (id 9)** tem os
+três documentos obrigatórios aprovados (ids 35, 41 e 192) mas aparecia sem
+nenhum, porque a página onde vivem falhava.
+
+Nota: vários documentos vêm com `document_type: null` (ex.: ids 36, 37, 38) — o
+backoffice não os consegue classificar e mostra-os como "outros documentos".
+Valeria a pena perceber se é um campo por preencher ou dados corrompidos.
+
 ### O que já foi feito do lado do backoffice
 
 - Passou a percorrer **todas** as páginas (antes lia só as primeiras 100 de 449 —

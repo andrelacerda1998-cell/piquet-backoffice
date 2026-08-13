@@ -81,35 +81,48 @@ export interface AllVendorDocuments {
  * é contado em `falharam`, para o ecrã poder dizer que a lista está incompleta.
  */
 export async function getAllVendorDocuments(status: VendorDocumentStatus): Promise<AllVendorDocuments> {
-  const PER_PAGE = 100;
+  // Páginas pequenas de propósito: com per_page=100 o backend falha quase
+  // sempre (incluindo a página 1); com 20 falha só em páginas específicas.
+  const PER_PAGE = 20;
+  const RETRY = 5;      // pedaço menor para recuperar uma página que falhou
+  const LOTE = 6;       // pedidos em paralelo
+
+  const fetchPage = (page: number, perPage: number) =>
+    getVendorDocuments(status, page, perPage).then((r) => r.items).catch(() => null);
+
+  // Descobrir o total. Se a primeira página falhar, NÃO desistir — tenta um
+  // pedaço menor só para ler o `meta` (era aqui que a lista saía vazia sem
+  // sequer avisar).
+  let total = 0;
+  const head = await getVendorDocuments(status, 1, PER_PAGE).catch(() => null)
+    ?? await getVendorDocuments(status, 1, RETRY).catch(() => null);
+  if (!head) return { items: [], falharam: 0 };
+  total = head.meta.total ?? head.items.length;
+  const totalPaginas = Math.max(1, Math.ceil(total / PER_PAGE));
+
   const items: VendorDocument[] = [];
-  let falharam = 0;
+  const falhadas: number[] = [];
 
-  const first = await getVendorDocuments(status, 1, PER_PAGE).catch(() => null);
-  if (!first) return { items, falharam: 0 };
-  items.push(...first.items);
-  const lastPage = Math.max(1, first.meta.last_page);
-
-  for (let page = 2; page <= lastPage; page++) {
-    try {
-      const p = await getVendorDocuments(status, page, PER_PAGE);
-      items.push(...p.items);
-    } catch {
-      // Página inteira falhou — tenta em pedaços de 10 para salvar o que der.
-      const CHUNK = 10;
-      const base = (page - 1) * PER_PAGE;
-      for (let off = 0; off < PER_PAGE; off += CHUNK) {
-        const sub = Math.floor((base + off) / CHUNK) + 1;
-        try {
-          const r = await getVendorDocuments(status, sub, CHUNK);
-          items.push(...r.items);
-        } catch {
-          falharam += CHUNK;
-        }
-      }
-    }
+  for (let inicio = 1; inicio <= totalPaginas; inicio += LOTE) {
+    const paginas = Array.from({ length: Math.min(LOTE, totalPaginas - inicio + 1) }, (_, k) => inicio + k);
+    const res = await Promise.all(paginas.map((pg) => fetchPage(pg, PER_PAGE)));
+    res.forEach((r, k) => (r ? items.push(...r) : falhadas.push(paginas[k])));
   }
-  return { items, falharam };
+
+  // Segunda passagem: as páginas que rebentaram são tentadas em pedaços de 5,
+  // para salvar os documentos que estão bons ao lado dos que o backend não
+  // consegue serializar.
+  let falharam = 0;
+  for (const pg of falhadas) {
+    const base = (pg - 1) * PER_PAGE;
+    const subs = Array.from({ length: PER_PAGE / RETRY }, (_, k) => Math.floor((base + k * RETRY) / RETRY) + 1);
+    const res = await Promise.all(subs.map((sp) => fetchPage(sp, RETRY)));
+    res.forEach((r) => (r ? items.push(...r) : (falharam += RETRY)));
+  }
+
+  // O backend pode devolver o mesmo documento em pedidos diferentes.
+  const porId = new Map(items.map((d) => [d.id, d]));
+  return { items: [...porId.values()], falharam };
 }
 
 export async function approveVendorDocument(id: number, expirationDate?: string | null): Promise<VendorDocument> {
