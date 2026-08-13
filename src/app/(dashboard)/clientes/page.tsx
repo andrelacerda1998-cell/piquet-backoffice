@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -20,8 +20,10 @@ import {
 } from "@/services/customersService";
 import { CreditCard, Smartphone, Trash2 } from "lucide-react";
 import { type Complaint } from "@/services/extrasService";
+import { getServices } from "@/services/dashboardService";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate } from "@/lib/formatters";
+import { formatDate, formatCurrency } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -111,6 +113,31 @@ export default function CustomersPage() {
   // modal com os cartões/MBWay do cliente; sem criar/editar (só o Filament
   // já não permitia isso na prática — o form estava comentado).
   const [selectedCustomer, setSelectedCustomer] = useState<RealCustomer | null>(null);
+  // Histórico de serviços do cliente. Os clientes vêm do Laravel (id numérico)
+  // e os serviços do Supabase (customer_id uuid) — os ids não correspondem, por
+  // isso a ligação possível hoje é pelo nome. Assinalado no ecrã.
+  const { data: custServices, loading: custServicesLoading } = useAsyncData(
+    () => (selectedCustomer?.name
+      ? getServices({ period: "este_ano" }, 1, 100, undefined, selectedCustomer.name)
+      : Promise.resolve(null)),
+    [selectedCustomer]
+  );
+  const historico = useMemo(() => {
+    const list = custServices?.data ?? [];
+    const concluidos = list.filter((x) => x.status === "concluido");
+    const avaliados = list.filter((x) => !!x.rating);
+    return {
+      total: list.length,
+      concluidos: concluidos.length,
+      gasto: concluidos.reduce((a, x) => a + x.totalCustomerValue, 0),
+      ticket: concluidos.length ? concluidos.reduce((a, x) => a + x.totalCustomerValue, 0) / concluidos.length : 0,
+      ultimo: list.map((x) => x.completedAt ?? x.requestedAt).filter(Boolean).sort().reverse()[0] ?? null,
+      avaliacao: avaliados.length ? avaliados.reduce((a, x) => a + (x.rating ?? 0), 0) / avaliados.length : 0,
+      reclamacoes: list.filter((x) => x.hasComplaint).length,
+      lista: [...list].sort((a, b) => (b.completedAt ?? b.requestedAt ?? "").localeCompare(a.completedAt ?? a.requestedAt ?? "")),
+    };
+  }, [custServices]);
+
   const { data: paymentMethods, loading: paymentMethodsLoading, refetch: refetchPaymentMethods } = useAsyncData(
     () => (selectedCustomer ? getCustomerPaymentMethods(selectedCustomer.id) : Promise.resolve([] as CustomerPaymentMethod[])),
     [selectedCustomer]
@@ -329,48 +356,148 @@ export default function CustomersPage() {
         </div>
       </Modal>
 
+      {/* Perfil do cliente: contactos, histórico de serviços e pagamentos. */}
       <Modal
         open={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
+        size="xl"
         title={selectedCustomer?.name ?? "Cliente"}
-        subtitle="Métodos de pagamento guardados"
+        subtitle={selectedCustomer ? [
+          selectedCustomer.email,
+          selectedCustomer.phone_number,
+          selectedCustomer.nif && `NIF ${selectedCustomer.nif}`,
+          selectedCustomer.created_at && `cliente desde ${formatDate(selectedCustomer.created_at)}`,
+        ].filter(Boolean).join(" · ") : undefined}
         footer={<button onClick={() => setSelectedCustomer(null)} className="btn-secondary text-sm">Fechar</button>}
       >
-        {paymentMethodsLoading ? (
-          <p className="text-sm text-text-secondary">A carregar…</p>
-        ) : (paymentMethods ?? []).length === 0 ? (
-          <p className="text-sm text-text-secondary">Sem métodos de pagamento guardados.</p>
-        ) : (
-          <div className="space-y-2">
-            {(paymentMethods ?? []).map((m) => (
-              <div key={m.id} className="card px-4 py-3 flex items-center gap-3">
-                {m.type === "mbway"
-                  ? <Smartphone className="h-5 w-5 shrink-0 text-text-secondary" />
-                  : <CreditCard className="h-5 w-5 shrink-0 text-text-secondary" />}
-                <div className="min-w-0 flex-1">
-                  {m.type === "mbway" ? (
-                    <p className="font-medium text-text-primary">MBWay · {m.phone_number ?? "—"}</p>
-                  ) : (
-                    <p className="font-medium text-text-primary">
-                      {(m.brand ?? "Cartão")}{m.brand_description ? ` ${m.brand_description}` : ""} · **** {m.last4 ?? "----"}
-                    </p>
-                  )}
-                  <p className="text-xs text-text-secondary">
-                    {m.holder && <>{m.holder} · </>}
-                    {m.expire_month && m.expire_year && <>Exp. {m.expire_month}/{m.expire_year} · </>}
-                    Guardado {m.created_at ? formatDate(m.created_at) : "—"}
-                  </p>
+        {selectedCustomer && (
+          <div className="space-y-5">
+            {/* Estado da conta */}
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedCustomer.blocked_at ? (
+                <span className="inline-flex items-center rounded-full bg-danger-light px-2.5 py-0.5 text-xs font-medium text-danger">
+                  Bloqueado {formatDate(selectedCustomer.blocked_at)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-success-light px-2.5 py-0.5 text-xs font-medium text-success">Ativo</span>
+              )}
+              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                selectedCustomer.email_verified ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+                Email {selectedCustomer.email_verified ? "verificado" : "por verificar"}
+              </span>
+              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                selectedCustomer.phone_verified ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+                Telefone {selectedCustomer.phone_verified ? "verificado" : "por verificar"}
+              </span>
+              {!selectedCustomer.can_request_service && (
+                <span className="inline-flex items-center rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning">
+                  Não pode pedir serviços
+                </span>
+              )}
+            </div>
+
+            {/* Resumo do histórico */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico</p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="card p-3">
+                  <p className="text-xs text-text-secondary">Serviços</p>
+                  <p className="text-xl font-bold text-text-primary tabular-nums">{historico.total}</p>
+                  <p className="text-[11px] text-text-muted">{historico.concluidos} concluído{historico.concluidos === 1 ? "" : "s"}</p>
                 </div>
-                <button
-                  onClick={() => handleDeletePaymentMethod(m)}
-                  disabled={deletingMethodId === m.id}
-                  className="text-danger hover:opacity-70 disabled:opacity-40 shrink-0"
-                  title="Remover"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="card p-3">
+                  <p className="text-xs text-text-secondary">Total gasto</p>
+                  <p className="text-xl font-bold text-text-primary tabular-nums">{formatCurrency(historico.gasto)}</p>
+                  <p className="text-[11px] text-text-muted">média {formatCurrency(historico.ticket)}</p>
+                </div>
+                <div className="card p-3">
+                  <p className="text-xs text-text-secondary">Último serviço</p>
+                  <p className="text-xl font-bold text-text-primary">{historico.ultimo ? formatDate(historico.ultimo) : "—"}</p>
+                </div>
+                <div className="card p-3">
+                  <p className="text-xs text-text-secondary">Avaliação dada</p>
+                  <p className="text-xl font-bold text-text-primary tabular-nums">
+                    {historico.avaliacao ? `${(Math.round(historico.avaliacao * 10) / 10).toString().replace(".", ",")}★` : "—"}
+                  </p>
+                  {historico.reclamacoes > 0 && <p className="text-[11px] text-danger">{historico.reclamacoes} reclamação(ões)</p>}
+                </div>
               </div>
-            ))}
+            </div>
+
+            {/* Serviços pedidos */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Serviços pedidos</p>
+              {custServicesLoading ? (
+                <p className="text-sm text-text-secondary py-4 text-center">A carregar histórico…</p>
+              ) : historico.lista.length === 0 ? (
+                <p className="text-sm text-text-muted py-4 text-center rounded-xl border border-surface-border">
+                  Sem serviços encontrados para este cliente.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                  {historico.lista.map((sv) => (
+                    <div key={sv.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary truncate">{sv.serviceName || sv.categoryName}</p>
+                        <p className="text-xs text-text-secondary">
+                          {formatDate(sv.completedAt ?? sv.requestedAt)}
+                          {sv.technicianName && ` · ${sv.technicianName}`}
+                          {sv.city && ` · ${sv.city}`}
+                          {sv.rating ? ` · ${sv.rating}★` : ""}
+                          {sv.hasComplaint && " · com reclamação"}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-text-primary tabular-nums">{formatCurrency(sv.totalCustomerValue)}</p>
+                        <StatusBadge status={sv.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-text-muted mt-2">
+                Histórico associado pelo nome do cliente — os serviços e as contas de cliente vivem em sistemas
+                diferentes, sem um identificador comum. Homónimos podem aparecer juntos.
+              </p>
+            </div>
+
+            {/* Métodos de pagamento */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Métodos de pagamento</p>
+              {paymentMethodsLoading ? (
+                <p className="text-sm text-text-secondary">A carregar…</p>
+              ) : (paymentMethods ?? []).length === 0 ? (
+                <p className="text-sm text-text-muted py-3 text-center rounded-xl border border-surface-border">Sem métodos guardados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {(paymentMethods ?? []).map((m) => (
+                    <div key={m.id} className="rounded-xl border border-surface-border px-4 py-3 flex items-center gap-3">
+                      {m.type === "mbway"
+                        ? <Smartphone className="h-5 w-5 shrink-0 text-text-secondary" />
+                        : <CreditCard className="h-5 w-5 shrink-0 text-text-secondary" />}
+                      <div className="min-w-0 flex-1">
+                        {m.type === "mbway" ? (
+                          <p className="font-medium text-text-primary">MBWay · {m.phone_number ?? "—"}</p>
+                        ) : (
+                          <p className="font-medium text-text-primary">
+                            {(m.brand ?? "Cartão")}{m.brand_description ? ` ${m.brand_description}` : ""} · **** {m.last4 ?? "----"}
+                          </p>
+                        )}
+                        <p className="text-xs text-text-secondary">
+                          {m.holder && <>{m.holder} · </>}
+                          {m.expire_month && m.expire_year && <>Exp. {m.expire_month}/{m.expire_year} · </>}
+                          Guardado {m.created_at ? formatDate(m.created_at) : "—"}
+                        </p>
+                      </div>
+                      <button onClick={() => handleDeletePaymentMethod(m)} disabled={deletingMethodId === m.id}
+                        className="text-danger hover:opacity-70 disabled:opacity-40 shrink-0" title="Remover">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>
