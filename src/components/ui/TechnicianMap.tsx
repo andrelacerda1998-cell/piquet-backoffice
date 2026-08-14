@@ -17,6 +17,16 @@ const markerIcon = L.icon({
   shadowSize: [41, 41],
 });
 
+// Contas de teste: um pin visualmente distinto (laranja, tracejado) em vez de
+// tentar arranjar outro PNG — para nunca se confundir com um técnico real.
+const testMarkerIcon = L.divIcon({
+  className: "",
+  html: '<div style="width:18px;height:18px;border-radius:50%;background:#f59e0b;border:2px dashed #92400e;box-shadow:0 0 0 2px white;"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -9],
+});
+
 // Centro por omissão: Lisboa — usado quando ainda não há nenhum técnico
 // online para calcular os limites do mapa.
 const DEFAULT_CENTER: [number, number] = [38.7223, -9.1393];
@@ -69,9 +79,10 @@ export function TechnicianMap({ locations }: { locations: VendorLiveLocation[] }
     );
 
     for (const t of withCoords) {
-      L.marker([t.latitude, t.longitude], { icon: markerIcon })
+      const testTag = t.is_test ? ' <span style="color:#92400e;font-weight:600;">(conta de teste)</span>' : "";
+      L.marker([t.latitude, t.longitude], { icon: t.is_test ? testMarkerIcon : markerIcon })
         .bindPopup(
-          `<b>${t.name ?? "Técnico"}</b><br/>${t.categories.join(", ") || "sem categoria"}<br/><span style="color:#888">${minutesAgo(t.updated_at)}</span>`
+          `<b>${t.name ?? "Técnico"}</b>${testTag}<br/>${t.categories.join(", ") || "sem categoria"}<br/><span style="color:#888">${minutesAgo(t.updated_at)}</span>`
         )
         .addTo(layer);
     }
