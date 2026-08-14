@@ -110,6 +110,8 @@ const LIVE_EXACT = new Set<string>([
   "/technicians/by-location",
   "/technicians/top",
   "/technicians/coverage",
+  // Mapa ao vivo — técnicos Online com localização recente (informativo)
+  "/technicians/live-locations",
   // Fase 3a — Financeiro derivável dos serviços
   "/finance/by-service",
   "/finance/daily-revenue",
@@ -245,6 +247,7 @@ const REAL_DATA = new Set<string>([
   "/technicians/by-location",
   "/technicians/top",
   "/technicians/coverage",
+  "/technicians/live-locations",
   "/marketing/campaigns",
   "/marketing/metrics",
   "/marketing/channels",
