@@ -74,7 +74,13 @@ export default function TechniciansPage() {
   // Controllers\Api\Admin\VendorController::liveLocations()). Só
   // informativo; não interfere no matching/fluxo de pedidos, esse continua
   // inteiramente na app. Atualiza a cada 15s enquanto esta página está aberta.
-  const { data: liveLocations, refetch: refetchLiveLocations } = useAsyncData(() => getVendorLiveLocations(), []);
+  // `showTestAccounts` é um interruptor manual para validar o mapa sem
+  // depender de um técnico real estar online — off por omissão.
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const { data: liveLocations, refetch: refetchLiveLocations } = useAsyncData(
+    () => getVendorLiveLocations(showTestAccounts),
+    [showTestAccounts]
+  );
   useEffect(() => {
     const id = setInterval(refetchLiveLocations, 15000);
     return () => clearInterval(id);
@@ -532,6 +538,15 @@ export default function TechniciansPage() {
                           : `${liveLocations!.length} técnico${liveLocations!.length === 1 ? "" : "s"} online agora`}
                         {" — "}atualiza a cada 15s. Só informativo: não afeta a atribuição de serviços.
                       </p>
+                      <label className="flex items-center gap-1.5 text-xs text-text-secondary shrink-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showTestAccounts}
+                          onChange={(e) => setShowTestAccounts(e.target.checked)}
+                          className="rounded border-surface-border"
+                        />
+                        Mostrar contas de teste
+                      </label>
                     </div>
                     <div className="card overflow-hidden">
                       <TechnicianMap locations={liveLocations ?? []} />

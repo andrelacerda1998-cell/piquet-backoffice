@@ -178,12 +178,21 @@ export async function getVendorCoverage() {
 export interface VendorLiveLocation {
   id: number;
   name: string | null;
+  is_test: boolean;
   latitude: number | null;
   longitude: number | null;
   updated_at: string | null;
   categories: string[];
 }
 
-export async function getVendorLiveLocations() {
-  return apiGet<VendorLiveLocation[]>("/technicians/live-locations", () => []).then((r) => r.data);
+/**
+ * `includeTest` inclui contas marcadas como teste (excluídas por omissão) —
+ * só para o staff validar o mapa sem depender de um técnico real online.
+ */
+export async function getVendorLiveLocations(includeTest = false) {
+  return apiGet<VendorLiveLocation[]>(
+    "/technicians/live-locations",
+    () => [],
+    { include_test: includeTest ? 1 : undefined }
+  ).then((r) => r.data);
 }
