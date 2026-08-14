@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,9 +15,13 @@ import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashb
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   type RealVendor, type TopVendor,
 } from "@/services/vendorsService";
+
+// Leaflet mexe em `window`/`document` na inicialização — sem ssr:false a
+// build do Next.js falha (o componente tenta correr no servidor).
+const TechnicianMap = dynamic(() => import("@/components/ui/TechnicianMap").then((m) => m.TechnicianMap), { ssr: false });
 import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
   getVendorDocuments, getAllVendorDocuments, approveVendorDocument, declineVendorDocument,
@@ -64,6 +69,16 @@ export default function TechniciansPage() {
   // equivalente direto no Filament, pedido explícito do utilizador 2026-08-10).
   const { data: technicianCoverage } = useAsyncData(() => getCoverage(), []);
   const [selectedArea, setSelectedArea] = useState<{ label: string; technicians: CoverageTechnician[] } | null>(null);
+
+  // Mapa ao vivo — técnicos Online com localização recente (App\Http\
+  // Controllers\Api\Admin\VendorController::liveLocations()). Só
+  // informativo; não interfere no matching/fluxo de pedidos, esse continua
+  // inteiramente na app. Atualiza a cada 15s enquanto esta página está aberta.
+  const { data: liveLocations, refetch: refetchLiveLocations } = useAsyncData(() => getVendorLiveLocations(), []);
+  useEffect(() => {
+    const id = setInterval(refetchLiveLocations, 15000);
+    return () => clearInterval(id);
+  }, [refetchLiveLocations]);
 
   // Cobertura: o que interessa decidir — onde falta gente e onde abrir a seguir.
   const zonasAbertasOrdenadas = useMemo(() =>
@@ -348,6 +363,7 @@ export default function TechniciansPage() {
             { id: "resumo", label: "Resumo" },
             { id: "categoria", label: "Por categoria" },
             { id: "cobertura", label: "Cobertura" },
+            { id: "mapa", label: "Mapa ao vivo" },
           ]}>
             {(sub) => (
               <>
@@ -504,6 +520,21 @@ export default function TechniciansPage() {
                       <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
                         <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
                       </ChartCard>
+                    </div>
+                  </div>
+                )}
+                {sub === "mapa" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-text-secondary">
+                        {(liveLocations?.length ?? 0) === 0
+                          ? "Nenhum técnico online com localização recente."
+                          : `${liveLocations!.length} técnico${liveLocations!.length === 1 ? "" : "s"} online agora`}
+                        {" — "}atualiza a cada 15s. Só informativo: não afeta a atribuição de serviços.
+                      </p>
+                    </div>
+                    <div className="card overflow-hidden">
+                      <TechnicianMap locations={liveLocations ?? []} />
                     </div>
                   </div>
                 )}

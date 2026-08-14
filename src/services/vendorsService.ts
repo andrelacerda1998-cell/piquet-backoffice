@@ -168,3 +168,22 @@ export async function getTopVendors(limit = 10) {
 export async function getVendorCoverage() {
   return apiGet<Array<{ name: string; procura: number; oferta: number; ratio: number }>>("/technicians/coverage", () => []).then((r) => r.data);
 }
+
+/**
+ * Mapa ao vivo -- técnicos Online com localização atualizada nos últimos
+ * 10 min (a app-vendor só envia GPS enquanto o técnico está Online ou com um
+ * serviço aceite). Só informativo: não interfere no matching/fluxo de
+ * pedidos, esse continua inteiramente na app.
+ */
+export interface VendorLiveLocation {
+  id: number;
+  name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  updated_at: string | null;
+  categories: string[];
+}
+
+export async function getVendorLiveLocations() {
+  return apiGet<VendorLiveLocation[]>("/technicians/live-locations", () => []).then((r) => r.data);
+}
