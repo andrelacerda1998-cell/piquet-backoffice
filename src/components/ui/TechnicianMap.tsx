@@ -93,5 +93,9 @@ export function TechnicianMap({ locations }: { locations: VendorLiveLocation[] }
     }
   }, [locations]);
 
-  return <div ref={containerRef} className="h-[520px] w-full rounded-xl" />;
+  // `isolate` contém os z-index internos do Leaflet (controlos chegam a 1000)
+  // dentro do seu próprio contexto de empilhamento -- sem isto, esses
+  // controlos passam por cima de qualquer modal/drawer da página com um
+  // z-index bem mais baixo (ex.: o modal "Criar conta de teste").
+  return <div ref={containerRef} className="relative z-0 isolate h-[520px] w-full rounded-xl" />;
 }
