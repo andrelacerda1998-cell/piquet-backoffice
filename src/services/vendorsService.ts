@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPut, apiPost } from "./api";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -195,4 +195,31 @@ export async function getVendorLiveLocations(includeTest = false) {
     () => [],
     { include_test: includeTest ? 1 : undefined }
   ).then((r) => r.data);
+}
+
+/**
+ * Cria um técnico de teste (is_test=true) já pronto a ficar Online na app —
+ * documentos obrigatórios aprovados automaticamente, IBAN/faturação/AT
+ * preenchidos (App\Http\Controllers\Api\Admin\VendorController::
+ * createTestAccount()). A password só é devolvida aqui, uma única vez —
+ * não fica recuperável depois. Login na app-vendor é por email+password
+ * (não SMS).
+ */
+export interface NewTestVendor {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  phone_number: string;
+}
+
+export async function createTestVendor(input: {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  email?: string;
+}): Promise<NewTestVendor> {
+  return apiPost<NewTestVendor>("/technicians/test-account", input, () => {
+    throw new Error("Criar conta de teste precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
 }
