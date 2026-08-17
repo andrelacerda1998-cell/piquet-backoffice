@@ -197,6 +197,31 @@ como "Por confirmar" (?), nunca como ✓.
 **Pedido:** que o `at_valid` deixe de vir `true` por omissão — deve ser `false`
 até haver validação efetiva, e passar a `true` só quando se grava a data.
 
+### A pergunta a que o ecrã tem de responder
+
+Não é "qual é a senha" (essa nunca deve sair do Laravel). É:
+
+> **Dá para criar workspace e emitir fatura em nome deste técnico?**
+
+Para isso, o `GET /v1/admin/vendors` precisa de mandar:
+
+```jsonc
+{
+  "id": 9,
+  "at_credentials_set": true,        // o técnico chegou a introduzir os dados?
+  "at_username": "253531497/1",      // identificador (NUNCA a senha)
+  "at_invoicing_ok": true,           // resultado de um teste REAL contra a AT
+  "at_checked_at": "2026-08-13",     // quando foi testado
+  "at_check_error": null,            // se falhou, porquê (ex.: "senha inválida")
+  "at_validated_at": "2026-02-26",
+  "at_validated_by": "André Lacerda"
+}
+```
+
+O `at_invoicing_ok` é o campo que importa: deve vir de uma verificação efetiva
+(tentar criar o workspace / emitir), não de uma opinião nem de um valor por
+omissão. Sem ele, validar no backoffice é carregar num botão às cegas.
+
 ### 1. Acrescentar campos ao `GET /v1/admin/vendors`
 
 ```jsonc

@@ -779,10 +779,26 @@ export default function TechniciansPage() {
                             <p className="text-xs text-text-secondary">
                               {atUser(profileVendor)
                                 ? <>Subutilizador <span className="font-mono text-text-primary">{atUser(profileVendor)}</span></>
-                                : "O backend ainda não envia o número do subutilizador."}
+                                : profileVendor.at_credentials_set === true
+                                  ? "O técnico introduziu credenciais (identificador não enviado pelo backend)."
+                                  : profileVendor.at_credentials_set === false
+                                    ? "O técnico ainda não introduziu os dados do subutilizador."
+                                    : "O backend ainda não diz se o técnico introduziu os dados."}
                               {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
                               {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
                             </p>
+
+                            {/* A pergunta que interessa: dá para faturar por ele? */}
+                            {profileVendor.at_invoicing_ok != null && (
+                              <p className={cn("mt-1 text-xs font-medium", profileVendor.at_invoicing_ok ? "text-success" : "text-danger")}>
+                                {profileVendor.at_invoicing_ok
+                                  ? "✓ Dá para criar workspace e faturar em nome dele"
+                                  : `✗ Não dá para faturar${profileVendor.at_check_error ? ` — ${profileVendor.at_check_error}` : ""}`}
+                                {profileVendor.at_checked_at && (
+                                  <span className="font-normal text-text-muted"> · testado {formatDate(profileVendor.at_checked_at)}</span>
+                                )}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {at === "validado" ? (

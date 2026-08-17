@@ -36,6 +36,19 @@ export interface RealVendor {
   at_user?: string | null;
   at_subuser?: string | null;
   at_validated_by?: string | null;
+  /**
+   * Se o técnico chegou a introduzir credenciais do subutilizador (sem dizer
+   * quais) e se elas servem para a Piquet emitir faturas em nome dele — que é
+   * a pergunta que interessa: "dá para faturar por este técnico?".
+   *
+   * `at_invoicing_ok` deve ser o resultado de uma verificação REAL contra a AT
+   * (criar workspace / emitir), não uma opinião. `at_checked_at` diz quando foi
+   * testado e `at_check_error` porque falhou. Nenhum existe ainda no backend.
+   */
+  at_credentials_set?: boolean | null;
+  at_invoicing_ok?: boolean | null;
+  at_checked_at?: string | null;
+  at_check_error?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
