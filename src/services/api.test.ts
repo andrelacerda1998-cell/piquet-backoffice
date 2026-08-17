@@ -21,6 +21,7 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/technicians?page=1")).toBe(true);
     expect(isLiveEndpoint("/technicians/coverage")).toBe(true);
     expect(isLiveEndpoint("/technicians/top")).toBe(true);
+    expect(isLiveEndpoint("/technicians/live-locations")).toBe(true);
   });
 
   it("marca como migrados os endpoints da Fase 3a (Financeiro derivável)", () => {
@@ -179,7 +180,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/customers", "/customers/metrics", "/customers/by-location", "/customers/by-source",
                       "/customers/trend", "/customers/retention", "/technicians",
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
-                      "/technicians/top", "/technicians/coverage",
+                      "/technicians/top", "/technicians/coverage", "/technicians/live-locations",
                       "/services-types", "/operation-areas", "/allowed-zones",
                       "/documents", "/audits", "/sent-notifications", "/sent-notifications/types",
                       "/sms-codes", "/coverage", "/vendor-payments"]) {

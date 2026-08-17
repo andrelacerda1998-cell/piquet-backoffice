@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPut, apiPost } from "./api";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -180,4 +180,59 @@ export async function getTopVendors(limit = 10) {
  */
 export async function getVendorCoverage() {
   return apiGet<Array<{ name: string; procura: number; oferta: number; ratio: number }>>("/technicians/coverage", () => []).then((r) => r.data);
+}
+
+/**
+ * Mapa ao vivo -- técnicos Online com localização atualizada nos últimos
+ * 10 min (a app-vendor só envia GPS enquanto o técnico está Online ou com um
+ * serviço aceite). Só informativo: não interfere no matching/fluxo de
+ * pedidos, esse continua inteiramente na app.
+ */
+export interface VendorLiveLocation {
+  id: number;
+  name: string | null;
+  is_test: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  updated_at: string | null;
+  categories: string[];
+}
+
+/**
+ * `includeTest` inclui contas marcadas como teste (excluídas por omissão) —
+ * só para o staff validar o mapa sem depender de um técnico real online.
+ */
+export async function getVendorLiveLocations(includeTest = false) {
+  return apiGet<VendorLiveLocation[]>(
+    "/technicians/live-locations",
+    () => [],
+    { include_test: includeTest ? 1 : undefined }
+  ).then((r) => r.data);
+}
+
+/**
+ * Cria um técnico de teste (is_test=true) já pronto a ficar Online na app —
+ * documentos obrigatórios aprovados automaticamente, IBAN/faturação/AT
+ * preenchidos (App\Http\Controllers\Api\Admin\VendorController::
+ * createTestAccount()). A password só é devolvida aqui, uma única vez —
+ * não fica recuperável depois. Login na app-vendor é por email+password
+ * (não SMS).
+ */
+export interface NewTestVendor {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  phone_number: string;
+}
+
+export async function createTestVendor(input: {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  email?: string;
+}): Promise<NewTestVendor> {
+  return apiPost<NewTestVendor>("/technicians/test-account", input, () => {
+    throw new Error("Criar conta de teste precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
 }

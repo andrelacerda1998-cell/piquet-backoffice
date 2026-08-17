@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,9 +15,13 @@ import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashb
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation,
-  type RealVendor, type TopVendor,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
 } from "@/services/vendorsService";
+
+// Leaflet mexe em `window`/`document` na inicialização — sem ssr:false a
+// build do Next.js falha (o componente tenta correr no servidor).
+const TechnicianMap = dynamic(() => import("@/components/ui/TechnicianMap").then((m) => m.TechnicianMap), { ssr: false });
 import { getCoverage, type CoverageTechnician, type CoverageOpenZone, type CoverageCandidateCity } from "@/services/coverageService";
 import {
   getVendorDocuments, getAllVendorDocuments, approveVendorDocument, declineVendorDocument,
@@ -64,6 +69,57 @@ export default function TechniciansPage() {
   // equivalente direto no Filament, pedido explícito do utilizador 2026-08-10).
   const { data: technicianCoverage } = useAsyncData(() => getCoverage(), []);
   const [selectedArea, setSelectedArea] = useState<{ label: string; technicians: CoverageTechnician[] } | null>(null);
+
+  // Mapa ao vivo — técnicos Online com localização recente (App\Http\
+  // Controllers\Api\Admin\VendorController::liveLocations()). Só
+  // informativo; não interfere no matching/fluxo de pedidos, esse continua
+  // inteiramente na app. Atualiza a cada 15s enquanto esta página está aberta.
+  // `showTestAccounts` é um interruptor manual para validar o mapa sem
+  // depender de um técnico real estar online — off por omissão.
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const { data: liveLocations, refetch: refetchLiveLocations } = useAsyncData(
+    () => getVendorLiveLocations(showTestAccounts),
+    [showTestAccounts]
+  );
+  useEffect(() => {
+    const id = setInterval(refetchLiveLocations, 15000);
+    return () => clearInterval(id);
+  }, [refetchLiveLocations]);
+
+  // Criar conta de teste — já pronta a ficar Online (documentos aprovados,
+  // faturação/AT preenchidos). A password só aparece uma vez, na resposta.
+  const [testAccountModalOpen, setTestAccountModalOpen] = useState(false);
+  const [testAccountForm, setTestAccountForm] = useState({ first_name: "", last_name: "", phone_number: "", email: "" });
+  const [creatingTestAccount, setCreatingTestAccount] = useState(false);
+  const [newTestVendor, setNewTestVendor] = useState<NewTestVendor | null>(null);
+
+  const openTestAccountModal = () => {
+    setNewTestVendor(null);
+    setTestAccountForm({ first_name: "", last_name: "", phone_number: "", email: "" });
+    setTestAccountModalOpen(true);
+  };
+
+  const submitTestAccount = async () => {
+    if (!testAccountForm.first_name.trim() || !testAccountForm.last_name.trim() || !testAccountForm.phone_number.trim()) {
+      toast("Nome e telefone são obrigatórios.", "error");
+      return;
+    }
+    setCreatingTestAccount(true);
+    try {
+      const vendor = await createTestVendor({
+        first_name: testAccountForm.first_name.trim(),
+        last_name: testAccountForm.last_name.trim(),
+        phone_number: testAccountForm.phone_number.trim(),
+        email: testAccountForm.email.trim() || undefined,
+      });
+      setNewTestVendor(vendor);
+      toast("Conta de teste criada — já pode ficar Online na app.");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível criar a conta de teste.", "error");
+    } finally {
+      setCreatingTestAccount(false);
+    }
+  };
 
   // Cobertura: o que interessa decidir — onde falta gente e onde abrir a seguir.
   const zonasAbertasOrdenadas = useMemo(() =>
@@ -348,6 +404,7 @@ export default function TechniciansPage() {
             { id: "resumo", label: "Resumo" },
             { id: "categoria", label: "Por categoria" },
             { id: "cobertura", label: "Cobertura" },
+            { id: "mapa", label: "Mapa ao vivo" },
           ]}>
             {(sub) => (
               <>
@@ -504,6 +561,33 @@ export default function TechniciansPage() {
                       <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
                         <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
                       </ChartCard>
+                    </div>
+                  </div>
+                )}
+                {sub === "mapa" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-text-secondary">
+                        {(liveLocations?.length ?? 0) === 0
+                          ? "Nenhum técnico online com localização recente."
+                          : `${liveLocations!.length} técnico${liveLocations!.length === 1 ? "" : "s"} online agora`}
+                        {" — "}atualiza a cada 15s. Só informativo: não afeta a atribuição de serviços.
+                      </p>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <label className="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={showTestAccounts}
+                            onChange={(e) => setShowTestAccounts(e.target.checked)}
+                            className="rounded border-surface-border"
+                          />
+                          Mostrar contas de teste
+                        </label>
+                        <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1">Criar conta de teste</button>
+                      </div>
+                    </div>
+                    <div className="card overflow-hidden">
+                      <TechnicianMap locations={liveLocations ?? []} />
                     </div>
                   </div>
                 )}
@@ -887,6 +971,76 @@ export default function TechniciansPage() {
               ))}
             </div>
           )
+        )}
+      </Modal>
+
+      {/* Criar conta de teste — já pronta a ficar Online (documentos
+          aprovados, faturação/AT preenchidos). A password só aparece uma
+          vez, aqui — não fica guardada em lado nenhum do backoffice. */}
+      <Modal
+        open={testAccountModalOpen}
+        onClose={() => setTestAccountModalOpen(false)}
+        title="Criar conta de teste"
+        subtitle="Fica pronta a ficar Online na app-vendor de imediato — login é por email + password."
+        footer={
+          newTestVendor ? (
+            <button onClick={() => setTestAccountModalOpen(false)} className="btn-primary text-sm">Fechar</button>
+          ) : (
+            <>
+              <button onClick={() => setTestAccountModalOpen(false)} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={submitTestAccount} disabled={creatingTestAccount} className="btn-primary text-sm disabled:opacity-60">
+                {creatingTestAccount ? "A criar…" : "Criar conta"}
+              </button>
+            </>
+          )
+        }
+      >
+        {newTestVendor ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 p-3">
+              <p className="text-sm font-semibold text-text-primary">Guarda já esta password — só aparece agora.</p>
+              <p className="text-xs text-text-secondary mt-0.5">Não fica recuperável depois de fechares esta janela.</p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-subtle px-3 py-2">
+                <span className="text-text-secondary">Email</span>
+                <span className="font-mono font-medium">{newTestVendor.email}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-subtle px-3 py-2">
+                <span className="text-text-secondary">Password</span>
+                <span className="font-mono font-medium">{newTestVendor.password}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-subtle px-3 py-2">
+                <span className="text-text-secondary">Telefone</span>
+                <span className="font-mono font-medium">{newTestVendor.phone_number}</span>
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              Entra na app do técnico com este email e password, liga o &ldquo;Online&rdquo; e o pin aparece no mapa
+              (com &ldquo;Mostrar contas de teste&rdquo; ligado) em poucos segundos.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nome">
+                <input className="input-field" value={testAccountForm.first_name}
+                  onChange={(e) => setTestAccountForm((f) => ({ ...f, first_name: e.target.value }))} />
+              </Field>
+              <Field label="Apelido">
+                <input className="input-field" value={testAccountForm.last_name}
+                  onChange={(e) => setTestAccountForm((f) => ({ ...f, last_name: e.target.value }))} />
+              </Field>
+            </div>
+            <Field label="Telefone" hint="Não precisa de ser um número real de telemóvel.">
+              <input className="input-field" value={testAccountForm.phone_number}
+                onChange={(e) => setTestAccountForm((f) => ({ ...f, phone_number: e.target.value }))} placeholder="+351910000000" />
+            </Field>
+            <Field label="Email (opcional)" hint="Se deixares vazio, é gerado um automaticamente.">
+              <input className="input-field" type="email" value={testAccountForm.email}
+                onChange={(e) => setTestAccountForm((f) => ({ ...f, email: e.target.value }))} />
+            </Field>
+          </div>
         )}
       </Modal>
     </RouteGuard>
