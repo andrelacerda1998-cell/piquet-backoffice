@@ -2,20 +2,17 @@
 
 import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
-import { useAsyncData, useFilters } from "@/hooks/useDashboard";
-import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, type SpendMonth } from "@/services/marketingService";
+import { useAsyncData } from "@/hooks/useDashboard";
+import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
-import { buildMetricValue } from "@/lib/calculations";
-import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone } from "lucide-react";
@@ -49,9 +46,7 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
 };
 
 export default function MarketingPage() {
-  const filters = useFilters();
   const [tab, setTab] = useState("desempenho");
-  const { data: metrics } = useAsyncData(() => getMarketingMetrics(filters), [filters]);
   const { data: campaigns } = useAsyncData(() => getCampaigns(), []);
   const { data: funnel } = useAsyncData(() => getMarketingFunnel(), []);
   const { data: creatives } = useAsyncData(() => getCreativesPerformance(), []);
@@ -273,21 +268,6 @@ export default function MarketingPage() {
                 </>
               )}
             </div>
-
-            {/* Evolução mês a mês — investimento vs leads */}
-            {spendMeses.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ChartCard title="Investimento por mês" subtitle="Quanto se gastou em cada mês">
-                  <BarChartComponent
-                    data={spendMeses.map((m) => ({ name: nomeMes(m.month).split(" ")[0], value: Math.round(m.spend * 100) / 100 }))}
-                    currency
-                  />
-                </ChartCard>
-                <ChartCard title="Leads por mês" subtitle="Pedidos recebidos em cada mês">
-                  <BarChartComponent data={spendMeses.map((m) => ({ name: nomeMes(m.month).split(" ")[0], value: m.leads }))} />
-                </ChartCard>
-              </div>
-            )}
 
             {/* Detalhe mensal */}
             {spendMeses.length > 0 && (
