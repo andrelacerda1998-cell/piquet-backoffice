@@ -17,6 +17,7 @@ import {
 } from "@/services/tasksService";
 import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat, KanbanSquare } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TaskTimeline } from "@/components/ui/TaskTimeline";
 
 const COLUMN_TONE: Record<TaskStatus, string> = {
   backlog: "border-surface-border",
@@ -95,7 +96,7 @@ export default function TarefasPage() {
   const [form, setForm] = useState<TaskForm>(EMPTY_FORM);
   const [quickCol, setQuickCol] = useState<TaskStatus | null>(null);
   const [quickText, setQuickText] = useState("");
-  const [tab, setTab] = useState<"quadro" | "lista">("quadro");
+  const [tab, setTab] = useState<"quadro" | "lista" | "cronograma">("quadro");
 
   if (loading && !base) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -205,7 +206,11 @@ export default function TarefasPage() {
     { key: "recurrence", label: "Repetição", render: (r) => r.recurrence === "nenhuma" ? <span className="text-text-muted">—</span> : <span className="whitespace-nowrap">{RECURRENCE_LABELS[r.recurrence]}</span> },
   ];
 
-  const subTabs: TabDef[] = [{ id: "quadro", label: "Quadro" }, { id: "lista", label: "Lista" }];
+  const subTabs: TabDef[] = [
+    { id: "quadro", label: "Quadro" },
+    { id: "lista", label: "Lista" },
+    { id: "cronograma", label: "Cronograma", count: tasks.filter((t) => t.dueDate && t.status !== "concluido").length },
+  ];
 
   return (
     <RouteGuard route="/tarefas">
@@ -233,7 +238,7 @@ export default function TarefasPage() {
           </div>
         </div>
 
-        <Tabs tabs={subTabs} active={tab} onChange={(id) => setTab(id as "quadro" | "lista")} />
+        <Tabs tabs={subTabs} active={tab} onChange={(id) => setTab(id as "quadro" | "lista" | "cronograma")} />
 
         {tab === "quadro" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -343,6 +348,8 @@ export default function TarefasPage() {
           })}
         </div>
         )}
+
+        {tab === "cronograma" && <TaskTimeline tasks={tasks} />}
 
         {tab === "lista" && (
           <DataTable columns={listColumns} data={listSorted} keyField="id" onRowClick={openEdit} emptyMessage="Sem tarefas." />
