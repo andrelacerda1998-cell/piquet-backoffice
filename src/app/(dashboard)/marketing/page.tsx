@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
-import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown } from "@/services/marketingService";
+import { getMarketingMetrics, getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -18,7 +18,8 @@ import { buildMetricValue } from "@/lib/calculations";
 import { buildMetricFromSeries } from "@/lib/trends";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone } from "lucide-react";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import type { MarketingCampaign } from "@/types";
 
 /**
@@ -55,6 +56,45 @@ export default function MarketingPage() {
   const { data: creatives } = useAsyncData(() => getCreativesPerformance(), []);
   const { data: scripts } = useAsyncData(() => getScripts(), []);
   const { data: channels } = useAsyncData(() => getChannelBreakdown(), []);
+  // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
+  const { data: spend } = useAsyncData(() => getAdSpend(), []);
+
+  // Período em análise: "" = tudo · "2026" = ano · "2026-07" = mês.
+  const [periodo, setPeriodo] = useState<string>("");
+  const spendMeses = useMemo(() => spend?.months ?? [], [spend]);
+  const anosDisponiveis = useMemo(
+    () => [...new Set(spendMeses.map((m) => m.month.slice(0, 4)))].sort().reverse(),
+    [spendMeses],
+  );
+  const mesesSelecionados = useMemo(
+    () => (periodo ? spendMeses.filter((m) => m.month.startsWith(periodo)) : spendMeses),
+    [spendMeses, periodo],
+  );
+  const resumo = useMemo(() => {
+    const a = mesesSelecionados.reduce((acc, m) => ({
+      spend: acc.spend + m.spend, impressions: acc.impressions + m.impressions,
+      clicks: acc.clicks + m.clicks, conversions: acc.conversions + m.conversions,
+      leads: acc.leads + m.leads,
+    }), { spend: 0, impressions: 0, clicks: 0, conversions: 0, leads: 0 });
+    const plataformas: Record<string, number> = {};
+    for (const m of mesesSelecionados) {
+      for (const [k, v] of Object.entries(m.byPlatform)) plataformas[k] = (plataformas[k] ?? 0) + v;
+    }
+    return {
+      ...a, plataformas,
+      // CPL com os leads REAIS que chegaram, não com as "conversions" que cada
+      // plataforma conta à sua maneira.
+      cpl: a.leads > 0 ? a.spend / a.leads : 0,
+      cpc: a.clicks > 0 ? a.spend / a.clicks : 0,
+      ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0,
+      media: mesesSelecionados.length ? a.spend / mesesSelecionados.length : 0,
+    };
+  }, [mesesSelecionados]);
+  const MESES_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const nomeMes = (ym: string) => {
+    const [y, m] = ym.split("-");
+    return `${MESES_PT[Number(m) - 1] ?? ym} ${y}`;
+  };
 
   const campaignColumns: Column<MarketingCampaign>[] = [
     { key: "platform", label: "Plataforma" },
@@ -97,25 +137,130 @@ export default function MarketingPage() {
   return (
     <RouteGuard route="/marketing">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Marketing</h1>
-          <p className="text-text-secondary mt-1">Campanhas, aquisição e ROAS</p>
-        </div>
+        <PageHeader
+          icon={Megaphone}
+          eyebrow="Crescimento"
+          title="Marketing"
+          subtitle="Investimento em anúncios, aquisição e retorno"
+        />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "desempenho" && (
           <div className="space-y-6">
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Investimento" metric={buildMetricFromSeries(metrics.totalInvestment, { key: "mkt:investimento", monthlyGrowth: 0.03 })} format="currency" />
-                <MetricCard title="Leads" metric={buildMetricFromSeries(metrics.leads, { key: "mkt:leads", monthlyGrowth: 0.05 })} />
-                <MetricCard title="Clientes pagantes" metric={buildMetricFromSeries(metrics.payingCustomers, { key: "mkt:clientes", monthlyGrowth: 0.045 })} />
-                <MetricCard title="CPL" metric={buildMetricFromSeries(metrics.cpl, { key: "mkt:cpl", monthlyGrowth: -0.02, invertTrend: true })} format="currency" />
-                <MetricCard title="CAC" metric={buildMetricFromSeries(metrics.cac, { key: "mkt:cac", monthlyGrowth: -0.015, invertTrend: true })} format="currency" />
-                <MetricCard title="Receita Piquet" metric={buildMetricFromSeries(metrics.piquetRevenue, { key: "mkt:receita", monthlyGrowth: 0.04 })} format="currency" />
-                <MetricCard title="ROAS Piquet" metric={buildMetricFromSeries(metrics.roas, { key: "mkt:roas", monthlyGrowth: 0.02 })} />
-                <MetricCard title="Campanhas ativas" metric={buildMetricFromSeries(metrics.activeCampaigns, { key: "mkt:campanhas", monthlyGrowth: 0.01, volatility: 0.02 })} />
+            {/* Investimento REAL, com período à escolha. Antes estes cartões
+                mostravam uma série simulada (monthlyGrowth), o que dava uma
+                tendência que nunca existiu. */}
+            <div className="card p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold text-text-primary">Investimento em anúncios</h2>
+                  <p className="text-xs text-text-secondary">
+                    Meta e Google, dia a dia
+                    {spend?.from && spend?.to && ` · dados de ${formatDate(spend.from)} a ${formatDate(spend.to)}`}
+                  </p>
+                </div>
+                <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="input-field w-auto" aria-label="Período">
+                  <option value="">Todo o período</option>
+                  {anosDisponiveis.map((a) => <option key={a} value={a}>Ano de {a}</option>)}
+                  {[...spendMeses].reverse().map((m) => (
+                    <option key={m.month} value={m.month}>{nomeMes(m.month)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {mesesSelecionados.length === 0 ? (
+                <p className="py-6 text-center text-sm text-text-muted">
+                  Sem investimento registado neste período.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-xs text-text-secondary">Investido</p>
+                      <p className="text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(resumo.spend)}</p>
+                      {mesesSelecionados.length > 1 && (
+                        <p className="text-[11px] text-text-muted">{formatCurrency(resumo.media)}/mês em média</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-secondary">Leads recebidas</p>
+                      <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.leads}</p>
+                      <p className="text-[11px] text-text-muted">no mesmo período</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-secondary">Custo por lead</p>
+                      <p className="text-2xl font-bold text-text-primary tabular-nums">
+                        {resumo.leads > 0 ? formatCurrency(resumo.cpl) : "—"}
+                      </p>
+                      <p className="text-[11px] text-text-muted">investido ÷ leads reais</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-secondary">Cliques</p>
+                      <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.clicks.toLocaleString("pt-PT")}</p>
+                      <p className="text-[11px] text-text-muted">
+                        {formatCurrency(resumo.cpc)}/clique · CTR {resumo.ctr.toFixed(2).replace(".", ",")}%
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Onde foi o dinheiro */}
+                  {Object.keys(resumo.plataformas).length > 0 && (
+                    <div className="space-y-2">
+                      <SectionHeader title="Por plataforma" />
+                      {Object.entries(resumo.plataformas).sort((a, b) => b[1] - a[1]).map(([plat, valor]) => (
+                        <div key={plat}>
+                          <div className="flex items-baseline justify-between text-sm">
+                            <span className="font-medium text-text-primary capitalize">{plat}</span>
+                            <span className="text-text-secondary tabular-nums">
+                              {formatCurrency(valor)} · {resumo.spend > 0 ? Math.round((valor / resumo.spend) * 100) : 0}%
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                            <div className="h-full rounded-full bg-piquet"
+                              style={{ width: `${resumo.spend > 0 ? (valor / resumo.spend) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Evolução mês a mês — investimento vs leads */}
+            {spendMeses.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ChartCard title="Investimento por mês" subtitle="Quanto se gastou em cada mês">
+                  <BarChartComponent
+                    data={spendMeses.map((m) => ({ name: nomeMes(m.month).split(" ")[0], value: Math.round(m.spend * 100) / 100 }))}
+                    currency
+                  />
+                </ChartCard>
+                <ChartCard title="Leads por mês" subtitle="Pedidos recebidos em cada mês">
+                  <BarChartComponent data={spendMeses.map((m) => ({ name: nomeMes(m.month).split(" ")[0], value: m.leads }))} />
+                </ChartCard>
+              </div>
+            )}
+
+            {/* Detalhe mensal */}
+            {spendMeses.length > 0 && (
+              <div>
+                <SectionHeader title="Detalhe por mês" />
+                <DataTable
+                  columns={[
+                    { key: "month", label: "Mês", render: (m: SpendMonth) => <span className="font-medium capitalize">{nomeMes(m.month)}</span> },
+                    { key: "spend", label: "Investido", render: (m: SpendMonth) => formatCurrency(m.spend) },
+                    { key: "impressions", label: "Impressões", render: (m: SpendMonth) => m.impressions.toLocaleString("pt-PT") },
+                    { key: "clicks", label: "Cliques", render: (m: SpendMonth) => m.clicks.toLocaleString("pt-PT") },
+                    { key: "ctr", label: "CTR", render: (m: SpendMonth) => m.impressions > 0 ? `${((m.clicks / m.impressions) * 100).toFixed(2).replace(".", ",")}%` : "—" },
+                    { key: "leads", label: "Leads", render: (m: SpendMonth) => m.leads },
+                    { key: "cpl", label: "Custo/lead", render: (m: SpendMonth) => m.leads > 0 ? formatCurrency(m.spend / m.leads) : "—" },
+                  ]}
+                  data={[...spendMeses].reverse()}
+                  keyField="month"
+                  emptyMessage="Sem investimento registado."
+                />
               </div>
             )}
             <SubTabs

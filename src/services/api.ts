@@ -135,6 +135,8 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/channels",
   "/marketing/creatives",
   "/marketing/leads",
+  // Investimento real em anúncios por mês (ad_metrics: Meta + Google)
+  "/marketing/spend",
   // Fase 5 — Equipa (chat, agenda e tarefas)
   "/team/messages",
   "/team/agenda",
@@ -318,6 +320,8 @@ const REAL_DATA = new Set<string>([
   // survey_cities/vendor_city_votes reais do Laravel (CoverageController,
   // sem equivalente direto no Filament).
   "/coverage",
+  // Investimento em anúncios: vem do Meta/Google via cron, é dinheiro real.
+  "/marketing/spend",
 ]);
 
 /**

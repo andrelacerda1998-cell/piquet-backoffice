@@ -147,3 +147,28 @@ export async function getCategoryZoneMetrics(filters: DashboardFilter) {
     return { categoryMetrics, zoneMetrics };
   }).then((r) => r.data);
 }
+
+/* ===================== Investimento real em anúncios ===================== */
+
+export interface SpendMonth {
+  month: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  leads: number;
+  byPlatform: Record<string, number>;
+}
+export interface SpendData {
+  months: SpendMonth[];
+  from: string | null;
+  to: string | null;
+}
+
+/**
+ * Investimento em anúncios por mês (Meta + Google), com os leads reais de cada
+ * mês. Alimenta a análise por período na aba de Marketing.
+ */
+export async function getAdSpend(): Promise<SpendData> {
+  return apiGet<SpendData>("/marketing/spend", () => ({ months: [], from: null, to: null })).then((r) => r.data);
+}
