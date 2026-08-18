@@ -158,6 +158,11 @@ export interface SpendMonth {
   conversions: number;
   leads: number;
   byPlatform: Record<string, number>;
+  spendCliente: number;
+  spendProfissional: number;
+  spendGeral: number;
+  downloadsCliente: number;
+  downloadsProfissional: number;
 }
 export interface SpendData {
   months: SpendMonth[];

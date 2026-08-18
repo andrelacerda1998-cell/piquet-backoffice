@@ -20,6 +20,7 @@ import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { costPerDownload } from "@/lib/adAttribution";
 import type { MarketingCampaign } from "@/types";
 
 /**
@@ -80,8 +81,19 @@ export default function MarketingPage() {
     for (const m of mesesSelecionados) {
       for (const [k, v] of Object.entries(m.byPlatform)) plataformas[k] = (plataformas[k] ?? 0) + v;
     }
+    // Investimento e downloads por app, para o custo por download.
+    const apps = mesesSelecionados.reduce((acc, m) => ({
+      spendCliente: acc.spendCliente + m.spendCliente,
+      spendProfissional: acc.spendProfissional + m.spendProfissional,
+      spendGeral: acc.spendGeral + m.spendGeral,
+      dlCliente: acc.dlCliente + m.downloadsCliente,
+      dlProfissional: acc.dlProfissional + m.downloadsProfissional,
+    }), { spendCliente: 0, spendProfissional: 0, spendGeral: 0, dlCliente: 0, dlProfissional: 0 });
     return {
-      ...a, plataformas,
+      ...a, plataformas, ...apps,
+      cpdCliente: costPerDownload(apps.spendCliente, apps.dlCliente),
+      cpdProfissional: costPerDownload(apps.spendProfissional, apps.dlProfissional),
+      cpdTotal: costPerDownload(a.spend, apps.dlCliente + apps.dlProfissional),
       // CPL com os leads REAIS que chegaram, não com as "conversions" que cada
       // plataforma conta à sua maneira.
       cpl: a.leads > 0 ? a.spend / a.leads : 0,
@@ -202,6 +214,40 @@ export default function MarketingPage() {
                         {formatCurrency(resumo.cpc)}/clique · CTR {resumo.ctr.toFixed(2).replace(".", ",")}%
                       </p>
                     </div>
+                  </div>
+
+                  {/* Custo por download, por app — só com o investimento que
+                      identifica a app; o resto fica de fora do cálculo. */}
+                  <div className="space-y-2">
+                    <SectionHeader title="Custo por download" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
+                        { app: "App Profissional", cor: "#1C1A17", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
+                      ]).map((x) => (
+                        <div key={x.app} className="rounded-xl border border-surface-border p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
+                            <p className="text-sm font-medium text-text-secondary">{x.app}</p>
+                          </div>
+                          <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
+                            {x.cpd != null ? formatCurrency(x.cpd) : "—"}
+                          </p>
+                          <p className="text-[11px] text-text-muted">
+                            {x.gasto > 0
+                              ? <>{formatCurrency(x.gasto)} em campanhas dela ÷ {x.dl.toLocaleString("pt-PT")} downloads</>
+                              : <>sem campanhas identificadas para esta app · {x.dl.toLocaleString("pt-PT")} downloads no período</>}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {resumo.spendGeral > 0 && (
+                      <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
+                        {formatCurrency(resumo.spendGeral)} foram para campanhas que não identificam app (tráfego para o
+                        site, notoriedade, landing pages) — ficam de fora destes custos, para não inflacionar nenhum.
+                        Contando tudo, o custo por download é {resumo.cpdTotal != null ? formatCurrency(resumo.cpdTotal) : "—"}.
+                      </p>
+                    )}
                   </div>
 
                   {/* Onde foi o dinheiro */}

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../../_lib/handler";
+import { campaignTarget } from "@/lib/adAttribution";
 
 /**
  * GET /api/marketing/spend — investimento em anúncios REAL, por mês e por
@@ -14,6 +15,7 @@ import { apiOk, withStaff } from "../../_lib/handler";
 interface MetricRow {
   date: string;
   platform: string | null;
+  campaign_name: string | null;
   spend: number | null;
   impressions: number | null;
   clicks: number | null;
@@ -28,6 +30,13 @@ export interface SpendMonth {
   conversions: number;
   leads: number;              // leads REAIS recebidas nesse mês (tabela leads)
   byPlatform: Record<string, number>;
+  /** Investimento atribuído a cada app (o resto fica em `geral`). */
+  spendCliente: number;
+  spendProfissional: number;
+  spendGeral: number;
+  /** Downloads reais das lojas nesse mês, por app. */
+  downloadsCliente: number;
+  downloadsProfissional: number;
 }
 
 export interface SpendData {
@@ -45,7 +54,7 @@ export const GET = withStaff(async () => {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await admin
       .from("ad_metrics")
-      .select("date, platform, spend, impressions, clicks, conversions")
+      .select("date, platform, campaign_name, spend, impressions, clicks, conversions")
       .order("date", { ascending: true })
       .range(from, from + 999);
     if (error) throw new Error(error.message);
@@ -62,6 +71,29 @@ export const GET = withStaff(async () => {
     if (m) leadsPorMes.set(m, (leadsPorMes.get(m) ?? 0) + 1);
   }
 
+  // Downloads reais das lojas, por mês e por app (app_metrics).
+  const dlRows: Array<{ date: string; app: string | null; downloads: number | null }> = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await admin
+      .from("app_metrics")
+      .select("date, app, downloads")
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    dlRows.push(...((data ?? []) as typeof dlRows));
+    if (!data || data.length < 1000) break;
+  }
+  const dlPorMes = new Map<string, { cliente: number; profissional: number }>();
+  for (const d of dlRows) {
+    const m = (d.date ?? "").slice(0, 7);
+    if (!m) continue;
+    const cur = dlPorMes.get(m) ?? { cliente: 0, profissional: 0 };
+    const app = (d.app ?? "").toLowerCase();
+    const n = Number(d.downloads) || 0;
+    if (app.startsWith("cliente")) cur.cliente += n;
+    else if (app) cur.profissional += n;
+    dlPorMes.set(m, cur);
+  }
+
   const porMes = new Map<string, SpendMonth>();
   for (const r of rows) {
     const month = (r.date ?? "").slice(0, 7);
@@ -69,6 +101,9 @@ export const GET = withStaff(async () => {
     const cur = porMes.get(month) ?? {
       month, spend: 0, impressions: 0, clicks: 0, conversions: 0,
       leads: leadsPorMes.get(month) ?? 0, byPlatform: {},
+      spendCliente: 0, spendProfissional: 0, spendGeral: 0,
+      downloadsCliente: dlPorMes.get(month)?.cliente ?? 0,
+      downloadsProfissional: dlPorMes.get(month)?.profissional ?? 0,
     };
     const plat = (r.platform || "outros").toLowerCase();
     cur.spend += Number(r.spend) || 0;
@@ -76,6 +111,11 @@ export const GET = withStaff(async () => {
     cur.clicks += Number(r.clicks) || 0;
     cur.conversions += Number(r.conversions) || 0;
     cur.byPlatform[plat] = (cur.byPlatform[plat] ?? 0) + (Number(r.spend) || 0);
+    const alvo = campaignTarget(r.campaign_name);
+    const valor = Number(r.spend) || 0;
+    if (alvo === "cliente") cur.spendCliente += valor;
+    else if (alvo === "profissional") cur.spendProfissional += valor;
+    else cur.spendGeral += valor;
     porMes.set(month, cur);
   }
 
