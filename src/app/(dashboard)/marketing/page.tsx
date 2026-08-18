@@ -97,6 +97,14 @@ export default function MarketingPage() {
       media: mesesSelecionados.length ? a.spend / mesesSelecionados.length : 0,
     };
   }, [mesesSelecionados]);
+  // Os dados de anúncios vêm de um cron. Se ele falha, o ecrã continua a
+  // mostrar os últimos números como se fossem atuais — daí este aviso.
+  const diasSemDados = useMemo(() => {
+    if (!spend?.to) return null;
+    const ms = Date.now() - new Date(spend.to + "T00:00:00Z").getTime();
+    return Math.floor(ms / 86_400_000);
+  }, [spend]);
+
   const MESES_PT = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
   const nomeMes = (ym: string) => {
     const [y, m] = ym.split("-");
@@ -175,6 +183,19 @@ export default function MarketingPage() {
                   ))}
                 </select>
               </div>
+
+              {diasSemDados != null && diasSemDados > 3 && (
+                <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-3 py-2">
+                  <p className="text-sm font-semibold text-danger">
+                    Dados parados há {diasSemDados} dias
+                  </p>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    O último dia com investimento registado é {spend?.to ? formatDate(spend.to) : "—"}. A recolha de
+                    anúncios está a falhar, por isso estes números não incluem o que se gastou desde então —
+                    ver Produto › Integrações.
+                  </p>
+                </div>
+              )}
 
               {mesesSelecionados.length === 0 ? (
                 <p className="py-6 text-center text-sm text-text-muted">
