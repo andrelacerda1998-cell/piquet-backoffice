@@ -34,6 +34,14 @@ export async function GET(req: Request) {
   const db = supabaseAdmin();
   const skipped: string[] = [];
   const errors: string[] = [];
+  /**
+   * Plataformas que responderam bem mas sem uma única linha no período. Isso
+   * quer dizer campanhas paradas/sem gastos — não uma avaria. Sem esta nota, o
+   * painel de Integrações mostra exatamente o mesmo que uma plataforma a
+   * funcionar (nenhum erro), e ficamos sem saber porque é que o Marketing
+   * deixou de crescer. Ver: Meta parou a 15/07/2026 sem nunca dar erro.
+   */
+  const notes: string[] = [];
   let upsertedCount = 0;
 
   const save = async (platform: "meta" | "google", rows: AdRow[]) => {
@@ -49,15 +57,21 @@ export async function GET(req: Request) {
   };
 
   if (metaConfigured()) {
-    try { await save("meta", await fetchMetaInsights(since, until)); }
-    catch (e) { errors.push(`meta: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const rows = await fetchMetaInsights(since, until);
+      await save("meta", rows);
+      if (!rows.length) notes.push(`meta: sem gastos entre ${since} e ${until} (API respondeu, 0 campanhas ativas)`);
+    } catch (e) { errors.push(`meta: ${e instanceof Error ? e.message : String(e)}`); }
   } else {
     skipped.push("meta: env vars não configuradas (META_ACCESS_TOKEN/META_AD_ACCOUNT_ID)");
   }
 
   if (googleAdsConfigured()) {
-    try { await save("google", await fetchGoogleAdsInsights(since, until)); }
-    catch (e) { errors.push(`google: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const rows = await fetchGoogleAdsInsights(since, until);
+      await save("google", rows);
+      if (!rows.length) notes.push(`google: sem gastos entre ${since} e ${until} (API respondeu, 0 campanhas ativas)`);
+    } catch (e) { errors.push(`google: ${e instanceof Error ? e.message : String(e)}`); }
   } else {
     skipped.push("google: env vars não configuradas (GOOGLE_ADS_DEVELOPER_TOKEN/CLIENT_ID/…)");
   }
@@ -89,9 +103,9 @@ export async function GET(req: Request) {
   await logCronRun(
     "ad-metrics",
     errors.length === 0,
-    [...errors, ...skipped].join(" | ") || "ok",
+    [...errors, ...skipped, ...notes].join(" | ") || "ok",
     upsertedCount,
   );
 
-  return NextResponse.json({ ok: errors.length === 0, upsertedCount, campaignsWritten, skipped, errors });
+  return NextResponse.json({ ok: errors.length === 0, upsertedCount, campaignsWritten, skipped, errors, notes });
 }
