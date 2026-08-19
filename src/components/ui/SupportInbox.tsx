@@ -103,14 +103,29 @@ export function SupportInbox() {
     replyInboxTicket(selected.id, body, userName)
       .then((real) => setTickets((prev) => prev.map((t) => t.id === selected.id
         ? { ...t, messages: t.messages.map((m) => (m.id === optimistic.id ? real : m)) } : t)))
-      .catch(() => toast("Falha ao enviar resposta.", "error"));
+      .catch(() => {
+        // Rollback: sem isto a mensagem ficava no fio com ar de enviada, e o
+        // agente ia-se embora convencido de que o cliente a tinha recebido.
+        setTickets((prev) => prev.map((t) => t.id === selected.id
+          ? { ...t, messages: t.messages.filter((m) => m.id !== optimistic.id) } : t));
+        setReply(body); // devolve o texto para não obrigar a reescrever
+        toast("Falha ao enviar resposta — não foi entregue.", "error");
+      });
   };
 
   const changeStatus = (status: TicketStatus) => {
     if (!selected) return;
+    const anterior = selected.status;
     setTickets((prev) => prev.map((t) => (t.id === selected.id ? { ...t, status } : t)));
-    updateInboxTicketStatus(selected.id, status).catch(() => toast("Falha ao mudar o estado.", "error"));
-    toast(`Ticket ${selected.id} → ${statusMeta(status).label}`, "success");
+    updateInboxTicketStatus(selected.id, status)
+      // O sucesso só se anuncia depois de o servidor confirmar: antes, o toast
+      // disparava sempre e o ticket ficava a dizer "Resolvido" no ecrã enquanto
+      // no servidor continuava aberto.
+      .then(() => toast(`Ticket ${selected.id} → ${statusMeta(status).label}`, "success"))
+      .catch(() => {
+        setTickets((prev) => prev.map((t) => (t.id === selected.id ? { ...t, status: anterior } : t)));
+        toast("Falha ao mudar o estado — nada foi alterado.", "error");
+      });
   };
 
   return (

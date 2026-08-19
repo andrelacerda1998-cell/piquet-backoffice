@@ -181,8 +181,15 @@ export default function TarefasPage() {
   const closeQuick = () => { setQuickCol(null); setQuickText(""); };
 
   const remove = (task: PersonalTask) => {
+    // Rollback: sem isto, uma falha do servidor deixava a tarefa apagada no
+    // ecrã e viva na base de dados — voltava a aparecer no próximo reload,
+    // depois de o utilizador a dar por perdida.
+    const antes = tasks;
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
-    deleteTask(task.id).catch(() => toast("Falha ao apagar tarefa.", "error"));
+    deleteTask(task.id).catch(() => {
+      setTasks(antes);
+      toast("Falha ao apagar tarefa — nada foi removido.", "error");
+    });
   };
 
   // Lista: por urgência (prazo mais próximo primeiro; concluídas no fim).

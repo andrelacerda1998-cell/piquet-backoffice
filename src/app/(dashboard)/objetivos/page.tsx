@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -51,6 +52,10 @@ export default function GoalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<AnnualGoal | null>(null);
   const [form, setForm] = useState<{ label: string; metric: string; target: string }>({ label: "", metric: "", target: "" });
+  // Confirmação: apagar um objetivo leva com ele a série de acompanhamento do
+  // ano, que não se reconstrói a partir do backoffice. Tem de ficar aqui em
+  // cima — abaixo dos early returns seria um hook condicional.
+  const [goalToDelete, setGoalToDelete] = useState<AnnualGoal | null>(null);
 
   if (loading && !data) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -98,6 +103,8 @@ export default function GoalsPage() {
       refetch();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível remover.", "error");
+    } finally {
+      setGoalToDelete(null);
     }
   };
 
@@ -149,7 +156,7 @@ export default function GoalsPage() {
                         {willHit ? "No bom caminho" : "Em risco"}
                       </span>
                       <button onClick={() => openEdit(g)} title="Editar" className="p-1.5 rounded-lg text-text-muted hover:bg-surface-subtle hover:text-text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => remove(g)} title="Remover" className="p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setGoalToDelete(g)} title="Remover" className="p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
 
@@ -215,6 +222,15 @@ export default function GoalsPage() {
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={goalToDelete !== null}
+        onClose={() => setGoalToDelete(null)}
+        onConfirm={async () => { if (goalToDelete) await remove(goalToDelete); }}
+        title="Remover objetivo?"
+        description={<>O objetivo <strong>{goalToDelete?.label ?? ""}</strong> e o seu acompanhamento do ano deixam de aparecer. Não é possível repor daqui.</>}
+        confirmLabel="Remover"
+        tone="danger"
+      />
     </RouteGuard>
   );
 }

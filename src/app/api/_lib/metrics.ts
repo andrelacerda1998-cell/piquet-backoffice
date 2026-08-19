@@ -1,6 +1,7 @@
 import "server-only";
+import { fetchAll } from "@/lib/fetchAll";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { derivePaymentState, isTestAmount } from "./paylands";
+import { derivePaymentState, isTestAmount, paymentKey, chargedCents } from "./paylands";
 
 /**
  * Métricas de negócio a que um objetivo pode ser associado, e como cada valor
@@ -60,22 +61,25 @@ async function cobradoBetween(startIso: string, endIso?: string): Promise<number
   const admin = supabaseAdmin();
   let q = admin
     .from("pop_transactions")
-    .select("order_uuid, amount_cents, status, type, created")
+    .select("order_uuid, transaction_uuid, amount_cents, status, type, created")
     .gte("created", startIso);
   if (endIso) q = q.lt("created", endIso);
-  const { data, error } = await q.limit(10000);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{ order_uuid: string; amount_cents: number; status: string; type: string }>;
+  // Paginado: `.limit(10000)` NÃO vence o teto de 1000 linhas do PostgREST —
+  // a partir daí o GMV e a comissão apareciam abaixo do real, sem erro.
+  type Tx = { order_uuid: string; transaction_uuid: string; amount_cents: number; status: string; type: string };
+  const rows = await fetchAll<Tx>(q);
 
-  const byOrder = new Map<string, Array<{ amount_cents: number; status: string; type: string }>>();
+  // Mesma chave e mesmo critério de valor que /api/finance/app-payments — os
+  // dois ecrãs mostravam GMVs diferentes para os mesmos dados.
+  const byOrder = new Map<string, Tx[]>();
   for (const r of rows) {
-    const k = r.order_uuid || "";
+    const k = paymentKey(r);
     (byOrder.get(k) ?? byOrder.set(k, []).get(k)!).push(r);
   }
   let cents = 0;
   for (const txs of byOrder.values()) {
     if (derivePaymentState(txs) !== "pago") continue;
-    const amount = Math.max(...txs.map((t) => t.amount_cents));
+    const amount = chargedCents(txs);
     if (isTestAmount(amount)) continue; // exclui tráfego de teste do programador
     cents += amount;
   }
@@ -95,10 +99,9 @@ async function servicesBetween(startIso: string, endIso?: string): Promise<{ gmv
     .eq("status", "concluido")
     .gte("completed_at", startIso);
   if (endIso) q = q.lt("completed_at", endIso);
-  const { data, error } = await q.limit(10000);
-  if (error) throw new Error(error.message);
+  const linhas = await fetchAll<{ total_customer_value: number; piquet_revenue: number }>(q);
   let gmv = 0, piquet = 0;
-  for (const r of (data ?? []) as Array<{ total_customer_value: number; piquet_revenue: number }>) {
+  for (const r of linhas) {
     gmv += Number(r.total_customer_value) || 0;
     piquet += Number(r.piquet_revenue) || 0;
   }

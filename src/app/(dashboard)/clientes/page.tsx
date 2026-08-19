@@ -6,6 +6,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Users } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal, Field } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -165,6 +166,10 @@ export default function CustomersPage() {
     [selectedCustomer]
   );
   const [deletingMethodId, setDeletingMethodId] = useState<number | null>(null);
+  // Confirmação antes de remover: é o meio de pagamento REAL de um cliente, e
+  // sem ele o cliente deixa de conseguir pagar na app. Não é reversível daqui —
+  // tem de ser o próprio a voltar a adicionar o cartão.
+  const [methodToDelete, setMethodToDelete] = useState<CustomerPaymentMethod | null>(null);
   const handleDeletePaymentMethod = async (method: CustomerPaymentMethod) => {
     if (!selectedCustomer) return;
     setDeletingMethodId(method.id);
@@ -176,6 +181,7 @@ export default function CustomersPage() {
       toast(e instanceof Error ? e.message : "Não foi possível remover o método de pagamento.", "error");
     } finally {
       setDeletingMethodId(null);
+      setMethodToDelete(null);
     }
   };
 
@@ -556,7 +562,7 @@ export default function CustomersPage() {
                           Guardado {m.created_at ? formatDate(m.created_at) : "—"}
                         </p>
                       </div>
-                      <button onClick={() => handleDeletePaymentMethod(m)} disabled={deletingMethodId === m.id}
+                      <button onClick={() => setMethodToDelete(m)} disabled={deletingMethodId === m.id}
                         className="text-danger hover:opacity-70 disabled:opacity-40 shrink-0" title="Remover">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -568,6 +574,24 @@ export default function CustomersPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={methodToDelete !== null}
+        onClose={() => setMethodToDelete(null)}
+        onConfirm={async () => { if (methodToDelete) await handleDeletePaymentMethod(methodToDelete); }}
+        title="Remover método de pagamento?"
+        description={
+          <>
+            {methodToDelete?.brand ?? "O método"}
+            {methodToDelete?.last4 ? ` •••• ${methodToDelete.last4}` : ""} de{" "}
+            <strong>{selectedCustomer?.name ?? "este cliente"}</strong> deixa de estar disponível na app.
+            O cliente terá de o voltar a adicionar — não dá para repor a partir daqui.
+          </>
+        }
+        confirmLabel="Remover"
+        tone="danger"
+        loading={deletingMethodId !== null}
+      />
     </RouteGuard>
   );
 }

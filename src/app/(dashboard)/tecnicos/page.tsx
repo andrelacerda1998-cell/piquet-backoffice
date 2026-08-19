@@ -157,9 +157,14 @@ export default function TechniciansPage() {
   // KYC — fila real de documentos por rever (App\Filament\...\VendorDocumentTextEntry
   // migrado). Contagem do separador vem sempre de "pending", independente do
   // filtro escolhido dentro do separador.
-  const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
+  // `revisaoFeita` incrementa a cada documento aprovado/recusado: sem isso, o
+  // badge do separador e o banner de avisos ficavam com os números de quando a
+  // página abriu — a tabela esvaziava ("Sem documentos pendentes") mas o topo
+  // continuava a dizer que havia N por validar até se recarregar à mão.
+  const [revisaoFeita, setRevisaoFeita] = useState(0);
+  const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), [revisaoFeita]);
   // Aviso por técnico: quais os técnicos com documentos por validar (não só o total).
-  const { data: pendingDocsList } = useAsyncData(() => getVendorDocuments("pending", 1, 100), []);
+  const { data: pendingDocsList } = useAsyncData(() => getVendorDocuments("pending", 1, 100), [revisaoFeita]);
   const pendingByVendor = useMemo(() => {
     const m = new Map<string, number>();
     for (const d of pendingDocsList?.items ?? []) {
@@ -260,6 +265,7 @@ export default function TechniciansPage() {
       closeReview();
       docsData.refetch();
       refetchAllDocs();
+      setRevisaoFeita((n) => n + 1);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível processar o documento.", "error");
     } finally {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "@/stores";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Bell } from "lucide-react";
@@ -20,15 +21,26 @@ export default function AlertsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
 
-  const { data: counts } = useAsyncData(() => getAlertCounts(), []);
+  // `resolvidos` incrementa a cada mudança de estado: os MetricCards e as
+  // contagens das abas vinham de um fetch com deps [] e ficavam congelados
+  // depois de resolver alertas.
+  const [resolvidos, setResolvidos] = useState(0);
+  const { data: counts } = useAsyncData(() => getAlertCounts(), [resolvidos]);
   const { data: alerts, loading, refetch } = useAsyncData(
     () => getAlerts(page, pageSize, { type: typeFilter || undefined, priority: priorityFilter || undefined }),
     [page, pageSize, typeFilter, priorityFilter]
   );
 
   const handleStatusChange = async (id: string, status: DashboardAlert["status"]) => {
-    await updateAlertStatus(id, status);
-    refetch();
+    try {
+      await updateAlertStatus(id, status);
+      refetch();
+      setResolvidos((n) => n + 1);
+    } catch (e) {
+      // Sem isto, uma falha era uma promise rejeitada sem qualquer sinal: o
+      // botão parecia simplesmente não fazer nada.
+      toast(e instanceof Error ? e.message : "Não foi possível atualizar o alerta.", "error");
+    }
   };
 
   const columns: Column<DashboardAlert>[] = [

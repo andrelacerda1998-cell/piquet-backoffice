@@ -137,3 +137,38 @@ export function derivePaymentState(txs: Array<{ type: string; status: string }>)
   if (okOf("DEFERRED") || okOf("AUTHORIZATION")) return "cativado";
   return "recusado";
 }
+
+/** Tipos de transação que representam dinheiro efetivamente cobrado. */
+export const CHARGE_TYPES = ["CONFIRMATION", "PURCHASE", "CAPTURE", "PAYMENT"];
+/** Tipos que só cativam (ainda não cobram). */
+export const HOLD_TYPES = ["DEFERRED", "AUTHORIZATION"];
+
+/**
+ * Chave de agrupamento de transações num pagamento.
+ *
+ * O fallback para `transaction_uuid` é essencial: agrupar as transações sem
+ * `order_uuid` sob a chave "" juntava-as todas num único pagamento fictício,
+ * de que depois só se contava um valor — o resto do dinheiro desaparecia do
+ * GMV. Hoje não há órfãs na base de dados, mas basta uma para o GMV encolher
+ * sem qualquer erro.
+ */
+export function paymentKey(t: { order_uuid?: string | null; transaction_uuid?: string | null }): string {
+  return t.order_uuid || t.transaction_uuid || "";
+}
+
+/**
+ * Valor cobrado de um pagamento: manda o CONFIRMADO, depois o cativado, depois
+ * a primeira transação.
+ *
+ * Usar `Math.max(...)` (o que se fazia no cálculo do GMV) dá o número errado em
+ * capturas parciais — cativa-se 200 € e confirma-se 150 €, e o GMV ficava com
+ * os 200 €. Era também a razão de o GMV da Visão Geral e o dos Pagamentos da
+ * app não baterem certo para os mesmos dados.
+ */
+export function chargedCents(txs: Array<{ type: string; status: string; amount_cents: number }>): number {
+  const pick = (types: string[]) =>
+    txs.find((t) => t.status === "SUCCESS" && types.includes(t.type)) ??
+    txs.find((t) => types.includes(t.type));
+  const main = pick(CHARGE_TYPES) ?? pick(HOLD_TYPES) ?? txs[0];
+  return main?.amount_cents ?? 0;
+}

@@ -27,7 +27,7 @@ export const GET = withStaff(async () => {
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
   const [svcRes, adRes] = await Promise.all([
-    admin.from("services").select("id, customer_name, piquet_revenue, completed_at").eq("status", "concluido").limit(10000),
+    admin.from("services").select("id, customer_name, piquet_revenue, completed_at").eq("status", "concluido"),
     admin.from("ad_metrics").select("spend").gte("date", monthStart.slice(0, 10)),
   ]);
   const services = (svcRes.data ?? []) as SvcRow[];

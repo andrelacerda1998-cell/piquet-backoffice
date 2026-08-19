@@ -69,15 +69,22 @@ export const GET = withStaff(async (req) => {
   // Como o nome vive na tabela `customers`, resolvem-se primeiro os ids que
   // batem e incluem-se no mesmo OR, mantendo a paginação do lado do servidor.
   if (search) {
-    const { data: custs } = await admin
-      .from("customers")
-      .select("id")
-      .ilike("name", `%${search}%`)
-      .limit(200);
-    const ids = ((custs ?? []) as Array<{ id: string }>).map((c) => c.id);
-    const parts = [`service_name.ilike.%${search}%`, `city.ilike.%${search}%`];
-    if (ids.length) parts.push(`customer_id.in.(${ids.join(",")})`);
-    query = query.or(parts.join(","));
+    // Sanitiza antes de entrar no `.or(...)`: uma vírgula é o separador de
+    // filtros do PostgREST, por isso pesquisar "Silva, João" partia a query e
+    // devolvia 500 na lista de serviços; um `%` virava wildcard e trazia
+    // resultados a mais. Mesma regra do helper de pesquisa global.
+    const termo = search.replace(/[%,()]/g, " ").trim();
+    if (termo) {
+      const { data: custs } = await admin
+        .from("customers")
+        .select("id")
+        .ilike("name", `%${termo}%`)
+        .limit(200);
+      const ids = ((custs ?? []) as Array<{ id: string }>).map((c) => c.id);
+      const parts = [`service_name.ilike.%${termo}%`, `city.ilike.%${termo}%`];
+      if (ids.length) parts.push(`customer_id.in.(${ids.join(",")})`);
+      query = query.or(parts.join(","));
+    }
   }
   if (period && period !== "personalizado") {
     const { start, end } = getDateRangeFromPreset(period);

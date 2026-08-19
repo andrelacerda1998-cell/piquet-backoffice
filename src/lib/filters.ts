@@ -4,19 +4,31 @@ import {
 } from "date-fns";
 import type { DashboardFilter, PeriodPreset } from "@/types";
 
+/**
+ * Início e fim do DIA a que uma data pertence.
+ *
+ * "Hoje" e "Ontem" devolviam o mesmo instante para início e fim, ou seja, uma
+ * janela de zero milissegundos. O cliente disfarçava (isDateInRange normaliza
+ * para 00:00/23:59), mas o servidor faz `.gte(start).lte(end)` diretamente:
+ * escolher "Hoje" no filtro dava lista vazia e 0 € de receita mesmo com
+ * serviços registados nesse dia.
+ */
+const inicioDoDia = (d: Date) => { const r = new Date(d); r.setHours(0, 0, 0, 0); return r; };
+const fimDoDia = (d: Date) => { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; };
+
 export function getDateRangeFromPreset(preset: PeriodPreset, customStart?: string, customEnd?: string): { start: Date; end: Date } {
   const now = new Date();
   switch (preset) {
     case "hoje":
-      return { start: now, end: now };
+      return { start: inicioDoDia(now), end: fimDoDia(now) };
     case "ontem": {
       const y = subDays(now, 1);
-      return { start: y, end: y };
+      return { start: inicioDoDia(y), end: fimDoDia(y) };
     }
     case "ultimos_7_dias":
-      return { start: subDays(now, 7), end: now };
+      return { start: inicioDoDia(subDays(now, 7)), end: fimDoDia(now) };
     case "ultimos_30_dias":
-      return { start: subDays(now, 30), end: now };
+      return { start: inicioDoDia(subDays(now, 30)), end: fimDoDia(now) };
     case "este_mes":
       return { start: startOfMonth(now), end: endOfMonth(now) };
     case "mes_anterior": {
@@ -24,16 +36,16 @@ export function getDateRangeFromPreset(preset: PeriodPreset, customStart?: strin
       return { start: startOfMonth(prev), end: endOfMonth(prev) };
     }
     case "este_trimestre":
-      return { start: startOfQuarter(now), end: now };
+      return { start: startOfQuarter(now), end: fimDoDia(now) };
     case "este_ano":
-      return { start: startOfYear(now), end: now };
+      return { start: startOfYear(now), end: fimDoDia(now) };
     case "personalizado":
       return {
-        start: customStart ? parseISO(customStart) : subDays(now, 30),
-        end: customEnd ? parseISO(customEnd) : now,
+        start: customStart ? inicioDoDia(parseISO(customStart)) : inicioDoDia(subDays(now, 30)),
+        end: customEnd ? fimDoDia(parseISO(customEnd)) : fimDoDia(now),
       };
     default:
-      return { start: subDays(now, 30), end: now };
+      return { start: inicioDoDia(subDays(now, 30)), end: fimDoDia(now) };
   }
 }
 

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // `server-only` rebenta fora de RSC — no-op nos testes.
 vi.mock("server-only", () => ({}));
 
-import { mapPopTransaction, paylandsDate, paymentMethodOf, derivePaymentState, isTestAmount } from "@/app/api/_lib/paylands";
+import { mapPopTransaction, paylandsDate, paymentMethodOf, derivePaymentState, isTestAmount, paymentKey, chargedCents } from "@/app/api/_lib/paylands";
 
 describe("mapPopTransaction (Payshop Online Payments / Paylands)", () => {
   it("mapeia uma transação real da API", () => {
@@ -91,5 +91,44 @@ describe("isTestAmount — pagamentos de teste fora do GMV", () => {
     expect(isTestAmount(1000)).toBe(false); // 10,00 € — fronteira: real
     expect(isTestAmount(1706)).toBe(false); // 17,06 € — pagamento real de julho
     expect(isTestAmount(492918)).toBe(false);
+  });
+});
+
+describe("paymentKey", () => {
+  it("usa a encomenda quando existe", () => {
+    expect(paymentKey({ order_uuid: "ord-1", transaction_uuid: "tx-1" })).toBe("ord-1");
+  });
+
+  it("cai para a transação quando não há encomenda", () => {
+    // Sem este fallback, TODAS as transações órfãs colapsavam na chave "" e
+    // contavam como um único pagamento — o resto do dinheiro sumia do GMV.
+    expect(paymentKey({ order_uuid: null, transaction_uuid: "tx-1" })).toBe("tx-1");
+    expect(paymentKey({ order_uuid: "", transaction_uuid: "tx-2" })).toBe("tx-2");
+  });
+
+  it("transações órfãs diferentes não partilham chave", () => {
+    expect(paymentKey({ order_uuid: null, transaction_uuid: "tx-a" }))
+      .not.toBe(paymentKey({ order_uuid: null, transaction_uuid: "tx-b" }));
+  });
+});
+
+describe("chargedCents", () => {
+  const tx = (type: string, amount_cents: number, status = "SUCCESS") => ({ type, status, amount_cents });
+
+  it("numa captura parcial conta o confirmado, não o cativado", () => {
+    // Cativa 200 €, confirma 150 € → o GMV tem de ser 150 €, não 200 €.
+    expect(chargedCents([tx("DEFERRED", 20000), tx("CONFIRMATION", 15000)])).toBe(15000);
+  });
+
+  it("sem confirmação, usa o valor cativado", () => {
+    expect(chargedCents([tx("DEFERRED", 20000)])).toBe(20000);
+  });
+
+  it("prefere a transação com SUCCESS à falhada do mesmo tipo", () => {
+    expect(chargedCents([tx("CONFIRMATION", 9900, "ERROR"), tx("CONFIRMATION", 15000)])).toBe(15000);
+  });
+
+  it("lista vazia não rebenta", () => {
+    expect(chargedCents([])).toBe(0);
   });
 });

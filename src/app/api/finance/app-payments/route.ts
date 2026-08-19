@@ -26,7 +26,7 @@ export const GET = withStaff(async () => {
     .from("pop_transactions")
     .select("transaction_uuid, order_uuid, customer_ext_id, amount_cents, status, type, service, source_type, created")
     .order("created", { ascending: false })
-    .limit(10000);
+    ;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Row[];
 

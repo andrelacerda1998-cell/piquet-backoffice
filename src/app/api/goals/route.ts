@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/fetchAll";
 import { apiOk, apiErr, withStaff } from "../_lib/handler";
 import { METRIC_DEFS, metricDef, isKnownMetric, computeMetric, projectEndOfPeriod } from "../_lib/metrics";
 
@@ -26,13 +27,18 @@ export const GET = withStaff(async () => {
   const metrics = [...new Set(rows.map((r) => r.metric))];
   const seriesByMetric = new Map<string, Array<{ date: string; value: number }>>();
   if (metrics.length) {
-    const { data: snaps } = await admin
-      .from("metric_snapshots")
-      .select("metric, date, value")
-      .in("metric", metrics)
-      .gte("date", `${year}-01-01`)
-      .order("date");
-    for (const s of (snaps ?? []) as Array<{ metric: string; date: string; value: number }>) {
+    // Paginado: são 365 dias × nº de métricas com objetivo. Com 3 métricas, a
+    // partir de setembro passa das 1000 linhas e o gráfico dos objetivos
+    // achatava nos últimos meses do ano.
+    const snaps = await fetchAll<{ metric: string; date: string; value: number }>(
+      admin
+        .from("metric_snapshots")
+        .select("metric, date, value")
+        .in("metric", metrics)
+        .gte("date", `${year}-01-01`)
+        .order("date"),
+    );
+    for (const s of snaps) {
       (seriesByMetric.get(s.metric) ?? seriesByMetric.set(s.metric, []).get(s.metric)!)
         .push({ date: s.date, value: Number(s.value) });
     }

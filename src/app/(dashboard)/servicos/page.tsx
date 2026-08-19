@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
@@ -147,6 +147,15 @@ export default function ServicesPage() {
       setSaving(false);
     }
   };
+
+  /**
+   * Mudar o período/filtro global repõe a página 1. Sem isto, quem estivesse
+   * na página 5 e mudasse o filtro para um período mais curto ficava com a
+   * tabela vazia ("Sem dados") — parecia não haver serviços nenhuns, quando
+   * só não havia página 5 nesse período. Os chips e a pesquisa já o faziam.
+   */
+  const chaveFiltros = JSON.stringify(filters);
+  useEffect(() => { setPage(1); }, [chaveFiltros, setPage]);
 
   const { data, loading, error, refetch } = useAsyncData(
     () => getServices(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch, activeStatuses),

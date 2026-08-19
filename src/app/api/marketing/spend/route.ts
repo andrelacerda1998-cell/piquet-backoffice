@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/fetchAll";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../../_lib/handler";
 import { campaignTarget } from "@/lib/adAttribution";
@@ -64,7 +65,9 @@ export const GET = withStaff(async () => {
 
   // Leads reais por mês — o denominador honesto do CPL (as "conversions" das
   // plataformas contam o que cada uma decide, não os pedidos que chegaram).
-  const { data: leadRows } = await admin.from("leads").select("created_at").limit(5000);
+  // Paginado: acima de 1000 leads os meses antigos ficavam sem leads contadas
+  // e o CPL desses meses aparecia inflacionado.
+  const leadRows = await fetchAll<{ created_at: string }>(admin.from("leads").select("created_at"));
   const leadsPorMes = new Map<string, number>();
   for (const l of (leadRows ?? []) as Array<{ created_at: string | null }>) {
     const m = (l.created_at ?? "").slice(0, 7);
