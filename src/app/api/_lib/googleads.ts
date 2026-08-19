@@ -1,5 +1,6 @@
 import "server-only";
 import type { AdRow } from "./metaads";
+import { versionsToTry, shouldTryNextVersion } from "@/lib/googleAdsVersion";
 
 /**
  * Google Ads — Google Ads API (GAQL).
@@ -80,15 +81,33 @@ export async function fetchGoogleAdsInsights(since: string, until: string): Prom
     headers["login-customer-id"] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, "");
   }
 
-  // v21 = versão atual em 2026-07 (a v18 já foi desligada — devolvia 404 em
-  // HTML; as versões desta API reformam-se ao fim de ~1 ano).
-  // A v21 já não aceita `pageSize` (erro PAGE_SIZE_NOT_SUPPORTED): a página é
-  // fixa em 10 000 linhas. Chega para as métricas diárias por campanha.
-  const res = await fetch(`https://googleads.googleapis.com/v21/customers/${customer}/googleAds:search`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ query }),
-  });
+  /**
+   * A versão da API não é fixa: a Google reforma cada uma ao fim de ~1 ano e
+   * passa a devolver 404 em HTML. Aconteceu à v18 e à v21 (esta em ago/2026,
+   * deixando a recolha parada ~30 dias). Tenta-se da mais recente para trás e
+   * só se roda em 404 — 401/403 são credenciais, e insistir aí só esconderia
+   * a causa real. Ver src/lib/googleAdsVersion.ts.
+   */
+  const tentativas = versionsToTry(process.env.GOOGLE_ADS_API_VERSION);
+  let res: Response | null = null;
+  const reformadas: string[] = [];
+  for (const v of tentativas) {
+    const r = await fetch(`https://googleads.googleapis.com/${v}/customers/${customer}/googleAds:search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query }),
+    });
+    if (shouldTryNextVersion(r.status)) { reformadas.push(v); continue; }
+    res = r;
+    break;
+  }
+  if (!res) {
+    throw new Error(
+      `Google Ads: nenhuma versão da API respondeu (404 em ${reformadas.join(", ")}). ` +
+      `A Google reformou-as todas — acrescentar a nova em src/lib/googleAdsVersion.ts ` +
+      `ou definir GOOGLE_ADS_API_VERSION.`
+    );
+  }
   if (!res.ok) throw new Error(`Google Ads ${res.status}: ${(await res.text()).slice(0, 4000)}`);
   const json = (await res.json()) as { results?: GoogleAdsResultRow[] };
   return mapGoogleAdsRows(json.results ?? []);
