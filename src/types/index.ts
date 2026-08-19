@@ -309,7 +309,13 @@ export interface MarketingCampaign {
   cpl: number;
   customers: number;
   cac: number;
+  /**
+   * Receita da PIQUET atribuída à campanha (comissão sobre o valor das
+   * conversões), não o valor das encomendas. É sobre isto que o ROAS se mede.
+   */
   piquetRevenue: number;
+  /** Valor bruto das conversões reportado pela plataforma (GMV atribuído). */
+  platformRevenue?: number;
   roas: number;
   status: "ativa" | "pausada" | "concluida";
   startDate: string;

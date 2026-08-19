@@ -36,6 +36,16 @@ export const DIAS_ATIVA = 7;
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Comissão da Piquet (25%). As plataformas reportam `conversion_value` = valor
+ * da ENCOMENDA (o que o cliente paga), mas a Piquet só fica com a comissão.
+ * Guardar o valor bruto num campo chamado `piquetRevenue` fazia o ROAS parecer
+ * 4× melhor do que é: 400 € gastos para 2 000 € de encomendas mostravam 5,0×,
+ * quando sobre os 500 € de comissão são 1,25×. É a diferença entre "escalar"
+ * e "está a dar prejuízo".
+ */
+export const COMISSAO_PIQUET = 0.25;
+
 export function aggregateRows(rows: DailyRow[], hojeMs: number): MarketingCampaign[] {
   interface Acc {
     platform: string; campaignId: string; campaignName: string;
@@ -68,7 +78,8 @@ export function aggregateRows(rows: DailyRow[], hojeMs: number): MarketingCampai
   return [...por.values()]
     .map((c) => {
       const leads = Math.round(c.conversions);
-      const revenue = round(c.conversionValue);
+      const valorPlataforma = round(c.conversionValue);
+      const revenue = round(valorPlataforma * COMISSAO_PIQUET);
       const ativa = c.ultima >= limiteAtiva;
       return {
         id: `${c.platform}_${c.campaignId}`,
@@ -86,6 +97,7 @@ export function aggregateRows(rows: DailyRow[], hojeMs: number): MarketingCampai
         customers: leads,
         cac: leads ? round(c.spend / leads) : 0,
         piquetRevenue: revenue,
+        platformRevenue: valorPlataforma,
         roas: c.spend ? revenue / c.spend : 0,
         status: (ativa ? "ativa" : "concluida") as MarketingCampaign["status"],
         startDate: c.primeira,

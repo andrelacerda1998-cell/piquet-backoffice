@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { calcularResultado } from "@/lib/resultado";
+import { mesesNoIntervalo } from "@/lib/periodo";
+import { getDateRangeFromPreset } from "@/lib/filters";
 import { rowToEmployee, type EmployeeRow } from "@/lib/supabase/adapters";
 import { computeEmployeeCost } from "@/services/employeesService";
 import { calculateBurnRate, calculateRunway, calculatePiquetRevenueWithoutVat } from "@/lib/calculations";
@@ -36,9 +39,23 @@ export const GET = withStaff(async (req) => {
 
   const vatRate = DEFAULT_TAX_CONFIG.vatRate;
   const operatingCosts = teamCosts + 4500;
-  const burnRate = calculateBurnRate(operatingCosts + 3000, piquetRevenue);
   const currentBalance = 185000;
   const revenueWithoutVat = calculatePiquetRevenueWithoutVat(piquetRevenue, vatRate);
+
+  /**
+   * Os custos são MENSAIS; a receita vem do período escolhido no filtro. Antes
+   * subtraía-se um mês de custos a (por exemplo) oito meses de receita, e
+   * multiplicava-se isso por 12 para o "anual" — erro de ordem de grandeza,
+   * com o sinal a poder inverter-se. Agora repartem-se os custos pelos meses
+   * que o período tem de facto. Ver src/lib/resultado.ts.
+   */
+  const { start, end } = getDateRangeFromPreset(f.period ?? "ultimos_30_dias");
+  const meses = mesesNoIntervalo(start, end);
+  const opexMensal = operatingCosts + 3000;
+  const res = calcularResultado(piquetRevenue, opexMensal, meses);
+  // Burn rate é, por definição, mensal: usa a receita média por mês.
+  const receitaMensalMedia = meses > 0 ? piquetRevenue / meses : piquetRevenue;
+  const burnRate = calculateBurnRate(opexMensal, receitaMensalMedia);
 
   return apiOk({
     totalServiceValue,
@@ -55,12 +72,15 @@ export const GET = withStaff(async (req) => {
     operatingCosts,
     teamCosts,
     estimatedTaxes,
-    estimatedMonthlyResult: piquetRevenue - operatingCosts - 3000,
-    estimatedAnnualResult: (piquetRevenue - operatingCosts - 3000) * 12,
+    estimatedMonthlyResult: res.resultadoMensalMedio,
+    estimatedAnnualResult: res.resultadoAnualProjetado,
+    /** Resultado do período escolhido (sem normalizar) e quantos meses tem. */
+    periodResult: res.resultadoDoPeriodo,
+    periodMonths: res.meses,
     averageMarginPerService: completed.length ? piquetRevenue / completed.length : 0,
     burnRate,
     runwayMonths: calculateRunway(currentBalance, burnRate),
     currentBalance,
-    projectedBalance: currentBalance + piquetRevenue - operatingCosts,
+    projectedBalance: currentBalance + res.resultadoDoPeriodo,
   });
 });

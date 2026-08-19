@@ -1,4 +1,5 @@
 import "server-only";
+import { inicioDoMesLisboa, inicioDoAnoLisboa } from "@/lib/periodo";
 import { fetchAll } from "@/lib/fetchAll";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { derivePaymentState, isTestAmount, paymentKey, chargedCents } from "./paylands";
@@ -47,13 +48,13 @@ export const metricDef = (key: string): MetricDef | undefined => BY_KEY.get(key)
 
 const COMMISSION = 0.25; // margem fixa da Piquet (25%)
 
+// Fronteiras no fuso do negócio (Lisboa) — as mesmas do IVA e dos filtros,
+// para os números baterem certo entre ecrãs.
 function monthBounds(now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return { start: start.toISOString() };
+  return { start: inicioDoMesLisboa(now).toISOString() };
 }
 function yearBounds(now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  return { start: start.toISOString() };
+  return { start: inicioDoAnoLisboa(now).toISOString() };
 }
 
 /** Total COBRADO no Payshop (pagamentos reais, sem testes) num intervalo. */

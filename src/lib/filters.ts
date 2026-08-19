@@ -1,7 +1,8 @@
+import { subDays, subMonths, format, parseISO } from "date-fns";
 import {
-  startOfMonth, endOfMonth, subDays, subMonths,
-  startOfQuarter, startOfYear, format, parseISO,
-} from "date-fns";
+  inicioDoDiaLisboa, fimDoDiaLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa,
+  inicioDoTrimestreLisboa, inicioDoAnoLisboa,
+} from "./periodo";
 import type { DashboardFilter, PeriodPreset } from "@/types";
 
 /**
@@ -13,8 +14,11 @@ import type { DashboardFilter, PeriodPreset } from "@/types";
  * escolher "Hoje" no filtro dava lista vazia e 0 € de receita mesmo com
  * serviços registados nesse dia.
  */
-const inicioDoDia = (d: Date) => { const r = new Date(d); r.setHours(0, 0, 0, 0); return r; };
-const fimDoDia = (d: Date) => { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; };
+// Fronteiras no fuso do NEGÓCIO (Lisboa), não no do servidor: a Vercel corre
+// em UTC e o portátil de quem desenvolve em Lisboa, por isso as funções locais
+// do date-fns davam meses diferentes em produção e em desenvolvimento.
+const inicioDoDia = inicioDoDiaLisboa;
+const fimDoDia = fimDoDiaLisboa;
 
 export function getDateRangeFromPreset(preset: PeriodPreset, customStart?: string, customEnd?: string): { start: Date; end: Date } {
   const now = new Date();
@@ -30,15 +34,15 @@ export function getDateRangeFromPreset(preset: PeriodPreset, customStart?: strin
     case "ultimos_30_dias":
       return { start: inicioDoDia(subDays(now, 30)), end: fimDoDia(now) };
     case "este_mes":
-      return { start: startOfMonth(now), end: endOfMonth(now) };
+      return { start: inicioDoMesLisboa(now), end: new Date(inicioDoMesSeguinteLisboa(now).getTime() - 1) };
     case "mes_anterior": {
       const prev = subMonths(now, 1);
-      return { start: startOfMonth(prev), end: endOfMonth(prev) };
+      return { start: inicioDoMesLisboa(prev), end: new Date(inicioDoMesLisboa(now).getTime() - 1) };
     }
     case "este_trimestre":
-      return { start: startOfQuarter(now), end: fimDoDia(now) };
+      return { start: inicioDoTrimestreLisboa(now), end: fimDoDia(now) };
     case "este_ano":
-      return { start: startOfYear(now), end: fimDoDia(now) };
+      return { start: inicioDoAnoLisboa(now), end: fimDoDia(now) };
     case "personalizado":
       return {
         start: customStart ? inicioDoDia(parseISO(customStart)) : inicioDoDia(subDays(now, 30)),

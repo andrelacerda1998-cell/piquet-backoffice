@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { partesLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa, inicioDoTrimestreLisboa, inicioDoTrimestreSeguinteLisboa } from "@/lib/periodo";
 import { gmvForPeriod } from "../../_lib/metrics";
 import { apiOk, withStaff } from "../../_lib/handler";
 
@@ -25,16 +26,23 @@ const vatInside = (grossAmount: number) => grossAmount - grossAmount / (1 + VAT_
 
 /** Trimestre civil (o período normal de entrega em Portugal) que contém a data. */
 function quarterBounds(now: Date) {
-  const q = Math.floor(now.getUTCMonth() / 3);
-  const start = new Date(Date.UTC(now.getUTCFullYear(), q * 3, 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), q * 3 + 3, 1));
-  return { start: start.toISOString(), end: end.toISOString(), label: `${q + 1}.º trimestre de ${now.getUTCFullYear()}` };
+  // Fronteiras em Lisboa: é uma declaração fiscal portuguesa, o trimestre é o
+  // civil português. Com fronteiras UTC, um pagamento das 00:30 de 1 de julho
+  // (hora de Lisboa) caía no 2.º trimestre — na declaração errada.
+  const { ano, mes0 } = partesLisboa(now);
+  const q = Math.floor(mes0 / 3);
+  return {
+    start: inicioDoTrimestreLisboa(now).toISOString(),
+    end: inicioDoTrimestreSeguinteLisboa(now).toISOString(),
+    label: `${q + 1}.º trimestre de ${ano}`,
+  };
 }
 
 function monthBounds(now: Date) {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { start: start.toISOString(), end: end.toISOString() };
+  return {
+    start: inicioDoMesLisboa(now).toISOString(),
+    end: inicioDoMesSeguinteLisboa(now).toISOString(),
+  };
 }
 
 /** Total das faturas de custo emitidas no intervalo (valor com IVA). */

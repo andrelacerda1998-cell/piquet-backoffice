@@ -88,3 +88,36 @@ describe("aggregateRows", () => {
     expect(aggregateRows([], HOJE)).toEqual([]);
   });
 });
+
+describe("ROAS sobre a receita da Piquet", () => {
+  const linhaCom = (spend: number, conversion_value: number): DailyRow => ({
+    date: "2026-08-18", platform: "google", campaign_id: "1", campaign_name: "C",
+    spend, impressions: 1000, clicks: 20, conversions: 2, conversion_value,
+  });
+
+  it("aplica a comissão de 25% ao valor reportado pela plataforma", () => {
+    // 400 € gastos, 2 000 € de encomendas → 500 € para a Piquet → ROAS 1,25×.
+    const [c] = aggregateRows([linhaCom(400, 2000)], Date.parse("2026-08-19T09:00:00Z"));
+    expect(c.platformRevenue).toBe(2000);
+    expect(c.piquetRevenue).toBe(500);
+    expect(c.roas).toBeCloseTo(1.25, 5);
+  });
+
+  it("não classifica como excelente uma campanha que só se paga a si própria", () => {
+    // Antes dava 5,0× (parecia "escalar"); sobre a comissão é 1,25×.
+    const [c] = aggregateRows([linhaCom(400, 2000)], Date.parse("2026-08-19T09:00:00Z"));
+    expect(c.roas).toBeLessThan(3);
+  });
+
+  it("sem conversões, receita e ROAS ficam a zero", () => {
+    const [c] = aggregateRows([linhaCom(100, 0)], Date.parse("2026-08-19T09:00:00Z"));
+    expect(c.piquetRevenue).toBe(0);
+    expect(c.roas).toBe(0);
+  });
+
+  it("sem investimento não divide por zero", () => {
+    const [c] = aggregateRows([linhaCom(0, 500)], Date.parse("2026-08-19T09:00:00Z"));
+    expect(c.roas).toBe(0);
+    expect(Number.isFinite(c.piquetRevenue)).toBe(true);
+  });
+});

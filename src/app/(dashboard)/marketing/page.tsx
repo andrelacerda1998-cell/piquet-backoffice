@@ -155,8 +155,28 @@ export default function MarketingPage() {
     { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl) },
     { key: "customers", label: "Clientes" },
     { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac) },
-    { key: "piquetRevenue", label: "Receita Piquet", render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "roas", label: "ROAS", render: (r) => `${r.roas.toFixed(2)}x` },
+    {
+      key: "piquetRevenue",
+      label: "Receita Piquet",
+      render: (r) => (
+        <span
+          title={
+            r.platformRevenue
+              ? `${formatCurrency(r.platformRevenue)} em encomendas atribuídas · comissão de 25% = ${formatCurrency(r.piquetRevenue)}`
+              : "Comissão de 25% sobre as conversões atribuídas"
+          }
+        >
+          {formatCurrency(r.piquetRevenue)}
+        </span>
+      ),
+    },
+    {
+      key: "roas",
+      label: "ROAS",
+      // Medido sobre a comissão da Piquet, não sobre o valor das encomendas —
+      // é o que diz se a campanha se paga a si própria.
+      render: (r) => <span title="Receita Piquet ÷ investimento (comissão de 25%)">{r.roas.toFixed(2)}x</span>,
+    },
     { key: "rating", label: "Classificação", render: (r) => {
       const c = RATING[rateCampaign(r)];
       return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
