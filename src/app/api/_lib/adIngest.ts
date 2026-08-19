@@ -120,7 +120,7 @@ export async function ingestAdMetrics(): Promise<IngestResult> {
   // reais — senão mantinha-se o mock semeado.
   let campaignsWritten = 0;
   try {
-    const campaigns = await aggregateCampaigns(30);
+    const campaigns = await aggregateCampaigns();
     if (campaigns.length) {
       for (const prefix of ["meta_%", "google_%", "camp_%"]) {
         await db.from("campaigns").delete().like("id", prefix);
@@ -129,7 +129,8 @@ export async function ingestAdMetrics(): Promise<IngestResult> {
         id: c.id, platform: c.platform, campaign_name: c.campaignName,
         investment: c.investment, impressions: c.impressions, reach: c.reach, frequency: c.frequency,
         clicks: c.clicks, ctr: c.ctr, cpc: c.cpc, leads: c.leads, cpl: c.cpl, customers: c.customers,
-        cac: c.cac, piquet_revenue: c.piquetRevenue, roas: c.roas, status: c.status, start_date: c.startDate,
+        cac: c.cac, piquet_revenue: c.piquetRevenue, roas: c.roas, status: c.status,
+        start_date: c.startDate, end_date: c.endDate ?? null,
       }));
       const { error } = await db.from("campaigns").upsert(rows, { onConflict: "id" });
       if (error) throw new Error(error.message);
