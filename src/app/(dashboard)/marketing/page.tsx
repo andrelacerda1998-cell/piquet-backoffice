@@ -47,15 +47,21 @@ const RATING: Record<CampaignRating, { label: string; tone: string; hint: string
 
 export default function MarketingPage() {
   const [tab, setTab] = useState("desempenho");
-  const { data: campaigns } = useAsyncData(() => getCampaigns(), []);
-  const { data: funnel } = useAsyncData(() => getMarketingFunnel(), []);
-  const { data: creatives } = useAsyncData(() => getCreativesPerformance(), []);
-  const { data: scripts } = useAsyncData(() => getScripts(), []);
-  const { data: channels } = useAsyncData(() => getChannelBreakdown(), []);
-  // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
-  // `recarga` incrementa ao fim de uma recolha manual para o gráfico refletir
-  // logo os dados novos, sem obrigar a recarregar a página.
+  /**
+   * Incrementa ao fim de uma recolha manual. TUDO o que vem de `ad_metrics`
+   * depende dele: campanhas, criativos e canais são derivados das mesmas
+   * linhas que o gráfico de investimento, e deixá-los presos a `[]` fazia com
+   * que o botão "Atualizar anúncios" parecesse não ter feito nada — os dados
+   * novos estavam gravados, mas o ecrã continuava a mostrar os antigos até se
+   * recarregar a página à mão.
+   */
   const [recarga, setRecarga] = useState(0);
+  const { data: campaigns } = useAsyncData(() => getCampaigns(), [recarga]);
+  const { data: funnel } = useAsyncData(() => getMarketingFunnel(), [recarga]);
+  const { data: creatives } = useAsyncData(() => getCreativesPerformance(), [recarga]);
+  const { data: scripts } = useAsyncData(() => getScripts(), []);
+  const { data: channels } = useAsyncData(() => getChannelBreakdown(), [recarga]);
+  // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
   const { data: spend } = useAsyncData(() => getAdSpend(), [recarga]);
   const [aAtualizar, setAAtualizar] = useState(false);
 
