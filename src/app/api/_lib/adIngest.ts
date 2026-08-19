@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { metaConfigured, fetchMetaInsights, type AdRow } from "./metaads";
-import { googleAdsConfigured, fetchGoogleAdsInsights } from "./googleads";
+import { googleAdsConfigured, fetchGoogleAdsInsights, fetchAccessibleCustomers } from "./googleads";
 import { aggregateCampaigns } from "./adAggregation";
 import { janelaSince } from "@/lib/adWindow";
 
@@ -26,6 +26,33 @@ export interface IngestResult {
 }
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Traduz erros crus da plataforma para a causa concreta e o que fazer a
+ * seguir. Um `USER_PERMISSION_DENIED` do Google, por exemplo, não distingue
+ * "autorizei com a conta Google errada" de "falta o login-customer-id da
+ * MCC" — mas perguntar à API que contas o token vê distingue, e é barato.
+ * Sem isto, o operador leva um bloco de JSON e fica na mesma.
+ */
+async function explicar(plataforma: "meta" | "google", msg: string): Promise<string> {
+  if (plataforma !== "google" || !msg.includes("USER_PERMISSION_DENIED")) return msg;
+  try {
+    const a = await fetchAccessibleCustomers();
+    if (a.acessiveis.length === 0) {
+      return "a conta Google autorizada não tem acesso a NENHUMA conta de anúncios. " +
+        "Refazer a autorização no OAuth Playground escolhendo a conta com que entra no Google Ads.";
+    }
+    if (!a.temAcesso) {
+      return `a conta Google autorizada não vê a conta de anúncios configurada (${a.configurada}). ` +
+        `Vê estas: ${a.acessiveis.join(", ")}. ` +
+        "Ou refazer a autorização com a conta certa, ou — se o acesso for por conta gestora (MCC) — " +
+        "definir GOOGLE_ADS_LOGIN_CUSTOMER_ID com o ID da gestora.";
+    }
+    return `${msg} (a conta ${a.configurada} está acessível, por isso o problema não é a autorização)`;
+  } catch {
+    return msg; // o diagnóstico é um extra: se falhar, mostra-se o erro original
+  }
+}
 
 export async function ingestAdMetrics(): Promise<IngestResult> {
   const until = iso(new Date(Date.now() - 86_400_000)); // ontem
@@ -78,7 +105,8 @@ export async function ingestAdMetrics(): Promise<IngestResult> {
         notes.push(`${p.nome}: sem gastos entre ${since} e ${until} (API respondeu, 0 campanhas ativas)`);
       }
     } catch (e) {
-      errors.push(`${p.nome}: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`${p.nome}: ${await explicar(p.nome, msg)}`);
     }
   }
 
