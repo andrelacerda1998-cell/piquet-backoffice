@@ -18,32 +18,8 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { costPerDownload } from "@/lib/adAttribution";
+import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
-
-/**
- * Classificação de uma campanha pelo retorno (ROAS = receita ÷ investimento).
- *
- * Regra honesta: sem conversões medidas (nem receita nem clientes atribuídos)
- * NÃO classificamos como "Má" — não há como julgar. Campanhas de notoriedade
- * ou sem tracking de conversões ficam "Sem dados" até haver o que medir.
- */
-type CampaignRating = "excelente" | "bom" | "media" | "ma" | "sem_dados";
-
-function rateCampaign(c: MarketingCampaign): CampaignRating {
-  if (!c.piquetRevenue && !c.customers) return "sem_dados";
-  if (c.roas >= 3) return "excelente";   // devolve 3× ou mais do investido
-  if (c.roas >= 1.5) return "bom";       // lucrativa com margem confortável
-  if (c.roas >= 1) return "media";       // paga-se a si própria
-  return "ma";                            // gasta mais do que devolve
-}
-
-const RATING: Record<CampaignRating, { label: string; tone: string; hint: string }> = {
-  excelente: { label: "Excelente", tone: "bg-success-light text-success", hint: "ROAS ≥ 3× — escalar" },
-  bom: { label: "Bom", tone: "bg-piquet/15 text-piquet-700", hint: "ROAS 1,5×–3× — manter" },
-  media: { label: "Média", tone: "bg-warning-light text-warning", hint: "ROAS 1×–1,5× — otimizar" },
-  ma: { label: "Má", tone: "bg-danger-light text-danger", hint: "ROAS < 1× — dá prejuízo" },
-  sem_dados: { label: "Sem dados", tone: "bg-surface-subtle text-text-secondary", hint: "Sem conversões medidas — não avaliável por ROAS" },
-};
 
 export default function MarketingPage() {
   const [tab, setTab] = useState("desempenho");
@@ -183,14 +159,66 @@ export default function MarketingPage() {
     },
     { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment) },
     { key: "clicks", label: "Cliques" },
-    { key: "leads", label: "Leads" },
-    { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl) },
+    {
+      key: "leads",
+      label: "Conversões",
+      // Numa campanha de instalação são instalações; numa de leads são leads.
+      // Chamar-lhe "Leads" em ambas dava a entender que havia 238 leads de uma
+      // campanha que só gerou downloads.
+      render: (r) => {
+        const o = campaignObjective(r.campaignName);
+        const que = o === "instalacao" ? "instalações" : o === "leads" ? "leads" : "conversões";
+        return <span title={`${r.leads} ${que} reportadas pela plataforma`}>{r.leads}</span>;
+      },
+    },
+    { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl), hidden: true },
     { key: "impressions", label: "Impressões", hidden: true },
     { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr), hidden: true },
     { key: "platform", label: "Plataforma", hidden: true },
     {
+      key: "objetivo",
+      label: "Objetivo",
+      render: (r) => (
+        <span className="text-xs font-medium text-text-secondary">
+          {OBJECTIVE_LABEL[campaignObjective(r.campaignName)]}
+        </span>
+      ),
+    },
+    {
+      key: "metricaChave",
+      label: "Métrica-chave",
+      // Cada objetivo é julgado pela sua: custo por instalação, por lead, por
+      // clique ou por mil pessoas. Antes era tudo ROAS.
+      render: (r) => {
+        const m = keyMetric(r);
+        return (
+          <span title={m.hint} className="cursor-help">
+            {m.value === null ? <span className="text-text-muted">—</span> : formatCurrency(m.value)}
+            <span className="block text-[11px] text-text-muted">{m.label}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "roas",
+      label: "ROAS",
+      // Só se mostra onde diz alguma coisa: uma campanha de notoriedade não
+      // tem retorno direto, e apresentar 0,00× fazia-a parecer um fracasso.
+      render: (r) =>
+        roasFazSentido(r) ? (
+          <span title="Receita Piquet ÷ investimento (comissão de 25%)">{r.roas.toFixed(2)}x</span>
+        ) : (
+          <span className="text-text-muted" title="Esta campanha não foi feita para gerar receita direta — avalia-se pela métrica-chave do objetivo">—</span>
+        ),
+    },
+    { key: "rating", label: "Desempenho", render: (r) => {
+      const c = COMPARACAO_UI[compararComPares(r, campanhasVisiveis)];
+      return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
+    } },
+    {
       key: "piquetRevenue",
       label: "Receita Piquet",
+      hidden: true,
       render: (r) => (
         <span
           title={
@@ -203,17 +231,6 @@ export default function MarketingPage() {
         </span>
       ),
     },
-    {
-      key: "roas",
-      label: "ROAS",
-      // Medido sobre a comissão da Piquet, não sobre o valor das encomendas —
-      // é o que diz se a campanha se paga a si própria.
-      render: (r) => <span title="Receita Piquet ÷ investimento (comissão de 25%)">{r.roas.toFixed(2)}x</span>,
-    },
-    { key: "rating", label: "Classificação", render: (r) => {
-      const c = RATING[rateCampaign(r)];
-      return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
-    } },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} />, hidden: true },
   ];
 
@@ -475,15 +492,23 @@ export default function MarketingPage() {
               <>
                 {sub === "campanhas" && (
                   <div className="space-y-3">
-                    {/* Legenda dos critérios de classificação (baseados no ROAS). */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-                      <span className="font-medium">Classificação por retorno (ROAS):</span>
-                      {(["excelente", "bom", "media", "ma", "sem_dados"] as CampaignRating[]).map((k) => (
-                        <span key={k} className="inline-flex items-center gap-1.5">
-                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full font-medium", RATING[k].tone)}>{RATING[k].label}</span>
-                          <span className="text-text-muted">{RATING[k].hint}</span>
-                        </span>
-                      ))}
+                    {/*
+                      Antes esta legenda explicava faixas de ROAS aplicadas a
+                      todas as campanhas por igual — o que marcava as de
+                      notoriedade como "Má" por terem 0,00×. Cada objetivo tem
+                      agora a sua métrica, e o desempenho é comparado só entre
+                      campanhas com o mesmo objetivo.
+                    */}
+                    <div className="rounded-xl bg-surface-subtle/60 px-3 py-2.5 text-xs text-text-secondary space-y-1">
+                      <p>
+                        <span className="font-medium text-text-primary">Cada objetivo é avaliado pela sua métrica:</span>{" "}
+                        instalações pelo custo por instalação · leads pelo custo por lead · tráfego pelo custo por clique ·
+                        notoriedade pelo custo por mil pessoas (CPM).
+                      </p>
+                      <p className="text-text-muted">
+                        O <strong>desempenho</strong> compara cada campanha com a mediana das outras do mesmo objetivo —
+                        não com metas de mercado, que não teríamos como fundamentar. O ROAS só aparece onde há receita medida.
+                      </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-1.5">
