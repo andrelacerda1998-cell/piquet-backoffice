@@ -4,6 +4,7 @@ import { metaConfigured, fetchMetaInsights, type AdRow } from "../../_lib/metaad
 import { googleAdsConfigured, fetchGoogleAdsInsights } from "../../_lib/googleads";
 import { aggregateCampaigns } from "../../_lib/adAggregation";
 import { logCronRun } from "../../_lib/cronlog";
+import { janelaSince } from "@/lib/adWindow";
 
 /**
  * Cron diário (vercel.json → 06:20 UTC): ingere o desempenho de campanhas de
@@ -30,8 +31,20 @@ export async function GET(req: Request) {
   }
 
   const until = iso(new Date(Date.now() - 86_400_000));       // ontem
-  const since = iso(new Date(Date.now() - 7 * 86_400_000));    // últimos 7 dias
   const db = supabaseAdmin();
+
+  /**
+   * Janela por plataforma: normalmente 7 dias, mas estica até cobrir o buraco
+   * se a plataforma esteve dias sem gravar. Regra e limites em `janelaSince`
+   * (testado em src/lib/adWindow.test.ts).
+   */
+  const sinceFor = async (platform: "meta" | "google"): Promise<string> => {
+    const { data } = await db
+      .from("ad_metrics").select("date").eq("platform", platform)
+      .order("date", { ascending: false }).limit(1);
+    return janelaSince(data?.[0]?.date as string | undefined, Date.now());
+  };
+
   const skipped: string[] = [];
   const errors: string[] = [];
   /**
@@ -58,6 +71,7 @@ export async function GET(req: Request) {
 
   if (metaConfigured()) {
     try {
+      const since = await sinceFor("meta");
       const rows = await fetchMetaInsights(since, until);
       await save("meta", rows);
       if (!rows.length) notes.push(`meta: sem gastos entre ${since} e ${until} (API respondeu, 0 campanhas ativas)`);
@@ -68,6 +82,7 @@ export async function GET(req: Request) {
 
   if (googleAdsConfigured()) {
     try {
+      const since = await sinceFor("google");
       const rows = await fetchGoogleAdsInsights(since, until);
       await save("google", rows);
       if (!rows.length) notes.push(`google: sem gastos entre ${since} e ${until} (API respondeu, 0 campanhas ativas)`);
