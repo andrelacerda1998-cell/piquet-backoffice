@@ -137,6 +137,8 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/leads",
   // Investimento real em anúncios por mês (ad_metrics: Meta + Google)
   "/marketing/spend",
+  // Recolha a pedido (mesma que o cron diário) — botão "Atualizar agora".
+  "/marketing/refresh",
   // Fase 5 — Equipa (chat, agenda e tarefas)
   "/team/messages",
   "/team/agenda",
@@ -322,6 +324,7 @@ const REAL_DATA = new Set<string>([
   "/coverage",
   // Investimento em anúncios: vem do Meta/Google via cron, é dinheiro real.
   "/marketing/spend",
+  "/marketing/refresh",
 ]);
 
 /**

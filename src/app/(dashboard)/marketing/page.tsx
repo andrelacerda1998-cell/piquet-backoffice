@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, type SpendMonth } from "@/services/marketingService";
+import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
 import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -15,7 +15,7 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone } from "lucide-react";
+import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { costPerDownload } from "@/lib/adAttribution";
 import type { MarketingCampaign } from "@/types";
@@ -53,7 +53,34 @@ export default function MarketingPage() {
   const { data: scripts } = useAsyncData(() => getScripts(), []);
   const { data: channels } = useAsyncData(() => getChannelBreakdown(), []);
   // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
-  const { data: spend } = useAsyncData(() => getAdSpend(), []);
+  // `recarga` incrementa ao fim de uma recolha manual para o gráfico refletir
+  // logo os dados novos, sem obrigar a recarregar a página.
+  const [recarga, setRecarga] = useState(0);
+  const { data: spend } = useAsyncData(() => getAdSpend(), [recarga]);
+  const [aAtualizar, setAAtualizar] = useState(false);
+
+  /**
+   * Vai buscar já o desempenho ao Meta e ao Google (a mesma rotina do cron das
+   * 06:20 UTC). O resultado é dito como é: quantas linhas entraram e, se uma
+   * plataforma não trouxe nada, que isso quer dizer campanhas sem gastos — não
+   * uma avaria.
+   */
+  const atualizarAnuncios = async () => {
+    setAAtualizar(true);
+    try {
+      const r = await refreshAdSpend();
+      setRecarga((n) => n + 1);
+      const partes = [`${r.upsertedCount} dia(s) de campanha recolhidos`];
+      if (r.campaignsWritten) partes.push(`${r.campaignsWritten} campanhas atualizadas`);
+      toast(partes.join(" · "), "success");
+      // Plataforma sem gastos no período não é erro, mas convém dizê-lo.
+      for (const n of [...r.notes, ...r.skipped]) toast(n, "info");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Falha ao atualizar os anúncios.", "error");
+    } finally {
+      setAAtualizar(false);
+    }
+  };
 
   // Período em análise: "" = tudo · "2026" = ano · "2026-07" = mês.
   const [periodo, setPeriodo] = useState<string>("");
@@ -157,6 +184,17 @@ export default function MarketingPage() {
           eyebrow="Crescimento"
           title="Marketing"
           subtitle="Investimento em anúncios, aquisição e retorno"
+          actions={
+            <button
+              onClick={atualizarAnuncios}
+              disabled={aAtualizar}
+              className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
+              title="Vai buscar já o desempenho ao Meta e ao Google, sem esperar pelo cron diário"
+            >
+              <RefreshCw className={cn("h-4 w-4", aAtualizar && "animate-spin")} />
+              {aAtualizar ? "A atualizar…" : "Atualizar anúncios"}
+            </button>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />

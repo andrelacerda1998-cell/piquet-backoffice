@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices } from "@/lib/filters";
 import { calculateCPL, calculateCAC, calculateROAS } from "@/lib/calculations";
@@ -176,4 +176,24 @@ export interface SpendData {
  */
 export async function getAdSpend(): Promise<SpendData> {
   return apiGet<SpendData>("/marketing/spend", () => ({ months: [], from: null, to: null })).then((r) => r.data);
+}
+
+/** Resultado da recolha a pedido (mesma rotina do cron diário). */
+export interface RefreshResult {
+  upsertedCount: number;
+  campaignsWritten: number;
+  skipped: string[];
+  /** Plataforma respondeu mas sem gastos no período — campanhas paradas. */
+  notes: string[];
+}
+
+/**
+ * Vai buscar já o desempenho ao Meta e ao Google, em vez de esperar pelo cron
+ * das 06:20 UTC. Útil logo a seguir a arranjar uma credencial: dá para saber
+ * na hora se ficou bom.
+ */
+export async function refreshAdSpend(): Promise<RefreshResult> {
+  return apiPost<RefreshResult>("/marketing/refresh", {}, () => {
+    throw new Error("Atualizar os anúncios precisa do backend configurado.");
+  }).then((r) => r.data);
 }
