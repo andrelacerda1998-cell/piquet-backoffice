@@ -64,6 +64,12 @@ export default function MarketingPage() {
   // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
   const { data: spend } = useAsyncData(() => getAdSpend(), [recarga]);
   const [aAtualizar, setAAtualizar] = useState(false);
+  /**
+   * A lista mostra por omissão só as campanhas A CORRER: são essas sobre as
+   * quais ainda se pode decidir alguma coisa. O histórico continua a um clique
+   * — foi preciso pedi-lo, e serve para comparar o que resultou no passado.
+   */
+  const [estadoCampanhas, setEstadoCampanhas] = useState<"ativas" | "concluidas" | "todas">("ativas");
 
   /**
    * Vai buscar já o desempenho ao Meta e ao Google (a mesma rotina do cron das
@@ -144,17 +150,44 @@ export default function MarketingPage() {
     return `${MESES_PT[Number(m) - 1] ?? ym} ${y}`;
   };
 
+  /**
+   * Colunas do essencial: o que decide se se mantém ou corta uma campanha —
+   * quanto custou, o que rendeu e o retorno.
+   *
+   * As restantes ficam `hidden` (acessíveis no menu de colunas) em vez de
+   * eliminadas. Duas delas eram duplicados puros: `customers` é sempre igual a
+   * `leads` e `cac` sempre igual a `cpl` — as plataformas reportam conversões,
+   * não clientes distintos, por isso mostrá-las como métricas separadas dava a
+   * impressão de haver ali mais informação do que há.
+   */
+  const campanhasAtivas = (campaigns ?? []).filter((c) => c.status === "ativa");
+  const campanhasConcluidas = (campaigns ?? []).filter((c) => c.status !== "ativa");
+  const campanhasVisiveis =
+    estadoCampanhas === "ativas" ? campanhasAtivas
+    : estadoCampanhas === "concluidas" ? campanhasConcluidas
+    : (campaigns ?? []);
+
   const campaignColumns: Column<MarketingCampaign>[] = [
-    { key: "platform", label: "Plataforma" },
-    { key: "campaignName", label: "Campanha" },
+    {
+      key: "campaignName",
+      label: "Campanha",
+      render: (r) => (
+        <div className="min-w-0">
+          <p className="font-medium text-text-primary truncate" title={r.campaignName}>{r.campaignName}</p>
+          <p className="text-xs text-text-muted">
+            {r.platform}
+            {r.startDate && <> · {formatDate(r.startDate)}{r.endDate ? ` – ${formatDate(r.endDate)}` : " – hoje"}</>}
+          </p>
+        </div>
+      ),
+    },
     { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment) },
-    { key: "impressions", label: "Impressões" },
     { key: "clicks", label: "Cliques" },
-    { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr) },
     { key: "leads", label: "Leads" },
     { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl) },
-    { key: "customers", label: "Clientes" },
-    { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac) },
+    { key: "impressions", label: "Impressões", hidden: true },
+    { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr), hidden: true },
+    { key: "platform", label: "Plataforma", hidden: true },
     {
       key: "piquetRevenue",
       label: "Receita Piquet",
@@ -181,7 +214,7 @@ export default function MarketingPage() {
       const c = RATING[rateCampaign(r)];
       return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
     } },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} /> },
+    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} />, hidden: true },
   ];
 
   const creativeColumns: Column<Record<string, unknown>>[] = [
@@ -190,15 +223,17 @@ export default function MarketingPage() {
     { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
     { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr as number) },
     { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl as number) },
-    { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac as number) },
-    { key: "revenue", label: "Receita", render: (r) => formatCurrency(r.revenue as number) },
+    // CAC é sempre igual ao CPL aqui (conversões ≠ clientes distintos): fica
+    // escondido para não parecer uma métrica independente.
+    { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac as number), hidden: true },
+    { key: "revenue", label: "Receita Piquet", render: (r) => formatCurrency(r.revenue as number) },
     { key: "roas", label: "ROAS", render: (r) => `${(r.roas as number).toFixed(2)}x` },
     { key: "recommendation", label: "Recomendação", render: (r) => <StatusBadge status={(r.recommendation as string) === "Escalar" ? "ativo" : (r.recommendation as string) === "Desativar" ? "cancelado_cliente" : "em_analise"} label={r.recommendation as string} /> },
   ];
 
   const TABS: TabDef[] = [
     { id: "desempenho", label: "Desempenho" },
-    { id: "campanhas", label: "Campanhas", count: campaigns?.length },
+    { id: "campanhas", label: "Campanhas", count: campanhasAtivas.length },
     { id: "comunicacao", label: "Comunicação" },
   ];
 
@@ -450,7 +485,43 @@ export default function MarketingPage() {
                         </span>
                       ))}
                     </div>
-                    <DataTable columns={campaignColumns} data={campaigns ?? []} keyField="id" />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-1.5">
+                        {([
+                          { id: "ativas", label: "A correr", n: campanhasAtivas.length },
+                          { id: "concluidas", label: "Concluídas", n: campanhasConcluidas.length },
+                          { id: "todas", label: "Todas", n: (campaigns ?? []).length },
+                        ] as const).map((o) => (
+                          <button
+                            key={o.id}
+                            onClick={() => setEstadoCampanhas(o.id)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                              estadoCampanhas === o.id
+                                ? "bg-piquet text-white"
+                                : "bg-surface-subtle text-text-secondary hover:text-text-primary",
+                            )}
+                          >
+                            {o.label} <span className="opacity-70">{o.n}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-text-muted">
+                        {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos
+                        {estadoCampanhas === "ativas" && campanhasConcluidas.length > 0 &&
+                          ` · ${campanhasConcluidas.length} concluídas escondidas`}
+                      </p>
+                    </div>
+                    <DataTable
+                      columns={campaignColumns}
+                      data={campanhasVisiveis}
+                      keyField="id"
+                      emptyMessage={
+                        estadoCampanhas === "ativas"
+                          ? "Nenhuma campanha a correr neste momento."
+                          : "Sem campanhas neste estado."
+                      }
+                    />
                   </div>
                 )}
                 {sub === "criativos" && (
