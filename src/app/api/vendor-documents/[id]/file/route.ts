@@ -1,3 +1,4 @@
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 import { withStaff } from "../../../_lib/handler";
 import { laravelAdminRequest } from "@/lib/laravelAdmin";
 import type { VendorDocument, VendorDocumentsData } from "../../route";
@@ -47,7 +48,8 @@ export const GET = withStaff(async (_req, { params }) => {
     return new Response("Documento sem ficheiro associado.", { status: 404 });
   }
 
-  const upstream = await fetch(doc.file_url, { cache: "no-store" });
+  // Com prazo: um ficheiro alojado num servidor lento pendurava o proxy.
+  const upstream = await fetchComPrazo(doc.file_url, { cache: "no-store" }, 30_000);
   if (!upstream.ok || !upstream.body) {
     return new Response("Não foi possível obter o ficheiro.", { status: 502 });
   }

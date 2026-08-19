@@ -71,7 +71,15 @@ export default function RecruitmentPage() {
 
   const decide = (c: TechCandidate, approved: boolean) => {
     setCandidates((prev) => prev.map((x) => x.id === c.id ? { ...x, status: approved ? "aprovado" : "recusado" } : x));
-    toast(approved ? `${c.name} aprovado como técnico.` : `Candidatura de ${c.name} recusada.`, approved ? "success" : "error");
+    // Secção de demonstração (ver <DemoBadge/> no cabeçalho): não há backend de
+    // recrutamento, a decisão vive só neste ecrã. O texto tem de o dizer — antes
+    // anunciava "aprovado como técnico", o que não acontecia em lado nenhum.
+    toast(
+      approved
+        ? `${c.name} marcado como aprovado (demonstração — não fica gravado).`
+        : `Candidatura de ${c.name} marcada como recusada (demonstração — não fica gravada).`,
+      approved ? "success" : "error",
+    );
   };
 
   if (loading && !data) return <LoadingState />;

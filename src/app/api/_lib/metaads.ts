@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 
 /**
  * Meta Ads — Marketing API (Insights).
@@ -61,7 +62,7 @@ export async function fetchMetaInsights(since: string, until: string): Promise<A
   let url = `${API}/${account}/insights?${params}`;
   // Segue a paginação do Graph API.
   for (let guard = 0; guard < 20 && url; guard++) {
-    const res = await fetch(url);
+    const res = await fetchComPrazo(url);
     if (!res.ok) throw new Error(`Meta Insights ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json = (await res.json()) as {
       data: Array<Record<string, unknown>>;

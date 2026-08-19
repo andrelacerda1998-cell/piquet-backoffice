@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verificarChave } from "../../_lib/webhookAuth";
 import { SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { paylandsConfigured, paylandsDate } from "../../_lib/paylands";
 import { syncPopTransactions } from "../../_lib/popSync";
@@ -32,8 +33,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 503 });
   }
 
-  const expected = process.env.PAYLANDS_WEBHOOK_KEY;
-  if (expected && new URL(req.url).searchParams.get("key") !== expected) {
+  // Falha FECHADO: sem a env definida recusa-se, em vez de aceitar tudo.
+  const auth = verificarChave(new URL(req.url).searchParams.get("key"), process.env.PAYLANDS_WEBHOOK_KEY, "PAYLANDS_WEBHOOK_KEY");
+  if (!auth.ok) {
+    console.error("[webhook] recusado:", auth.motivo);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verificarChave } from "../../_lib/webhookAuth";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
 
@@ -23,8 +24,10 @@ const clip = (v: unknown, max: number) => (typeof v === "string" ? v : "").trim(
 export async function POST(req: Request) {
   if (!SUPABASE_ENABLED) return NextResponse.json({ ok: false }, { status: 503 });
 
-  const expected = process.env.OUTLOOK_WEBHOOK_KEY;
-  if (expected && new URL(req.url).searchParams.get("key") !== expected) {
+  // Falha FECHADO: sem a env definida recusa-se, em vez de aceitar tudo.
+  const auth = verificarChave(new URL(req.url).searchParams.get("key"), process.env.OUTLOOK_WEBHOOK_KEY, "OUTLOOK_WEBHOOK_KEY");
+  if (!auth.ok) {
+    console.error("[webhook] recusado:", auth.motivo);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 

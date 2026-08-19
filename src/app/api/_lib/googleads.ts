@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 import type { AdRow } from "./metaads";
 import { versionsToTry, shouldTryNextVersion } from "@/lib/googleAdsVersion";
 
@@ -24,7 +25,7 @@ export function googleAdsConfigured(): boolean {
 }
 
 async function accessToken(): Promise<string> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetchComPrazo("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -92,7 +93,7 @@ export async function fetchGoogleAdsInsights(since: string, until: string): Prom
   let res: Response | null = null;
   const reformadas: string[] = [];
   for (const v of tentativas) {
-    const r = await fetch(`https://googleads.googleapis.com/${v}/customers/${customer}/googleAds:search`, {
+    const r = await fetchComPrazo(`https://googleads.googleapis.com/${v}/customers/${customer}/googleAds:search`, {
       method: "POST",
       headers,
       body: JSON.stringify({ query }),
@@ -144,7 +145,7 @@ export async function fetchAccessibleCustomers(): Promise<GoogleAdsAccess> {
   }
 
   for (const v of versionsToTry(process.env.GOOGLE_ADS_API_VERSION)) {
-    const r = await fetch(`https://googleads.googleapis.com/${v}/customers:listAccessibleCustomers`, { headers });
+    const r = await fetchComPrazo(`https://googleads.googleapis.com/${v}/customers:listAccessibleCustomers`, { headers });
     if (shouldTryNextVersion(r.status)) continue;
     if (!r.ok) throw new Error(`Google Ads ${r.status}: ${(await r.text()).slice(0, 1000)}`);
     const json = (await r.json()) as { resourceNames?: string[] };
@@ -169,7 +170,7 @@ export async function findManagerFor(alvo: string, candidatas: string[]): Promis
 
   for (const gestora of candidatas) {
     try {
-      const r = await fetch(`https://googleads.googleapis.com/${versao}/customers/${gestora}/googleAds:search`, {
+      const r = await fetchComPrazo(`https://googleads.googleapis.com/${versao}/customers/${gestora}/googleAds:search`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

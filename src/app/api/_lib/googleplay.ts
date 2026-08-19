@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 import { SignJWT, importPKCS8 } from "jose";
 
 /**
@@ -32,7 +33,7 @@ async function googleToken(): Promise<string> {
     .setExpirationTime("10m")
     .sign(key);
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetchComPrazo("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -71,7 +72,7 @@ export async function fetchPlayInstalls(packageName: string, yyyymm: string): Pr
   const token = await googleToken();
   const bucket = process.env.GOOGLE_PLAY_BUCKET!;
   const object = encodeURIComponent(`stats/installs/installs_${packageName}_${yyyymm}_overview.csv`);
-  const res = await fetch(`https://storage.googleapis.com/storage/v1/b/${bucket}/o/${object}?alt=media`, {
+  const res = await fetchComPrazo(`https://storage.googleapis.com/storage/v1/b/${bucket}/o/${object}?alt=media`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 404) return null; // mês ainda sem relatório
@@ -98,7 +99,7 @@ import type { StoreRating } from "./appstore";
  */
 export async function fetchPlayRating(packageName: string): Promise<StoreRating | null> {
   try {
-    const res = await fetch(`https://play.google.com/store/apps/details?id=${packageName}&hl=pt_PT`, {
+    const res = await fetchComPrazo(`https://play.google.com/store/apps/details?id=${packageName}&hl=pt_PT`, {
       headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
       next: { revalidate: 3600 },
     });
@@ -119,7 +120,7 @@ export async function fetchPlayRating(packageName: string): Promise<StoreRating 
   for (const d of [now, new Date(now.getFullYear(), now.getMonth() - 1, 1)]) {
     const yyyymm = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
     const object = encodeURIComponent(`stats/ratings/ratings_${packageName}_${yyyymm}_overview.csv`);
-    const res = await fetch(`https://storage.googleapis.com/storage/v1/b/${bucket}/o/${object}?alt=media`, {
+    const res = await fetchComPrazo(`https://storage.googleapis.com/storage/v1/b/${bucket}/o/${object}?alt=media`, {
       headers: { Authorization: `Bearer ${token}` },
       next: { revalidate: 3600 },
     });

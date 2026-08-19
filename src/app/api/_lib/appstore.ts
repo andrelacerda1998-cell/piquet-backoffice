@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 import { SignJWT, importPKCS8 } from "jose";
 import { gunzipSync } from "node:zlib";
 
@@ -77,7 +78,7 @@ export async function fetchAppleDownloads(date: string): Promise<{ cliente: numb
     "filter[reportType]": "SALES",
     "filter[vendorNumber]": process.env.APPLE_VENDOR_NUMBER!,
   });
-  const res = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
+  const res = await fetchComPrazo(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/a-gzip" },
   });
   if (res.status === 404) return null; // relatório ainda não disponível
@@ -114,7 +115,7 @@ export interface StoreRating {
  * iTunes (sem autenticação). Devolve null se a app não tiver avaliações.
  */
 export async function fetchAppleRating(app: keyof typeof APPLE_APP_IDS): Promise<StoreRating | null> {
-  const res = await fetch(`https://itunes.apple.com/lookup?id=${APPLE_APP_IDS[app]}&country=pt`, {
+  const res = await fetchComPrazo(`https://itunes.apple.com/lookup?id=${APPLE_APP_IDS[app]}&country=pt`, {
     next: { revalidate: 3600 },
   });
   if (!res.ok) return null;

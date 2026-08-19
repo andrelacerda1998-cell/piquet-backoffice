@@ -1,3 +1,4 @@
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 /**
  * Integração Mixpanel — funil da jornada na app (onde os utilizadores param).
  *
@@ -31,7 +32,7 @@ async function query(path: string, params: Record<string, string | number | unde
   const url = new URL(`${HOST}/api/query/${path}`);
   url.searchParams.set("project_id", env("MIXPANEL_PROJECT_ID"));
   for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, String(v));
-  const res = await fetch(url.toString(), { headers: { Authorization: authHeader(), Accept: "application/json" } });
+  const res = await fetchComPrazo(url.toString(), { headers: { Authorization: authHeader(), Accept: "application/json" } });
   if (!res.ok) throw new Error(`Mixpanel ${res.status}: ${(await res.text()).slice(0, 400)}`);
   return res.json();
 }

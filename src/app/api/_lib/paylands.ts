@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchComPrazo } from "@/lib/fetchTimeout";
 
 /**
  * Payshop Online Payments (plataforma Paylands / PaynoPain).
@@ -95,7 +96,7 @@ export async function fetchPopTransactions(start: string, end: string): Promise<
   let offset = 0;
   for (let guard = 0; guard < 20; guard++) {
     const params = new URLSearchParams({ start, end, limit: "10000", offset: String(offset) });
-    const res = await fetch(`${BASE}/orders?${params}`, { headers: { Authorization: auth } });
+    const res = await fetchComPrazo(`${BASE}/orders?${params}`, { headers: { Authorization: auth } });
     if (!res.ok) throw new Error(`Paylands ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const json = (await res.json()) as { code: number; transactions?: RawTx[]; next_offset?: number; count?: number };
     if (json.code !== 200) throw new Error(`Paylands code ${json.code}`);
