@@ -112,3 +112,44 @@ export async function fetchGoogleAdsInsights(since: string, until: string): Prom
   const json = (await res.json()) as { results?: GoogleAdsResultRow[] };
   return mapGoogleAdsRows(json.results ?? []);
 }
+
+/**
+ * Contas de anúncios a que o refresh token configurado dá acesso.
+ *
+ * Existe para responder a uma pergunta concreta que o erro 403 da API não
+ * responde: "a conta Google que autorizei chega sequer a ver a conta de
+ * anúncios da Piquet?". Sem isto, um USER_PERMISSION_DENIED é ambíguo — pode
+ * ser conta errada na autorização, pode ser falta do login-customer-id de uma
+ * MCC — e adivinhar custa outra ida ao OAuth Playground.
+ */
+export interface GoogleAdsAccess {
+  /** Contas visíveis para o token (só dígitos). */
+  acessiveis: string[];
+  /** A conta que o backoffice está configurado para ler. */
+  configurada: string;
+  /** `true` se a configurada está entre as acessíveis. */
+  temAcesso: boolean;
+  versao: string;
+}
+
+export async function fetchAccessibleCustomers(): Promise<GoogleAdsAccess> {
+  const token = await accessToken();
+  const configurada = (process.env.GOOGLE_ADS_CUSTOMER_ID ?? "").replace(/-/g, "");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+  };
+  if (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) {
+    headers["login-customer-id"] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, "");
+  }
+
+  for (const v of versionsToTry(process.env.GOOGLE_ADS_API_VERSION)) {
+    const r = await fetch(`https://googleads.googleapis.com/${v}/customers:listAccessibleCustomers`, { headers });
+    if (shouldTryNextVersion(r.status)) continue;
+    if (!r.ok) throw new Error(`Google Ads ${r.status}: ${(await r.text()).slice(0, 1000)}`);
+    const json = (await r.json()) as { resourceNames?: string[] };
+    const acessiveis = (json.resourceNames ?? []).map((n) => n.replace("customers/", ""));
+    return { acessiveis, configurada, temAcesso: acessiveis.includes(configurada), versao: v };
+  }
+  throw new Error("Google Ads: nenhuma versão da API respondeu.");
+}

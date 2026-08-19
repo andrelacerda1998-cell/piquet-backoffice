@@ -139,6 +139,8 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/spend",
   // Recolha a pedido (mesma que o cron diário) — botão "Atualizar agora".
   "/marketing/refresh",
+  // Diagnóstico: que contas de anúncios o token do Google consegue ver.
+  "/marketing/google-access",
   // Fase 5 — Equipa (chat, agenda e tarefas)
   "/team/messages",
   "/team/agenda",
@@ -325,6 +327,7 @@ const REAL_DATA = new Set<string>([
   // Investimento em anúncios: vem do Meta/Google via cron, é dinheiro real.
   "/marketing/spend",
   "/marketing/refresh",
+  "/marketing/google-access",
 ]);
 
 /**
