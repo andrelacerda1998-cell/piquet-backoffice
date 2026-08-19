@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { metaConfigured, fetchMetaInsights, type AdRow } from "./metaads";
-import { googleAdsConfigured, fetchGoogleAdsInsights, fetchAccessibleCustomers } from "./googleads";
+import { googleAdsConfigured, fetchGoogleAdsInsights, fetchAccessibleCustomers, findManagerFor } from "./googleads";
 import { aggregateCampaigns } from "./adAggregation";
 import { janelaSince } from "@/lib/adWindow";
 
@@ -43,10 +43,16 @@ async function explicar(plataforma: "meta" | "google", msg: string): Promise<str
         "Refazer a autorização no OAuth Playground escolhendo a conta com que entra no Google Ads.";
     }
     if (!a.temAcesso) {
-      return `a conta Google autorizada não vê a conta de anúncios configurada (${a.configurada}). ` +
-        `Vê estas: ${a.acessiveis.join(", ")}. ` +
-        "Ou refazer a autorização com a conta certa, ou — se o acesso for por conta gestora (MCC) — " +
-        "definir GOOGLE_ADS_LOGIN_CUSTOMER_ID com o ID da gestora.";
+      // Antes de mandar refazer a autorização, ver se a conta está apenas
+      // debaixo de uma gestora — nesse caso só falta um header.
+      const gestora = await findManagerFor(a.configurada, a.acessiveis);
+      if (gestora) {
+        return `a conta ${a.configurada} está sob a conta gestora ${gestora}. ` +
+          `Falta definir GOOGLE_ADS_LOGIN_CUSTOMER_ID=${gestora} na Vercel (e voltar a publicar).`;
+      }
+      return `a conta Google autorizada não vê a conta de anúncios configurada (${a.configurada}), ` +
+        `e ela também não está sob nenhuma das gestoras acessíveis (${a.acessiveis.join(", ")}). ` +
+        "Refazer a autorização no OAuth Playground com a conta que administra o Google Ads.";
     }
     return `${msg} (a conta ${a.configurada} está acessível, por isso o problema não é a autorização)`;
   } catch {

@@ -153,3 +153,37 @@ export async function fetchAccessibleCustomers(): Promise<GoogleAdsAccess> {
   }
   throw new Error("Google Ads: nenhuma versão da API respondeu.");
 }
+
+/**
+ * Procura, entre as contas que o token vê, qual é a gestora (MCC) que tem a
+ * conta `alvo` por baixo.
+ *
+ * O 403 do Google diz "define o login-customer-id" mas não diz com quê — e
+ * adivinhar entre várias contas é tentativa e erro com um deploy pelo meio.
+ * A hierarquia está em `customer_client`, basta perguntar.
+ */
+export async function findManagerFor(alvo: string, candidatas: string[]): Promise<string | null> {
+  const token = await accessToken();
+  const versao = versionsToTry(process.env.GOOGLE_ADS_API_VERSION)[0];
+  const query = "SELECT customer_client.id FROM customer_client";
+
+  for (const gestora of candidatas) {
+    try {
+      const r = await fetch(`https://googleads.googleapis.com/${versao}/customers/${gestora}/googleAds:search`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+          "login-customer-id": gestora,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
+      if (!r.ok) continue; // não é gestora, ou sem permissão: passa à seguinte
+      const json = (await r.json()) as { results?: Array<{ customerClient?: { id?: string } }> };
+      const filhos = (json.results ?? []).map((x) => String(x.customerClient?.id ?? ""));
+      if (filhos.includes(alvo)) return gestora;
+    } catch { /* candidata falhou: tenta a próxima */ }
+  }
+  return null;
+}
