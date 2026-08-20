@@ -53,6 +53,8 @@ export function SupportInbox() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("todos");
   const [query, setQuery] = useState("");
+  /** Mais recente primeiro por omissão: é onde está a conversa viva. */
+  const [ordem, setOrdem] = useState<"recentes" | "antigos">("recentes");
   const [reply, setReply] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -70,8 +72,7 @@ export function SupportInbox() {
     todos: tickets.length,
     abertos: tickets.filter((t) => isOpen(t.status)).length,
     novo: tickets.filter((t) => t.status === "novo").length,
-    // "Em curso" agrega "à espera do cliente": conversas a decorrer.
-    em_curso: tickets.filter((t) => t.status === "em_curso" || t.status === "aguarda_cliente").length,
+    em_curso: tickets.filter((t) => t.status === "em_curso").length,
     aguarda_cliente: tickets.filter((t) => t.status === "aguarda_cliente").length,
     resolvido: tickets.filter((t) => t.status === "resolvido").length,
     fechado: tickets.filter((t) => t.status === "fechado").length,
@@ -85,14 +86,19 @@ export function SupportInbox() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tickets.filter((t) => {
+    const lista = tickets.filter((t) => {
       if (filter === "abertos" && !isOpen(t.status)) return false;
-      if (filter === "em_curso" && !(t.status === "em_curso" || t.status === "aguarda_cliente")) return false;
-      if (!["todos", "abertos", "em_curso"].includes(filter) && t.status !== filter) return false;
+      if (!["todos", "abertos"].includes(filter) && t.status !== filter) return false;
       if (q && !(`${t.subject} ${t.requesterName} ${t.id}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [tickets, filter, query]);
+    // Ordena pela última mensagem — é a atividade real do ticket, não a data
+    // de abertura: um pedido antigo com resposta de hoje está vivo.
+    return lista.sort((a, b) => {
+      const d = Date.parse(b.lastMessageAt) - Date.parse(a.lastMessageAt);
+      return ordem === "recentes" ? d : -d;
+    });
+  }, [tickets, filter, query, ordem]);
 
   const selected = tickets.find((t) => t.id === selectedId) ?? null;
 
@@ -170,13 +176,9 @@ export function SupportInbox() {
                 className="input-field pl-8 py-1.5 text-sm" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {/*
-                Cinco filtros: Todos, e os quatro estados do ciclo. "Em curso"
-                agrega "à espera do cliente" — para a equipa é a mesma pilha
-                (conversas a decorrer).
-              */}
-              {(["todos", "novo", "em_curso", "resolvido", "fechado"] as StatusFilter[]).map((f) => {
-                const label = f === "todos" ? "Todos" : f === "em_curso" ? "Em curso" : statusMeta(f as TicketStatus).label;
+              {/* "Todos" + um filtro por cada estado do ciclo de vida. */}
+              {(["todos", ...TICKET_STATUS.map((x) => x.id)] as StatusFilter[]).map((f) => {
+                const label = f === "todos" ? "Todos" : statusMeta(f as TicketStatus).label;
                 const n = counts[f as keyof typeof counts];
                 return (
                   <button key={f} onClick={() => setFilter(f)}
@@ -186,6 +188,21 @@ export function SupportInbox() {
                   </button>
                 );
               })}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-text-muted">
+                {filtered.length} {filtered.length === 1 ? "ticket" : "tickets"}
+              </span>
+              <select
+                value={ordem}
+                onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
+                aria-label="Ordenar tickets"
+                title="Ordena pela última mensagem — a atividade real do ticket, não a data de abertura"
+                className="input-field w-auto py-1 text-xs"
+              >
+                <option value="recentes">Mais recentes primeiro</option>
+                <option value="antigos">Mais antigos primeiro</option>
+              </select>
             </div>
           </div>
           {/* Tickets */}
