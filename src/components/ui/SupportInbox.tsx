@@ -22,7 +22,7 @@ const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = {
   email: Mail,
 };
 
-type StatusFilter = "abertos" | TicketStatus;
+type StatusFilter = "todos" | "abertos" | TicketStatus;
 
 function timeAgo(iso: string) {
   const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -51,8 +51,7 @@ export function SupportInbox() {
   const [tickets, setTickets] = useState<InboxTicket[]>([]);
   const seeded = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<StatusFilter>("abertos");
-  const [channelFilter, setChannelFilter] = useState<TicketChannel | "todos">("todos");
+  const [filter, setFilter] = useState<StatusFilter>("todos");
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -68,28 +67,15 @@ export function SupportInbox() {
   }, [ticketParam]);
 
   const counts = useMemo(() => ({
+    todos: tickets.length,
     abertos: tickets.filter((t) => isOpen(t.status)).length,
     novo: tickets.filter((t) => t.status === "novo").length,
-    em_curso: tickets.filter((t) => t.status === "em_curso").length,
+    // "Em curso" agrega "à espera do cliente": conversas a decorrer.
+    em_curso: tickets.filter((t) => t.status === "em_curso" || t.status === "aguarda_cliente").length,
     aguarda_cliente: tickets.filter((t) => t.status === "aguarda_cliente").length,
     resolvido: tickets.filter((t) => t.status === "resolvido").length,
     fechado: tickets.filter((t) => t.status === "fechado").length,
   }), [tickets]);
-
-  /**
-   * Quantos tickets POR ORIGEM, contando só os que estão abertos — é isso que
-   * diz de onde está a vir trabalho agora. Sem estes números, o filtro de canal
-   * obrigava a clicar em cada um para descobrir se havia lá alguma coisa.
-   */
-  const porCanal = useMemo(() => {
-    const abertos = tickets.filter((t) => isOpen(t.status));
-    return {
-      todos: abertos.length,
-      app_cliente: abertos.filter((t) => t.channel === "app_cliente").length,
-      app_tecnico: abertos.filter((t) => t.channel === "app_tecnico").length,
-      email: abertos.filter((t) => t.channel === "email").length,
-    };
-  }, [tickets]);
 
   /**
    * Medidas de serviço: o que interessa não é o total de tickets, é há quanto
@@ -100,12 +86,13 @@ export function SupportInbox() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tickets.filter((t) => {
-      if (filter === "abertos" ? !isOpen(t.status) : t.status !== filter) return false;
-      if (channelFilter !== "todos" && t.channel !== channelFilter) return false;
+      if (filter === "abertos" && !isOpen(t.status)) return false;
+      if (filter === "em_curso" && !(t.status === "em_curso" || t.status === "aguarda_cliente")) return false;
+      if (!["todos", "abertos", "em_curso"].includes(filter) && t.status !== filter) return false;
       if (q && !(`${t.subject} ${t.requesterName} ${t.id}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [tickets, filter, channelFilter, query]);
+  }, [tickets, filter, query]);
 
   const selected = tickets.find((t) => t.id === selectedId) ?? null;
 
@@ -183,8 +170,13 @@ export function SupportInbox() {
                 className="input-field pl-8 py-1.5 text-sm" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {(["abertos", ...TICKET_STATUS.map((s) => s.id)] as StatusFilter[]).map((f) => {
-                const label = f === "abertos" ? "Abertos" : statusMeta(f).label;
+              {/*
+                Cinco filtros: Todos, e os quatro estados do ciclo. "Em curso"
+                agrega "à espera do cliente" — para a equipa é a mesma pilha
+                (conversas a decorrer).
+              */}
+              {(["todos", "novo", "em_curso", "resolvido", "fechado"] as StatusFilter[]).map((f) => {
+                const label = f === "todos" ? "Todos" : f === "em_curso" ? "Em curso" : statusMeta(f as TicketStatus).label;
                 const n = counts[f as keyof typeof counts];
                 return (
                   <button key={f} onClick={() => setFilter(f)}
@@ -194,17 +186,6 @@ export function SupportInbox() {
                   </button>
                 );
               })}
-            </div>
-            <div className="flex gap-1">
-              {(["todos", "app_cliente", "app_tecnico", "email"] as const).map((c) => (
-                <button key={c} onClick={() => setChannelFilter(c)}
-                  title={c === "todos" ? "Todos os canais" : `Abertos vindos de ${CHANNEL_LABEL[c]}`}
-                  className={cn("px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
-                    channelFilter === c ? "bg-surface-strong text-text-primary" : "text-text-muted hover:bg-surface-muted")}>
-                  {c === "todos" ? "Todos os canais" : CHANNEL_LABEL[c]}
-                  {porCanal[c] > 0 && <span className="ml-1 opacity-70">{porCanal[c]}</span>}
-                </button>
-              ))}
             </div>
           </div>
           {/* Tickets */}
@@ -243,15 +224,24 @@ export function SupportInbox() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
-                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", meta.dot)} />
                       <span className="text-sm font-medium text-text-primary truncate flex-1">{t.subject}</span>
                       <span className="text-[10px] text-text-muted shrink-0">{timeAgo(t.lastMessageAt)}</span>
                     </span>
                     <span className="flex items-center gap-1.5 mt-0.5 text-xs text-text-muted">
-                      <Icon className="h-3 w-3 shrink-0" />
                       <span className="truncate">{t.requesterName}</span>
-                      <span className="text-text-muted/50">·</span>
-                      <span className="font-mono text-[10px]">{t.id}</span>
+                    </span>
+                    {/* Origem e estado sempre à vista: com todos os canais na
+                        mesma lista, é isto que diz de onde veio e em que ponto
+                        está sem abrir o ticket. */}
+                    <span className="flex items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+                        <Icon className="h-2.5 w-2.5" />
+                        {CHANNEL_LABEL[t.channel]}
+                      </span>
+                      <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium", meta.tone)}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+                        {meta.label}
+                      </span>
                     </span>
                     {last && <span className="block text-xs text-text-secondary truncate mt-0.5">{last.from === "agente" ? "Tu: " : ""}{last.body}</span>}
                   </span>
