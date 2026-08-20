@@ -62,9 +62,12 @@ export const GET = withStaff(async () => {
 
     impostosVencidos: await tenta("tax_obligations", async () => {
       const hoje = new Date(agora).toISOString();
+      // Só obrigações CONFIRMADAS: a tabela tem 11 linhas "estimado" (projeções
+      // semeadas a partir da folha salarial, não dívidas reais) e alertar
+      // "crítico" sobre estimativas encheria a página de falsos alarmes.
       const { data } = await db.from("tax_obligations")
         .select("name, amount_estimated, amount_confirmed, is_estimated, status, due_date")
-        .lt("due_date", hoje).neq("status", "pago").limit(100);
+        .lt("due_date", hoje).neq("status", "pago").neq("status", "estimado").limit(100);
       return ((data ?? []) as Array<{ name: string; amount_estimated: number; amount_confirmed: number | null; is_estimated: boolean; due_date: string }>)
         .map((t) => ({
           nome: t.name,
