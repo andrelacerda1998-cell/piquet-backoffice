@@ -76,15 +76,21 @@ export default function LeadsPage() {
     if (ua !== ub) return ub - ua;
     return (b.createdAt || "").localeCompare(a.createdAt || "");
   };
-  // Por omissão os recusados ficam ocultos (o pedido está fechado); aparecem ao
-  // escolher "Recusado" ou "Todos (inclui recusados)" no filtro de estado.
+  /**
+   * Por omissão a lista mostra só o que está NA MÃO DA EQUIPA: pedidos novos e
+   * orçamentos enviados à espera de resposta. Aceites, executados, recusados e
+   * reembolsados são consulta, não trabalho — aparecem pelo filtro de estado
+   * ou pelos cartões. O que fica oculto é dito por baixo da lista, para não
+   * parecer que desapareceu.
+   */
+  const ESTADOS_ATIVOS: LeadStage[] = ["nao_iniciado", "orcamento_enviado"];
   const byStage = leadStage === ""
-    ? baseFiltered.filter((l) => l.stage !== "recusado")
+    ? baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage))
     : leadStage === "todos"
       ? baseFiltered
       : baseFiltered.filter((l) => l.stage === leadStage);
   const filteredLeads = byStage.slice().sort(byUrgencyThenDate);
-  const hiddenRefused = leadStage === "" ? baseFiltered.filter((l) => l.stage === "recusado").length : 0;
+  const escondidas = leadStage === "" ? baseFiltered.length - byStage.length : 0;
   // O mês atual é o estado por omissão — só conta como filtro se for outro mês.
   const hasActiveFilters = !!(leadSearch || (leadMonth && leadMonth !== currentMonth) || leadStage || leadCategory || leadSource);
   const clearFilters = () => { setLeadSearch(""); setLeadMonth(currentMonth); setLeadStage(""); setLeadCategory(""); setLeadSource(""); };
@@ -386,8 +392,8 @@ export default function LeadsPage() {
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
                 <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | "todos" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
-                  <option value="">Em aberto (sem recusados)</option>
-                  <option value="todos">Todos (inclui recusados)</option>
+                  <option value="">A trabalhar (novos + orçamento enviado)</option>
+                  <option value="todos">Todos os estados</option>
                   {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
                 <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
@@ -416,10 +422,10 @@ export default function LeadsPage() {
                     {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
                   </span>
                 )}
-                {hiddenRefused > 0 && (
+                {escondidas > 0 && (
                   <button onClick={() => setLeadStage("todos")}
                     className="text-xs text-text-muted hover:text-text-primary underline decoration-dotted underline-offset-2">
-                    +{hiddenRefused} recusado{hiddenRefused === 1 ? "" : "s"} oculto{hiddenRefused === 1 ? "" : "s"} — mostrar
+                    +{escondidas} noutros estados (aceites, executados, recusados…) — mostrar todos
                   </button>
                 )}
               </div>
