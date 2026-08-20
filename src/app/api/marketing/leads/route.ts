@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 
@@ -17,13 +18,9 @@ interface Row {
 
 const SELECT = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id";
 
-// Estados do pipeline do CRM (pedido de serviço).
-const STAGES = ["nao_iniciado", "orcamento_enviado", "orcamento_aceite", "recusado", "concluido"] as const;
-// Compatibilidade com estados antigos de marketing, caso existam linhas legadas.
-const LEGACY: Record<string, (typeof STAGES)[number]> = {
-  novo: "nao_iniciado", contactado: "orcamento_enviado", qualificado: "orcamento_aceite",
-  convertido: "concluido", perdido: "recusado",
-};
+// Estados do funil: fonte única em src/lib/leadStages.ts (leitura, escrita e
+// interface partilham a mesma lista — foi terem-se separado que fez o estado
+// "reembolsado" voltar a aparecer como "Novo").
 
 /** Linha da BD → forma `Lead` que a página de Marketing consome. */
 function toLead(r: Row) {
@@ -35,9 +32,7 @@ function toLead(r: Row) {
     source: r.source || "website",
     city: r.city || "—",
     message: r.message || "",
-    stage: (STAGES as readonly string[]).includes(r.stage)
-      ? (r.stage as (typeof STAGES)[number])
-      : (LEGACY[r.stage] ?? "nao_iniciado"),
+    stage: normalizeLeadStage(r.stage),
     quoteValue: r.quote_value != null ? Number(r.quote_value) : null,
     technicianValue: r.technician_value != null ? Number(r.technician_value) : null,
     technicianName: r.technician_name || "",

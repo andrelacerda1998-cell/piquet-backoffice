@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
+import type { LeadStageId } from "@/lib/leadStages";
 import { mockData } from "@/mocks/data";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
@@ -583,7 +584,8 @@ export async function getComplaints(): Promise<Complaint[]> {
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
 
 // Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
-export type LeadStage = "nao_iniciado" | "orcamento_enviado" | "orcamento_aceite" | "recusado" | "concluido" | "reembolsado";
+/** Estados do funil — definidos em src/lib/leadStages.ts (fonte única). */
+export type LeadStage = LeadStageId;
 
 // Rótulos pedidos pelo André: Novo / Orçamento enviado / Aceite / Executado /
 // Recusado. Os `id` mantêm-se (a BD e a lógica de criar serviço no "concluido"
@@ -600,11 +602,7 @@ export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
   { id: "reembolsado", label: "Reembolsado" },
 ];
 
-/**
- * Estados em que o pedido já não pode gerar receita.
- * "recusado" nunca chegou a fechar; "reembolsado" fechou e foi desfeito.
- */
-export const LEAD_STAGES_SEM_RECEITA: LeadStage[] = ["recusado", "reembolsado"];
+export { LEAD_STAGES_SEM_RECEITA } from "@/lib/leadStages";
 export const LEAD_STAGE_LABEL: Record<LeadStage, string> =
   Object.fromEntries(LEAD_STAGES.map((s) => [s.id, s.label])) as Record<LeadStage, string>;
 

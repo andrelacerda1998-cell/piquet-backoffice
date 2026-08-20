@@ -1,9 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { isLeadStage, LEAD_STAGE_IDS } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../../../_lib/entities";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 
-const STAGES = ["nao_iniciado", "orcamento_enviado", "orcamento_aceite", "recusado", "concluido", "reembolsado"];
+// Estados válidos: fonte única em src/lib/leadStages.ts.
 
 // Patch camelCase (frontend) → coluna da tabela `leads`.
 const WRITABLE: Record<string, string> = {
@@ -80,8 +81,8 @@ export const PUT = withStaff(async (req, { params }) => {
     if (key in body) patch[col] = body[key] === "" ? null : body[key];
   }
   if (Object.keys(patch).length === 0) return apiErr("Nada para atualizar.", 400);
-  if ("stage" in patch && !STAGES.includes(String(patch.stage))) {
-    return apiErr(`Estado inválido. Usa um de: ${STAGES.join(", ")}.`, 400);
+  if ("stage" in patch && !isLeadStage(patch.stage)) {
+    return apiErr(`Estado inválido. Usa um de: ${LEAD_STAGE_IDS.join(", ")}.`, 400);
   }
 
   const admin = supabaseAdmin();
