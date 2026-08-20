@@ -42,12 +42,21 @@ export default function SuportePage() {
 
   const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
 
+  // "Tickets" é a única secção com dados reais; as restantes são demonstração
+  // e dizem-no dentro de cada uma — o selo já não mancha a página toda.
   const TABS: TabDef[] = [
     { id: "tickets", label: "Tickets" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
-    { id: "mediacao", label: "Mediação de conflitos", count: (mediation ?? []).filter((m) => m.status === "aberto" || m.status === "em_mediacao").length },
+    { id: "mediacao", label: "Mediação", count: (mediation ?? []).filter((m) => m.status === "aberto" || m.status === "em_mediacao").length },
     { id: "faq", label: "FAQ interna" },
   ];
+
+  const AvisoDemo = () => (
+    <div className="rounded-lg bg-surface-subtle px-3 py-2 text-xs text-text-secondary inline-flex items-center gap-2">
+      <DemoBadge endpoint="/complaints" />
+      Secção de demonstração — ainda sem dados reais por trás.
+    </div>
+  );
 
   const complaintColumns: Column<Complaint>[] = [
     { key: "id", label: "Serviço", render: (r) => <span className="font-mono text-xs">{r.id}</span> },
@@ -84,8 +93,8 @@ export default function SuportePage() {
         <PageHeader
           icon={LifeBuoy}
           eyebrow="Operação"
-          title={<>Suporte <DemoBadge endpoint="/complaints" /></>}
-          subtitle="Caixa de entrada de tickets, reclamações e mediação de conflitos"
+          title="Suporte"
+          subtitle="Tickets das apps do cliente e do técnico — responde daqui, a resposta chega ao canal certo"
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -98,6 +107,7 @@ export default function SuportePage() {
 
         {tab === "reclamacoes" && (
           <div className="space-y-4">
+            <AvisoDemo />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <MetricCard title="Total" metric={buildMetricValue(complaints.length, complaints.length)} />
               <MetricCard title="Abertas" metric={buildMetricValue(complaints.filter((c) => c.status === "aberta").length, complaints.filter((c) => c.status === "aberta").length)} hideDelta />
@@ -110,6 +120,7 @@ export default function SuportePage() {
 
         {tab === "mediacao" && (
           <div className="space-y-4">
+            <AvisoDemo />
             <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary inline-flex items-center gap-2">
               <Scale className="h-4 w-4 text-piquet-600" />
               Conflitos entre cliente e técnico que precisam de mediação da Piquet (danos, valores, horas).
@@ -119,6 +130,8 @@ export default function SuportePage() {
         )}
 
         {tab === "faq" && (
+          <div className="space-y-4">
+            <AvisoDemo />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(faq ?? []).map((f) => (
               <div key={f.id} className="card p-4">
@@ -131,6 +144,7 @@ export default function SuportePage() {
                 <p className="mt-2 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{f.answer}</p>
               </div>
             ))}
+          </div>
           </div>
         )}
       </div>

@@ -6,6 +6,7 @@ const haDias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString();
 
 const vazio: SinaisDoNegocio = {
   leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [],
+  orcamentosSemResposta: [], faturasVencidas: [], impostosVencidos: [],
   documentosPendentes: 0, diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
 };
 
@@ -53,12 +54,36 @@ describe("gerarAlertas", () => {
     expect(tres[0].description).toContain("OAuth 400");
   });
 
-  it("fila de KYC só alerta acima do limite", () => {
-    expect(gerarAlertas({ ...vazio, documentosPendentes: 9 }, AGORA)).toHaveLength(0);
-    const r = gerarAlertas({ ...vazio, documentosPendentes: 10 }, AGORA);
-    expect(r).toHaveLength(1);
-    expect(r[0].priority).toBe("media");
-    expect(gerarAlertas({ ...vazio, documentosPendentes: 30 }, AGORA)[0].priority).toBe("alta");
+  it("um único documento de técnico já aparece; a fila grande sobe de urgência", () => {
+    expect(gerarAlertas({ ...vazio, documentosPendentes: 0 }, AGORA)).toHaveLength(0);
+    const um = gerarAlertas({ ...vazio, documentosPendentes: 1 }, AGORA);
+    expect(um).toHaveLength(1);
+    expect(um[0].priority).toBe("media");
+    expect(gerarAlertas({ ...vazio, documentosPendentes: 10 }, AGORA)[0].priority).toBe("alta");
+  });
+
+  it("orçamento enviado sem resposta: alto a 1 dia, crítico aos 3", () => {
+    const o = (dias: number) => gerarAlertas({ ...vazio,
+      orcamentosSemResposta: [{ id: "1", nome: "Ana", enviadoDesde: haDias(dias), valor: 120 }] }, AGORA);
+    expect(o(0)).toHaveLength(0);
+    expect(o(1)[0].priority).toBe("alta");
+    expect(o(1)[0].description).toContain("120,00 €");
+    expect(o(3)[0].priority).toBe("critica");
+  });
+
+  it("fatura vencida é alta; aos 15 dias passa a crítica", () => {
+    const f = (dias: number) => gerarAlertas({ ...vazio,
+      faturasVencidas: [{ fornecedor: "CAPENSIS", valorEmDivida: 2152.5, venceuEm: haDias(dias) }] }, AGORA);
+    expect(f(2)[0].priority).toBe("alta");
+    expect(f(2)[0].description).toContain("2152,50 €");
+    expect(f(20)[0].priority).toBe("critica");
+  });
+
+  it("imposto com prazo ultrapassado é sempre crítico e diz se é estimativa", () => {
+    const r = gerarAlertas({ ...vazio,
+      impostosVencidos: [{ nome: "IVA", valor: 2685.38, venceuEm: haDias(5), estimado: true }] }, AGORA);
+    expect(r[0].priority).toBe("critica");
+    expect(r[0].description).toContain("(estimativa)");
   });
 
   it("anúncios: sem histórico nenhum não alerta (é diferente de estar parado)", () => {
@@ -69,7 +94,7 @@ describe("gerarAlertas", () => {
 
   it("ordena por urgência e, dentro dela, o mais antigo primeiro", () => {
     const r = gerarAlertas({ ...vazio,
-      documentosPendentes: 12, // media
+      documentosPendentes: 5, // media
       leadsPorResponder: [
         { id: "recente", nome: "Recente", recebidaEm: haDias(4) },  // critica
         { id: "antiga", nome: "Antiga", recebidaEm: haDias(10) },   // critica
@@ -85,9 +110,12 @@ describe("gerarAlertas", () => {
       leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(2) }],
       cronsFalhados: [{ job: "x", falhasSeguidas: 5, ultimoErro: "e", ultimaTentativa: haDias(0) }],
       ticketsAbertos: [{ id: "TK-1", assunto: "A", canal: "App · Cliente", desde: haDias(2) }],
+      orcamentosSemResposta: [{ id: "2", nome: "Rui", enviadoDesde: haDias(2), valor: null }],
+      faturasVencidas: [{ fornecedor: "X", valorEmDivida: 10, venceuEm: haDias(1) }],
+      impostosVencidos: [{ nome: "IVA", valor: 5, venceuEm: haDias(1), estimado: false }],
       documentosPendentes: 40, diasSemDadosDeAnuncios: 10, pagamentosRecusados: 6,
     }, AGORA);
-    expect(r.length).toBe(6);
+    expect(r.length).toBe(9);
     for (const a of r) {
       expect(a.recommendedAction.length, a.title).toBeGreaterThan(10);
       expect(a.status).toBe("novo");

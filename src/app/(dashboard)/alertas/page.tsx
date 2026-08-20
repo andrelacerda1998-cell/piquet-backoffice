@@ -33,6 +33,8 @@ function destino(a: DashboardAlert): { href: string; label: string } {
     case "kyc": return { href: "/tecnicos?tab=kyc", label: "Rever documentos" };
     case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
     case "pagamentos": return { href: "/financeiro?tab=pagamentos", label: "Ver pagamentos" };
+    case "fatura": return { href: "/financeiro?tab=faturas", label: "Ver faturas" };
+    case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
     default: return { href: "/", label: "Abrir" };
   }
 }

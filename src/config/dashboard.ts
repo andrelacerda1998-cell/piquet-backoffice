@@ -81,6 +81,8 @@ export const SERVICE_STATUS_LABELS: Record<string, string> = {
 
 export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
+  // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
+  { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
@@ -89,7 +91,6 @@ export const NAV_ITEMS = [
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
   { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
-  { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
@@ -112,8 +113,8 @@ export const NAV_ITEMS = [
 // inclui Impostos e RH; Equipa inclui Tarefas e Desenvolvimento). Nada é
 // apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
 export const NAV_PRIMARY: string[] = [
-  "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/alertas", "/chat", "/desenvolvimento",
+  "/", "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
+  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento",
   "/tarefas", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).

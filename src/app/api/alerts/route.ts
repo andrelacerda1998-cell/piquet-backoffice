@@ -36,6 +36,44 @@ export const GET = withStaff(async () => {
         .map((l) => ({ id: l.id, nome: l.name || l.phone || "Contacto sem nome", recebidaEm: l.created_at }));
     }, []),
 
+    orcamentosSemResposta: await tenta("leads-orcamentos", async () => {
+      const { data } = await db.from("leads").select("id, name, phone, stage, created_at, quote_value").limit(500);
+      return ((data ?? []) as Array<{ id: string; name: string; phone: string; stage: string; created_at: string; quote_value: number | null }>)
+        .filter((l) => normalizeLeadStage(l.stage) === "orcamento_enviado")
+        .map((l) => ({
+          id: l.id, nome: l.name || l.phone || "Contacto sem nome",
+          enviadoDesde: l.created_at,
+          valor: l.quote_value != null ? Number(l.quote_value) : null,
+        }));
+    }, []),
+
+    faturasVencidas: await tenta("company_invoices", async () => {
+      const hoje = new Date(agora).toISOString().slice(0, 10);
+      const { data } = await db.from("company_invoices")
+        .select("vendor, amount, amount_paid, due_date").lt("due_date", hoje).limit(200);
+      return ((data ?? []) as Array<{ vendor: string; amount: number; amount_paid: number; due_date: string }>)
+        .filter((f) => Number(f.amount_paid) < Number(f.amount))
+        .map((f) => ({
+          fornecedor: f.vendor || "Fornecedor",
+          valorEmDivida: Number(f.amount) - Number(f.amount_paid),
+          venceuEm: f.due_date,
+        }));
+    }, []),
+
+    impostosVencidos: await tenta("tax_obligations", async () => {
+      const hoje = new Date(agora).toISOString();
+      const { data } = await db.from("tax_obligations")
+        .select("name, amount_estimated, amount_confirmed, is_estimated, status, due_date")
+        .lt("due_date", hoje).neq("status", "pago").limit(100);
+      return ((data ?? []) as Array<{ name: string; amount_estimated: number; amount_confirmed: number | null; is_estimated: boolean; due_date: string }>)
+        .map((t) => ({
+          nome: t.name,
+          valor: Number(t.amount_confirmed ?? t.amount_estimated) || 0,
+          venceuEm: t.due_date,
+          estimado: Boolean(t.is_estimated) && t.amount_confirmed == null,
+        }));
+    }, []),
+
     cronsFalhados: await tenta("cron_runs", async () => {
       const { data } = await db.from("cron_runs")
         .select("job, ok, detail, ran_at").order("ran_at", { ascending: false }).limit(200);

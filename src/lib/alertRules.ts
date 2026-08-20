@@ -22,6 +22,12 @@ export interface SinaisDoNegocio {
   ticketsAbertos: Array<{ id: string; assunto: string; canal: string; desde: string }>;
   /** Documentos de técnicos à espera de revisão. */
   documentosPendentes: number;
+  /** Orçamentos enviados que continuam sem resposta do cliente. */
+  orcamentosSemResposta: Array<{ id: string; nome: string; enviadoDesde: string; valor: number | null }>;
+  /** Faturas de custos com o prazo de pagamento ultrapassado. */
+  faturasVencidas: Array<{ fornecedor: string; valorEmDivida: number; venceuEm: string }>;
+  /** Obrigações fiscais com o prazo ultrapassado e ainda não pagas. */
+  impostosVencidos: Array<{ nome: string; valor: number; venceuEm: string; estimado: boolean }>;
   /** Dias desde o último dia com investimento registado (null = nunca houve). */
   diasSemDadosDeAnuncios: number | null;
   /** Pagamentos recusados nos últimos 7 dias. */
@@ -37,8 +43,12 @@ export const LIMITES = {
   cronFalhasSeguidas: 3,
   /** Suporte sem resposta há mais de 1 dia. */
   ticketDiasAlerta: 1,
-  /** Fila de KYC acima disto atrasa a entrada de técnicos. */
-  documentosPendentes: 10,
+  /** A partir de 1 documento já vale a pena aparecer; sobe de urgência com a fila. */
+  documentosPendentes: 1,
+  documentosPendentesAlta: 10,
+  /** Orçamento enviado sem resposta do cliente. */
+  orcamentoDiasAlerta: 1,
+  orcamentoDiasCritico: 3,
   /** Recolha de anúncios parada há mais de 2 dias. */
   diasSemAnuncios: 2,
 } as const;
@@ -110,11 +120,57 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
     alertas.push(novo(
       "kyc-fila",
       "equipa",
-      s.documentosPendentes >= 30 ? "alta" : "media",
-      `${plural(s.documentosPendentes, "documento", "documentos")} por validar`,
+      s.documentosPendentes >= LIMITES.documentosPendentesAlta ? "alta" : "media",
+      `${plural(s.documentosPendentes, "documento de técnico", "documentos de técnicos")} por aprovar`,
       "Técnicos à espera de aprovação não podem aceitar serviços.",
       "Rever em Técnicos › Aprovações e KYC.",
       new Date(agoraMs).toISOString(), "kyc",
+    ));
+  }
+
+  // --- Orçamentos enviados sem resposta ------------------------------------
+  // A data disponível é a de ENTRADA do pedido (não há registo de quando o
+  // estado mudou), por isso o texto diz "desde a entrada" — impreciso mas
+  // honesto; um orçamento parado dias continua a ser apanhado.
+  for (const o of s.orcamentosSemResposta) {
+    const dias = diasEntre(o.enviadoDesde, agoraMs);
+    if (dias < LIMITES.orcamentoDiasAlerta) continue;
+    alertas.push(novo(
+      `orcamento-sem-resposta-${o.id}`,
+      "operacional",
+      dias >= LIMITES.orcamentoDiasCritico ? "critica" : "alta",
+      `Orçamento sem resposta (pedido com ${plural(dias, "dia", "dias")})`,
+      `${o.nome}${o.valor != null ? ` · ${o.valor.toFixed(2).replace(".", ",")} €` : ""} — enviado e sem decisão do cliente.`,
+      "Ligar ao cliente ou marcar como recusado em CRM & Leads.",
+      o.enviadoDesde, "lead", o.id,
+    ));
+  }
+
+  // --- Faturas de custos vencidas ------------------------------------------
+  for (const f of s.faturasVencidas) {
+    const dias = diasEntre(f.venceuEm, agoraMs);
+    alertas.push(novo(
+      `fatura-vencida-${f.fornecedor}-${f.venceuEm}`,
+      "financeiro",
+      dias >= 15 ? "critica" : "alta",
+      `Fatura de ${f.fornecedor} vencida há ${plural(Math.max(dias, 1), "dia", "dias")}`,
+      `${f.valorEmDivida.toFixed(2).replace(".", ",")} € em dívida — atrasos estragam a relação com fornecedores.`,
+      "Registar o pagamento em Financeiro › Faturas de custos.",
+      f.venceuEm, "fatura",
+    ));
+  }
+
+  // --- Obrigações fiscais vencidas -----------------------------------------
+  // Sempre críticas: prazos fiscais falhados geram coimas, não conversas.
+  for (const i of s.impostosVencidos) {
+    alertas.push(novo(
+      `imposto-vencido-${i.nome}-${i.venceuEm}`,
+      "fiscal",
+      "critica",
+      `${i.nome} com prazo ultrapassado`,
+      `${i.valor.toFixed(2).replace(".", ",")} €${i.estimado ? " (estimativa)" : ""} · prazo era ${i.venceuEm.slice(0, 10)}.`,
+      "Confirmar o pagamento em Financeiro › Impostos e RH.",
+      i.venceuEm, "imposto",
     ));
   }
 
