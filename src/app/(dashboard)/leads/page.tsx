@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getLeads, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
+import { getLeads, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_STAGES_SEM_RECEITA, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import { categoryName } from "@/lib/categories";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -109,8 +109,13 @@ export default function LeadsPage() {
     const total = baseFiltered.length;
     const executadas = baseFiltered.filter((l) => l.stage === "concluido");
     const porResponder = baseFiltered.filter((l) => l.stage === "nao_iniciado").length;
-    // Pipeline = só o que ainda pode fechar (recusados já não valem nada).
-    const emAberto = baseFiltered.filter((l) => l.stage !== "recusado");
+    // Reembolsados: o serviço chegou a fechar e o dinheiro foi devolvido. Não
+    // entram no pipeline (já não podem fechar), não contam como executados, e
+    // o que se devolveu aparece à parte para não desaparecer da conta.
+    const reembolsadas = baseFiltered.filter((l) => l.stage === "reembolsado");
+    const valorReembolsado = reembolsadas.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
+    // Pipeline = só o que ainda pode fechar (recusados e reembolsados não).
+    const emAberto = baseFiltered.filter((l) => !LEAD_STAGES_SEM_RECEITA.includes(l.stage));
     const pipeline = emAberto.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
     const comissao = emAberto.reduce(
       (acc, l) => acc + (l.quoteValue != null ? l.quoteValue - (l.technicianValue ?? 0) : 0), 0);
@@ -118,6 +123,8 @@ export default function LeadsPage() {
     return {
       total, porResponder, pipeline, comissao, ganho,
       executadas: executadas.length,
+      reembolsadas: reembolsadas.length,
+      valorReembolsado,
       conversao: total ? (executadas.length / total) * 100 : 0,
     };
   })();
@@ -353,6 +360,15 @@ export default function LeadsPage() {
                 <p className={cn("mt-1 text-2xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>{crm.porResponder}</p>
                 <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
               </div>
+              {crm.reembolsadas > 0 && (
+                <div className="card p-4 border-l-[3px] border-l-danger">
+                  <p className="text-xs text-text-secondary">Reembolsado</p>
+                  <p className="mt-1 text-2xl font-bold text-danger tabular-nums">−{formatCurrency(crm.valorReembolsado)}</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">
+                    {crm.reembolsadas} {crm.reembolsadas === 1 ? "pedido devolvido" : "pedidos devolvidos"} · fora do pipeline
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}
@@ -407,7 +423,7 @@ export default function LeadsPage() {
             </div>
 
             {/* Cartões de estado — clicáveis para filtrar por esse estado. */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {LEAD_STAGES.map((s) => {
                 const active = leadStage === s.id;
                 return (
@@ -460,9 +476,13 @@ export default function LeadsPage() {
         open={!!editing}
         onClose={() => setEditing(null)}
         title="Editar pedido"
-        subtitle={editForm.stage === "concluido"
-          ? "Ao guardar como “Concluído”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
-          : "Atualiza os dados e o estado do pedido."}
+        subtitle={
+          editForm.stage === "concluido"
+            ? "Ao guardar como “Executado”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
+            : editForm.stage === "reembolsado"
+              ? "Ao guardar como “Reembolsado”, o serviço correspondente em Operações deixa de contar como receita."
+              : "Atualiza os dados e o estado do pedido."
+        }
         size="lg"
         footer={
           <>

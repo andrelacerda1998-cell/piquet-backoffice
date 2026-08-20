@@ -583,7 +583,7 @@ export async function getComplaints(): Promise<Complaint[]> {
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
 
 // Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
-export type LeadStage = "nao_iniciado" | "orcamento_enviado" | "orcamento_aceite" | "recusado" | "concluido";
+export type LeadStage = "nao_iniciado" | "orcamento_enviado" | "orcamento_aceite" | "recusado" | "concluido" | "reembolsado";
 
 // Rótulos pedidos pelo André: Novo / Orçamento enviado / Aceite / Executado /
 // Recusado. Os `id` mantêm-se (a BD e a lógica de criar serviço no "concluido"
@@ -594,7 +594,17 @@ export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
   { id: "orcamento_aceite", label: "Aceite" },
   { id: "concluido", label: "Executado" },
   { id: "recusado", label: "Recusado" },
+  // Serviço que chegou a ser executado e pago, e cujo dinheiro foi depois
+  // devolvido ao cliente. É diferente de "Recusado" (nunca houve trabalho nem
+  // dinheiro) e não pode continuar a contar como ganho.
+  { id: "reembolsado", label: "Reembolsado" },
 ];
+
+/**
+ * Estados em que o pedido já não pode gerar receita.
+ * "recusado" nunca chegou a fechar; "reembolsado" fechou e foi desfeito.
+ */
+export const LEAD_STAGES_SEM_RECEITA: LeadStage[] = ["recusado", "reembolsado"];
 export const LEAD_STAGE_LABEL: Record<LeadStage, string> =
   Object.fromEntries(LEAD_STAGES.map((s) => [s.id, s.label])) as Record<LeadStage, string>;
 

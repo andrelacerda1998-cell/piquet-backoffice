@@ -3,7 +3,7 @@ import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../../../_lib/entities";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 
-const STAGES = ["nao_iniciado", "orcamento_enviado", "orcamento_aceite", "recusado", "concluido"];
+const STAGES = ["nao_iniciado", "orcamento_enviado", "orcamento_aceite", "recusado", "concluido", "reembolsado"];
 
 // Patch camelCase (frontend) → coluna da tabela `leads`.
 const WRITABLE: Record<string, string> = {
@@ -115,6 +115,22 @@ export const PUT = withStaff(async (req, { params }) => {
   }
   if (concluding) {
     patch.service_id = await createServiceFromLead(admin, merged);
+  }
+
+  /**
+   * Reembolso: o serviço que este pedido gerou em Operações tem de deixar de
+   * contar como receita. Sem isto, o CRM dizia "Reembolsado" e o Financeiro
+   * continuava a somar o serviço como concluído — dois ecrãs a contar
+   * histórias diferentes sobre o mesmo dinheiro.
+   */
+  if (patch.stage === "reembolsado" && lead.stage !== "reembolsado" && lead.service_id) {
+    const { error: svcErr } = await admin
+      .from("services")
+      .update({ status: "reembolsado" })
+      .eq("id", lead.service_id);
+    // Não bloqueia a mudança de estado do pedido: o reembolso é um facto, e
+    // falhar aqui não deve impedir o registo — mas fica no log do servidor.
+    if (svcErr) console.error("[leads] falha ao reembolsar o serviço", lead.service_id, svcErr.message);
   }
 
   const { error } = await admin.from("leads").update(patch).eq("id", params.id);
