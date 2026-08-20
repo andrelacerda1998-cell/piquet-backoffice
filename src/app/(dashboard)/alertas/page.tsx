@@ -1,109 +1,148 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "@/stores";
+import { useMemo } from "react";
+import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Bell } from "lucide-react";
-import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
-import { PriorityBadge, AlertTypeBadge, StatusBadge } from "@/components/ui/StatusBadge";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { Tabs, type TabDef } from "@/components/ui/Tabs";
-import { useAsyncData, usePagination } from "@/hooks/useDashboard";
-import { getAlerts, updateAlertStatus, getAlertCounts } from "@/services/supportService";
-import { buildMetricValue } from "@/lib/calculations";
+import { Bell, ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
+import { PriorityBadge, AlertTypeBadge } from "@/components/ui/StatusBadge";
+import { useAsyncData } from "@/hooks/useDashboard";
+import { getAlerts } from "@/services/supportService";
 import { formatDateTime } from "@/lib/formatters";
-import type { DashboardAlert } from "@/types";
-import { DemoBadge } from "@/components/ui/DemoBadge";
+import { cn } from "@/lib/utils";
+import type { DashboardAlert, AlertPriority } from "@/types";
+
+/**
+ * Alertas DERIVADOS do estado real do negócio.
+ *
+ * O ecrã anterior tinha estados ("Analisar", "Resolver") que não gravavam
+ * nada: a lista vinha de `mockData.alerts` em memória e voltava ao início a
+ * cada recarregamento. Dava a sensação de haver vigilância a acontecer.
+ *
+ * Um alerta destes não se "resolve" aqui — resolve-se resolvendo a causa. Por
+ * isso a única ação é ir ao ecrã onde isso se faz, e o alerta desaparece
+ * sozinho quando o motivo deixar de existir.
+ */
+
+/** Para onde vai o botão de cada alerta, conforme o que o originou. */
+function destino(a: DashboardAlert): { href: string; label: string } {
+  switch (a.entityType) {
+    case "lead": return { href: "/leads", label: "Abrir no CRM" };
+    case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
+    case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
+    case "kyc": return { href: "/tecnicos?tab=kyc", label: "Rever documentos" };
+    case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
+    case "pagamentos": return { href: "/financeiro?tab=pagamentos", label: "Ver pagamentos" };
+    default: return { href: "/", label: "Abrir" };
+  }
+}
+
+const GRUPOS: Array<{ p: AlertPriority; titulo: string; nota: string }> = [
+  { p: "critica", titulo: "A precisar de atenção agora", nota: "Está parado há demasiado tempo" },
+  { p: "alta", titulo: "Para tratar hoje", nota: "" },
+  { p: "media", titulo: "Quando houver tempo", nota: "" },
+  { p: "baixa", titulo: "Informativo", nota: "" },
+];
 
 export default function AlertsPage() {
-  const { page, setPage, pageSize } = usePagination();
-  const [typeFilter, setTypeFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
+  const { data, loading, refetch } = useAsyncData(() => getAlerts(1, 200), []);
+  const alertas = useMemo(() => data?.data ?? [], [data]);
+  const fontesEmFalta = (data as unknown as { fontesIndisponiveis?: string[] })?.fontesIndisponiveis ?? [];
 
-  // `resolvidos` incrementa a cada mudança de estado: os MetricCards e as
-  // contagens das abas vinham de um fetch com deps [] e ficavam congelados
-  // depois de resolver alertas.
-  const [resolvidos, setResolvidos] = useState(0);
-  const { data: counts } = useAsyncData(() => getAlertCounts(), [resolvidos]);
-  const { data: alerts, loading, refetch } = useAsyncData(
-    () => getAlerts(page, pageSize, { type: typeFilter || undefined, priority: priorityFilter || undefined }),
-    [page, pageSize, typeFilter, priorityFilter]
+  const porGrupo = useMemo(
+    () => GRUPOS.map((g) => ({ ...g, itens: alertas.filter((a) => a.priority === g.p) }))
+      .filter((g) => g.itens.length > 0),
+    [alertas],
   );
-
-  const handleStatusChange = async (id: string, status: DashboardAlert["status"]) => {
-    try {
-      await updateAlertStatus(id, status);
-      refetch();
-      setResolvidos((n) => n + 1);
-    } catch (e) {
-      // Sem isto, uma falha era uma promise rejeitada sem qualquer sinal: o
-      // botão parecia simplesmente não fazer nada.
-      toast(e instanceof Error ? e.message : "Não foi possível atualizar o alerta.", "error");
-    }
-  };
-
-  const columns: Column<DashboardAlert>[] = [
-    { key: "type", label: "Tipo", render: (r) => <AlertTypeBadge type={r.type} /> },
-    { key: "priority", label: "Prioridade", render: (r) => <PriorityBadge priority={r.priority} /> },
-    { key: "title", label: "Título" },
-    { key: "description", label: "Descrição", className: "max-w-xs truncate" },
-    { key: "createdAt", label: "Data", render: (r) => formatDateTime(r.createdAt) },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} label={r.status.replace(/_/g, " ")} /> },
-    { key: "recommendedAction", label: "Ação recomendada", className: "max-w-xs truncate" },
-    { key: "actions", label: "Ações", render: (r) => r.status === "novo" ? (
-      <button onClick={() => handleStatusChange(r.id, "em_analise")} className="text-xs text-piquet-600 hover:underline">Analisar</button>
-    ) : r.status === "em_analise" ? (
-      <button onClick={() => handleStatusChange(r.id, "resolvido")} className="text-xs text-success hover:underline">Resolver</button>
-    ) : null },
-  ];
 
   return (
     <RouteGuard route="/alertas">
       <div className="space-y-6">
         <PageHeader
           icon={Bell}
-          eyebrow="Sistema"
-          title={<>Alertas <DemoBadge endpoint="/alerts" /></>}
-          subtitle="Sistema central de alertas operacionais, financeiros e fiscais"
+          eyebrow="Operação"
+          title="Alertas"
+          subtitle="O que precisa de ação, apurado a partir dos dados reais do negócio"
+          actions={
+            <button onClick={refetch} className="btn-secondary inline-flex items-center gap-2">
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              Verificar agora
+            </button>
+          }
         />
 
-        {counts && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <MetricCard title="Total abertos" metric={buildMetricValue(counts.total, counts.total)} hideDelta />
-            <MetricCard title="Críticos" metric={buildMetricValue(counts.critica, counts.critica, true)} />
-            <MetricCard title="Alta prioridade" metric={buildMetricValue(counts.alta, counts.alta, true)} />
-            <MetricCard title="Operacionais" metric={buildMetricValue(counts.operacional, counts.operacional, true)} />
-            <MetricCard title="Financeiros" metric={buildMetricValue(counts.financeiro, counts.financeiro, true)} />
-            <MetricCard title="Fiscais" metric={buildMetricValue(counts.fiscal, counts.fiscal, true)} />
+        {fontesEmFalta.length > 0 && (
+          <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/40 px-4 py-3 text-sm">
+            <p className="font-medium text-text-primary">Verificação incompleta</p>
+            <p className="text-text-secondary">
+              Não foi possível consultar: {fontesEmFalta.join(", ")}. Podem existir alertas por mostrar.
+            </p>
           </div>
         )}
 
-        <Tabs
-          tabs={([
-            { id: "", label: "Todos", count: counts?.total },
-            { id: "operacional", label: "Operacionais", count: counts?.operacional },
-            { id: "financeiro", label: "Financeiros", count: counts?.financeiro },
-            { id: "fiscal", label: "Fiscais", count: counts?.fiscal },
-            { id: "equipa", label: "Equipa" },
-            { id: "marketing", label: "Marketing" },
-            { id: "produto", label: "Produto" },
-          ] as TabDef[])}
-          active={typeFilter}
-          onChange={(id) => { setTypeFilter(id); setPage(1); }}
-        />
+        {loading && alertas.length === 0 && (
+          <p className="text-sm text-text-muted py-10 text-center">A verificar…</p>
+        )}
 
-        <div className="flex gap-3 flex-wrap">
-          <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }} className="input-field text-sm w-40">
-            <option value="">Todas prioridades</option>
-            {["critica", "alta", "media", "baixa"].map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
+        {!loading && alertas.length === 0 && (
+          <div className="card p-10 text-center">
+            <CheckCircle2 className="h-10 w-10 mx-auto text-success mb-3" />
+            <p className="font-semibold text-text-primary">Nada a assinalar</p>
+            <p className="text-sm text-text-secondary mt-1 max-w-md mx-auto">
+              Sem leads por responder, integrações paradas, tickets sem resposta ou fila de
+              documentos acumulada. Esta página só mostra alguma coisa quando há mesmo.
+            </p>
+          </div>
+        )}
 
-        <DataTable columns={columns} data={alerts?.data ?? []} keyField="id" loading={loading} />
-        {alerts && <Pagination page={page} totalPages={alerts.totalPages} total={alerts.total} pageSize={pageSize} onPageChange={setPage} />}
+        {porGrupo.map((g) => (
+          <section key={g.p} className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <h2 className="font-semibold text-text-primary">{g.titulo}</h2>
+              <span className="text-xs text-text-muted">
+                {g.itens.length} {g.itens.length === 1 ? "alerta" : "alertas"}
+                {g.nota && ` · ${g.nota}`}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {g.itens.map((a) => {
+                const d = destino(a);
+                return (
+                  <div
+                    key={a.id}
+                    className={cn(
+                      "card p-4 flex flex-col sm:flex-row sm:items-center gap-3",
+                      a.priority === "critica" && "border-l-[3px] border-l-danger",
+                      a.priority === "alta" && "border-l-[3px] border-l-warning",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PriorityBadge priority={a.priority} />
+                        <AlertTypeBadge type={a.type} />
+                        <span className="text-[11px] text-text-muted">{formatDateTime(a.createdAt)}</span>
+                      </div>
+                      <p className="mt-1.5 font-medium text-text-primary">{a.title}</p>
+                      <p className="text-sm text-text-secondary">{a.description}</p>
+                      <p className="text-xs text-text-muted mt-1">→ {a.recommendedAction}</p>
+                    </div>
+                    <Link href={d.href} className="btn-secondary shrink-0 inline-flex items-center gap-1.5 self-start sm:self-auto">
+                      {d.label}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+
+        {alertas.length > 0 && (
+          <p className="text-xs text-text-muted">
+            Os alertas são recalculados a cada visita e desaparecem sozinhos quando o motivo
+            deixa de existir — não há nada para marcar como resolvido.
+          </p>
+        )}
       </div>
     </RouteGuard>
   );
