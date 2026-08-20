@@ -88,6 +88,8 @@ export const NAV_ITEMS = [
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
   { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
+  { href: "/suporte", label: "Suporte", icon: "Headphones" },
+  { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
@@ -98,13 +100,11 @@ export const NAV_ITEMS = [
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
   { href: "/servicos?tab=qualidade", label: "Qualidade", icon: "ShieldCheck" },
-  { href: "/clientes?tab=suporte", label: "Suporte", icon: "Headphones" },
   { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
   // Operacional próprio, ainda fora do menu.
   { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
-  { href: "/alertas", label: "Alertas", icon: "Bell" },
 ] as const;
 
 // Consolidação 2026-07-20: o menu passa a 9 grupos; cada um agrega os ecrãs
@@ -113,7 +113,8 @@ export const NAV_ITEMS = [
 // apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
 export const NAV_PRIMARY: string[] = [
   "/", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/chat", "/desenvolvimento", "/tarefas", "/configuracao",
+  "/marketing", "/leads", "/suporte", "/alertas", "/chat", "/desenvolvimento",
+  "/tarefas", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -123,9 +124,9 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 export const NAV_DEEPLINKS: string[] = [
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados", "/servicos?tab=qualidade",
-  "/clientes?tab=suporte", "/tecnicos?tab=recrutamento",
+  "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
-  "/despacho", "/alertas",
+  "/despacho",
 ];
 
 export const MARKETING_CHANNELS = [

@@ -75,6 +75,21 @@ export function SupportInbox() {
     fechado: tickets.filter((t) => t.status === "fechado").length,
   }), [tickets]);
 
+  /**
+   * Quantos tickets POR ORIGEM, contando só os que estão abertos — é isso que
+   * diz de onde está a vir trabalho agora. Sem estes números, o filtro de canal
+   * obrigava a clicar em cada um para descobrir se havia lá alguma coisa.
+   */
+  const porCanal = useMemo(() => {
+    const abertos = tickets.filter((t) => isOpen(t.status));
+    return {
+      todos: abertos.length,
+      app_cliente: abertos.filter((t) => t.channel === "app_cliente").length,
+      app_tecnico: abertos.filter((t) => t.channel === "app_tecnico").length,
+      email: abertos.filter((t) => t.channel === "email").length,
+    };
+  }, [tickets]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tickets.filter((t) => {
@@ -155,9 +170,11 @@ export function SupportInbox() {
           <div className="flex gap-1">
             {(["todos", "app_cliente", "app_tecnico", "email"] as const).map((c) => (
               <button key={c} onClick={() => setChannelFilter(c)}
+                title={c === "todos" ? "Todos os canais" : `Abertos vindos de ${CHANNEL_LABEL[c]}`}
                 className={cn("px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
                   channelFilter === c ? "bg-surface-strong text-text-primary" : "text-text-muted hover:bg-surface-muted")}>
                 {c === "todos" ? "Todos os canais" : CHANNEL_LABEL[c]}
+                {porCanal[c] > 0 && <span className="ml-1 opacity-70">{porCanal[c]}</span>}
               </button>
             ))}
           </div>
