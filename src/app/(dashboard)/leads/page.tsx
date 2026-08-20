@@ -134,12 +134,13 @@ export default function LeadsPage() {
     if (filteredLeads.length === 0) { toast("Sem pedidos para exportar.", "error"); return; }
     downloadCsv(
       `crm-leads-${leadMonth || "todos"}.csv`,
-      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Estado", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
+      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Observações", "Estado", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
       filteredLeads.map((l) => [
         l.createdAt ? formatDate(l.createdAt) : "",
         l.name, l.phone || "", l.city || "",
         categoryName(l.categoryId) || "",
         (l.message || "").replace(/\n/g, " · "),
+        (l.notes || "").replace(/\n/g, " · "),
         LEAD_STAGE_LABEL[l.stage] ?? l.stage,
         l.quoteValue != null ? String(l.quoteValue) : "",
         l.technicianValue != null ? String(l.technicianValue) : "",
@@ -160,7 +161,7 @@ export default function LeadsPage() {
   // Editar pedido (dados + orçamento + valor do técnico + data + classificação + estado).
   // Modelo: escreve-se o orçamento e o valor do técnico; a margem é sempre orçamento − técnico.
 
-  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
+  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
   const [editing, setEditing] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   const openEdit = (lead: Lead, presetStage?: LeadStage) => {
@@ -172,6 +173,7 @@ export default function LeadsPage() {
       phone: lead.phone || "",
       city: lead.city === "—" ? "" : lead.city || "",
       message: lead.message || "",
+      notes: lead.notes || "",
       technicianName: lead.technicianName || "",
       categoryId: lead.categoryId || "",
       quoteValue: q != null ? String(q) : "",
@@ -191,7 +193,8 @@ export default function LeadsPage() {
       : (q != null ? Math.round(q * 0.75 * 100) / 100 : null);
     const patch: LeadPatch = {
       name: editForm.name.trim(), phone: editForm.phone.trim(), city: editForm.city.trim(),
-      message: editForm.message.trim(), technicianName: editForm.technicianName.trim(),
+      message: editForm.message.trim(), notes: editForm.notes.trim(),
+      technicianName: editForm.technicianName.trim(),
       categoryId: editForm.categoryId, quoteValue: q, technicianValue: techValue,
       executionDate: editForm.executionDate || "",
       rating: editForm.rating.trim() === "" ? null : Number(editForm.rating),
@@ -511,6 +514,27 @@ export default function LeadsPage() {
               {editForm.message.trim()
                 ? <p className="rounded-lg border border-surface-border bg-surface-subtle px-3 py-2 text-sm text-text-primary whitespace-pre-wrap">{editForm.message}</p>
                 : <p className="text-sm text-text-muted">Sem mensagem registada.</p>}
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            {/*
+              Campo separado da mensagem do cliente, de propósito: a mensagem é
+              o que ele escreveu e fica intacta; isto é o que a equipa vai
+              anotando (o que ficou combinado ao telefone, porque foi recusado,
+              o que falta confirmar).
+            */}
+            <Field label="Observações internas">
+              <textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                rows={3}
+                maxLength={2000}
+                placeholder="Notas da equipa sobre este pedido — o que ficou combinado, o que falta confirmar, porque foi recusado…"
+                className="input-field resize-y"
+              />
+              <p className="mt-1 text-[11px] text-text-muted">
+                Só visível no backoffice — o cliente nunca vê estas notas.
+              </p>
             </Field>
           </div>
           <Field label="Técnico">

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { isMissingColumn } from "@/lib/missingColumn";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
@@ -14,9 +15,14 @@ interface Row {
   message: string; source: string; stage: string; created_at: string;
   quote_value: number | null; technician_value: number | null; technician_name: string | null;
   category_id: string | null; execution_date: string | null; rating: number | null; service_id: string | null;
+  /** Opcional: pode não vir se a migração das observações ainda não correu. */
+  notes?: string | null;
 }
 
-const SELECT = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id";
+// `notes` é opcional no SELECT: se a migração ainda não foi aplicada, a
+// leitura recorre à lista sem essa coluna em vez de devolver 500.
+const COLUNAS_BASE = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id";
+const SELECT = `${COLUNAS_BASE}, notes`;
 
 // Estados do funil: fonte única em src/lib/leadStages.ts (leitura, escrita e
 // interface partilham a mesma lista — foi terem-se separado que fez o estado
@@ -33,6 +39,7 @@ function toLead(r: Row) {
     city: r.city || "—",
     message: r.message || "",
     stage: normalizeLeadStage(r.stage),
+    notes: r.notes ?? "",
     quoteValue: r.quote_value != null ? Number(r.quote_value) : null,
     technicianValue: r.technician_value != null ? Number(r.technician_value) : null,
     technicianName: r.technician_name || "",
@@ -49,13 +56,21 @@ function toLead(r: Row) {
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v : "").trim().slice(0, max);
 
 export const GET = withStaff(async () => {
-  const { data, error } = await supabaseAdmin()
-    .from("leads")
-    .select(SELECT)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  const ler = (colunas: string) =>
+    supabaseAdmin()
+      .from("leads")
+      .select(colunas)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+  let { data, error } = await ler(SELECT);
+  // Sem a migração aplicada, lê-se sem `notes` em vez de devolver 500 — o CRM
+  // continua a funcionar, só sem observações.
+  if (error && isMissingColumn(error, "notes")) {
+    ({ data, error } = await ler(COLUNAS_BASE));
+  }
   if (error) throw new Error(error.message);
-  return apiOk(((data ?? []) as Row[]).map(toLead));
+  return apiOk(((data ?? []) as unknown as Row[]).map(toLead));
 });
 
 /**
@@ -77,11 +92,10 @@ export const POST = withStaff(async (req) => {
   if (categoryId) row.category_id = categoryId;
   if (!row.name && !row.phone) return apiErr("Indica pelo menos o nome ou o telefone.", 400);
 
-  const { data, error } = await supabaseAdmin()
-    .from("leads")
-    .insert(row)
-    .select(SELECT)
-    .single();
+  const inserir = (colunas: string) =>
+    supabaseAdmin().from("leads").insert(row).select(colunas).single();
+  let { data, error } = await inserir(SELECT);
+  if (error && isMissingColumn(error, "notes")) ({ data, error } = await inserir(COLUNAS_BASE));
   if (error) return apiErr(error.message, 400);
-  return apiOk(toLead(data as Row), 201);
+  return apiOk(toLead(data as unknown as Row), 201);
 });

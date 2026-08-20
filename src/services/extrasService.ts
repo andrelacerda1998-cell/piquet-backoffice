@@ -612,7 +612,10 @@ export interface Lead {
   phone: string;
   source: string;
   city: string;
+  /** O que o cliente escreveu (formulário/WhatsApp) — não se edita. */
   message: string;
+  /** Observações internas da equipa sobre o acompanhamento do pedido. */
+  notes: string;
   stage: LeadStage;
   value: number;
   createdAt: string;
@@ -631,6 +634,8 @@ export interface LeadPatch {
   name?: string; phone?: string; city?: string; message?: string; stage?: LeadStage;
   technicianName?: string; categoryId?: string; quoteValue?: number | null;
   technicianValue?: number | null; executionDate?: string; rating?: number | null;
+  /** Observações internas — texto livre da equipa. */
+  notes?: string;
 }
 
 export async function getLeads(): Promise<Lead[]> {
@@ -661,7 +666,7 @@ export async function createLead(input: NewLead): Promise<Lead> {
   const now = new Date().toISOString();
   return apiPost<Lead>("/marketing/leads", input, () => ({
     id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
-    stage: "nao_iniciado", value: 0, createdAt: now,
+    stage: "nao_iniciado", value: 0, createdAt: now, notes: "",
     quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
     executionDate: "", rating: null, serviceId: null,
   })).then((r) => r.data);

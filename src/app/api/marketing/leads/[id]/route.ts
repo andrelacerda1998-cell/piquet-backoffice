@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { isMissingColumn } from "@/lib/missingColumn";
 import { isLeadStage, LEAD_STAGE_IDS } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../../../_lib/entities";
@@ -19,6 +20,7 @@ const WRITABLE: Record<string, string> = {
   technicianValue: "technician_value",
   executionDate: "execution_date",
   rating: "rating",
+  notes: "notes",
 };
 
 interface LeadRow {
@@ -134,7 +136,25 @@ export const PUT = withStaff(async (req, { params }) => {
     if (svcErr) console.error("[leads] falha ao reembolsar o serviço", lead.service_id, svcErr.message);
   }
 
-  const { error } = await admin.from("leads").update(patch).eq("id", params.id);
+  let { error } = await admin.from("leads").update(patch).eq("id", params.id);
+  // A coluna `notes` é recente. Enquanto a migração não estiver aplicada,
+  // guarda-se tudo o resto em vez de rejeitar a edição inteira — de outra
+  // forma, acrescentar um campo partia TODAS as edições do CRM.
+  if (error && isMissingColumn(error, "notes") && "notes" in patch) {
+    const { notes: _ignorado, ...semNotas } = patch;
+    if (Object.keys(semNotas).length > 0) {
+      ({ error } = await admin.from("leads").update(semNotas).eq("id", params.id));
+    } else {
+      error = null;
+    }
+    if (!error) {
+      return apiOk({
+        id: params.id,
+        serviceId: patch.service_id ?? lead.service_id ?? null,
+        aviso: "As observações não foram guardadas: falta aplicar a migração 20260820120000_leads_notes.sql.",
+      });
+    }
+  }
   if (error) return apiErr(error.message, 400);
   return apiOk({ id: params.id, serviceId: patch.service_id ?? lead.service_id ?? null });
 });
