@@ -369,15 +369,6 @@ export default function LeadsPage() {
                 <p className={cn("mt-1 text-2xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>{crm.porResponder}</p>
                 <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
               </div>
-              {crm.reembolsadas > 0 && (
-                <div className="card p-4 border-l-[3px] border-l-danger">
-                  <p className="text-xs text-text-secondary">Reembolsado</p>
-                  <p className="mt-1 text-2xl font-bold text-danger tabular-nums">−{formatCurrency(crm.valorReembolsado)}</p>
-                  <p className="text-[11px] text-text-muted mt-0.5">
-                    {crm.reembolsadas} {crm.reembolsadas === 1 ? "pedido devolvido" : "pedidos devolvidos"} · fora do pipeline
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}
