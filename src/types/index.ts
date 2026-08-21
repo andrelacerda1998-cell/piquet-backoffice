@@ -545,8 +545,12 @@ export interface FinanceSummary {
   averageMarginPerService: number;
   burnRate: number;
   runwayMonths: number | null;
-  currentBalance: number;
-  projectedBalance: number;
+  /** `null` quando não há fonte de saldo bancário — não se inventa um valor. */
+  currentBalance: number | null;
+  projectedBalance: number | null;
+  /** Custos fixos: média das faturas reais e quantos meses a sustentam. */
+  fixedCostsMonthly?: number;
+  fixedCostsMonths?: number;
 }
 
 export interface OverviewMetrics {

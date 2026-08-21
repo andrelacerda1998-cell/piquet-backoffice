@@ -27,9 +27,18 @@ interface MetricCardProps {
   hideDelta?: boolean;
   /** Rótulo da comparação (por omissão "vs mês ant."). */
   deltaLabel?: string;
+  /**
+   * Não há dado para mostrar — falta a FONTE, não é um zero.
+   * Mostra "—" em vez de um número. Um "0,00 €" onde não há informação é
+   * indistinguível de um saldo mesmo a zero, e leva a decidir com base em
+   * algo que não existe.
+   */
+  empty?: boolean;
+  /** O que falta para o valor existir (aparece por baixo do "—"). */
+  emptyHint?: string;
 }
 
-export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint, hideDelta, deltaLabel = "vs mês ant." }: MetricCardProps) {
+export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint, hideDelta, deltaLabel = "vs mês ant.", empty, emptyHint }: MetricCardProps) {
   if (loading) {
     return (
       <div className={cn("card p-4 animate-pulse", className)}>
@@ -60,7 +69,14 @@ export function MetricCard({ title, metric, format = "number", className, loadin
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
+      {empty ? (
+        <>
+          <p className="text-2xl font-bold text-text-muted mb-1" title={emptyHint ?? "Sem fonte de dados"}>—</p>
+          {emptyHint && <p className="text-[11px] text-text-muted mb-1">{emptyHint}</p>}
+        </>
+      ) : (
+        <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
+      )}
       {/* Só se mostra variação quando ela EXISTE: sem histórico real (anterior
           igual ao atual, ou zero sem história) não há nada a comparar — mostrar
           "0,0%" seria fabricar uma tendência. `hideDelta` força o mesmo nas

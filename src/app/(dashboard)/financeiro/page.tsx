@@ -498,12 +498,30 @@ export default function FinancePage() {
               <div className="pt-2">
                 <h2 className="font-semibold mb-3">Tesouraria</h2>
                 {summary && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance, summary.currentBalance)} hideDelta format="currency" />
-                    <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance, summary.projectedBalance)} hideDelta format="currency" />
-                    <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate)} hideDelta format="currency" />
-                    <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta />
-                  </div>
+                  <>
+                    {/*
+                      Saldo, saldo previsto e runway dependem do dinheiro em
+                      conta, e o backoffice não tem ligação bancária nem
+                      registo de tesouraria. Mostravam 185 000 € — uma
+                      constante no código. Passa a dizer-se o que falta.
+                    */}
+                    {summary.currentBalance === null && (
+                      <div className="mb-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-2.5 text-sm">
+                        <p className="text-text-primary font-medium">Saldo em conta por ligar</p>
+                        <p className="text-text-secondary text-xs mt-0.5">
+                          Sem ligação bancária ou mapa de tesouraria, não há saldo real para mostrar —
+                          e sem saldo não se calcula saldo previsto nem runway. O burn rate abaixo é real
+                          (custos de equipa + faturas de fornecedores).
+                        </p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance ?? 0, summary.currentBalance ?? 0)} hideDelta format="currency" empty={summary.currentBalance === null} emptyHint="falta ligar a conta" />
+                      <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance ?? 0, summary.projectedBalance ?? 0)} hideDelta format="currency" empty={summary.projectedBalance === null} emptyHint="depende do saldo" />
+                      <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate)} hideDelta format="currency" />
+                      <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta empty={summary.runwayMonths === null} emptyHint="depende do saldo" />
+                    </div>
+                  </>
                 )}
                 <div className="mt-4">
                   <ChartCard
