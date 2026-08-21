@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useTabParam } from "@/hooks/useTabParam";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -81,7 +82,8 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay 
 }
 
 export default function ProdutoPage() {
-  const [tab, setTab] = useState("apps");
+  // Lê ?tab= para os alertas poderem apontar direto (ex.: Integrações).
+  const [tab, setTab] = useTabParam("apps");
   const { data: metrics } = useAsyncData(() => getProductMetrics(), []);
   const { data: apps } = useAsyncData(() => getAppsStatus(), []);
   const { data: bugs } = useAsyncData(() => getBugs(), []);

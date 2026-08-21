@@ -26,14 +26,17 @@ import type { DashboardAlert, AlertPriority } from "@/types";
 
 /** Para onde vai o botão de cada alerta, conforme o que o originou. */
 function destino(a: DashboardAlert): { href: string; label: string } {
+  // Os `tab` têm de bater certo com os ids reais de cada página — três destes
+  // apontavam para separadores que não existem ("kyc", "faturas") e o clique
+  // abria a página no separador por omissão, como se não tivesse funcionado.
   switch (a.entityType) {
     case "lead": return { href: "/leads", label: "Abrir no CRM" };
     case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
     case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
-    case "kyc": return { href: "/tecnicos?tab=kyc", label: "Rever documentos" };
+    case "kyc": return { href: "/tecnicos?tab=aprovacoes", label: "Rever documentos" };
     case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
-    case "pagamentos": return { href: "/financeiro?tab=pagamentos", label: "Ver pagamentos" };
-    case "fatura": return { href: "/financeiro?tab=faturas", label: "Ver faturas" };
+    case "pagamentos": return { href: "/financeiro?tab=app-pagamentos", label: "Ver pagamentos" };
+    case "fatura": return { href: "/financeiro?tab=custos", label: "Ver faturas" };
     case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
     default: return { href: "/", label: "Abrir" };
   }
@@ -110,10 +113,14 @@ export default function AlertsPage() {
               {g.itens.map((a) => {
                 const d = destino(a);
                 return (
-                  <div
+                  <Link
                     key={a.id}
+                    href={d.href}
                     className={cn(
-                      "card p-4 flex flex-col sm:flex-row sm:items-center gap-3",
+                      // O cartão todo é o link: clicar no texto do alerta era o
+                      // gesto natural e não fazia nada — só o botão da direita
+                      // navegava.
+                      "card p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-surface-muted transition-colors",
                       a.priority === "critica" && "border-l-[3px] border-l-danger",
                       a.priority === "alta" && "border-l-[3px] border-l-warning",
                     )}
@@ -128,11 +135,11 @@ export default function AlertsPage() {
                       <p className="text-sm text-text-secondary">{a.description}</p>
                       <p className="text-xs text-text-muted mt-1">→ {a.recommendedAction}</p>
                     </div>
-                    <Link href={d.href} className="btn-secondary shrink-0 inline-flex items-center gap-1.5 self-start sm:self-auto">
+                    <span className="btn-secondary shrink-0 inline-flex items-center gap-1.5 self-start sm:self-auto pointer-events-none">
                       {d.label}
                       <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
+                    </span>
+                  </Link>
                 );
               })}
             </div>
