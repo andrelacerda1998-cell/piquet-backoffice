@@ -30,13 +30,16 @@ function destino(a: DashboardAlert): { href: string; label: string } {
   // apontavam para separadores que não existem ("kyc", "faturas") e o clique
   // abria a página no separador por omissão, como se não tivesse funcionado.
   switch (a.entityType) {
-    case "lead": return { href: "/leads", label: "Abrir no CRM" };
+    // Com o id, o CRM abre o pedido em vez de deixar o utilizador à procura.
+    case "lead": return { href: `/leads?lead=${a.entityId ?? ""}`, label: "Abrir pedido" };
     case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
     case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
     case "kyc": return { href: "/tecnicos?tab=aprovacoes", label: "Rever documentos" };
     case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
     case "pagamentos": return { href: "/financeiro?tab=app-pagamentos", label: "Ver pagamentos" };
     case "fatura": return { href: "/financeiro?tab=custos", label: "Ver faturas" };
+    // KYC, integrações e impostos são filas/listas, não um registo só — o
+    // destino certo é mesmo o separador.
     case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
     default: return { href: "/", label: "Abrir" };
   }

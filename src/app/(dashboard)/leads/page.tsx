@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -37,7 +38,7 @@ const waHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
  * Casa própria (antes vivia numa aba do Marketing): é trabalho diário de
  * comercial, não análise de campanhas.
  */
-export default function LeadsPage() {
+function LeadsPageInner() {
   const { data: leads } = useAsyncData(() => getLeads(), []);
 
   // Estado local dos pedidos, para editar (com feedback otimista).
@@ -170,6 +171,21 @@ export default function LeadsPage() {
   const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
   const [editing, setEditing] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
+  /**
+   * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
+   * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
+   * é o trabalho todo. Corre uma vez, quando os dados já cá estão.
+   */
+  const leadParam = useSearchParams().get("lead");
+  const abriuDoUrl = useRef(false);
+  useEffect(() => {
+    if (abriuDoUrl.current || !leadParam || leadRows.length === 0) return;
+    const alvo = leadRows.find((l) => l.id === leadParam);
+    if (!alvo) return;
+    abriuDoUrl.current = true;
+    openEdit(alvo);
+  }, [leadParam, leadRows]);
+
   const openEdit = (lead: Lead, presetStage?: LeadStage) => {
     const q = lead.quoteValue, tv = lead.technicianValue;
     // Valor do técnico é o campo editável; por omissão 75% do orçamento (margem 25%).
@@ -586,5 +602,17 @@ export default function LeadsPage() {
         })()}
       </Modal>
         </RouteGuard>
+  );
+}
+
+/**
+ * `useSearchParams` obriga a um limite de Suspense na compilação estática
+ * (o Next não consegue pré-renderizar sem saber o URL).
+ */
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-text-muted py-8 text-center">A carregar pedidos…</div>}>
+      <LeadsPageInner />
+    </Suspense>
   );
 }

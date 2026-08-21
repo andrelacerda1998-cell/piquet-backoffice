@@ -54,3 +54,24 @@ describe("destinos dos alertas", () => {
     }
   });
 });
+
+describe("alertas de um registo específico abrem esse registo", () => {
+  it("o alerta de lead leva o id no URL", () => {
+    // Abrir só /leads não chegava: com dezenas de pedidos, encontrar aquele à
+    // mão é o trabalho todo.
+    const src = readFileSync(PAGINA, "utf8");
+    const bloco = src.slice(src.indexOf("function destino("), src.indexOf("const GRUPOS"));
+    expect(bloco).toMatch(/case "lead":[^]*?\/leads\?lead=\$\{a\.entityId/);
+  });
+
+  it("o alerta de ticket leva o id no URL", () => {
+    const src = readFileSync(PAGINA, "utf8");
+    const bloco = src.slice(src.indexOf("function destino("), src.indexOf("const GRUPOS"));
+    expect(bloco).toMatch(/case "ticket":[^]*?\/suporte\?ticket=\$\{a\.entityId/);
+  });
+
+  it("as páginas de destino sabem ler esse id", () => {
+    expect(readFileSync("src/app/(dashboard)/leads/page.tsx", "utf8")).toContain('get("lead")');
+    expect(readFileSync("src/components/ui/SupportInbox.tsx", "utf8")).toContain('get("ticket")');
+  });
+});
