@@ -173,7 +173,6 @@ const LIVE_EXACT = new Set<string>([
   "/finance/budget",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
   "/support/inbox",
-  "/support/inbox/priority", // etiqueta de importância posta pela equipa
   "/support/inbox/seed",     // tickets de exemplo, criados/apagados a pedido
   // Pesquisa global de entidades (serviços, clientes, técnicos, faturas, leads, tickets)
   "/search",
@@ -242,6 +241,11 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  // Tickets de suporte: chegam das apps por POST /api/tickets e ficam na tabela
+  // support_tickets. São mensagens de pessoas reais — nunca foram semeados.
+  // Sem isto, `deepZero` transformava a lista em [] e a caixa aparecia sempre
+  // vazia, mesmo com tickets gravados na base de dados.
+  "/support/inbox",
   // Serviços: o seed foi apagado; a tabela só tem serviços concluídos
   // registados à mão (POST /api/services) — dados reais do staff.
   "/services",
@@ -396,7 +400,10 @@ export function isLiveEndpoint(endpoint: string): boolean {
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
-  if (/^\/support\/inbox\/[^/]+\/(reply|status)$/.test(path)) return true; // responder/mudar estado de ticket
+  if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
+  // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex
+  // acima para não apanhar os subcaminhos.
+  if (/^\/support\/inbox\/[^/]+$/.test(path)) return true;
   if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
   if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
   if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
