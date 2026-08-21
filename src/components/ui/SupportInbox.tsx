@@ -217,26 +217,23 @@ export function SupportInbox() {
         </div>
       )}
 
-      {tickets.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="card p-3">
-            <p className="text-xs text-text-secondary">Abertos</p>
-            <p className="mt-0.5 text-xl font-bold text-text-primary tabular-nums">{metricas.abertos}</p>
-          </div>
-          <div className={cn("card p-3", metricas.semPrimeiraResposta > 0 && "border-l-[3px] border-l-warning")}>
-            <p className="text-xs text-text-secondary">Sem 1.ª resposta</p>
-            <p className={cn("mt-0.5 text-xl font-bold tabular-nums", metricas.semPrimeiraResposta > 0 ? "text-warning" : "text-text-primary")}>{metricas.semPrimeiraResposta}</p>
-          </div>
-          <div className={cn("card p-3", (metricas.horasDoMaisAntigo ?? 0) >= 24 && "border-l-[3px] border-l-danger")}>
-            <p className="text-xs text-text-secondary">Mais antigo à espera</p>
-            <p className={cn("mt-0.5 text-xl font-bold tabular-nums", (metricas.horasDoMaisAntigo ?? 0) >= 24 ? "text-danger" : "text-text-primary")}>{formatarEspera(metricas.horasDoMaisAntigo)}</p>
-          </div>
-          <div className="card p-3">
-            <p className="text-xs text-text-secondary" title="Mediana — assim um ticket esquecido não falseia o resto">1.ª resposta (mediana)</p>
-            <p className="mt-0.5 text-xl font-bold text-text-primary tabular-nums">{formatarEspera(metricas.medianaPrimeiraRespostaHoras)}</p>
-          </div>
-        </div>
+      {/*
+        Uma linha em vez de quatro cartões: o que interessa a quem abre esta
+        página é se há alguém à espera, não um painel de indicadores. A mediana
+        de resposta e o resto só faziam ruído por cima da caixa.
+      */}
+      {metricas.abertos > 0 && (
+        <p className="text-sm text-text-secondary">
+          <strong className="text-text-primary">{metricas.abertos}</strong> por fechar
+          {metricas.semPrimeiraResposta > 0 && (
+            <> · <span className="text-warning font-medium">{metricas.semPrimeiraResposta} ainda sem resposta</span></>
+          )}
+          {(metricas.horasDoMaisAntigo ?? 0) >= 24 && (
+            <> · o mais antigo espera há <span className="text-danger font-medium">{formatarEspera(metricas.horasDoMaisAntigo)}</span></>
+          )}
+        </p>
       )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
         {/* ---------------------------- Lista ---------------------------- */}
         <div className="card p-0 overflow-hidden flex flex-col h-[620px]">
@@ -247,33 +244,30 @@ export function SupportInbox() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar ticket, cliente…"
                 className="input-field pl-8 py-1.5 text-sm" />
             </div>
-            <div className="flex flex-wrap gap-1">
-              {/* "Todos" + um filtro por cada estado do ciclo de vida. */}
-              {(["todos", ...TICKET_STATUS.map((x) => x.id)] as StatusFilter[]).map((f) => {
-                const label = f === "todos" ? "Todos" : statusMeta(f as TicketStatus).label;
-                const n = counts[f as keyof typeof counts];
-                return (
-                  <button key={f} onClick={() => setFilter(f)}
-                    className={cn("px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                      filter === f ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                    {label}{n ? <span className="ml-1 opacity-70">{n}</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-text-muted">
-                {filtered.length} {filtered.length === 1 ? "ticket" : "tickets"}
-              </span>
+            <div className="flex gap-2">
+              {/* Dois seletores em vez de seis botões e uma linha à parte. */}
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as StatusFilter)}
+                aria-label="Filtrar por estado"
+                className="input-field py-1.5 text-xs flex-1 min-w-0"
+              >
+                <option value="todos">Todos ({counts.todos})</option>
+                {TICKET_STATUS.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.label} ({counts[st.id as keyof typeof counts] ?? 0})
+                  </option>
+                ))}
+              </select>
               <select
                 value={ordem}
                 onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
-                aria-label="Ordenar tickets"
-                title="Ordena pela última mensagem — a atividade real do ticket, não a data de abertura"
-                className="input-field w-auto py-1 text-xs"
+                aria-label="Ordenar"
+                title="Ordena pela última mensagem — a atividade real do ticket"
+                className="input-field py-1.5 text-xs w-auto"
               >
-                <option value="recentes">Mais recentes primeiro</option>
-                <option value="antigos">Mais antigos primeiro</option>
+                <option value="recentes">Recentes</option>
+                <option value="antigos">Antigos</option>
               </select>
             </div>
           </div>
@@ -319,35 +313,32 @@ export function SupportInbox() {
                     {t.unread > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center">{t.unread}</span>}
                   </span>
                   <span className="min-w-0 flex-1">
+                    {/*
+                      Duas linhas por ticket, não quatro. O estado é um ponto
+                      colorido antes do assunto e a origem é o ícone do avatar —
+                      três etiquetas por linha enchiam a lista de ruído.
+                    */}
                     <span className="flex items-center gap-1.5">
+                      <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} title={meta.label} />
                       <span className="text-sm font-medium text-text-primary truncate flex-1">{t.subject}</span>
-                      <span className="text-[10px] text-text-muted shrink-0">{timeAgo(t.lastMessageAt)}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 mt-0.5 text-xs text-text-muted">
-                      <span className="truncate">{t.requesterName}</span>
-                    </span>
-                    {/* Origem e estado sempre à vista: com todos os canais na
-                        mesma lista, é isto que diz de onde veio e em que ponto
-                        está sem abrir o ticket. */}
-                    <span className="flex items-center gap-1.5 mt-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
-                        <Icon className="h-2.5 w-2.5" />
-                        {CHANNEL_LABEL[t.channel]}
-                      </span>
-                      <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium", meta.tone)}>
-                        <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
-                        {meta.label}
-                      </span>
-                      {/* Só se mostra quando sai do normal: uma etiqueta em
-                          todos os tickets deixa de chamar a atenção em nenhum. */}
                       {(t.priority === "critica" || t.priority === "alta") && (
-                        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                        <span className={cn("shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide",
                           t.priority === "critica" ? "bg-danger-light text-danger" : "bg-warning-light text-warning")}>
                           {t.priority === "critica" ? "Crítica" : "Alta"}
                         </span>
                       )}
+                      <span className="text-[10px] text-text-muted shrink-0">{timeAgo(t.lastMessageAt)}</span>
                     </span>
-                    {last && <span className="block text-xs text-text-secondary truncate mt-0.5">{last.from === "agente" ? "Tu: " : ""}{last.body}</span>}
+                    <span className="flex items-center gap-1 mt-0.5 text-xs text-text-muted">
+                      <span title={CHANNEL_LABEL[t.channel]} className="shrink-0 inline-flex"><Icon className="h-3 w-3" /></span>
+                      <span className="truncate">{t.requesterName}</span>
+                      {last && (
+                        <>
+                          <span className="opacity-40">·</span>
+                          <span className="truncate">{last.from === "agente" ? "Tu: " : ""}{last.body}</span>
+                        </>
+                      )}
+                    </span>
                   </span>
                 </button>
               );
