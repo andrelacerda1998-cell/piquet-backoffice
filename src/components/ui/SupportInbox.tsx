@@ -16,6 +16,7 @@ import {
 } from "@/services/supportInboxService";
 import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
 
 const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = {
   app_cliente: Smartphone,
@@ -234,216 +235,224 @@ export function SupportInbox() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
-        {/* ---------------------------- Lista ---------------------------- */}
-        <div className="card p-0 overflow-hidden flex flex-col h-[620px]">
-          {/* Filtros */}
-          <div className="p-3 border-b border-surface-border space-y-2.5">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar ticket, cliente…"
-                className="input-field pl-8 py-1.5 text-sm" />
-            </div>
-            <div className="flex gap-2">
-              {/* Dois seletores em vez de seis botões e uma linha à parte. */}
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as StatusFilter)}
-                aria-label="Filtrar por estado"
-                className="input-field py-1.5 text-xs flex-1 min-w-0"
-              >
-                <option value="todos">Todos ({counts.todos})</option>
-                {TICKET_STATUS.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.label} ({counts[st.id as keyof typeof counts] ?? 0})
-                  </option>
-                ))}
-              </select>
-              <select
-                value={ordem}
-                onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
-                aria-label="Ordenar"
-                title="Ordena pela última mensagem — a atividade real do ticket"
-                className="input-field py-1.5 text-xs w-auto"
-              >
-                <option value="recentes">Recentes</option>
-                <option value="antigos">Antigos</option>
-              </select>
-            </div>
-          </div>
-          {/* Tickets */}
-          <div className="flex-1 overflow-y-auto">
-            {filtered.length === 0 && (
-            tickets.length === 0 ? (
-              /*
-                Caixa vazia por não haver NENHUM ticket é diferente de vazia
-                por causa de um filtro. Enquanto as apps não chamarem o
-                endpoint, este ecrã fica assim — e sem explicação parecia
-                avaria do backoffice.
-              */
-              <div className="px-4 py-10 text-center">
-                <p className="text-sm font-medium text-text-primary">Ainda não chegou nenhum ticket</p>
-                <p className="mt-1 text-xs text-text-secondary max-w-xs mx-auto">
-                  A caixa recebe pedidos da app do cliente e da app do técnico assim que elas
-                  começarem a enviá-los. O backoffice já está pronto do lado dele.
-                </p>
-                <p className="mt-2 text-[11px] text-text-muted font-mono">POST /api/tickets</p>
-                <button onClick={criarExemplos} disabled={aSemear}
-                  className="btn-secondary mt-4 text-xs disabled:opacity-60">
-                  {aSemear ? "A criar…" : "Criar tickets de exemplo"}
-                </button>
-                <p className="mt-1.5 text-[10px] text-text-muted">
-                  Para experimentar o ecrã. Apagam-se a qualquer momento.
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-text-muted text-center py-10">Sem tickets neste filtro.</p>
-            )
-          )}
-            {filtered.map((t) => {
-              const Icon = CHANNEL_ICON[t.channel];
-              const meta = statusMeta(t.status);
-              const last = t.messages[t.messages.length - 1];
-              return (
-                <button key={t.id} onClick={() => setSelectedId(t.id)}
-                  className={cn("w-full text-left px-3 py-3 border-b border-surface-border/60 flex gap-3 hover:bg-surface-muted transition-colors",
-                    selectedId === t.id && "bg-piquet/5")}>
-                  <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-xs font-bold">
-                    {initials(t.requesterName)}
-                    {t.unread > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center">{t.unread}</span>}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    {/*
-                      Duas linhas por ticket, não quatro. O estado é um ponto
-                      colorido antes do assunto e a origem é o ícone do avatar —
-                      três etiquetas por linha enchiam a lista de ruído.
-                    */}
-                    <span className="flex items-center gap-1.5">
-                      <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} title={meta.label} />
-                      <span className="text-sm font-medium text-text-primary truncate flex-1">{t.subject}</span>
-                      {(t.priority === "critica" || t.priority === "alta") && (
-                        <span className={cn("shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-                          t.priority === "critica" ? "bg-danger-light text-danger" : "bg-warning-light text-warning")}>
-                          {t.priority === "critica" ? "Crítica" : "Alta"}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-text-muted shrink-0">{timeAgo(t.lastMessageAt)}</span>
-                    </span>
-                    <span className="flex items-center gap-1 mt-0.5 text-xs text-text-muted">
-                      <span title={CHANNEL_LABEL[t.channel]} className="shrink-0 inline-flex"><Icon className="h-3 w-3" /></span>
-                      <span className="truncate">{t.requesterName}</span>
-                      {last && (
-                        <>
-                          <span className="opacity-40">·</span>
-                          <span className="truncate">{last.from === "agente" ? "Tu: " : ""}{last.body}</span>
-                        </>
-                      )}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Filtros */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar ticket, cliente…"
+            className="input-field pl-8 py-1.5 text-sm" />
         </div>
+        <select value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)}
+          aria-label="Filtrar por estado" className="input-field py-1.5 text-sm w-auto">
+          <option value="todos">Todos ({counts.todos})</option>
+          {TICKET_STATUS.map((st) => (
+            <option key={st.id} value={st.id}>{st.label} ({counts[st.id as keyof typeof counts] ?? 0})</option>
+          ))}
+        </select>
+        <select value={ordem} onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
+          aria-label="Ordenar" title="Ordena pela última mensagem — a atividade real do ticket"
+          className="input-field py-1.5 text-sm w-auto">
+          <option value="recentes">Recentes primeiro</option>
+          <option value="antigos">Antigos primeiro</option>
+        </select>
+      </div>
 
-        {/* -------------------------- Conversa --------------------------- */}
-        <div className="card p-0 overflow-hidden flex flex-col h-[620px]">
-          {!selected ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-text-muted p-8">
-              <Mail className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-sm">Escolhe um ticket à esquerda para ver a conversa e responder.</p>
-            </div>
-          ) : (
-            <>
-              {/* Cabeçalho */}
-              <div className="px-4 py-3 border-b border-surface-border">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-text-primary truncate">{selected.subject}</p>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {selected.requesterName} · {selected.requesterEmail} · {CHANNEL_LABEL[selected.channel]}
-                      {selected.category ? ` · ${selected.category}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <StatusPicker status={selected.status} onChange={changeStatus} />
-                    <button
-                      onClick={() => setTicketAApagar(selected)}
-                      title="Apagar este ticket (irreversível)"
-                      className="p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <PriorityPicker priority={selected.priority} onChange={changePriority} />
-                  <span className="text-[11px] text-text-muted inline-flex items-center gap-1"><Clock className="h-3 w-3" />aberto {formatDateTime(selected.openedAt)}</span>
-                </div>
-              </div>
-              {/* Mensagens */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-surface-muted/30">
-                {selected.messages.map((m) => {
-                  const own = m.from === "agente";
+      {/* Tabela — clicar numa linha abre a conversa */}
+      {filtered.length === 0 ? (
+        tickets.length === 0 ? (
+          /*
+            Caixa vazia por não haver NENHUM ticket é diferente de vazia por
+            causa de um filtro. Enquanto as apps não chamarem o endpoint, este
+            ecrã fica assim — e sem explicação parecia avaria do backoffice.
+          */
+          <div className="card px-4 py-12 text-center">
+            <Mail className="h-9 w-9 mx-auto text-text-muted opacity-40 mb-3" />
+            <p className="text-sm font-medium text-text-primary">Ainda não chegou nenhum ticket</p>
+            <p className="mt-1 text-xs text-text-secondary max-w-sm mx-auto">
+              A caixa recebe pedidos da app do cliente e da app do técnico assim que elas começarem
+              a enviá-los. O backoffice já está pronto do lado dele.
+            </p>
+            <p className="mt-2 text-[11px] text-text-muted font-mono">POST /api/tickets</p>
+            <button onClick={criarExemplos} disabled={aSemear} className="btn-secondary mt-4 text-xs disabled:opacity-60">
+              {aSemear ? "A criar…" : "Criar tickets de exemplo"}
+            </button>
+            <p className="mt-1.5 text-[10px] text-text-muted">Para experimentar o ecrã. Apagam-se a qualquer momento.</p>
+          </div>
+        ) : (
+          <div className="card px-4 py-10 text-center text-sm text-text-muted">Sem tickets neste filtro.</div>
+        )
+      ) : (
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wide text-text-muted">
+                  <th className="px-4 py-2.5 font-medium">Assunto</th>
+                  <th className="px-3 py-2.5 font-medium">De</th>
+                  <th className="px-3 py-2.5 font-medium"><span className="sr-only">Origem</span></th>
+                  <th className="px-3 py-2.5 font-medium">Estado</th>
+                  <th className="px-3 py-2.5 font-medium">Importância</th>
+                  <th className="px-3 py-2.5 font-medium whitespace-nowrap">Última atividade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t) => {
+                  const Icon = CHANNEL_ICON[t.channel];
+                  const meta = statusMeta(t.status);
+                  const pri = PRIORIDADES.find((x) => x.id === t.priority);
                   return (
-                    <div key={m.id} className={cn("flex gap-2.5", own && "flex-row-reverse")}>
-                      <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
-                        own ? "bg-piquet/15 text-piquet-700" : "bg-surface-strong text-text-secondary")}>
-                        {initials(m.authorName)}
-                      </span>
-                      <div className={cn("max-w-[78%]", own && "text-right")}>
-                        <div className={cn("flex items-center gap-2 text-[11px] text-text-muted mb-0.5", own && "justify-end")}>
-                          <span className="font-medium text-text-secondary">{m.authorName}</span>
-                          <span>{timeAgo(m.at)}</span>
+                    <tr
+                      key={t.id}
+                      onClick={() => setSelectedId(t.id)}
+                      className="border-b border-surface-border/60 last:border-0 cursor-pointer hover:bg-surface-muted transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {t.unread > 0 && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-danger shrink-0" title={`${t.unread} por ler`} />
+                          )}
+                          <span className={cn("font-medium text-text-primary truncate", t.unread > 0 && "font-semibold")}>
+                            {t.subject}
+                          </span>
                         </div>
-                        <div className={cn("inline-block rounded-2xl px-3 py-2 text-sm text-text-primary text-left whitespace-pre-wrap",
-                          own ? "bg-piquet/15" : "bg-surface")}>{m.body}</div>
-                      </div>
-                    </div>
+                        <p className="text-xs text-text-muted truncate mt-0.5 max-w-md">
+                          {t.messages[t.messages.length - 1]?.from === "agente" ? "Tu: " : ""}
+                          {t.messages[t.messages.length - 1]?.body}
+                        </p>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-text-secondary">{t.requesterName}</td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {/* Só o ícone: o texto "Cliente"/"Técnico" repetido em
+                            todas as linhas empurrava a última coluna para fora. */}
+                        <span
+                          className="inline-flex text-text-secondary"
+                          title={`${CHANNEL_LABEL[t.channel]} · ${t.requesterType === "tecnico" ? "Técnico" : "Cliente"}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", meta.tone)}>
+                          <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+                          {meta.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {/* Só quando sai do normal: "Média" repetida em todas as
+                            linhas não dizia nada e ocupava a coluna toda. */}
+                        {t.priority === "critica" || t.priority === "alta" ? (
+                          <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold",
+                            t.priority === "critica" ? "text-danger" : "text-warning")}>
+                            <span className={cn("h-1.5 w-1.5 rounded-full", pri?.dot)} />
+                            {pri?.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-text-muted" title={pri?.label}>—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-xs text-text-muted">{timeAgo(t.lastMessageAt)}</td>
+                    </tr>
                   );
                 })}
-                <div ref={endRef} />
-              </div>
-              {/* Resposta */}
-              {selected.status === "fechado" ? (
-                <div className="p-3 border-t border-surface-border text-center text-sm text-text-muted">
-                  Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="text-piquet-600 hover:underline">Reabrir</button>
-                </div>
-              ) : (
-                <div className="p-3 border-t border-surface-border">
-                  {selected.channel === "email" ? (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <span className="text-xs text-text-muted inline-flex items-center gap-1.5 flex-1">
-                        <Mail className="h-3.5 w-3.5 shrink-0" /> Este pedido chegou por email — responde a partir do teu cliente de email.
-                      </span>
-                      <a href={mailtoHref(selected)} className="btn-primary text-sm inline-flex items-center justify-center gap-1.5 shrink-0">
-                        <Mail className="h-4 w-4" /> Responder por email
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="flex items-end gap-2">
-                      <textarea value={reply} onChange={(e) => setReply(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                        rows={2} placeholder={`Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
-                        className="input-field text-sm resize-none flex-1" />
-                      <button onClick={send} disabled={!reply.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mt-2">
-                    {selected.status !== "resolvido" && (
-                      <button onClick={() => changeStatus("resolvido")} className="btn-secondary text-xs py-1">Marcar resolvido</button>
-                    )}
-                    {selected.status !== "aguarda_cliente" && (
-                      <button onClick={() => changeStatus("aguarda_cliente")} className="btn-secondary text-xs py-1">À espera do cliente</button>
-                    )}
-                    <button onClick={() => changeStatus("fechado")} className="text-xs text-text-muted hover:text-text-primary ml-auto">Fechar ticket</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <ConfirmDialog
+      )}
+
+      {/* Conversa em modal — abre ao clicar numa linha */}
+      <Modal
+        open={selected !== null}
+        onClose={() => setSelectedId(null)}
+        title={selected?.subject ?? ""}
+        subtitle={selected
+          ? `${selected.requesterName} · ${selected.requesterEmail} · ${CHANNEL_LABEL[selected.channel]}${selected.category ? ` · ${selected.category}` : ""}`
+          : undefined}
+        size="xl"
+      >
+        {selected && (
+          <div className="flex flex-col h-[60vh] -mx-1">
+            {/* Estado, importância e ações */}
+            <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-surface-border">
+              <StatusPicker status={selected.status} onChange={changeStatus} />
+              <PriorityPicker priority={selected.priority} onChange={changePriority} />
+              <span className="text-[11px] text-text-muted inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" />aberto {formatDateTime(selected.openedAt)}
+              </span>
+              <button
+                onClick={() => setTicketAApagar(selected)}
+                title="Apagar este ticket (irreversível)"
+                className="ml-auto p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Mensagens */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4">
+              {selected.messages.map((m) => {
+                const own = m.from === "agente";
+                return (
+                  <div key={m.id} className={cn("flex gap-2.5", own && "flex-row-reverse")}>
+                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                      own ? "bg-piquet/15 text-piquet-700" : "bg-surface-strong text-text-secondary")}>
+                      {initials(m.authorName)}
+                    </span>
+                    <div className={cn("max-w-[78%]", own && "text-right")}>
+                      <div className={cn("flex items-center gap-2 text-[11px] text-text-muted mb-0.5", own && "justify-end")}>
+                        <span className="font-medium text-text-secondary">{m.authorName}</span>
+                        <span>{timeAgo(m.at)}</span>
+                      </div>
+                      <div className={cn("inline-block rounded-2xl px-3 py-2 text-sm text-text-primary text-left whitespace-pre-wrap",
+                        own ? "bg-piquet/15" : "bg-surface-subtle")}>{m.body}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={endRef} />
+            </div>
+
+            {/* Resposta */}
+            {selected.status === "fechado" ? (
+              <div className="pt-3 border-t border-surface-border text-center text-sm text-text-muted">
+                Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="text-piquet-600 hover:underline">Reabrir</button>
+              </div>
+            ) : (
+              <div className="pt-3 border-t border-surface-border">
+                {selected.channel === "email" ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span className="text-xs text-text-muted inline-flex items-center gap-1.5 flex-1">
+                      <Mail className="h-3.5 w-3.5 shrink-0" /> Este pedido chegou por email — responde a partir do teu cliente de email.
+                    </span>
+                    <a href={mailtoHref(selected)} className="btn-primary text-sm inline-flex items-center justify-center gap-1.5 shrink-0">
+                      <Mail className="h-4 w-4" /> Responder por email
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex items-end gap-2">
+                    <textarea value={reply} onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                      rows={2} placeholder={`Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
+                      className="input-field text-sm resize-none flex-1" />
+                    <button onClick={send} disabled={!reply.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  {selected.status !== "resolvido" && (
+                    <button onClick={() => changeStatus("resolvido")} className="btn-secondary text-xs py-1">Marcar resolvido</button>
+                  )}
+                  {selected.status !== "aguarda_cliente" && (
+                    <button onClick={() => changeStatus("aguarda_cliente")} className="btn-secondary text-xs py-1">À espera do cliente</button>
+                  )}
+                  <button onClick={() => changeStatus("fechado")} className="text-xs text-text-muted hover:text-text-primary ml-auto">Fechar ticket</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
         open={ticketAApagar !== null}
         onClose={() => setTicketAApagar(null)}
         onConfirm={async () => { if (ticketAApagar) await apagarTicket(ticketAApagar); }}
@@ -457,7 +466,6 @@ export function SupportInbox() {
         confirmLabel="Apagar"
         tone="danger"
       />
-    </div>
     </div>
   );
 }
