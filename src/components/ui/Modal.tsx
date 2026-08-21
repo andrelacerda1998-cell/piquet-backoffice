@@ -11,10 +11,15 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
-const SIZES = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-2xl", xl: "max-w-4xl" };
+/**
+ * `full` ocupa praticamente o ecrã todo — para conteúdos que só fazem sentido
+ * lado a lado (perfil de um técnico: documentos à esquerda, dados à direita).
+ * Numa coluna estreita ficava tudo empilhado e obrigava a rolar muito.
+ */
+const SIZES = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-2xl", xl: "max-w-4xl", full: "max-w-[min(1400px,95vw)]" };
 
 export function Modal({ open, ...props }: ModalProps) {
   // Só monta quando aberto — garante que o Esc/focus-trap corre a cada abertura.
@@ -26,7 +31,8 @@ function ModalInner({ onClose, title, subtitle, children, footer, size = "md" }:
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 pt-[8vh] overflow-y-auto" onClick={onClose}>
+    <div className={cn("fixed inset-0 z-[65] flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto",
+      size === "full" ? "p-3 sm:p-6 pt-[4vh]" : "p-4 pt-[8vh]")} onClick={onClose}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className={cn("w-full card shadow-elevated", SIZES[size])} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between px-6 py-4 border-b border-surface-border">
           <div>
