@@ -19,6 +19,8 @@ export interface TicketRow {
 }
 
 export const TICKET_STATUSES = ["novo", "em_curso", "aguarda_cliente", "resolvido", "fechado"];
+/** Graus de importância aceites (mesma lista que a UI mostra). */
+export const TICKET_PRIORITIES = ["baixa", "media", "alta", "critica"];
 
 export function toInboxTicket(r: TicketRow) {
   return {

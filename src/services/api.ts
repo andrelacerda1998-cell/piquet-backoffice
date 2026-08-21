@@ -173,6 +173,8 @@ const LIVE_EXACT = new Set<string>([
   "/finance/budget",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
   "/support/inbox",
+  "/support/inbox/priority", // etiqueta de importância posta pela equipa
+  "/support/inbox/seed",     // tickets de exemplo, criados/apagados a pedido
   // Pesquisa global de entidades (serviços, clientes, técnicos, faturas, leads, tickets)
   "/search",
   // Fase 8 — Migração Filament: definições de taxas, lucro do sistema, vouchers

@@ -5,16 +5,17 @@ import { metricasSuporte, formatarEspera } from "@/lib/supportMetrics";
 import { useSearchParams } from "next/navigation";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
-import { PriorityBadge } from "@/components/ui/StatusBadge";
 import { useAuthStore, toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import {
-  getInboxTickets, replyInboxTicket, updateInboxTicketStatus,
+  getInboxTickets, replyInboxTicket, updateInboxTicketStatus, updateInboxTicketPriority,
+  deleteInboxTicket, seedInboxExamples, clearInboxExamples,
   TICKET_STATUS, statusMeta, CHANNEL_LABEL, isOpen,
-  type InboxTicket, type TicketStatus, type TicketChannel,
+  type InboxTicket, type TicketStatus, type TicketChannel, type TicketPriority,
 } from "@/services/supportInboxService";
-import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown } from "lucide-react";
+import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = {
   app_cliente: Smartphone,
@@ -55,6 +56,13 @@ export function SupportInbox() {
   const [query, setQuery] = useState("");
   /** Mais recente primeiro por omissão: é onde está a conversa viva. */
   const [ordem, setOrdem] = useState<"recentes" | "antigos">("recentes");
+  /**
+   * Exemplos e eliminação. Declarados aqui em cima com os outros estados: mais
+   * abaixo ficariam depois dos `return` de carregamento/erro, e um hook a
+   * seguir a um return é um hook condicional.
+   */
+  const [aSemear, setASemear] = useState(false);
+  const [ticketAApagar, setTicketAApagar] = useState<InboxTicket | null>(null);
   const [reply, setReply] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +136,56 @@ export function SupportInbox() {
       });
   };
 
+  /**
+   * Grau de importância — etiqueta posta pela equipa, não vem da app.
+   * Mesmo padrão do estado: otimista, com reposição se o servidor recusar.
+   */
+  const changePriority = (priority: TicketPriority) => {
+    if (!selected) return;
+    const anterior = selected.priority;
+    setTickets((prev) => prev.map((t) => (t.id === selected.id ? { ...t, priority } : t)));
+    updateInboxTicketPriority(selected.id, priority)
+      .then(() => toast(`Importância: ${PRIORIDADES.find((p) => p.id === priority)?.label}`, "success"))
+      .catch(() => {
+        setTickets((prev) => prev.map((t) => (t.id === selected.id ? { ...t, priority: anterior } : t)));
+        toast("Falha ao mudar a importância — nada foi alterado.", "error");
+      });
+  };
+
+  const criarExemplos = async () => {
+    setASemear(true);
+    try {
+      const n = await seedInboxExamples();
+      await refetch();
+      toast(`${n} tickets de exemplo criados.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível criar os exemplos.", "error");
+    } finally { setASemear(false); }
+  };
+
+  const limparExemplos = async () => {
+    setASemear(true);
+    try {
+      await clearInboxExamples();
+      setSelectedId(null);
+      await refetch();
+      toast("Tickets de exemplo removidos.", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível remover os exemplos.", "error");
+    } finally { setASemear(false); }
+  };
+
+  const apagarTicket = async (t: InboxTicket) => {
+    try {
+      await deleteInboxTicket(t.id);
+      setTickets((prev) => prev.filter((x) => x.id !== t.id));
+      if (selectedId === t.id) setSelectedId(null);
+      toast(`Ticket ${t.id} apagado.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível apagar o ticket.", "error");
+    } finally { setTicketAApagar(null); }
+  };
+
   const changeStatus = (status: TicketStatus) => {
     if (!selected) return;
     const anterior = selected.status;
@@ -145,6 +203,20 @@ export function SupportInbox() {
 
   return (
     <div className="space-y-4">
+      {/* Só aparece quando há exemplos por limpar — não estorva no dia a dia. */}
+      {tickets.some((t) => t.id.startsWith("EX-")) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-surface-border bg-surface-subtle/50 px-3 py-2">
+          <p className="text-xs text-text-secondary">
+            <strong className="text-text-primary">Tickets de exemplo</strong> na caixa — são os que têm
+            &quot;[EXEMPLO]&quot; no assunto. Servem para experimentar o ecrã.
+          </p>
+          <button onClick={limparExemplos} disabled={aSemear}
+            className="btn-secondary text-xs disabled:opacity-60">
+            {aSemear ? "A remover…" : "Remover exemplos"}
+          </button>
+        </div>
+      )}
+
       {tickets.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="card p-3">
@@ -222,6 +294,13 @@ export function SupportInbox() {
                   começarem a enviá-los. O backoffice já está pronto do lado dele.
                 </p>
                 <p className="mt-2 text-[11px] text-text-muted font-mono">POST /api/tickets</p>
+                <button onClick={criarExemplos} disabled={aSemear}
+                  className="btn-secondary mt-4 text-xs disabled:opacity-60">
+                  {aSemear ? "A criar…" : "Criar tickets de exemplo"}
+                </button>
+                <p className="mt-1.5 text-[10px] text-text-muted">
+                  Para experimentar o ecrã. Apagam-se a qualquer momento.
+                </p>
               </div>
             ) : (
               <p className="text-sm text-text-muted text-center py-10">Sem tickets neste filtro.</p>
@@ -259,6 +338,14 @@ export function SupportInbox() {
                         <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
                         {meta.label}
                       </span>
+                      {/* Só se mostra quando sai do normal: uma etiqueta em
+                          todos os tickets deixa de chamar a atenção em nenhum. */}
+                      {(t.priority === "critica" || t.priority === "alta") && (
+                        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                          t.priority === "critica" ? "bg-danger-light text-danger" : "bg-warning-light text-warning")}>
+                          {t.priority === "critica" ? "Crítica" : "Alta"}
+                        </span>
+                      )}
                     </span>
                     {last && <span className="block text-xs text-text-secondary truncate mt-0.5">{last.from === "agente" ? "Tu: " : ""}{last.body}</span>}
                   </span>
@@ -287,10 +374,19 @@ export function SupportInbox() {
                       {selected.category ? ` · ${selected.category}` : ""}
                     </p>
                   </div>
-                  <StatusPicker status={selected.status} onChange={changeStatus} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <StatusPicker status={selected.status} onChange={changeStatus} />
+                    <button
+                      onClick={() => setTicketAApagar(selected)}
+                      title="Apagar este ticket (irreversível)"
+                      className="p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 mt-2">
-                  <PriorityBadge priority={selected.priority} />
+                  <PriorityPicker priority={selected.priority} onChange={changePriority} />
                   <span className="text-[11px] text-text-muted inline-flex items-center gap-1"><Clock className="h-3 w-3" />aberto {formatDateTime(selected.openedAt)}</span>
                 </div>
               </div>
@@ -356,12 +452,66 @@ export function SupportInbox() {
             </>
           )}
         </div>
-      </div>
+        <ConfirmDialog
+        open={ticketAApagar !== null}
+        onClose={() => setTicketAApagar(null)}
+        onConfirm={async () => { if (ticketAApagar) await apagarTicket(ticketAApagar); }}
+        title="Apagar este ticket?"
+        description={
+          <>
+            <strong>{ticketAApagar?.subject}</strong> de {ticketAApagar?.requesterName} e toda a conversa
+            desaparecem de vez. Não há como repor.
+          </>
+        }
+        confirmLabel="Apagar"
+        tone="danger"
+      />
+    </div>
     </div>
   );
 }
 
 /* --------------------------- Seletor de estado --------------------------- */
+
+/** Graus de importância, do mais grave para o menos. */
+const PRIORIDADES: { id: TicketPriority; label: string; tone: string; dot: string }[] = [
+  { id: "critica", label: "Crítica", tone: "bg-danger-light text-danger", dot: "bg-danger" },
+  { id: "alta", label: "Alta", tone: "bg-warning-light text-warning", dot: "bg-warning" },
+  { id: "media", label: "Média", tone: "bg-info-light text-info", dot: "bg-info" },
+  { id: "baixa", label: "Baixa", tone: "bg-surface-subtle text-text-muted", dot: "bg-text-muted" },
+];
+
+function PriorityPicker({ priority, onChange }: { priority: TicketPriority; onChange: (p: TicketPriority) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+  const meta = PRIORIDADES.find((p) => p.id === priority) ?? PRIORIDADES[2];
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)} title="Mudar o grau de importância"
+        className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium hover:opacity-80 transition-opacity", meta.tone)}>
+        <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+        {meta.label}
+        <ChevronDown className="h-3 w-3 opacity-60" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-40 bg-surface border border-surface-border rounded-lg shadow-elevated z-30 py-1">
+          {PRIORIDADES.map((p) => (
+            <button key={p.id} onClick={() => { onChange(p.id); setOpen(false); }}
+              className={cn("w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2", p.id === priority && "font-semibold")}>
+              <span className={cn("h-1.5 w-1.5 rounded-full", p.dot)} />{p.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StatusPicker({ status, onChange }: { status: TicketStatus; onChange: (s: TicketStatus) => void }) {
   const [open, setOpen] = useState(false);

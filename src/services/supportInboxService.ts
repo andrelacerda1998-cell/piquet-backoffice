@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 
 /* ============================================================================
  * Caixa de entrada de tickets — modelo unificado, agnóstico ao canal.
@@ -148,6 +148,36 @@ export async function replyInboxTicket(id: string, body: string, authorName: str
         : t
     );
     return msg;
+  }).then((r) => r.data);
+}
+
+/** Apaga um ticket de vez (conversa incluída). Irreversível. */
+export async function deleteInboxTicket(id: string): Promise<void> {
+  await apiDelete(`/support/inbox/${id}`, () => {
+    cache = cache.filter((t) => t.id !== id);
+    return { id };
+  });
+}
+
+/** Cria tickets de EXEMPLO para experimentar a caixa (prefixo "[EXEMPLO]"). */
+export async function seedInboxExamples(): Promise<number> {
+  return apiPost<{ criados: number }>("/support/inbox/seed", {}, () => ({ criados: 0 }))
+    .then((r) => r.data.criados);
+}
+
+/** Remove todos os tickets de exemplo de uma vez. */
+export async function clearInboxExamples(): Promise<number> {
+  return apiDelete<{ apagados: number }>("/support/inbox/seed", () => ({ apagados: 0 }))
+    .then((r) => r.data.apagados);
+}
+
+/** Grau de importância — etiqueta que a equipa põe, não vem da app. */
+export async function updateInboxTicketPriority(id: string, priority: TicketPriority): Promise<InboxTicket> {
+  return apiPut(`/support/inbox/${id}/priority`, { priority }, () => {
+    cache = cache.map((t) => (t.id === id ? { ...t, priority } : t));
+    const t = cache.find((x) => x.id === id);
+    if (!t) throw new Error("Ticket não encontrado");
+    return t;
   }).then((r) => r.data);
 }
 
