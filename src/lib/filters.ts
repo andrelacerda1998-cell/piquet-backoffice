@@ -1,7 +1,7 @@
 import { subDays, subMonths, format, parseISO } from "date-fns";
 import {
   inicioDoDiaLisboa, fimDoDiaLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa,
-  inicioDoTrimestreLisboa, inicioDoAnoLisboa,
+  inicioDoTrimestreLisboa, inicioDoAnoLisboa, deLisboa,
 } from "./periodo";
 import type { DashboardFilter, PeriodPreset } from "@/types";
 
@@ -43,11 +43,24 @@ export function getDateRangeFromPreset(preset: PeriodPreset, customStart?: strin
       return { start: inicioDoTrimestreLisboa(now), end: fimDoDia(now) };
     case "este_ano":
       return { start: inicioDoAnoLisboa(now), end: fimDoDia(now) };
-    case "personalizado":
-      return {
-        start: customStart ? inicioDoDia(parseISO(customStart)) : inicioDoDia(subDays(now, 30)),
-        end: customEnd ? fimDoDia(parseISO(customEnd)) : fimDoDia(now),
+    case "personalizado": {
+      /**
+       * "2026-03-01" é uma DATA CIVIL escolhida no calendário, não um instante.
+       * `parseISO` interpretava-a no fuso do servidor: num servidor a leste de
+       * Lisboa, o dia 1 de março passava a 28 de fevereiro. Constrói-se
+       * diretamente como dia de Lisboa.
+       */
+      const dia = (iso: string) => {
+        const [a, m, d] = iso.split("-").map(Number);
+        return { a, m: m - 1, d };
       };
+      const i = customStart && /^\d{4}-\d{2}-\d{2}$/.test(customStart) ? dia(customStart) : null;
+      const f = customEnd && /^\d{4}-\d{2}-\d{2}$/.test(customEnd) ? dia(customEnd) : null;
+      return {
+        start: i ? deLisboa(i.a, i.m, i.d) : inicioDoDia(subDays(now, 30)),
+        end: f ? deLisboa(f.a, f.m, f.d, 23, 59, 59, 999) : fimDoDia(now),
+      };
+    }
     default:
       return { start: inicioDoDia(subDays(now, 30)), end: fimDoDia(now) };
   }
