@@ -895,8 +895,23 @@ export default function TechniciansPage() {
                               <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
                                 className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
                             ) : (
-                              <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, true)}
-                                className="btn-primary text-xs py-1 disabled:opacity-50">{atSaving ? "A gravar…" : "Validar"}</button>
+                              /*
+                                Sem o identificador à vista NÃO se valida.
+                                Validar é dizer "conferi que este acesso é o
+                                certo" — sem o ver, seria carimbar às cegas e
+                                criar um registo em que ninguém pode confiar.
+                                O botão volta sozinho assim que o backend
+                                enviar o campo.
+                              */
+                              <button
+                                disabled={atSaving || !atUser(profileVendor)}
+                                onClick={() => setAtValidation(profileVendor, true)}
+                                title={atUser(profileVendor)
+                                  ? "Confirmar que o subutilizador está correto"
+                                  : "Não dá para validar sem ver o identificador do subutilizador"}
+                                className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                                {atSaving ? "A gravar…" : "Validar"}
+                              </button>
                             )}
                           </div>
                         </div>
@@ -910,11 +925,21 @@ export default function TechniciansPage() {
                     );
                   })()}
                   {!atUser(profileVendor) && (
-                    <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
-                      Para conferires o acesso antes de validar, o backend tem de passar a enviar o identificador do
-                      subutilizador (e quem/quando validou) no <span className="font-mono">VendorController</span>.
-                      A senha nunca deve vir para aqui.
-                    </p>
+                    <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/25 px-3 py-2.5 text-[11px] space-y-1">
+                      <p className="font-medium text-text-primary">Não dá para validar já</p>
+                      <p className="text-text-secondary">
+                        A API de admin devolve só <span className="font-mono">at_valid</span> e{" "}
+                        <span className="font-mono">at_validated_at</span> — não envia o identificador do
+                        subutilizador, por isso não há como conferir se está correto. Validar sem o ver seria
+                        carimbar às cegas.
+                      </p>
+                      <p className="text-text-muted">
+                        Falta no backend: expor <span className="font-mono">at_username</span> em{" "}
+                        <span className="font-mono">GET /v1/admin/vendors</span> e criar{" "}
+                        <span className="font-mono">PUT /v1/admin/vendors/{"{id}"}/at-validation</span>.
+                        Está no quadro do Rodrigo. A senha nunca deve vir para aqui.
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
