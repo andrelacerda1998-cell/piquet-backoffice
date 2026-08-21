@@ -28,7 +28,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
-import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, atFlagWithoutProof, AT_STATE_UI } from "@/lib/vendorDocs";
+import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -861,86 +861,63 @@ export default function TechniciansPage() {
                   {(() => {
                     const at = atValidationState(profileVendor);
                     const ui = AT_STATE_UI[at];
+                    const utilizador = atUser(profileVendor);
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className={cn("font-medium", ui.tone)}>{ui.symbol} {ui.label}</p>
-                            <p className="text-xs text-text-secondary">
-                              {atUser(profileVendor)
-                                ? <>Subutilizador <span className="font-mono text-text-primary">{atUser(profileVendor)}</span></>
-                                : profileVendor.at_credentials_set === true
-                                  ? "O técnico introduziu credenciais (identificador não enviado pelo backend)."
-                                  : profileVendor.at_credentials_set === false
-                                    ? "O técnico ainda não introduziu os dados do subutilizador."
-                                    : "O backend ainda não diz se o técnico introduziu os dados."}
-                              {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
-                              {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
-                            </p>
+                            {utilizador ? (
+                              <p className="text-xs text-text-secondary">
+                                Subutilizador <span className="font-mono text-text-primary">{utilizador}</span>
+                                {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
+                                {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
+                              </p>
+                            ) : (
+                              /*
+                                Uma frase, não três. Antes havia o estado, um
+                                aviso sobre a falta de data e uma caixa com o
+                                contrato do backend — tudo a dizer o mesmo:
+                                não há como conferir. O detalhe técnico está
+                                no tooltip, para quem o quiser.
+                              */
+                              <p
+                                className="text-xs text-text-secondary"
+                                title="A API de admin devolve só at_valid e at_validated_at. Falta expor at_username em GET /v1/admin/vendors e criar PUT /v1/admin/vendors/{id}/at-validation."
+                              >
+                                O backend não envia o identificador — não há como conferir se está correto.
+                              </p>
+                            )}
 
                             {/* A pergunta que interessa: dá para faturar por ele? */}
                             {profileVendor.at_invoicing_ok != null && (
                               <p className={cn("mt-1 text-xs font-medium", profileVendor.at_invoicing_ok ? "text-success" : "text-danger")}>
                                 {profileVendor.at_invoicing_ok
-                                  ? "✓ Dá para criar workspace e faturar em nome dele"
+                                  ? "✓ Dá para faturar em nome dele"
                                   : `✗ Não dá para faturar${profileVendor.at_check_error ? ` — ${profileVendor.at_check_error}` : ""}`}
-                                {profileVendor.at_checked_at && (
-                                  <span className="font-normal text-text-muted"> · testado {formatDate(profileVendor.at_checked_at)}</span>
-                                )}
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="shrink-0">
                             {at === "validado" ? (
                               <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
                                 className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
                             ) : (
-                              /*
-                                Sem o identificador à vista NÃO se valida.
-                                Validar é dizer "conferi que este acesso é o
-                                certo" — sem o ver, seria carimbar às cegas e
-                                criar um registo em que ninguém pode confiar.
-                                O botão volta sozinho assim que o backend
-                                enviar o campo.
-                              */
                               <button
-                                disabled={atSaving || !atUser(profileVendor)}
+                                disabled={atSaving || !utilizador}
                                 onClick={() => setAtValidation(profileVendor, true)}
-                                title={atUser(profileVendor)
+                                title={utilizador
                                   ? "Confirmar que o subutilizador está correto"
-                                  : "Não dá para validar sem ver o identificador do subutilizador"}
+                                  : "Sem o identificador à vista, validar seria carimbar às cegas"}
                                 className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
                                 {atSaving ? "A gravar…" : "Validar"}
                               </button>
                             )}
                           </div>
                         </div>
-                        {atFlagWithoutProof(profileVendor) && (
-                          <p className="rounded-lg bg-warning-light/50 px-3 py-2 text-[11px] text-warning">
-                            O registo vem marcado como válido, mas <b>não há data de validação</b> — provavelmente ninguém
-                            conferiu o subutilizador. {!profileVendor.can_accept_service && "Este técnico também não pode aceitar serviços."}
-                          </p>
-                        )}
                       </>
                     );
                   })()}
-                  {!atUser(profileVendor) && (
-                    <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/25 px-3 py-2.5 text-[11px] space-y-1">
-                      <p className="font-medium text-text-primary">Não dá para validar já</p>
-                      <p className="text-text-secondary">
-                        A API de admin devolve só <span className="font-mono">at_valid</span> e{" "}
-                        <span className="font-mono">at_validated_at</span> — não envia o identificador do
-                        subutilizador, por isso não há como conferir se está correto. Validar sem o ver seria
-                        carimbar às cegas.
-                      </p>
-                      <p className="text-text-muted">
-                        Falta no backend: expor <span className="font-mono">at_username</span> em{" "}
-                        <span className="font-mono">GET /v1/admin/vendors</span> e criar{" "}
-                        <span className="font-mono">PUT /v1/admin/vendors/{"{id}"}/at-validation</span>.
-                        Está no quadro do Rodrigo. A senha nunca deve vir para aqui.
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
