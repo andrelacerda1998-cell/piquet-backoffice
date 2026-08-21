@@ -551,6 +551,8 @@ export interface FinanceSummary {
   /** Custos fixos: média das faturas reais e quantos meses a sustentam. */
   fixedCostsMonthly?: number;
   fixedCostsMonths?: number;
+  /** Data do último saldo registado (null se ainda não há nenhum). */
+  balanceDate?: string | null;
 }
 
 export interface OverviewMetrics {

@@ -17,3 +17,18 @@ export function isMissingColumn(erro: unknown, coluna: string): boolean {
   if (code !== "42703" && code !== "PGRST204") return false;
   return msg.includes(coluna.toLowerCase());
 }
+
+/**
+ * Deteta "esta tabela não existe" — o equivalente ao `isMissingColumn` para
+ * tabelas novas cuja migração ainda não correu. Mesma razão: o ecrã continua a
+ * funcionar sem a funcionalidade nova, em vez de rebentar inteiro.
+ *
+ * `42P01` é o SQLSTATE `undefined_table`; o PostgREST devolve `PGRST205`.
+ */
+export function isMissingTable(erro: unknown, tabela: string): boolean {
+  if (!erro || typeof erro !== "object") return false;
+  const e = erro as { code?: string; message?: string };
+  const code = e.code ?? "";
+  if (code !== "42P01" && code !== "PGRST205") return false;
+  return (e.message ?? "").toLowerCase().includes(tabela.toLowerCase());
+}

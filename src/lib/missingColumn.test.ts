@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isMissingColumn } from "./missingColumn";
+import { isMissingColumn, isMissingTable } from "./missingColumn";
 
 describe("isMissingColumn", () => {
   it("reconhece o erro do Postgres (42703)", () => {
@@ -29,5 +29,30 @@ describe("isMissingColumn", () => {
     expect(isMissingColumn(undefined, "notes")).toBe(false);
     expect(isMissingColumn("erro", "notes")).toBe(false);
     expect(isMissingColumn({}, "notes")).toBe(false);
+  });
+});
+
+describe("isMissingTable", () => {
+  it("reconhece o erro do Postgres (42P01)", () => {
+    expect(isMissingTable(
+      { code: "42P01", message: 'relation "public.treasury_balances" does not exist' },
+      "treasury_balances",
+    )).toBe(true);
+  });
+
+  it("reconhece o erro do PostgREST (PGRST205)", () => {
+    expect(isMissingTable(
+      { code: "PGRST205", message: "Could not find the table 'public.treasury_balances' in the schema cache" },
+      "treasury_balances",
+    )).toBe(true);
+  });
+
+  it("não confunde com outra tabela em falta", () => {
+    expect(isMissingTable({ code: "42P01", message: 'relation "outra" does not exist' }, "treasury_balances")).toBe(false);
+  });
+
+  it("não trata erros normais como tabela em falta", () => {
+    expect(isMissingTable({ code: "23505", message: "duplicate key" }, "treasury_balances")).toBe(false);
+    expect(isMissingTable(null, "treasury_balances")).toBe(false);
   });
 });

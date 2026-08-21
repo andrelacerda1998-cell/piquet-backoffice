@@ -487,3 +487,34 @@ export async function updateBudgetItem(id: string, patch: BudgetItemPatch): Prom
 export async function deleteBudgetItem(id: string): Promise<void> {
   await apiDelete(`/finance/budget/${id}`, () => null);
 }
+
+/* --------------------------- Tesouraria (manual) -------------------------- */
+
+/** Uma leitura do saldo da conta, registada por alguém da equipa. */
+export interface TreasuryBalance {
+  id: string;
+  balance_date: string;
+  amount: number;
+  account: string;
+  note: string;
+  created_by: string;
+}
+
+export interface TreasuryData {
+  items: TreasuryBalance[];
+  /** `true` enquanto a migração da tabela não tiver sido aplicada. */
+  migracaoEmFalta: boolean;
+}
+
+export async function getTreasury(): Promise<TreasuryData> {
+  return apiGet<TreasuryData>("/finance/treasury", () => ({ items: [], migracaoEmFalta: false }))
+    .then((r) => r.data);
+}
+
+export async function addTreasuryBalance(input: {
+  amount: number; balanceDate: string; account?: string; note?: string;
+}): Promise<TreasuryBalance> {
+  return apiPost<TreasuryBalance>("/finance/treasury", input, () => {
+    throw new Error("Registar o saldo precisa do backend configurado.");
+  }).then((r) => r.data);
+}

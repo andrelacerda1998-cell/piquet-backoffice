@@ -171,6 +171,8 @@ const LIVE_EXACT = new Set<string>([
   "/tax/vat",
   // Planeamento financeiro mensal (linhas de orçamento do André)
   "/finance/budget",
+  // Saldo de tesouraria registado à mão (substitui a constante inventada).
+  "/finance/treasury",
   // Tickets de suporte reais (app cliente → /api/tickets → esta inbox)
   "/support/inbox",
   "/support/inbox/seed",     // tickets de exemplo, criados/apagados a pedido
@@ -271,6 +273,7 @@ const REAL_DATA = new Set<string>([
   "/finance/app-payments",
   "/finance/gmv", // GMV real = Payshop cobrado + serviços concluídos.
   "/finance/unit-economics", // LTV/CAC dos serviços + investimento em anúncios.
+  "/finance/treasury", // registado pelo staff — real por definição.
   "/dev-tasks",
   "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
@@ -280,6 +283,8 @@ const REAL_DATA = new Set<string>([
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
   "/finance/budget", // Planeamento mensal — linhas escritas pelo André.
+  // Saldo de tesouraria registado à mão (substitui a constante inventada).
+  "/finance/treasury",
   "/search", // Pesquisa global de entidades — resultados reais das tabelas.
   // Colaboradores: seed apagado a 2026-07-22 (backup em _seed_backup_employees);
   // a tabela só tem colaboradores registados à mão em Impostos e RH.

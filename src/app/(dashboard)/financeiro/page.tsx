@@ -23,6 +23,7 @@ import {
   type AppPayment, type PaymentState, type CompanyInvoice,
   type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
   type InvoiceRecurrence,
+  getTreasury, addTreasuryBalance,
 } from "@/services/financeService";
 import { buildMonthlyPlan, type PlanItem } from "@/lib/budgetPlan";
 import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService";
@@ -110,6 +111,37 @@ export default function FinancePage() {
 
   // Lucro do sistema (wallet) — filtros de data próprios, não os globais do resto da página.
   const [profitPage, setProfitPage] = useState(1);
+
+  /**
+   * Tesouraria registada à mão: o backoffice não tem ligação bancária, por
+   * isso o saldo passa a ser uma leitura que alguém da equipa regista. O mais
+   * recente alimenta o "Saldo atual", e com ele voltam a fazer sentido o
+   * "Saldo previsto" e o "Runway".
+   */
+  const { data: treasury, refetch: refetchTreasury } = useAsyncData(() => getTreasury(), []);
+  const [showSaldo, setShowSaldo] = useState(false);
+  const [saldoForm, setSaldoForm] = useState({
+    amount: "", balanceDate: new Date().toISOString().slice(0, 10), account: "", note: "",
+  });
+  const [aGravarSaldo, setAGravarSaldo] = useState(false);
+
+  const gravarSaldo = async () => {
+    const amount = Number(saldoForm.amount.replace(",", "."));
+    if (!Number.isFinite(amount)) { toast("Indica o saldo em euros.", "error"); return; }
+    setAGravarSaldo(true);
+    try {
+      await addTreasuryBalance({
+        amount, balanceDate: saldoForm.balanceDate,
+        account: saldoForm.account.trim(), note: saldoForm.note.trim(),
+      });
+      setShowSaldo(false);
+      setSaldoForm({ amount: "", balanceDate: new Date().toISOString().slice(0, 10), account: "", note: "" });
+      await Promise.all([refetchTreasury(), refetch()]);
+      toast("Saldo registado.", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível registar o saldo.", "error");
+    } finally { setAGravarSaldo(false); }
+  };
   const [profitFrom, setProfitFrom] = useState("");
   const [profitTo, setProfitTo] = useState("");
   const { data: systemProfit, loading: profitLoading, error: profitError, refetch: refetchProfit } = useAsyncData(
@@ -505,14 +537,29 @@ export default function FinancePage() {
                       registo de tesouraria. Mostravam 185 000 € — uma
                       constante no código. Passa a dizer-se o que falta.
                     */}
-                    {summary.currentBalance === null && (
-                      <div className="mb-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-2.5 text-sm">
-                        <p className="text-text-primary font-medium">Saldo em conta por ligar</p>
-                        <p className="text-text-secondary text-xs mt-0.5">
-                          Sem ligação bancária ou mapa de tesouraria, não há saldo real para mostrar —
-                          e sem saldo não se calcula saldo previsto nem runway. O burn rate abaixo é real
-                          (custos de equipa + faturas de fornecedores).
-                        </p>
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-text-secondary">
+                        {summary.currentBalance === null ? (
+                          <>
+                            <span className="font-medium text-text-primary">Sem saldo registado.</span>{" "}
+                            Não há ligação bancária — regista o saldo da conta para o
+                            &quot;Saldo previsto&quot; e o &quot;Runway&quot; passarem a fazer sentido.
+                          </>
+                        ) : (
+                          <>
+                            Saldo lido a <strong className="text-text-primary">{summary.balanceDate ? formatDate(summary.balanceDate) : "—"}</strong>.
+                            {" "}Regista de novo sempre que consultares a conta.
+                          </>
+                        )}
+                      </p>
+                      <button onClick={() => setShowSaldo(true)} className="btn-secondary text-xs">
+                        Registar saldo
+                      </button>
+                    </div>
+                    {treasury?.migracaoEmFalta && (
+                      <div className="mb-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-2.5 text-xs text-text-secondary">
+                        Falta aplicar a migração <code>20260821100000_treasury_balances.sql</code> no
+                        Supabase — até lá o saldo não pode ser guardado.
                       </div>
                     )}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -521,6 +568,25 @@ export default function FinancePage() {
                       <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate)} hideDelta format="currency" />
                       <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta empty={summary.runwayMonths === null} emptyHint="depende do saldo" />
                     </div>
+                    {(treasury?.items.length ?? 0) > 1 && (
+                      <details className="mt-3">
+                        <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                          Histórico de saldos ({treasury!.items.length})
+                        </summary>
+                        <div className="mt-2 space-y-1">
+                          {treasury!.items.map((b) => (
+                            <div key={b.id} className="flex items-center justify-between text-xs border-b border-surface-border/60 py-1.5 last:border-0">
+                              <span className="text-text-secondary">
+                                {formatDate(b.balance_date)}
+                                {b.account && <span className="text-text-muted"> · {b.account}</span>}
+                                {b.note && <span className="text-text-muted"> · {b.note}</span>}
+                              </span>
+                              <span className="font-medium text-text-primary tabular-nums">{formatCurrency(b.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </>
                 )}
                 <div className="mt-4">
@@ -1061,6 +1127,53 @@ export default function FinancePage() {
           )}
         />
       </PermissionGate>
+      <Modal
+        open={showSaldo}
+        onClose={() => setShowSaldo(false)}
+        title="Registar saldo da conta"
+        subtitle="Uma leitura do que está mesmo na conta, num dia. O mais recente é o que conta."
+        footer={
+          <>
+            <button onClick={() => setShowSaldo(false)} className="btn-secondary">Cancelar</button>
+            <button onClick={gravarSaldo} disabled={aGravarSaldo} className="btn-primary disabled:opacity-60">
+              {aGravarSaldo ? "A guardar…" : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Saldo (€)">
+            <input
+              type="number" step="0.01" autoFocus
+              value={saldoForm.amount}
+              onChange={(e) => setSaldoForm({ ...saldoForm, amount: e.target.value })}
+              placeholder="0,00" className="input-field"
+            />
+          </Field>
+          <Field label="Data da leitura">
+            <input
+              type="date" max={new Date().toISOString().slice(0, 10)}
+              value={saldoForm.balanceDate}
+              onChange={(e) => setSaldoForm({ ...saldoForm, balanceDate: e.target.value })}
+              className="input-field"
+            />
+          </Field>
+          <Field label="Conta (opcional)">
+            <input
+              value={saldoForm.account}
+              onChange={(e) => setSaldoForm({ ...saldoForm, account: e.target.value })}
+              placeholder="ex.: Millennium — conta à ordem" className="input-field"
+            />
+          </Field>
+          <Field label="Nota (opcional)">
+            <input
+              value={saldoForm.note}
+              onChange={(e) => setSaldoForm({ ...saldoForm, note: e.target.value })}
+              placeholder="ex.: antes de pagar salários" className="input-field"
+            />
+          </Field>
+        </div>
+      </Modal>
     </RouteGuard>
   );
 }

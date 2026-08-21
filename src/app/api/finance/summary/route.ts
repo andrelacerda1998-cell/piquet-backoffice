@@ -17,7 +17,7 @@ export const GET = withStaff(async (req) => {
   const f = parseFinanceFilters(new URL(req.url));
   const admin = supabaseAdmin();
 
-  const [completedRes, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes] = await Promise.all([
+  const [completedRes, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes, saldoRes] = await Promise.all([
     completedQuery("piquet_revenue, total_customer_value, technician_value, invoice_status", f),
     admin.from("employees").select("*"),
     admin.from("tax_obligations").select("amount_estimated, status"),
@@ -27,6 +27,8 @@ export const GET = withStaff(async (req) => {
     // técnicos — ambos substituem números que antes eram constantes no código.
     admin.from("company_invoices").select("amount, issue_date"),
     admin.from("technician_payout_records").select("amount"),
+    // Saldo de tesouraria registado à mão — o mais recente é o que vale.
+    admin.from("treasury_balances").select("amount, balance_date").order("balance_date", { ascending: false }).limit(1),
   ]);
   if (completedRes.error) throw new Error(completedRes.error.message);
   if (empRes.error) throw new Error(empRes.error.message);
@@ -56,12 +58,15 @@ export const GET = withStaff(async (req) => {
   const operatingCosts = teamCosts + custos.mediaMensal;
 
   /**
-   * Saldo em conta: NÃO existe fonte no backoffice — não há ligação bancária
-   * nem registo de tesouraria. Era a constante 185 000 €, e dela dependiam o
-   * "Saldo previsto" e o "Runway", que assim eram ficção com ar de rigor.
-   * Fica `null` e o ecrã diz que falta a fonte.
+   * Saldo em conta: o último registo manual de tesouraria. Era a constante
+   * 185 000 €, e dela dependiam o "Saldo previsto" e o "Runway". Sem nenhum
+   * registo continua `null` — o ecrã diz que falta, em vez de inventar.
    */
-  const currentBalance: number | null = null;
+  // `saldoRes.error` quando a migração ainda não correu: ignora-se de
+  // propósito, para o Financeiro inteiro não cair por causa do saldo.
+  const saldoLinha = ((saldoRes.data ?? []) as Array<{ amount: number; balance_date: string }>)[0];
+  const currentBalance: number | null = saldoLinha ? Number(saldoLinha.amount) : null;
+  const balanceDate: string | null = saldoLinha?.balance_date ?? null;
   const revenueWithoutVat = calculatePiquetRevenueWithoutVat(piquetRevenue, vatRate);
 
   /**
@@ -111,6 +116,8 @@ export const GET = withStaff(async (req) => {
     // Sem saldo real, não há saldo previsto nem runway possíveis.
     projectedBalance: currentBalance === null ? null : currentBalance + res.resultadoDoPeriodo,
     /** Quantos meses de faturas sustentam a média de custos (0 = sem histórico). */
+    /** Data da leitura do saldo — para o ecrã dizer de quando é. */
+    balanceDate,
     fixedCostsMonths: custos.mesesConsiderados,
     fixedCostsMonthly: custos.mediaMensal,
   });
