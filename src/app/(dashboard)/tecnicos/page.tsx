@@ -951,6 +951,69 @@ export default function TechniciansPage() {
                 <div><p className="text-xs text-text-muted">Pode aceitar serviço</p><p className="text-text-primary">{profileVendor.can_accept_service ? "Sim" : "Não"}</p></div>
                 <div><p className="text-xs text-text-muted">Registado</p><p className="text-text-primary">{profileVendor.created_at ? formatDate(profileVendor.created_at) : "—"}</p></div>
               </div>
+
+              {/* ------------------------- Faturação ------------------------- */}
+              {(() => {
+                const v = profileVendor;
+                const morada = v.address || v.billing_address || null;
+                const nomeFiscal = v.billing_name || v.fiscal_name || null;
+                const temAlgum = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime || v.withholding_tax != null);
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Dados de faturação</p>
+                    {temAlgum ? (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs text-text-muted">Nome fiscal</p>
+                          <p className="text-text-primary">{nomeFiscal ?? v.name ?? "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-text-muted">NIF</p>
+                          <p className="text-text-primary font-mono">{v.nif ?? "—"}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-text-muted">Morada fiscal</p>
+                          <p className="text-text-primary">
+                            {[morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-text-muted">IBAN</p>
+                          {/* Sensível: no Filament só o super-admin o via. Mostra-se
+                              parcialmente — chega para conferir sem o expor inteiro. */}
+                          <p className="text-text-primary font-mono" title="Mostrado parcialmente por segurança">
+                            {v.iban ? `${v.iban.slice(0, 8)}••••${v.iban.slice(-4)}` : "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-text-muted">Regime de IVA</p>
+                          <p className="text-text-primary">
+                            {v.vat_regime ?? "—"}
+                            {v.withholding_tax != null && (
+                              <span className="text-text-secondary">
+                                {" · "}{v.withholding_tax ? `retenção ${v.withholding_rate ?? "?"}%` : "sem retenção"}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/25 px-3 py-2.5 text-[11px] space-y-1">
+                        <p className="font-medium text-text-primary">Sem dados de faturação</p>
+                        <p className="text-text-secondary">
+                          A API de admin devolve 12 campos por técnico e nenhum é de faturação — só o NIF{" "}
+                          (<span className="font-mono">{v.nif ?? "—"}</span>), que já aparece no topo.
+                          Não há morada fiscal, IBAN nem regime de IVA para mostrar.
+                        </p>
+                        <p className="text-text-muted">
+                          Falta no <span className="font-mono">VendorController</span>: morada + código postal,
+                          IBAN, regime de IVA/retenção e nome fiscal. Está no quadro do Rodrigo.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

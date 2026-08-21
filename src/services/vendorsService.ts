@@ -49,6 +49,24 @@ export interface RealVendor {
   at_invoicing_ok?: boolean | null;
   at_checked_at?: string | null;
   at_check_error?: string | null;
+  /**
+   * Dados de faturação do técnico — o que é preciso para emitir uma fatura em
+   * nome dele e para pagar. Nenhum destes campos vem hoje do VendorController
+   * (confirmado a 21/08: a API devolve 12 campos e nenhum é de faturação).
+   *
+   * Ficam opcionais e com nomes alternativos: assim que o backend enviar
+   * qualquer um, aparece no perfil sem mexer no frontend.
+   */
+  billing_name?: string | null;        // designação fiscal, se difere do nome
+  fiscal_name?: string | null;
+  address?: string | null;             // morada da sede
+  billing_address?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  iban?: string | null;                // sensível — ver nota na UI
+  vat_regime?: string | null;          // ex.: "isento_art53", "normal"
+  withholding_tax?: boolean | null;    // retenção na fonte
+  withholding_rate?: number | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
