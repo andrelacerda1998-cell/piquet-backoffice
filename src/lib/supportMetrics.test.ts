@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { metricasSuporte, horasAtePrimeiraResposta, formatarEspera, type TicketParaMetricas } from "./supportMetrics";
+import { metricasSuporte, horasAtePrimeiraResposta, formatarEspera, esperaDoTicket, HORAS_URGENTE, type TicketParaMetricas } from "./supportMetrics";
 
 const AGORA = Date.parse("2026-08-20T12:00:00Z");
 const haHoras = (h: number) => new Date(AGORA - h * 3_600_000).toISOString();
@@ -73,5 +73,34 @@ describe("formatarEspera", () => {
     expect(formatarEspera(5)).toBe("5 h");
     expect(formatarEspera(24)).toBe("1 dia");
     expect(formatarEspera(72)).toBe("3 dias");
+  });
+});
+
+describe("esperaDoTicket", () => {
+  it("ticket novo sem resposta conta desde a abertura", () => {
+    const r = esperaDoTicket(t({ status: "novo", openedAt: haHoras(5), messages: [] }), AGORA);
+    expect(r.tipo).toBe("sem_resposta");
+    expect(r.tipo === "sem_resposta" && Math.round(r.horas)).toBe(5);
+    expect(r.tipo === "sem_resposta" && r.urgente).toBe(false);
+  });
+
+  it("passa a urgente às 24 horas sem resposta", () => {
+    const antes = esperaDoTicket(t({ openedAt: haHoras(23) }), AGORA);
+    const depois = esperaDoTicket(t({ openedAt: haHoras(HORAS_URGENTE) }), AGORA);
+    expect(antes.tipo === "sem_resposta" && antes.urgente).toBe(false);
+    expect(depois.tipo === "sem_resposta" && depois.urgente).toBe(true);
+  });
+
+  it("com resposta da equipa deixa de estar 'sem resposta'", () => {
+    const r = esperaDoTicket(t({
+      status: "em_curso", openedAt: haHoras(50),
+      messages: [{ from: "agente", at: haHoras(48) }],
+    }), AGORA);
+    expect(r.tipo).toBe("a_decorrer");
+  });
+
+  it("resolvido ou fechado não conta espera, por antigo que seja", () => {
+    expect(esperaDoTicket(t({ status: "resolvido", openedAt: haHoras(900) }), AGORA).tipo).toBe("fechado");
+    expect(esperaDoTicket(t({ status: "fechado", openedAt: haHoras(900) }), AGORA).tipo).toBe("fechado");
   });
 });

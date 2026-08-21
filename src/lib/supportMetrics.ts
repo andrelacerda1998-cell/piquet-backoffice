@@ -69,3 +69,26 @@ export function formatarEspera(horas: number | null): string {
   const dias = Math.round(horas / 24);
   return `${dias} ${dias === 1 ? "dia" : "dias"}`;
 }
+
+/**
+ * Estado de espera de um ticket, para a lista dizer o que interessa em vez de
+ * "há 38d" — que não distingue um ticket a decorrer de um esquecido.
+ *
+ * - `sem_resposta`: ninguém da equipa respondeu ainda. Conta desde a abertura.
+ * - `a_decorrer`: já houve resposta; o tempo mostrado é o da última mensagem.
+ * - `fechado`: resolvido ou fechado — a espera deixou de contar.
+ */
+export type EsperaTicket =
+  | { tipo: "sem_resposta"; horas: number; urgente: boolean }
+  | { tipo: "a_decorrer" }
+  | { tipo: "fechado" };
+
+/** A partir de quantas horas sem primeira resposta se assinala como urgente. */
+export const HORAS_URGENTE = 24;
+
+export function esperaDoTicket(t: TicketParaMetricas, agoraMs: number): EsperaTicket {
+  if (!ABERTOS.includes(t.status)) return { tipo: "fechado" };
+  if (horasAtePrimeiraResposta(t) !== null) return { tipo: "a_decorrer" };
+  const horas = Math.max((agoraMs - Date.parse(t.openedAt)) / HORA, 0);
+  return { tipo: "sem_resposta", horas, urgente: horas >= HORAS_URGENTE };
+}

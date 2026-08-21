@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
-import { metricasSuporte, formatarEspera } from "@/lib/supportMetrics";
+import { metricasSuporte, formatarEspera, esperaDoTicket } from "@/lib/supportMetrics";
 import { useSearchParams } from "next/navigation";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { LoadingState, ErrorState } from "@/components/ui/States";
@@ -14,7 +14,7 @@ import {
   TICKET_STATUS, statusMeta, CHANNEL_LABEL, isOpen,
   type InboxTicket, type TicketStatus, type TicketChannel, type TicketPriority,
 } from "@/services/supportInboxService";
-import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2 } from "lucide-react";
+import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2, Check } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 
@@ -187,6 +187,18 @@ export function SupportInbox() {
     } finally { setTicketAApagar(null); }
   };
 
+  /** Marca resolvido a partir da tabela, sem abrir a conversa. */
+  const resolverRapido = (t: InboxTicket) => {
+    const anterior = t.status;
+    setTickets((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "resolvido" } : x)));
+    updateInboxTicketStatus(t.id, "resolvido")
+      .then(() => toast(`${t.subject} → Resolvido`, "success"))
+      .catch(() => {
+        setTickets((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: anterior } : x)));
+        toast("Falha ao marcar como resolvido — nada foi alterado.", "error");
+      });
+  };
+
   const changeStatus = (status: TicketStatus) => {
     if (!selected) return;
     const anterior = selected.status;
@@ -287,12 +299,16 @@ export function SupportInbox() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wide text-text-muted">
+                  {/*
+                    Cinco colunas. O tempo vive dentro do Assunto e o ícone de
+                    origem dentro do De — como colunas próprias empurravam a
+                    Importância para fora do ecrã em 1280px.
+                  */}
                   <th className="px-4 py-2.5 font-medium">Assunto</th>
                   <th className="px-3 py-2.5 font-medium">De</th>
-                  <th className="px-3 py-2.5 font-medium"><span className="sr-only">Origem</span></th>
                   <th className="px-3 py-2.5 font-medium">Estado</th>
                   <th className="px-3 py-2.5 font-medium">Importância</th>
-                  <th className="px-3 py-2.5 font-medium whitespace-nowrap">Última atividade</th>
+                  <th className="px-2 py-2.5"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -300,11 +316,18 @@ export function SupportInbox() {
                   const Icon = CHANNEL_ICON[t.channel];
                   const meta = statusMeta(t.status);
                   const pri = PRIORIDADES.find((x) => x.id === t.priority);
+                  const espera = esperaDoTicket(t, Date.now());
                   return (
                     <tr
                       key={t.id}
                       onClick={() => setSelectedId(t.id)}
-                      className="border-b border-surface-border/60 last:border-0 cursor-pointer hover:bg-surface-muted transition-colors"
+                      className={cn(
+                        "group border-b border-surface-border/60 last:border-0 cursor-pointer hover:bg-surface-muted transition-colors",
+                        // Quem espera há mais de um dia sem resposta fica
+                        // marcado na própria linha — não basta estar escrito
+                        // numa coluna que se lê de passagem.
+                        espera.tipo === "sem_resposta" && espera.urgente && "bg-danger-light/30",
+                      )}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 min-w-0">
@@ -314,21 +337,31 @@ export function SupportInbox() {
                           <span className={cn("font-medium text-text-primary truncate", t.unread > 0 && "font-semibold")}>
                             {t.subject}
                           </span>
+                          <span className="ml-auto shrink-0 text-xs">
+                            {espera.tipo === "sem_resposta" ? (
+                              <span className={cn("font-medium", espera.urgente ? "text-danger" : "text-warning")}
+                                title="Ninguém da equipa respondeu ainda">
+                                sem resposta há {formatarEspera(espera.horas)}
+                              </span>
+                            ) : (
+                              <span className="text-text-muted">{timeAgo(t.lastMessageAt)}</span>
+                            )}
+                          </span>
                         </div>
-                        <p className="text-xs text-text-muted truncate mt-0.5 max-w-md">
+                        <p className="text-xs text-text-muted truncate mt-0.5">
                           {t.messages[t.messages.length - 1]?.from === "agente" ? "Tu: " : ""}
                           {t.messages[t.messages.length - 1]?.body}
                         </p>
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-text-secondary">{t.requesterName}</td>
                       <td className="px-3 py-3 whitespace-nowrap">
-                        {/* Só o ícone: o texto "Cliente"/"Técnico" repetido em
-                            todas as linhas empurrava a última coluna para fora. */}
-                        <span
-                          className="inline-flex text-text-secondary"
-                          title={`${CHANNEL_LABEL[t.channel]} · ${t.requesterType === "tecnico" ? "Técnico" : "Cliente"}`}
-                        >
-                          <Icon className="h-4 w-4" />
+                        <span className="inline-flex items-center gap-1.5 text-text-secondary">
+                          <span
+                            className="inline-flex text-text-muted"
+                            title={`${CHANNEL_LABEL[t.channel]} · ${t.requesterType === "tecnico" ? "Técnico" : "Cliente"}`}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
+                          {t.requesterName}
                         </span>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
@@ -350,7 +383,20 @@ export function SupportInbox() {
                           <span className="text-xs text-text-muted" title={pri?.label}>—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-xs text-text-muted">{timeAgo(t.lastMessageAt)}</td>
+                      <td className="px-2 py-3 whitespace-nowrap text-right">
+                        {/* Ação rápida: fechar um ticket simples sem abrir a
+                            conversa. Só aparece ao passar o rato, para não
+                            encher a tabela de botões. */}
+                        {isOpen(t.status) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resolverRapido(t); }}
+                            title="Marcar como resolvido"
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-lg text-text-muted hover:bg-success-light hover:text-success"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
