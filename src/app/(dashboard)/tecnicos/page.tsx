@@ -771,226 +771,169 @@ export default function TechniciansPage() {
       <Modal
         open={!!profileVendor}
         onClose={() => setProfileVendor(null)}
-        size="lg"
+        size="full"
         title={profileVendor?.name ?? "Técnico"}
         subtitle={profileVendor ? [profileVendor.nif && `NIF ${profileVendor.nif}`, profileVendor.phone_number, profileVendor.created_at && `registado ${formatDate(profileVendor.created_at)}`].filter(Boolean).join(" · ") : undefined}
         footer={<button onClick={() => setProfileVendor(null)} className="btn-secondary text-sm">Fechar</button>}
       >
         {profileVendor && (() => {
-          const states = docsByVendor.get(profileVendor.id);
+          const v = profileVendor;
+          const states = docsByVendor.get(v.id);
           const emFalta = missingCount(states);
-          const meus = docsOfVendor(profileVendor.id);
+          const meus = docsOfVendor(v.id);
+          const outros = meus.filter((d) => !classifyDocument(d.document_type));
+          const at = atValidationState(v);
+          const atUi = AT_STATE_UI[at];
+          const utilizador = atUser(v);
+          const morada = v.address || v.billing_address || null;
+          const nomeFiscal = v.billing_name || v.fiscal_name || null;
+          const temFaturacao = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime);
+
+          /** Rótulo curto do que falta ou está feito — o essencial de relance. */
+          const chip = (ok: boolean, texto: string) => (
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+              ok ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
+              <span className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-success" : "bg-warning")} />
+              {texto}
+            </span>
+          );
+
           return (
             <div className="space-y-5">
-              {/* Resumo do KYC */}
-              <div className={cn("rounded-xl border p-3 text-sm",
-                emFalta === 0 ? "border-success/30 bg-success-light/40 text-success" : "border-warning/30 bg-warning-light/40 text-warning")}>
-                {emFalta === 0
-                  ? "✓ Documentação completa — os três documentos obrigatórios estão aprovados."
-                  : `⚠️ Falta${emFalta === 1 ? "" : "m"} ${emFalta} de ${REQUIRED_DOCS.length} documento${emFalta === 1 ? "" : "s"} por aprovar.`}
+              {/* Estado de relance — substitui as três faixas de aviso que havia. */}
+              <div className="flex flex-wrap items-center gap-2">
+                {chip(emFalta === 0, emFalta === 0
+                  ? "Documentação completa"
+                  : `${emFalta} de ${REQUIRED_DOCS.length} documentos por aprovar`)}
+                {chip(at === "validado", at === "validado" ? "AT validada" : "AT por validar")}
+                {chip(v.can_accept_service, v.can_accept_service ? "Pode aceitar serviços" : "Não pode aceitar serviços")}
+                {docsIncompletos > 0 && (
+                  <span
+                    className="text-xs text-text-muted cursor-help"
+                    title={`O backend falhou a devolver ~${docsIncompletos} documentos. Se este técnico aparecer sem documentos, pode ser essa a razão.`}
+                  >
+                    · lista possivelmente incompleta
+                  </span>
+                )}
               </div>
 
-              {docsIncompletos > 0 && (
-                <p className="rounded-lg bg-warning-light/50 px-3 py-2 text-[11px] text-warning">
-                  Nota: o backend falhou a devolver ~{docsIncompletos} documentos. Se este técnico aparecer sem
-                  documentos, pode ser essa a razão.
-                </p>
-              )}
+              {/* Duas colunas: à esquerda o que se aprova, à direita o que se consulta. */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* ------------------------- Documentos ------------------------- */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Documentos obrigatórios</p>
+                  {REQUIRED_DOCS.map((req) => {
+                    const st = states?.[req.key] ?? "em_falta";
+                    const ui = DOC_STATE_UI[st];
+                    const doc = meus.find((d) => classifyDocument(d.document_type) === req.key);
+                    return (
+                      <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary">{req.label}</p>
+                          <p className={cn("text-xs", ui.tone)}>
+                            {ui.symbol} {ui.label}
+                            {doc?.created_at && st !== "em_falta" && ` · ${formatDate(doc.created_at)}`}
+                            {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
+                            {doc?.reason && st === "recusado" && ` · ${doc.reason}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {doc?.file_url && (
+                            <button onClick={() => { setProfileVendor(null); setPreviewDoc(doc); }}
+                              className="btn-secondary text-xs py-1" title="Ver documento">
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {doc && doc.status === "pending" && (
+                            <>
+                              <button onClick={() => { setProfileVendor(null); openApprove(doc); }}
+                                className="text-xs font-medium text-success hover:underline">Aprovar</button>
+                              <button onClick={() => { setProfileVendor(null); openDecline(doc); }}
+                                className="text-xs text-danger hover:underline">Recusar</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
 
-              {/* Os três obrigatórios, com o documento entregue (se houver) */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Documentos obrigatórios</p>
-                {REQUIRED_DOCS.map((req) => {
-                  const st = states?.[req.key] ?? "em_falta";
-                  const ui = DOC_STATE_UI[st];
-                  const doc = meus.find((d) => classifyDocument(d.document_type) === req.key);
-                  return (
-                    <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
+                  {outros.length > 0 && (
+                    <details className="pt-1">
+                      <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                        Outros documentos ({outros.length})
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {outros.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2">
+                            <p className="text-sm text-text-primary truncate">{d.document_type ?? "Documento"}</p>
+                            {d.file_url && (
+                              <button onClick={() => { setProfileVendor(null); setPreviewDoc(d); }}
+                                className="btn-secondary text-xs py-1 shrink-0"><Eye className="h-3.5 w-3.5" /></button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+
+                {/* --------------------- AT + dados + faturação -------------------- */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT</p>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
                       <div className="min-w-0">
-                        <p className="font-medium text-text-primary">{req.label}</p>
-                        <p className={cn("text-xs", ui.tone)}>
-                          {ui.symbol} {ui.label}
-                          {doc?.created_at && st !== "em_falta" && ` · enviado ${formatDate(doc.created_at)}`}
-                          {doc?.reason && st === "recusado" && ` · ${doc.reason}`}
-                          {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
+                        <p className={cn("text-sm font-medium", atUi.tone)}>{atUi.symbol} {atUi.label}</p>
+                        <p className="text-xs text-text-secondary truncate"
+                          title={utilizador ? undefined : "A API devolve só at_valid e at_validated_at. Falta expor at_username no VendorController."}>
+                          {utilizador
+                            ? <><span className="font-mono text-text-primary">{utilizador}</span>
+                                {v.at_validated_at && ` · ${formatDate(v.at_validated_at)}`}</>
+                            : "Identificador não enviado pelo backend"}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {doc?.file_url && (
-                          <button onClick={() => { setProfileVendor(null); setPreviewDoc(doc); }} className="btn-secondary text-xs py-1">
-                            <Eye className="h-3.5 w-3.5" /> Ver
-                          </button>
-                        )}
-                        {doc && doc.status === "pending" && (
-                          <>
-                            <button onClick={() => { setProfileVendor(null); openApprove(doc); }} className="text-xs text-success hover:underline">Aprovar</button>
-                            <button onClick={() => { setProfileVendor(null); openDecline(doc); }} className="text-xs text-danger hover:underline">Recusar</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Outros documentos que o técnico tenha enviado */}
-              {meus.filter((d) => !classifyDocument(d.document_type)).length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Outros documentos</p>
-                  {meus.filter((d) => !classifyDocument(d.document_type)).map((d) => (
-                    <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-text-primary truncate">{d.document_type ?? "Documento"}</p>
-                        <p className="text-xs text-text-secondary">{DOC_STATE_UI[d.status === "approved" ? "aprovado" : d.status === "declined" ? "recusado" : "pendente"].label}</p>
-                      </div>
-                      {d.file_url && (
-                        <button onClick={() => { setProfileVendor(null); setPreviewDoc(d); }} className="btn-secondary text-xs py-1 shrink-0">
-                          <Eye className="h-3.5 w-3.5" /> Ver
+                      {at === "validado" ? (
+                        <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
+                          className="text-xs text-warning hover:underline disabled:opacity-50 shrink-0">Retirar</button>
+                      ) : (
+                        <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
+                          title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
+                          className="btn-primary text-xs py-1 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
+                          {atSaving ? "A gravar…" : "Validar"}
                         </button>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
 
-              {/* Subutilizador do Portal das Finanças — o acesso que permite à
-                  Piquet faturar em nome do técnico. */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT (Portal das Finanças)</p>
-                <div className="rounded-xl border border-surface-border p-3 space-y-3">
-                  {(() => {
-                    const at = atValidationState(profileVendor);
-                    const ui = AT_STATE_UI[at];
-                    const utilizador = atUser(profileVendor);
-                    return (
-                      <>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={cn("font-medium", ui.tone)}>{ui.symbol} {ui.label}</p>
-                            {utilizador ? (
-                              <p className="text-xs text-text-secondary">
-                                Subutilizador <span className="font-mono text-text-primary">{utilizador}</span>
-                                {profileVendor.at_validated_at && ` · validado ${formatDate(profileVendor.at_validated_at)}`}
-                                {profileVendor.at_validated_by && ` por ${profileVendor.at_validated_by}`}
-                              </p>
-                            ) : (
-                              /*
-                                Uma frase, não três. Antes havia o estado, um
-                                aviso sobre a falta de data e uma caixa com o
-                                contrato do backend — tudo a dizer o mesmo:
-                                não há como conferir. O detalhe técnico está
-                                no tooltip, para quem o quiser.
-                              */
-                              <p
-                                className="text-xs text-text-secondary"
-                                title="A API de admin devolve só at_valid e at_validated_at. Falta expor at_username em GET /v1/admin/vendors e criar PUT /v1/admin/vendors/{id}/at-validation."
-                              >
-                                O backend não envia o identificador — não há como conferir se está correto.
-                              </p>
-                            )}
-
-                            {/* A pergunta que interessa: dá para faturar por ele? */}
-                            {profileVendor.at_invoicing_ok != null && (
-                              <p className={cn("mt-1 text-xs font-medium", profileVendor.at_invoicing_ok ? "text-success" : "text-danger")}>
-                                {profileVendor.at_invoicing_ok
-                                  ? "✓ Dá para faturar em nome dele"
-                                  : `✗ Não dá para faturar${profileVendor.at_check_error ? ` — ${profileVendor.at_check_error}` : ""}`}
-                              </p>
-                            )}
-                          </div>
-                          <div className="shrink-0">
-                            {at === "validado" ? (
-                              <button disabled={atSaving} onClick={() => setAtValidation(profileVendor, false)}
-                                className="text-xs text-warning hover:underline disabled:opacity-50">Retirar validação</button>
-                            ) : (
-                              <button
-                                disabled={atSaving || !utilizador}
-                                onClick={() => setAtValidation(profileVendor, true)}
-                                title={utilizador
-                                  ? "Confirmar que o subutilizador está correto"
-                                  : "Sem o identificador à vista, validar seria carimbar às cegas"}
-                                className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
-                                {atSaving ? "A gravar…" : "Validar"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Dados do técnico */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-xs text-text-muted">Preço/h</p><p className="text-text-primary">{profileVendor.price_rate !== null ? formatCurrency(profileVendor.price_rate) : "—"}</p></div>
-                <div><p className="text-xs text-text-muted">Categorias</p><p className="text-text-primary">{profileVendor.operation_areas.length ? profileVendor.operation_areas.join(", ") : "—"}</p></div>
-                <div><p className="text-xs text-text-muted">Pode aceitar serviço</p><p className="text-text-primary">{profileVendor.can_accept_service ? "Sim" : "Não"}</p></div>
-                <div><p className="text-xs text-text-muted">Registado</p><p className="text-text-primary">{profileVendor.created_at ? formatDate(profileVendor.created_at) : "—"}</p></div>
-              </div>
-
-              {/* ------------------------- Faturação ------------------------- */}
-              {(() => {
-                const v = profileVendor;
-                const morada = v.address || v.billing_address || null;
-                const nomeFiscal = v.billing_name || v.fiscal_name || null;
-                const temAlgum = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime || v.withholding_tax != null);
-                return (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Dados de faturação</p>
-                    {temAlgum ? (
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs text-text-muted">Nome fiscal</p>
-                          <p className="text-text-primary">{nomeFiscal ?? v.name ?? "—"}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Dados</p>
+                    <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
+                      {[
+                        ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
+                        ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
+                        ["Nome fiscal", nomeFiscal ?? "—"],
+                        ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
+                        ["IBAN", v.iban ? `${v.iban.slice(0, 8)}••••${v.iban.slice(-4)}` : "—"],
+                        ["Regime de IVA", v.vat_regime
+                          ? `${v.vat_regime}${v.withholding_tax != null ? (v.withholding_tax ? ` · retenção ${v.withholding_rate ?? "?"}%` : " · sem retenção") : ""}`
+                          : "—"],
+                      ].map(([rotulo, valor]) => (
+                        <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
+                          <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
+                          <span className="text-sm text-text-primary text-right truncate">{valor}</span>
                         </div>
-                        <div>
-                          <p className="text-xs text-text-muted">NIF</p>
-                          <p className="text-text-primary font-mono">{v.nif ?? "—"}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-xs text-text-muted">Morada fiscal</p>
-                          <p className="text-text-primary">
-                            {[morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-text-muted">IBAN</p>
-                          {/* Sensível: no Filament só o super-admin o via. Mostra-se
-                              parcialmente — chega para conferir sem o expor inteiro. */}
-                          <p className="text-text-primary font-mono" title="Mostrado parcialmente por segurança">
-                            {v.iban ? `${v.iban.slice(0, 8)}••••${v.iban.slice(-4)}` : "—"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-text-muted">Regime de IVA</p>
-                          <p className="text-text-primary">
-                            {v.vat_regime ?? "—"}
-                            {v.withholding_tax != null && (
-                              <span className="text-text-secondary">
-                                {" · "}{v.withholding_tax ? `retenção ${v.withholding_rate ?? "?"}%` : "sem retenção"}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/25 px-3 py-2.5 text-[11px] space-y-1">
-                        <p className="font-medium text-text-primary">Sem dados de faturação</p>
-                        <p className="text-text-secondary">
-                          A API de admin devolve 12 campos por técnico e nenhum é de faturação — só o NIF{" "}
-                          (<span className="font-mono">{v.nif ?? "—"}</span>), que já aparece no topo.
-                          Não há morada fiscal, IBAN nem regime de IVA para mostrar.
-                        </p>
-                        <p className="text-text-muted">
-                          Falta no <span className="font-mono">VendorController</span>: morada + código postal,
-                          IBAN, regime de IVA/retenção e nome fiscal. Está no quadro do Rodrigo.
-                        </p>
-                      </div>
+                      ))}
+                    </div>
+                    {!temFaturacao && (
+                      /* Uma linha, não uma caixa de seis. O detalhe fica no tooltip. */
+                      <p className="text-[11px] text-text-muted cursor-help"
+                        title="A API de admin devolve 12 campos por técnico e nenhum é de faturação. Falta no VendorController: morada + código postal, IBAN, regime de IVA/retenção e nome fiscal.">
+                        Dados de faturação por enviar pelo backend — está no quadro do Rodrigo.
+                      </p>
                     )}
                   </div>
-                );
-              })()}
+                </div>
+              </div>
             </div>
           );
         })()}
