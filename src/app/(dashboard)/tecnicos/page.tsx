@@ -198,7 +198,7 @@ export default function TechniciansPage() {
   // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
   // filtrar só a página daria contas erradas — com filtro ativo carregamos a
   // lista toda de uma vez e filtramos aqui.
-  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar">("");
+  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif">("");
   const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
     () => (atFilter ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
     [atFilter, debouncedSearch]
@@ -206,6 +206,9 @@ export default function TechniciansPage() {
   const atFiltered = useMemo(() => {
     const list = allVendors?.data ?? [];
     if (!atFilter) return [];
+    // "Sem NIF" não é sobre a AT, mas usa a mesma mecânica (carregar tudo e
+    // filtrar aqui) porque a contagem tem de ser sobre a lista completa.
+    if (atFilter === "sem_nif") return list.filter((v) => !v.nif?.trim());
     return list.filter((v) => atValidationState(v) === (atFilter === "validada" ? "validado" : "por_validar"));
   }, [allVendors, atFilter]);
   const atCounts = useMemo(() => {
@@ -213,6 +216,7 @@ export default function TechniciansPage() {
     return {
       validada: list.filter((v) => atValidationState(v) === "validado").length,
       por_validar: list.filter((v) => atValidationState(v) === "por_validar").length,
+      sem_nif: list.filter((v) => !v.nif?.trim()).length,
       total: allVendors?.total ?? 0,
       carregados: list.length,
     };
@@ -680,6 +684,9 @@ export default function TechniciansPage() {
                           { id: "", label: "Todos" },
                           { id: "validada", label: "AT validada" },
                           { id: "por_validar", label: "AT por validar" },
+                          // Sem NIF não há como faturar em nome do técnico —
+                          // são registos que nunca poderão receber.
+                          { id: "sem_nif", label: "Sem NIF" },
                         ] as const).map((f) => (
                           <button key={f.id} onClick={() => setAtFilter(f.id)}
                             className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
@@ -689,7 +696,9 @@ export default function TechniciansPage() {
                             {f.label}
                             {f.id && atFilter && (
                               <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
-                                {f.id === "validada" ? atCounts.validada : atCounts.por_validar}
+                                {f.id === "validada" ? atCounts.validada
+                                  : f.id === "por_validar" ? atCounts.por_validar
+                                  : atCounts.sem_nif}
                               </span>
                             )}
                           </button>
@@ -807,6 +816,18 @@ export default function TechniciansPage() {
                   : `${emFalta} de ${REQUIRED_DOCS.length} documentos por aprovar`)}
                 {chip(at === "validado", at === "validado" ? "AT validada" : "AT por validar")}
                 {chip(v.can_accept_service, v.can_accept_service ? "Pode aceitar serviços" : "Não pode aceitar serviços")}
+                {/* Sem NIF não há fatura possível em nome dele — 168 dos 422
+                    técnicos estão assim (medido a 22/08). É bloqueio, não
+                    detalhe: por isso aparece a vermelho e não como os outros. */}
+                {!v.nif?.trim() && (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full bg-danger-light px-2.5 py-1 text-xs font-medium text-danger"
+                    title="O técnico registou-se sem NIF. Sem ele não é possível emitir fatura em nome dele."
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-danger" />
+                    Sem NIF
+                  </span>
+                )}
                 {docsIncompletos > 0 && (
                   <span
                     className="text-xs text-text-muted cursor-help"
