@@ -12,6 +12,7 @@
  */
 export const LEAD_STAGE_IDS = [
   "nao_iniciado",
+  "aguarda_resposta",
   "orcamento_enviado",
   "orcamento_aceite",
   "concluido",

@@ -114,6 +114,9 @@ const STATUS_TONE: Record<string, StatusTone> = {
   reembolsado: "warning", em_reclamacao: "warning",
   // Leads / CRM (os `id` mantêm-se; rótulos são Novo/…/Executado/Cancelado)
   nao_iniciado: "info", orcamento_aceite: "success", recusado: "danger",
+  // À espera do cliente: amarelo, como tudo o que está parado à espera de
+  // terceiros (não é problema nosso, mas também não está fechado).
+  aguarda_resposta: "warning",
   // Faturas de custos
   pendente: "warning", parcial: "info",
   // Pagamentos

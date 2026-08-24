@@ -592,6 +592,9 @@ export type LeadStage = LeadStageId;
 // dependem deles); muda só o texto.
 export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
   { id: "nao_iniciado", label: "Novo" },
+  // Já se contactou o cliente e espera-se que ele diga alguma coisa — antes
+  // disto, um pedido contactado sem resposta ficava indistinguível de um novo.
+  { id: "aguarda_resposta", label: "Aguardar resposta" },
   { id: "orcamento_enviado", label: "Orçamento enviado" },
   { id: "orcamento_aceite", label: "Aceite" },
   { id: "concluido", label: "Executado" },
