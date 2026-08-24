@@ -164,6 +164,7 @@ const LIVE_EXACT = new Set<string>([
   // Diagnóstico: que contas de anúncios o token do Google consegue ver.
   "/marketing/google-access",
   "/alerts",
+  "/alerts/snooze",
   // Fase 5 — Equipa (chat, agenda e tarefas)
   "/team/messages",
   "/team/agenda",
@@ -364,6 +365,7 @@ const REAL_DATA = new Set<string>([
   "/marketing/google-access",
   // Alertas derivados do estado real do negócio (leads, crons, tickets, KYC).
   "/alerts",
+  "/alerts/snooze",
 ]);
 
 /**

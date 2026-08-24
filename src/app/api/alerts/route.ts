@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../_lib/handler";
 import { gerarAlertas, type SinaisDoNegocio } from "@/lib/alertRules";
+import { agruparAlertas } from "@/lib/alertGroups";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 
@@ -133,15 +134,33 @@ export const GET = withStaff(async () => {
     }, 0),
   };
 
-  const alertas = gerarAlertas(sinais, agora);
+  // Resumir famílias grandes ANTES de aplicar os adiamentos: adia-se o que se
+  // vê, e o que se vê é o grupo.
+  const alertas = agruparAlertas(gerarAlertas(sinais, agora));
+
+  /**
+   * Adiamentos ativos. Falha ou tabela em falta não podem esconder alertas —
+   * na dúvida mostram-se todos, que é o lado seguro do erro.
+   */
+  const adiados = await tenta("alert_snoozes", async () => {
+    const { data } = await db.from("alert_snoozes")
+      .select("alert_id, snooze_until").gt("snooze_until", new Date(agora).toISOString()).limit(500);
+    return new Map(((data ?? []) as Array<{ alert_id: string; snooze_until: string }>)
+      .map((r) => [r.alert_id, r.snooze_until]));
+  }, new Map<string, string>());
+
+  const visiveis = alertas.filter((a) => !adiados.has(a.id));
   return apiOk({
-    data: alertas,
-    total: alertas.length,
+    data: visiveis,
+    total: visiveis.length,
     page: 1,
-    pageSize: alertas.length || 1,
+    pageSize: visiveis.length || 1,
     totalPages: 1,
     // Honestidade sobre a cobertura: se uma fonte falhou, os alertas dela não
     // aparecem, e isso tem de ser visível em vez de parecer "está tudo bem".
     fontesIndisponiveis: falhas,
+    /** Adiados: contam-se e mostram-se a pedido, não desaparecem em silêncio. */
+    adiados: alertas.filter((a) => adiados.has(a.id))
+      .map((a) => ({ ...a, snoozeUntil: adiados.get(a.id)! })),
   });
 });

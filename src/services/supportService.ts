@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { paginateArray, sortArray } from "@/lib/filters";
 import type { PaginatedResult, DashboardAlert } from "@/types";
@@ -18,6 +18,22 @@ export async function getAlerts(
     items = sortArray(items, "createdAt", "desc");
     return paginateArray(items, page, pageSize);
   }).then((r) => r.data);
+}
+
+/** Alerta adiado: o mesmo alerta mais a data em que volta a aparecer. */
+export type AlertaAdiado = DashboardAlert & { snoozeUntil: string };
+
+/**
+ * Adia um alerta até uma data. Não o resolve nem o apaga: se o motivo ainda lá
+ * estiver nessa data, volta a aparecer.
+ */
+export async function adiarAlerta(alertId: string, until: string, note = "") {
+  return apiPost("/alerts/snooze", { alertId, until, note }, () => ({ alertId, until }));
+}
+
+/** Anula o adiamento — o alerta volta a aparecer já. */
+export async function reporAlerta(alertId: string) {
+  return apiDelete(`/alerts/snooze?id=${encodeURIComponent(alertId)}`, () => ({ alertId }));
 }
 
 export async function updateAlertStatus(id: string, status: DashboardAlert["status"]) {

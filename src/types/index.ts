@@ -548,6 +548,9 @@ export interface FinanceSummary {
   /** `null` quando não há fonte de saldo bancário — não se inventa um valor. */
   currentBalance: number | null;
   projectedBalance: number | null;
+  /** Resultado do período escolhido (não normalizado) e quantos meses tem. */
+  periodResult?: number;
+  periodMonths?: number;
   /** Custos fixos: média das faturas reais e quantos meses a sustentam. */
   fixedCostsMonthly?: number;
   fixedCostsMonths?: number;
