@@ -47,6 +47,11 @@ const config: Config = {
           soft: "#272219",
           border: "#3D362A",
           muted: "#8C8477",
+          // Vermelho das bolinhas da barra lateral. Fixo de propósito: a barra
+          // é sempre escura, não segue o tema, por isso não pode usar o
+          // `danger` do tema — no claro esse tom é escurecido para se ler sobre
+          // branco e, sobre a barra preta, uma bolinha escura não se vê.
+          alert: "#D6503B",
         },
       },
       boxShadow: {

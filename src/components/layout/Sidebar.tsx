@@ -102,7 +102,7 @@ export function Sidebar() {
                 */}
                 {badge > 0 && (sidebarCollapsed ? (
                   <span
-                    className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-danger ring-2 ring-ink-deep"
+                    className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ink-alert ring-2 ring-ink-deep"
                     aria-hidden
                   />
                 ) : (
@@ -111,7 +111,7 @@ export function Sidebar() {
                     "inline-flex items-center justify-center tabular-nums",
                     // Ativo, o fundo já é dourado: o vermelho vivo por cima
                     // vibra, por isso ali usa-se o contraste do próprio item.
-                    isActive(href) ? "bg-ink text-piquet" : "bg-danger text-white",
+                    isActive(href) ? "bg-ink text-piquet" : "bg-ink-alert text-white",
                   )}>
                     {rotuloBadge(badge)}
                   </span>

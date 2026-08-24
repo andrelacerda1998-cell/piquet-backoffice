@@ -80,6 +80,40 @@ describe("tema escuro — contraste do texto", () => {
     });
 });
 
+describe("bolinhas da barra lateral", () => {
+  /**
+   * A barra lateral é sempre escura, nos dois temas. Se as bolinhas usassem o
+   * `danger` do tema, no claro ficariam com o tom escurecido (feito para se ler
+   * sobre branco) em cima de um fundo quase preto — uma bolinha de aviso que
+   * não se vê. Por isso o vermelho da barra é fixo, e este teste guarda-o.
+   */
+  const hex = (h: string): [number, number, number] =>
+    [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+
+  const config = readFileSync(join(process.cwd(), "tailwind.config.ts"), "utf8");
+  const bloco = config.slice(config.indexOf("ink: {"), config.indexOf("}", config.indexOf("ink: {")));
+  const alerta = bloco.match(/alert:\s*"(#[0-9A-Fa-f]{6})"/)?.[1];
+  const fundoBarra = bloco.match(/deep:\s*"(#[0-9A-Fa-f]{6})"/)?.[1];
+
+  it("o vermelho da barra está definido e é fixo (não é uma variável de tema)", () => {
+    expect(alerta).toBeTruthy();
+    expect(fundoBarra).toBeTruthy();
+  });
+
+  it("vê-se sobre o fundo da barra", () => {
+    expect(contraste(hex(alerta!), hex(fundoBarra!))).toBeGreaterThanOrEqual(4);
+  });
+
+  it("o número branco lê-se dentro da bolinha", () => {
+    expect(contraste([255, 255, 255], hex(alerta!))).toBeGreaterThanOrEqual(4);
+  });
+
+  it("a barra lateral não usa o `danger` do tema nas bolinhas", () => {
+    const sidebar = readFileSync(join(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
+    expect(sidebar).not.toMatch(/bg-danger/);
+  });
+});
+
 describe("branco sobre vermelho", () => {
   // O `danger` é a única semântica usada como FUNDO com texto branco por cima
   // (botão de confirmação destrutiva, contador do sino). Clareá-lo para o texto
