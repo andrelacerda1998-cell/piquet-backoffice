@@ -652,9 +652,13 @@ export async function getLeads(): Promise<Lead[]> {
 }
 
 /** Edita um pedido no CRM (PUT /api/marketing/leads/:id). Ao concluir, cria o serviço. */
-export async function updateLead(id: string, patch: LeadPatch): Promise<{ serviceId: string | null }> {
-  return apiPut<{ id: string; serviceId: string | null }>(`/marketing/leads/${id}`, patch, () => ({ id, serviceId: null }))
-    .then((r) => ({ serviceId: r.data.serviceId }));
+export async function updateLead(id: string, patch: LeadPatch): Promise<{ serviceId: string | null; aviso?: string }> {
+  // `aviso` vem preenchido quando parte do patch não pôde ser guardada (uma
+  // coluna cuja migração ainda não correu). O essencial ficou gravado, mas o
+  // ecrã tem de o dizer em vez de fingir sucesso completo.
+  return apiPut<{ id: string; serviceId: string | null; aviso?: string }>(
+    `/marketing/leads/${id}`, patch, () => ({ id, serviceId: null }),
+  ).then((r) => ({ serviceId: r.data.serviceId, aviso: r.data.aviso }));
 }
 
 /** Atalho: muda só o estado. */
