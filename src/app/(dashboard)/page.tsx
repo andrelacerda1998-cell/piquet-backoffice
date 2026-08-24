@@ -161,6 +161,10 @@ export default function OverviewPage() {
   const commissionPrevMonth = gmvData?.prevMonth.commission ?? 0;
   const gmvYear = gmvData?.year.gmv ?? 0;
   const gmvPrevYear = gmvData?.prevYearSame.gmv ?? 0;
+  // A comissão do ano vinha da API desde sempre e nunca chegou ao ecrã: via-se
+  // o GMV acumulado sem se ver quanto disso é receita da Piquet.
+  const commissionYear = gmvData?.year.commission ?? 0;
+  const commissionPrevYear = gmvData?.prevYearSame.commission ?? 0;
 
   // Downloads da App Cliente (acumulados das lojas): total e crescimento do mês.
   const dl = growth?.downloads ?? [];
@@ -282,10 +286,27 @@ export default function OverviewPage() {
               custos={custosDoMes}
             />
           </div>
-          {/* Secundárias: acumulado do ano e sinais da app. */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {/*
+            O ano em par com o mês: antes só cá estava o GMV acumulado, perdido
+            entre os downloads e a avaliação das lojas, e a comissão do ano não
+            aparecia em lado nenhum — via-se quanto passou pela plataforma sem
+            se ver quanto disso ficou para a Piquet.
+          */}
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">
+            Acumulado do ano
+            <span className="ml-2 font-normal normal-case tracking-normal text-[11px]">
+              1 de janeiro até hoje · comparado com o mesmo período do ano passado
+            </span>
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <MetricCard title="GMV do ano" format="currency" deltaLabel="vs ano ant."
-              metric={buildMetricValue(gmvYear, gmvPrevYear, false, undefined, "Acumulado do ano vs. período homólogo.")} />
+              metric={buildMetricValue(gmvYear, gmvPrevYear, false, undefined, "Tudo o que passou pela plataforma desde 1 de janeiro (Payshop cobrado + serviços concluídos).")} />
+            <MetricCard title="Comissão Piquet (ano)" format="currency" deltaLabel="vs ano ant."
+              metric={buildMetricValue(commissionYear, commissionPrevYear, false, undefined, "A parte do GMV que é receita da Piquet (25%), acumulada desde 1 de janeiro.")} />
+          </div>
+
+          {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}
+          <div className="grid grid-cols-2 gap-3">
             <MetricCard title="Downloads App Cliente" format="number" hideDelta
               metric={buildMetricValue(clienteTotal, clientePrev, false, undefined, "Instalações acumuladas da app cliente (App Store + Google Play).")} />
             <MetricCard title="Avaliação nas lojas" hideDelta
