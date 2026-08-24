@@ -37,13 +37,24 @@ export function PageHeader({ title, subtitle, icon: Icon, eyebrow, actions, clas
           {eyebrow && (
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted mb-0.5">{eyebrow}</p>
           )}
-          <h1 className="text-2xl font-bold text-text-primary leading-tight flex items-center gap-2 flex-wrap">
+          {/* No telemóvel o título desce um degrau: a 2xl, um "Serviços
+              personalizados" ocupava três linhas antes de qualquer conteúdo. */}
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight flex items-center gap-2 flex-wrap">
             {title}
           </h1>
           {subtitle && <p className="text-sm text-text-secondary mt-1 max-w-2xl">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0 flex-wrap">{actions}</div>}
+      {/*
+        As ações empilhavam-se uma por linha no telemóvel — dois botões
+        gastavam 120px de altura antes de se ver um único dado. Em linha, com
+        scroll lateral se não couberem, ficam num gesto e numa faixa.
+      */}
+      {actions && (
+        <div className="flex items-center gap-2 shrink-0 overflow-x-auto sm:flex-wrap sm:overflow-visible -mx-1 px-1 [&>*]:shrink-0">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

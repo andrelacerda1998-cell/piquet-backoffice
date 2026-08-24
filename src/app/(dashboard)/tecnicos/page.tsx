@@ -679,7 +679,7 @@ export default function TechniciansPage() {
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
                           { id: "validada", label: "AT validada" },

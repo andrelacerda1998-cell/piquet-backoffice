@@ -119,6 +119,18 @@
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-all duration-150 hover:bg-surface-muted hover:border-surface-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted;
   }
+  /*
+   * Fila de filtros/etiquetas. No telemóvel corre na horizontal em vez de
+   * quebrar: sete filtros a três linhas empurravam a lista para fora do ecrã,
+   * e um ecrã que começa com um terço de controlos não deixa ver nada.
+   * A partir de sm volta a quebrar normalmente, que é o melhor com largura.
+   */
+  .chip-row {
+    @apply flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0;
+  }
+  .chip-row > * {
+    @apply shrink-0;
+  }
   .input-field {
     @apply w-full rounded-xl border border-surface-border bg-surface px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-piquet focus:outline-none focus:ring-1 focus:ring-piquet;
   }

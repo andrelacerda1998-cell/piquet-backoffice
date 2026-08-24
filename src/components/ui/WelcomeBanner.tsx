@@ -27,11 +27,14 @@ export function WelcomeBanner() {
           Bem-vindo(a), {firstName} <span className="align-middle">👋</span>
         </h2>
         <p className="mt-1 text-sm text-text-secondary">
-          Tens visão total. Começa pela Visão geral ou usa ⌘K para saltar para qualquer módulo.
+          Tens visão total. Começa pela Visão geral
+          {/* Falar de ⌘K a quem está no telemóvel é dar uma indicação
+              impossível de seguir — não há teclado nem atalho. */}
+          <span className="hidden sm:inline"> ou usa ⌘K para saltar para qualquer módulo</span>.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <button onClick={() => setCommandOpen(true)} className="btn-primary text-sm py-1.5">
+          <button onClick={() => setCommandOpen(true)} className="btn-primary text-sm py-1.5 hidden sm:inline-flex">
             <Command className="h-4 w-4" />
             Abrir comandos (⌘K)
           </button>

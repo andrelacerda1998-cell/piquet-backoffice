@@ -32,9 +32,12 @@ function ModalInner({ onClose, title, subtitle, children, footer, size = "md" }:
 
   return (
     <div className={cn("fixed inset-0 z-[65] flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto",
-      size === "full" ? "p-3 sm:p-6 pt-[4vh]" : "p-4 pt-[8vh]")} onClick={onClose}>
+      // No telemóvel a janela encosta mais ao topo e às margens: com pt-[8vh]
+      // e p-4 sobrava pouco ecrã para o conteúdo, e formulários com vários
+      // campos ficavam a pedir scroll dentro de scroll.
+      size === "full" ? "p-2 sm:p-6 pt-[2vh] sm:pt-[4vh]" : "p-2 sm:p-4 pt-[3vh] sm:pt-[8vh]")} onClick={onClose}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className={cn("w-full card shadow-elevated", SIZES[size])} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-6 py-4 border-b border-surface-border">
+        <div className="flex items-start justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-surface-border">
           <div>
             <h2 className="text-lg font-bold text-text-primary">{title}</h2>
             {subtitle && <p className="text-sm text-text-secondary mt-0.5">{subtitle}</p>}
@@ -43,8 +46,8 @@ function ModalInner({ onClose, title, subtitle, children, footer, size = "md" }:
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-surface-border">{footer}</div>}
+        <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>
+        {footer && <div className="flex items-center justify-end gap-2 px-4 sm:px-6 py-3.5 sm:py-4 border-t border-surface-border">{footer}</div>}
       </div>
     </div>
   );

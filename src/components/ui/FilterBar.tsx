@@ -72,7 +72,9 @@ export function FilterBar({ className }: { className?: string }) {
       )}
 
       <div className="relative ml-auto" ref={ref}>
-        <div className="flex items-center gap-1.5">
+        {/* Só a partir de sm: guardar combinações de filtros é trabalho de
+            secretária, e no telemóvel roubava uma faixa inteira à lista. */}
+        <div className="hidden sm:flex items-center gap-1.5">
           <button onClick={() => setPanel(panel === "views" ? null : "views")} className="btn-secondary text-xs py-1.5" aria-haspopup="menu" aria-expanded={panel === "views"}>
             <Bookmark className="h-3.5 w-3.5" /> Vistas{savedViews.length > 0 ? ` (${savedViews.length})` : ""} <ChevronDown className="h-3 w-3" />
           </button>

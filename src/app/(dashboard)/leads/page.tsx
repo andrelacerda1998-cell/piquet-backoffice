@@ -359,7 +359,7 @@ function LeadsPageInner() {
       return (
         <div className="max-w-[300px]">
           {(catName || urgent) && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="chip-row">
               {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
               {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>}
             </div>

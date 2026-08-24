@@ -357,7 +357,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
     <div className="space-y-4">
       {/* Barra de controlo */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="chip-row">
           <button onClick={() => setPerson("Todos")}
             className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
               person === "Todos" ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
@@ -503,7 +503,7 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
     <div className="space-y-4">
       {/* Filtro por membro + nova tarefa */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="chip-row">
           <button onClick={() => setPerson("Todos")}
             className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
               person === "Todos" ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
