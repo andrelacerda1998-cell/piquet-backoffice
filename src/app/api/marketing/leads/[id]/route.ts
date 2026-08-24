@@ -142,24 +142,46 @@ export const PUT = withStaff(async (req, { params }) => {
     if (svcErr) console.error("[leads] falha ao reembolsar o serviço", lead.service_id, svcErr.message);
   }
 
-  let { error } = await admin.from("leads").update(patch).eq("id", params.id);
-  // A coluna `notes` é recente. Enquanto a migração não estiver aplicada,
-  // guarda-se tudo o resto em vez de rejeitar a edição inteira — de outra
-  // forma, acrescentar um campo partia TODAS as edições do CRM.
-  if (error && isMissingColumn(error, "notes") && "notes" in patch) {
-    const { notes: _ignorado, ...semNotas } = patch;
-    if (Object.keys(semNotas).length > 0) {
-      ({ error } = await admin.from("leads").update(semNotas).eq("id", params.id));
-    } else {
-      error = null;
-    }
-    if (!error) {
-      return apiOk({
-        id: params.id,
-        serviceId: patch.service_id ?? lead.service_id ?? null,
-        aviso: "As observações não foram guardadas: falta aplicar a migração 20260820120000_leads_notes.sql.",
-      });
-    }
+  /**
+   * Colunas acrescentadas por migrações recentes. Enquanto uma delas não
+   * existir na base de dados, guarda-se TUDO O RESTO em vez de rejeitar a
+   * edição inteira.
+   *
+   * Isto já existia, mas só para `notes` — e por isso marcar um pedido como
+   * "Recusado" rebentava por causa de `loss_note`: perdia-se a mudança de
+   * estado, que é o essencial, por causa do motivo, que é o acessório. Agora é
+   * genérico: tenta-se, e a cada coluna em falta larga-se essa e repete-se.
+   */
+  const OPCIONAIS: Array<{ coluna: string; migracao: string }> = [
+    { coluna: "notes", migracao: "20260820120000_leads_notes.sql" },
+    { coluna: "loss_reason", migracao: "20260824100000_leads_loss_reason.sql" },
+    { coluna: "loss_note", migracao: "20260824100000_leads_loss_reason.sql" },
+  ];
+
+  const porGravar = { ...patch };
+  const emFalta: string[] = [];
+  let error: { message: string } | null = null;
+
+  // No máximo uma tentativa por coluna opcional, mais a inicial — o ciclo
+  // termina sempre, mesmo que o erro devolvido seja inesperado.
+  for (let i = 0; i <= OPCIONAIS.length; i++) {
+    if (Object.keys(porGravar).length === 0) { error = null; break; }
+    ({ error } = await admin.from("leads").update(porGravar).eq("id", params.id));
+    if (!error) break;
+    const falha = OPCIONAIS.find((o) => o.coluna in porGravar && isMissingColumn(error, o.coluna));
+    if (!falha) break;
+    delete porGravar[falha.coluna];
+    emFalta.push(falha.coluna);
+  }
+
+  if (!error && emFalta.length > 0) {
+    const migracoes = [...new Set(OPCIONAIS.filter((o) => emFalta.includes(o.coluna)).map((o) => o.migracao))];
+    return apiOk({
+      id: params.id,
+      serviceId: patch.service_id ?? lead.service_id ?? null,
+      // O resto foi guardado; dizer o que ficou por guardar e como resolver.
+      aviso: `Guardado, exceto: ${emFalta.join(", ")}. Falta aplicar ${migracoes.join(" e ")}.`,
+    });
   }
   if (error) return apiErr(error.message, 400);
   return apiOk({ id: params.id, serviceId: patch.service_id ?? lead.service_id ?? null });

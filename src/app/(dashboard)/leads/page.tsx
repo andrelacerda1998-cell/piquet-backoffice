@@ -262,8 +262,11 @@ function LeadsPageInner() {
     setLeadRows((prev) => prev.map((l) => (l.id === lead.id
       ? { ...l, stage, lossReason: motivoForm.reason, lossNote: motivoForm.note.trim() } : l)));
     try {
-      await updateLead(lead.id, { stage, lossReason: motivoForm.reason, lossNote: motivoForm.note.trim() });
-      toast(`"${LEAD_STAGE_LABEL[stage]}" · ${lossReasonLabel(motivoForm.reason)}`);
+      const r = await updateLead(lead.id, { stage, lossReason: motivoForm.reason, lossNote: motivoForm.note.trim() });
+      // O estado muda na mesma se a coluna do motivo ainda não existir — mas
+      // então diz-se, em vez de dar por guardado o que não foi.
+      if (r.aviso) toast(`Estado alterado, mas o motivo não ficou guardado. ${r.aviso}`, "error");
+      else toast(`"${LEAD_STAGE_LABEL[stage]}" · ${lossReasonLabel(motivoForm.reason)}`);
       setMotivoPara(null);
       setMotivoForm({ reason: "", note: "" });
     } catch (e) {
