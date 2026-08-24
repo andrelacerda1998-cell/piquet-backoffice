@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { isLossReason } from "@/lib/leadLossReasons";
 import { isMissingColumn } from "@/lib/missingColumn";
 import { isLeadStage, LEAD_STAGE_IDS } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
@@ -21,6 +22,8 @@ const WRITABLE: Record<string, string> = {
   executionDate: "execution_date",
   rating: "rating",
   notes: "notes",
+  lossReason: "loss_reason",
+  lossNote: "loss_note",
 };
 
 interface LeadRow {
@@ -85,6 +88,9 @@ export const PUT = withStaff(async (req, { params }) => {
   if (Object.keys(patch).length === 0) return apiErr("Nada para atualizar.", 400);
   if ("stage" in patch && !isLeadStage(patch.stage)) {
     return apiErr(`Estado inválido. Usa um de: ${LEAD_STAGE_IDS.join(", ")}.`, 400);
+  }
+  if ("loss_reason" in patch && patch.loss_reason != null && !isLossReason(patch.loss_reason)) {
+    return apiErr("Motivo de perda inválido.", 400);
   }
 
   const admin = supabaseAdmin();

@@ -618,6 +618,10 @@ export interface Lead {
   message: string;
   /** Observações internas da equipa sobre o acompanhamento do pedido. */
   notes: string;
+  /** Motivo da perda (id da lista fechada) — só em recusado/reembolsado. */
+  lossReason: string;
+  /** Detalhe livre do motivo, sobretudo quando é "outro". */
+  lossNote: string;
   stage: LeadStage;
   value: number;
   createdAt: string;
@@ -638,6 +642,8 @@ export interface LeadPatch {
   technicianValue?: number | null; executionDate?: string; rating?: number | null;
   /** Observações internas — texto livre da equipa. */
   notes?: string;
+  lossReason?: string | null;
+  lossNote?: string;
 }
 
 export async function getLeads(): Promise<Lead[]> {
@@ -668,7 +674,7 @@ export async function createLead(input: NewLead): Promise<Lead> {
   const now = new Date().toISOString();
   return apiPost<Lead>("/marketing/leads", input, () => ({
     id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
-    stage: "nao_iniciado", value: 0, createdAt: now, notes: "",
+    stage: "nao_iniciado", value: 0, createdAt: now, notes: "", lossReason: "", lossNote: "",
     quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
     executionDate: "", rating: null, serviceId: null,
   })).then((r) => r.data);
