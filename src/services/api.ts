@@ -66,6 +66,28 @@ export async function currentToken(): Promise<string | null> {
   }
 }
 
+/**
+ * Sessão expirada (401): limpa token, sessão do Supabase e utilizador
+ * guardado, e volta ao login.
+ */
+async function sessaoExpirou(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const { handleSessionExpired } = await import("@/lib/sessionExpired");
+  await handleSessionExpired({
+    clearToken: clearAuthToken,
+    signOut: async () => {
+      const { SUPABASE_AUTH_ENABLED, supabaseBrowser } = await import("@/lib/supabase/client");
+      if (SUPABASE_AUTH_ENABLED) await supabaseBrowser().auth.signOut();
+    },
+    clearUser: () => {
+      // Import dinâmico: o store é de cliente e este ficheiro também corre no
+      // servidor durante a compilação.
+      void import("@/stores").then((m) => m.useAuthStore.getState().logout());
+    },
+    redirect: (to) => { window.location.href = to; },
+  });
+}
+
 /* ------------------------------- Núcleo --------------------------------- */
 
 async function mockResponse<T>(data: T): Promise<ApiResponse<T>> {
@@ -446,7 +468,10 @@ async function request<T>(endpoint: string, options: RequestOptions<T>): Promise
     params,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "include",
-    onUnauthorized: clearAuthToken,
+    // Limpar só o token deixava o utilizador guardado no browser e o guarda
+    // de rotas continuava a deixar entrar — resultado: "Sessão expirada" em
+    // ciclo, sem forma de voltar ao login. Ver src/lib/sessionExpired.ts.
+    onUnauthorized: () => { void sessaoExpirou(); },
   });
 
   // Aceita tanto `{ data, success, meta }` como um payload cru. Endpoints
