@@ -203,7 +203,7 @@ function Conversas({ base, channels, userName }: { base: ChatMessage[]; channels
                 active === c.id ? "bg-piquet/15 text-text-primary font-semibold" : "text-text-secondary hover:bg-surface-muted")}>
               <Hash className={cn("h-4 w-4", active === c.id ? "text-piquet-600" : "text-text-muted")} />
               <span className="flex-1 text-left">{c.name}</span>
-              {c.unread > 0 && <span className="min-w-5 h-5 px-1 rounded-full bg-piquet text-ink text-[10px] font-bold flex items-center justify-center">{c.unread}</span>}
+              {c.unread > 0 && <span className="min-w-5 h-5 px-1 rounded-full bg-piquet text-ink text-[11px] font-bold flex items-center justify-center">{c.unread}</span>}
             </button>
           ))}
         </div>
@@ -215,7 +215,7 @@ function Conversas({ base, channels, userName }: { base: ChatMessage[]; channels
               <button key={m.id} onClick={() => setActive(id)}
                 className={cn("w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                   active === id ? "bg-piquet/15 text-text-primary font-semibold" : "text-text-secondary hover:bg-surface-muted")}>
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[10px] font-bold">{m.initials}</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[11px] font-bold">{m.initials}</span>
                 <span className="flex-1 text-left truncate">{m.name}</span>
               </button>
             );
@@ -367,7 +367,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
             <button key={m.id} onClick={() => setPerson(m.name)}
               className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
                 person === m.name ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[9px] font-bold">{m.initials}</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[11px] font-bold">{m.initials}</span>
               {m.name.split(" ")[0]}
             </button>
           ))}
@@ -515,9 +515,9 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
               <button key={m.id} onClick={() => setPerson(m.name)}
                 className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
                   person === m.name ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[9px] font-bold">{m.initials}</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[11px] font-bold">{m.initials}</span>
                 {m.name.split(" ")[0]}
-                {openCount > 0 && <span className="text-[10px] text-text-muted">· {openCount}</span>}
+                {openCount > 0 && <span className="text-[11px] text-text-muted">· {openCount}</span>}
               </button>
             );
           })}
@@ -543,7 +543,7 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
               <p className={cn("font-medium text-text-primary leading-snug", t.status === "concluida" && "line-through text-text-muted")}>{t.title}</p>
               <div className="flex items-center justify-between text-xs pt-0.5">
                 <span className="inline-flex items-center gap-1.5 text-text-secondary">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[9px] font-bold">{initialsOf(t.assignee)}</span>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-[11px] font-bold">{initialsOf(t.assignee)}</span>
                   {t.assignee.split(" ")[0]}
                 </span>
                 <span className={cn(t.status !== "concluida" && d < 0 ? "text-danger font-medium" : "text-text-muted")}>

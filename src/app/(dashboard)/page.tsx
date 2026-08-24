@@ -62,7 +62,7 @@ function HeroKpi({
         {showDelta && (
           <span className="mt-2 inline-flex items-baseline gap-1">
             <TrendIndicator value={metric.changePercent} trend={metric.trend} />
-            <span className="text-[10px] text-text-muted">{deltaLabel}</span>
+            <span className="text-[11px] text-text-muted">{deltaLabel}</span>
           </span>
         )}
         {sparkData.length > 0 && (
@@ -247,7 +247,7 @@ export default function OverviewPage() {
                   <p className="font-semibold text-text-primary">
                     {leadsPorResponder.length} lead{leadsPorResponder.length === 1 ? "" : "s"} por responder
                     {leadsUrgentes > 0 && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger align-middle">
+                      <span className="ml-2 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger align-middle">
                         {leadsUrgentes} urgente{leadsUrgentes === 1 ? "" : "s"}
                       </span>
                     )}

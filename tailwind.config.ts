@@ -25,7 +25,12 @@ const config: Config = {
         // Semânticos quentes/terrosos do artefacto (base estático, .light troca no dark)
         success: { DEFAULT: "rgb(var(--success) / <alpha-value>)", light: "rgb(var(--success-light) / <alpha-value>)" },
         warning: { DEFAULT: "rgb(var(--warning) / <alpha-value>)", light: "rgb(var(--warning-light) / <alpha-value>)" },
-        danger: { DEFAULT: "rgb(var(--danger) / <alpha-value>)", light: "rgb(var(--danger-light) / <alpha-value>)" },
+        danger: {
+          DEFAULT: "rgb(var(--danger) / <alpha-value>)",
+          light: "rgb(var(--danger-light) / <alpha-value>)",
+          // Para texto POR CIMA de `bg-danger` — segue o tema, como o vermelho.
+          on: "rgb(var(--on-danger) / <alpha-value>)",
+        },
         info: { DEFAULT: "rgb(var(--info) / <alpha-value>)", light: "rgb(var(--info-light) / <alpha-value>)" },
         // Superfícies e texto — variáveis (claro: creme, escuro: castanho profundo)
         surface: {

@@ -59,7 +59,7 @@ export function Sidebar() {
           <Link href="/" className="flex items-center gap-1.5">
             <span className="font-bold text-lg tracking-tight text-white">Piquet</span>
             <span className="text-piquet text-xl leading-none">.</span>
-            <span className="ml-1.5 text-[10px] font-semibold tracking-[0.18em] text-ink-muted">ADMIN</span>
+            <span className="ml-1.5 text-[11px] font-semibold tracking-[0.18em] text-ink-muted">ADMIN</span>
           </Link>
         ) : (
           <Link href="/" className="mx-auto flex items-center">

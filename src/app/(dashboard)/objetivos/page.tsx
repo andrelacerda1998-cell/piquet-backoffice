@@ -42,7 +42,7 @@ function Sparkline({ series, hit }: { series: AnnualGoal["series"]; hit: boolean
         <polyline points={pts} fill="none" strokeWidth={2}
           className={cn(hit ? "stroke-success" : "stroke-piquet")} strokeLinejoin="round" strokeLinecap="round" />
       </svg>
-      <p className="text-[10px] text-text-muted">Evolução diária · {series.length} dias registados</p>
+      <p className="text-[11px] text-text-muted">Evolução diária · {series.length} dias registados</p>
     </div>
   );
 }

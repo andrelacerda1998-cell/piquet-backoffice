@@ -70,8 +70,8 @@ export function ConfirmDialog({
             onClick={confirm}
             disabled={working || (requireReason && !reason.trim())}
             className={cn(
-              "text-sm px-3 py-2 rounded-lg font-medium text-white disabled:opacity-50",
-              tone === "danger" ? "bg-danger hover:opacity-90" : "bg-piquet text-ink hover:opacity-90"
+              "text-sm px-3 py-2 rounded-lg font-medium disabled:opacity-50",
+              tone === "danger" ? "bg-danger text-danger-on hover:opacity-90" : "bg-piquet text-ink hover:opacity-90"
             )}
           >
             {working ? "A processar…" : confirmLabel}

@@ -277,7 +277,7 @@ export default function ServicesPage() {
         {tab === "desempenho" && opMetrics && (
           <div className="space-y-6">
             <DemoBadge endpoint="/services/operational-metrics" />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
               <MetricCard title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, opMetrics.avgResponseTime)} hideDelta />
               <MetricCard title="Tempo encontrar técnico" metric={buildMetricValue(opMetrics.avgTechnicianFindTime, opMetrics.avgTechnicianFindTime)} hideDelta />
               <MetricCard title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, opMetrics.completionRate)} hideDelta format="percent" />

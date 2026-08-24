@@ -206,7 +206,7 @@ export default function TaxHRPage() {
         <span className="inline-flex items-center gap-1.5">
           {formatCurrency(effectiveMonthlyCost(r, r.cost))}
           {r.monthlyCompanyCost != null && r.monthlyCompanyCost > 0 && (
-            <span title="Custo definido à mão — substitui o cálculo automático" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">manual</span>
+            <span title="Custo definido à mão — substitui o cálculo automático" className="text-[11px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">manual</span>
           )}
         </span>
       </PermissionGate>
@@ -252,7 +252,7 @@ export default function TaxHRPage() {
         {tab === "fiscal" && (
           <>
             {taxSummary && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                 <MetricCard title="Previstos (mês)" metric={buildMetricValue(taxSummary.estimatedThisMonth, taxSummary.estimatedThisMonth)} hideDelta format="currency" />
                 <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth)} hideDelta format="currency" />
                 <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending)} hideDelta format="currency" />

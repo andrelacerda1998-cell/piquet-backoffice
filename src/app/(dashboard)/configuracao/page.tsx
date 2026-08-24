@@ -464,7 +464,7 @@ function NotificacoesTab() {
       <div>
         <p className="font-medium">{r.recipient?.name ?? "—"}</p>
         {r.recipient_type && (
-          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium",
             r.recipient_type === "vendor" ? "bg-warning-light text-warning" : "bg-success-light text-success")}>
             {r.recipient_type === "vendor" ? "Técnico" : "Cliente"}
           </span>

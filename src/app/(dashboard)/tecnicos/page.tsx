@@ -421,7 +421,7 @@ export default function TechniciansPage() {
                 {sub === "resumo" && (
                   <div className="space-y-6">
                     {metrics && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                         <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
                         <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
                         <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
@@ -523,7 +523,7 @@ export default function TechniciansPage() {
                                 <span className="font-medium text-text-primary group-hover:text-piquet-700 transition-colors">
                                   {c.city}
                                   {c.district && <span className="text-text-muted font-normal"> · {c.district}</span>}
-                                  {!c.active && <span className="ml-1.5 text-[10px] rounded bg-surface-subtle px-1 py-0.5 text-text-muted">fechada a votos</span>}
+                                  {!c.active && <span className="ml-1.5 text-[11px] rounded bg-surface-subtle px-1 py-0.5 text-text-muted">fechada a votos</span>}
                                 </span>
                                 <span className="text-text-secondary tabular-nums">{c.technicians.length}</span>
                               </div>

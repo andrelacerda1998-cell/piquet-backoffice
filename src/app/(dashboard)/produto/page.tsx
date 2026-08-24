@@ -198,7 +198,11 @@ export default function ProdutoPage() {
                 <AppAdoptionCard app="App Cliente" accent="#FAB347"
                   total={dlLast?.Cliente ?? 0} novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)}
                   appStore={ratings?.cliente.appStore ?? null} googlePlay={ratings?.cliente.googlePlay ?? null} />
-                <AppAdoptionCard app="App Profissional" accent="#1C1A17"
+                {/* Era #1C1A17, quase preto: no tema escuro a série da App
+                    Profissional desaparecia contra o fundo (1,0:1 de
+                    contraste — literalmente invisível). O azul-petróleo da
+                    paleta lê-se nos dois temas. */}
+                <AppAdoptionCard app="App Profissional" accent="#3E7C8C"
                   total={dlLast?.Profissional ?? 0} novos={newProfissional} pct={growthPct(newProfissional, dlPrev?.Profissional ?? 0)}
                   appStore={ratings?.profissional.appStore ?? null} googlePlay={ratings?.profissional.googlePlay ?? null} />
               </div>
@@ -219,7 +223,7 @@ export default function ProdutoPage() {
                 data={dlMonthly}
                 bars={[
                   { key: "Cliente", color: "#FAB347", name: "App Cliente" },
-                  { key: "Profissional", color: "#1C1A17", name: "App Profissional" },
+                  { key: "Profissional", color: "#3E7C8C", name: "App Profissional" },
                 ]}
               />
             </ChartCard>
@@ -229,7 +233,7 @@ export default function ProdutoPage() {
                   data={dl}
                   lines={[
                     { key: "Cliente", color: "#FAB347", name: "App Cliente" },
-                    { key: "Profissional", color: "#1C1A17", name: "App Profissional" },
+                    { key: "Profissional", color: "#3E7C8C", name: "App Profissional" },
                   ]}
                 />
               </ChartCard>
@@ -279,7 +283,7 @@ export default function ProdutoPage() {
               ))}
             </div>
             {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                 <DemoBadge endpoint="/product/metrics" className="col-span-full" />
                 <MetricCard title="DAU" metric={buildMetricValue(metrics.dau, metrics.dau)} hideDelta />
                 <MetricCard title="MAU" metric={buildMetricValue(metrics.mau, metrics.mau)} hideDelta />

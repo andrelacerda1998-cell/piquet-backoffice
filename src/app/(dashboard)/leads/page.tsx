@@ -345,7 +345,7 @@ function LeadsPageInner() {
         {r.createdAt ? formatDate(r.createdAt) : "—"}
         {isDuplicate(r) && (
           <span title="Mesmo contacto e pedido de outra lead — possível duplicado"
-            className="inline-flex items-center rounded-full bg-warning-light px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+            className="inline-flex items-center rounded-full bg-warning-light px-1.5 py-0.5 text-[11px] font-semibold text-warning">
             dup?
           </span>
         )}
@@ -361,7 +361,7 @@ function LeadsPageInner() {
           {(catName || urgent) && (
             <div className="chip-row">
               {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
-              {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>}
+              {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger">Urgente</span>}
             </div>
           )}
           {primary
@@ -536,7 +536,7 @@ function LeadsPageInner() {
             </div>
 
             {/* Cartões de estado — clicáveis para filtrar por esse estado. */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
               {LEAD_STAGES.map((s) => {
                 const active = leadStage === s.id;
                 return (

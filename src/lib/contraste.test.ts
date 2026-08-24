@@ -53,6 +53,15 @@ describe("tema claro — contraste do texto", () => {
   });
 
   it.each([
+    ["text-secondary", "text-secondary"],
+    ["text-muted", "text-muted"],
+  ])("%s é legível também sobre a superfície mais escura", (_, nome) => {
+    // `surface-subtle` é o fundo dos blocos dentro de cartões. O `muted` dava
+    // aí 4,17:1 e é onde vivem os rótulos dos KPIs.
+    expect(contraste(token(":root", nome), token(":root", "surface-subtle"))).toBeGreaterThanOrEqual(AA);
+  });
+
+  it.each([
     ["success", "success", "success-light"],
     ["warning", "warning", "warning-light"],
     ["danger", "danger", "danger-light"],
@@ -77,6 +86,11 @@ describe("tema escuro — contraste do texto", () => {
   it.each([["success"], ["warning"], ["info"], ["piquet-600"], ["piquet-700"]])(
     "text-%s é legível sobre o fundo", (nome) => {
       expect(contraste(token(".dark", nome), fundo())).toBeGreaterThanOrEqual(AA);
+    });
+
+  it.each([["text-secondary"], ["text-muted"]])(
+    "%s é legível também sobre a superfície mais escura", (nome) => {
+      expect(contraste(token(".dark", nome), token(".dark", "surface-subtle"))).toBeGreaterThanOrEqual(AA);
     });
 });
 
@@ -114,11 +128,20 @@ describe("bolinhas da barra lateral", () => {
   });
 });
 
-describe("branco sobre vermelho", () => {
-  // O `danger` é a única semântica usada como FUNDO com texto branco por cima
-  // (botão de confirmação destrutiva, contador do sino). Clareá-lo para o texto
-  // vermelho ficar melhor estragaria estes dois — o teste guarda o equilíbrio.
+describe("texto sobre vermelho cheio", () => {
+  /**
+   * O `danger` é usado como FUNDO no botão destrutivo e no contador do sino.
+   * O texto que lhe assenta por cima segue o tema (`--on-danger`), porque o
+   * próprio vermelho segue: no claro é escuro e leva texto branco, no escuro é
+   * claro e leva texto escuro. Antes era branco fixo, e isso obrigava o
+   * vermelho do tema escuro a ficar escuro — com o texto das etiquetas a
+   * pagar a fatura, a 3,7:1.
+   */
   it.each([[":root"], [".dark"]] as const)("continua legível em %s", (bloco) => {
-    expect(contraste([255, 255, 255], token(bloco, "danger"))).toBeGreaterThanOrEqual(4);
+    expect(contraste(token(bloco, "on-danger"), token(bloco, "danger"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each([[":root"], [".dark"]] as const)("e o vermelho lê-se na sua etiqueta em %s", (bloco) => {
+    expect(contraste(token(bloco, "danger"), token(bloco, "danger-light"))).toBeGreaterThanOrEqual(4.5);
   });
 });

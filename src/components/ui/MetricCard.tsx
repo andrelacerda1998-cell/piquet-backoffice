@@ -86,7 +86,7 @@ export function MetricCard({ title, metric, format = "number", className, loadin
           {(!hideDelta && metric.changePercent !== 0) ? (
             <span className="inline-flex items-baseline gap-1">
               <TrendIndicator value={metric.changePercent} trend={metric.trend} />
-              <span className="text-[10px] text-text-muted">{deltaLabel}</span>
+              <span className="text-[11px] text-text-muted">{deltaLabel}</span>
             </span>
           ) : <span />}
           {metric.goal !== undefined && (
