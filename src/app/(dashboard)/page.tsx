@@ -7,7 +7,7 @@ import { MetricCard, TrendIndicator } from "@/components/ui/MetricCard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getFinanceGmv, getUnitEconomics } from "@/services/financeService";
+import { getFinanceGmv, getUnitEconomics, getFinanceSummary } from "@/services/financeService";
 import { getGoals, getLeads } from "@/services/extrasService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
@@ -21,7 +21,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2 } from "lucide-react";
+import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -85,9 +85,65 @@ function HeroKpi({
   );
 }
 
+/**
+ * Resultado do mês — o cartão que faltava.
+ *
+ * A Visão Geral mostrava o que ENTRA (GMV, comissão) e nunca o que SAI, por
+ * isso não respondia à única pergunta que se faz ao abrir o ecrã de manhã.
+ *
+ * Quando não há fonte de custos mostra "—" em vez de um número: sem custos, o
+ * resultado seria igual à receita e apareceria um lucro inventado.
+ */
+function ResultadoDoMes({ resultado, receita, custos }: {
+  resultado: number | null;
+  receita: number;
+  custos: number;
+}) {
+  const positivo = (resultado ?? 0) >= 0;
+  return (
+    <div className="card p-5 flex flex-col">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-text-secondary">Resultado do mês</p>
+        <span
+          title="Comissão da Piquet no mês menos os custos imputados ao mês (equipa + média das faturas de fornecedores)."
+          className="text-text-muted cursor-help text-xs"
+        >ⓘ</span>
+      </div>
+      {resultado === null ? (
+        <>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-text-muted tabular-nums">—</p>
+          <p className="mt-2 text-xs text-text-muted">
+            Sem custos registados não dá para saber.{" "}
+            <Link href="/financeiro?tab=custos" className="text-piquet-600 hover:underline">Registar custos</Link>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className={cn("mt-2 text-3xl font-bold tracking-tight tabular-nums",
+            positivo ? "text-success" : "text-danger")}>
+            {positivo ? "+" : "−"}{formatCurrency(Math.abs(resultado))}
+          </p>
+          {/* A composição em vez de uma variação: o mês vai a meio, e comparar
+              com um mês anterior completo daria uma queda que não existe. */}
+          <p className="mt-2 text-xs text-text-secondary tabular-nums">
+            {formatCurrency(receita)} de comissão − {formatCurrency(custos)} de custos
+          </p>
+          <p className="mt-auto pt-2 text-[11px] text-text-muted">
+            <Scale className="inline h-3 w-3 mr-0.5 align-[-1px]" />
+            Mês a decorrer · <Link href="/financeiro" className="hover:underline">ver detalhe</Link>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function OverviewPage() {
   const { data: gmvData, loading, error, refetch } = useAsyncData(() => getFinanceGmv(), []);
   const { data: unit } = useAsyncData(() => getUnitEconomics(), []);
+  // Resultado do mês: é a pergunta que traz um CEO a este ecrã ("ganhámos ou
+  // perdemos dinheiro?") e a resposta estava só no Financeiro.
+  const { data: fin } = useAsyncData(() => getFinanceSummary({ period: "este_mes" }), []);
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
@@ -131,6 +187,21 @@ export default function OverviewPage() {
 
   const goals = goalsData?.goals ?? [];
   const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
+
+  /**
+   * Resultado do mês = comissão da Piquet no mês − custos imputados ao mês.
+   *
+   * Os custos vêm do Financeiro (equipa real + média das faturas de
+   * fornecedores) e já vêm repartidos pelos dias decorridos, para não comparar
+   * receita de 24 dias com um mês inteiro de custos.
+   *
+   * Sem fonte de custos NÃO se mostra um número: resultado = receita daria um
+   * lucro que não existe, e é exatamente o tipo de zero que engana. Ver a
+   * política "zero em vez de ficção" em services/api.ts.
+   */
+  const custosConhecidos = (fin?.teamCosts ?? 0) > 0 || (fin?.fixedCostsMonths ?? 0) > 0;
+  const custosDoMes = (fin?.operatingCosts ?? 0) * (fin?.periodMonths ?? 0);
+  const resultadoMes = fin?.periodResult ?? null;
 
   const gmvMonthMetric = buildMetricValue(gmvMonth, gmvPrevMonth, false, undefined, "Payshop cobrado + serviços concluídos, no mês.");
   const commissionMetric = buildMetricValue(commissionMonth, commissionPrevMonth, false, undefined, "Receita da Piquet no mês.");
@@ -206,9 +277,14 @@ export default function OverviewPage() {
         <div>
           <SectionHeader title="Indicadores-chave" />
           {/* Banda herói: as duas métricas que mandam no negócio, em destaque. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             <HeroKpi title="GMV do mês" value={formatCurrency(gmvMonth)} metric={gmvMonthMetric} deltaLabel="vs mês ant." tone="brand" />
             <HeroKpi title="Comissão Piquet (mês)" value={formatCurrency(commissionMonth)} metric={commissionMetric} deltaLabel="vs mês ant." />
+            <ResultadoDoMes
+              resultado={custosConhecidos ? resultadoMes : null}
+              receita={fin?.piquetRevenue ?? 0}
+              custos={custosDoMes}
+            />
           </div>
           {/*
             O ano em par com o mês: antes só cá estava o GMV acumulado, perdido
