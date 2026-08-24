@@ -18,8 +18,15 @@ describe("normalizeLeadStage", () => {
     expect(normalizeLeadStage("perdido")).toBe("recusado");
     expect(normalizeLeadStage("convertido")).toBe("concluido");
     expect(normalizeLeadStage("novo")).toBe("nao_iniciado");
-    expect(normalizeLeadStage("contactado")).toBe("orcamento_enviado");
+    expect(normalizeLeadStage("contactado")).toBe("aguarda_resposta");
     expect(normalizeLeadStage("qualificado")).toBe("orcamento_aceite");
+  });
+
+  it("'orcamento_enviado' (estado retirado do funil) vira 'aguarda_resposta'", () => {
+    // Saiu em 22/08 por ser o mesmo que esperar pela resposta do cliente. Os
+    // pedidos que lá estavam não podem cair no fallback "Novo" — isso apagava
+    // o trabalho já feito.
+    expect(normalizeLeadStage("orcamento_enviado")).toBe("aguarda_resposta");
   });
 
   it("valor desconhecido, nulo ou vazio cai em 'nao_iniciado'", () => {
