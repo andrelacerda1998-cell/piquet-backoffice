@@ -35,6 +35,7 @@ function toLead(r: Row) {
     // Nome pode vir vazio do formulário — cai para o contacto que existir.
     name: r.name || r.phone || r.email,
     phone: r.phone || "",
+    email: r.email || "",
     source: r.source || "website",
     city: r.city || "—",
     message: r.message || "",

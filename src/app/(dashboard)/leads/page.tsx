@@ -309,15 +309,20 @@ function LeadsPageInner() {
       // Descrição livre; senão o serviço (só se a categoria não ficou preenchida, p/ não repetir).
       const primary = description || (r.categoryId ? "" : service);
       return (
-        <div className="max-w-[300px]">
+        <div className="max-w-[360px]">
           {(catName || urgent) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
               {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[10px] font-semibold text-danger">Urgente</span>}
             </div>
           )}
+          {/*
+            Três linhas em vez de uma. Com `truncate` via-se só o começo do
+            pedido — e é no pedido que está o que o cliente quer. O texto
+            completo continua no tooltip e no ecrã de edição.
+          */}
           {primary
-            ? <p className={cn("truncate text-sm text-text-secondary", (catName || urgent) && "mt-0.5")} title={r.message || undefined}>{primary}</p>
+            ? <p className={cn("text-sm text-text-secondary line-clamp-3 whitespace-pre-wrap", (catName || urgent) && "mt-0.5")} title={r.message || undefined}>{primary}</p>
             : (!catName && !urgent) && <span className="text-text-muted">—</span>}
         </div>
       );

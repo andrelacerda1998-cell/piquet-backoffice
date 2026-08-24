@@ -610,6 +610,12 @@ export interface Lead {
   id: string;
   name: string;
   phone: string;
+  /**
+   * Hoje vem sempre vazio — o formulário da landing não pede email. Fica no
+   * tipo para não se perder se algum dia passar a pedir: sem isto, o campo era
+   * guardado na base de dados e nunca chegava ao ecrã.
+   */
+  email: string;
   source: string;
   city: string;
   /** O que o cliente escreveu (formulário/WhatsApp) — não se edita. */
@@ -666,7 +672,7 @@ export async function createLead(input: NewLead): Promise<Lead> {
   const now = new Date().toISOString();
   return apiPost<Lead>("/marketing/leads", input, () => ({
     id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
-    stage: "nao_iniciado", value: 0, createdAt: now, notes: "",
+    stage: "nao_iniciado", value: 0, createdAt: now, notes: "", email: "",
     quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
     executionDate: "", rating: null, serviceId: null,
   })).then((r) => r.data);
