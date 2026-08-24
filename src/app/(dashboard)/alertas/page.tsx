@@ -45,10 +45,16 @@ function destino(a: DashboardAlert): { href: string; label: string } {
   }
 }
 
+/**
+ * Os títulos dizem o que fazer, não o "nível" do alerta. A regra por trás é
+ * quem tem a bola: o que se resolve do nosso lado pode ser urgente; o que
+ * depende de terceiros (um cliente que ainda não decidiu) é acompanhamento,
+ * por muito tempo que leve.
+ */
 const GRUPOS: Array<{ p: AlertPriority; titulo: string; nota: string }> = [
-  { p: "critica", titulo: "A precisar de atenção agora", nota: "Está parado há demasiado tempo" },
-  { p: "alta", titulo: "Para tratar hoje", nota: "" },
-  { p: "media", titulo: "Quando houver tempo", nota: "" },
+  { p: "critica", titulo: "Resolver hoje", nota: "Parado há demasiado tempo, ou com prazo legal ultrapassado" },
+  { p: "alta", titulo: "Tratar esta semana", nota: "Está à nossa espera" },
+  { p: "media", titulo: "A acompanhar", nota: "Depende de terceiros ou não bloqueia nada" },
   { p: "baixa", titulo: "Informativo", nota: "" },
 ];
 
