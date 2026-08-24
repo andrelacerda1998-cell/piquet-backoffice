@@ -39,7 +39,7 @@ export const GET = withStaff(async () => {
     orcamentosSemResposta: await tenta("leads-orcamentos", async () => {
       const { data } = await db.from("leads").select("id, name, phone, stage, created_at, quote_value").limit(500);
       return ((data ?? []) as Array<{ id: string; name: string; phone: string; stage: string; created_at: string; quote_value: number | null }>)
-        .filter((l) => normalizeLeadStage(l.stage) === "orcamento_enviado")
+        .filter((l) => normalizeLeadStage(l.stage) === "aguarda_resposta")
         .map((l) => ({
           id: l.id, nome: l.name || l.phone || "Contacto sem nome",
           enviadoDesde: l.created_at,

@@ -13,7 +13,6 @@
 export const LEAD_STAGE_IDS = [
   "nao_iniciado",
   "aguarda_resposta",
-  "orcamento_enviado",
   "orcamento_aceite",
   "concluido",
   "recusado",
@@ -25,10 +24,17 @@ export type LeadStageId = (typeof LEAD_STAGE_IDS)[number];
 /** Estados antigos de marketing, de linhas anteriores ao CRM atual. */
 export const LEAD_STAGE_LEGACY: Record<string, LeadStageId> = {
   novo: "nao_iniciado",
-  contactado: "orcamento_enviado",
+  contactado: "aguarda_resposta",
   qualificado: "orcamento_aceite",
   convertido: "concluido",
   perdido: "recusado",
+  /**
+   * "Orçamento enviado" saiu do funil (22/08) — na prática era o mesmo que
+   * estar à espera da resposta do cliente. Os pedidos que lá estavam passam a
+   * aparecer em "Aguardar resposta" em vez de caírem no fallback "Novo", que
+   * apagaria o trabalho já feito.
+   */
+  orcamento_enviado: "aguarda_resposta",
 };
 
 export function isLeadStage(v: unknown): v is LeadStageId {
