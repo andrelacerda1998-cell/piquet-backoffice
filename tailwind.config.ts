@@ -15,16 +15,18 @@ const config: Config = {
           300: "#FAC873",
           400: "#FAB347",
           500: "#E39A1C",
-          600: "#C67E0F",
-          700: "#A96C0A",
+          // Variáveis: no claro escurecem para dar contraste sobre branco; no
+          // escuro clareiam. São usados só como TEXTO (links e destaques).
+          600: "rgb(var(--piquet-600) / <alpha-value>)",
+          700: "rgb(var(--piquet-700) / <alpha-value>)",
           800: "#7E5208",
           900: "#533605",
         },
         // Semânticos quentes/terrosos do artefacto (base estático, .light troca no dark)
-        success: { DEFAULT: "#1F9D6B", light: "rgb(var(--success-light) / <alpha-value>)" },
-        warning: { DEFAULT: "#E39A1C", light: "rgb(var(--warning-light) / <alpha-value>)" },
-        danger: { DEFAULT: "#D6503B", light: "rgb(var(--danger-light) / <alpha-value>)" },
-        info: { DEFAULT: "#3E7C8C", light: "rgb(var(--info-light) / <alpha-value>)" },
+        success: { DEFAULT: "rgb(var(--success) / <alpha-value>)", light: "rgb(var(--success-light) / <alpha-value>)" },
+        warning: { DEFAULT: "rgb(var(--warning) / <alpha-value>)", light: "rgb(var(--warning-light) / <alpha-value>)" },
+        danger: { DEFAULT: "rgb(var(--danger) / <alpha-value>)", light: "rgb(var(--danger-light) / <alpha-value>)" },
+        info: { DEFAULT: "rgb(var(--info) / <alpha-value>)", light: "rgb(var(--info-light) / <alpha-value>)" },
         // Superfícies e texto — variáveis (claro: creme, escuro: castanho profundo)
         surface: {
           DEFAULT: "rgb(var(--surface) / <alpha-value>)",
@@ -45,6 +47,11 @@ const config: Config = {
           soft: "#272219",
           border: "#3D362A",
           muted: "#8C8477",
+          // Vermelho das bolinhas da barra lateral. Fixo de propósito: a barra
+          // é sempre escura, não segue o tema, por isso não pode usar o
+          // `danger` do tema — no claro esse tom é escurecido para se ler sobre
+          // branco e, sobre a barra preta, uma bolinha escura não se vê.
+          alert: "#D6503B",
         },
       },
       boxShadow: {

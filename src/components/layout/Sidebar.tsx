@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS, NAV_PRIMARY, NAV_SECONDARY } from "@/config/dashboard";
 import { useFilterStore } from "@/stores";
 import { canAccessRoute, ROLE_LABELS } from "@/lib/permissions";
+import { useNavBadges } from "@/hooks/useNavBadges";
+import { rotuloBadge } from "@/lib/navBadges";
 import { useAuthStore } from "@/stores";
 import {
   LayoutDashboard, Wrench, Euro, Landmark, Users, HardHat,
@@ -31,6 +33,8 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useFilterStore();
   const user = useAuthStore((s) => s.user);
   const [showMore, setShowMore] = useState(false);
+  // Quantos assuntos estão à espera em cada ecrã — mesma fonte dos Alertas.
+  const badges = useNavBadges();
 
   const canSee = (href: string) => (user ? canAccessRoute(user.role, href) : false);
   const isActive = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(href));
@@ -75,6 +79,7 @@ export function Sidebar() {
             const item = NAV_BY_HREF[href];
             if (!item) return null;
             const Icon = iconMap[item.icon] ?? LayoutDashboard;
+            const badge = badges[href] ?? 0;
             return (
               <Link
                 key={href}
@@ -91,6 +96,29 @@ export function Sidebar() {
               >
                 <Icon className="h-5 w-5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {/*
+                  Recolhido, o menu só tem ícones: aí a bolinha vira um ponto
+                  sobre o ícone — o número não caberia e ficaria ilegível.
+                */}
+                {badge > 0 && (sidebarCollapsed ? (
+                  <span
+                    className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ink-alert ring-2 ring-ink-deep"
+                    aria-hidden
+                  />
+                ) : (
+                  <span className={cn(
+                    "ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold",
+                    "inline-flex items-center justify-center tabular-nums",
+                    // Ativo, o fundo já é dourado: o vermelho vivo por cima
+                    // vibra, por isso ali usa-se o contraste do próprio item.
+                    isActive(href) ? "bg-ink text-piquet" : "bg-ink-alert text-white",
+                  )}>
+                    {rotuloBadge(badge)}
+                  </span>
+                ))}
+                <span className="sr-only">
+                  {badge > 0 ? `${badge} por tratar` : ""}
+                </span>
               </Link>
             );
           };

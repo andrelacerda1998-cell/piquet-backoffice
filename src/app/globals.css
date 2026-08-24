@@ -16,17 +16,46 @@
   .animate-toast-pop { animation: none; }
 }
 
-/* Tokens de cor como variáveis RGB (space-separated) para suportar tema claro/escuro */
+/* Tokens de cor como variáveis RGB (space-separated) para suportar tema claro/escuro
+ *
+ * LEGIBILIDADE: as cores semânticas e os dourados de texto eram fixos e
+ * pensados para o tema escuro. No tema claro davam contrastes abaixo do
+ * mínimo legível (WCAG AA = 4.5:1 para texto normal):
+ *
+ *   text-muted    #9A9389 sobre o fundo   2,84:1
+ *   text-warning  #E39A1C sobre a etiqueta 2,10:1   <- praticamente invisível
+ *   text-piquet-600 (links) sobre branco   3,29:1
+ *   success / danger / info                3,2–3,9:1
+ *
+ * Passaram a variáveis: o tema claro recebe tons escurecidos que cumprem AA
+ * sobre o fundo E sobre as etiquetas coloridas; o escuro recebe tons mais
+ * claros do que os de antes, onde o problema era simétrico (o dourado escuro
+ * dos links dava 3,99:1 sobre fundo escuro).
+ *
+ * Nenhuma cor de marca se perde: o #FAB347 continua a ser o dourado dos
+ * preenchimentos (bg-piquet); o que muda são os tons usados como TEXTO.
+ */
 :root {
   --surface: 255 255 255; /* #FFFFFF */
   --surface-muted: 250 247 242; /* #FAF7F2 */
   --surface-subtle: 241 236 227; /* #F1ECE3 */
-  --surface-border: 236 230 221; /* #ECE6DD */
-  --surface-strong: 222 215 203; /* #DED7CB */
+  /* Contornos: eram tão claros que a estrutura dos cartões e das tabelas
+     desaparecia em ecrãs com brilho alto. */
+  --surface-border: 224 216 202; /* #E0D8CA */
+  --surface-strong: 199 188 169; /* #C7BCA9 */
 
   --text-primary: 28 26 23; /* #1C1A17 */
-  --text-secondary: 110 103 94; /* #6E675E */
-  --text-muted: 154 147 137; /* #9A9389 */
+  --text-secondary: 110 103 94; /* #6E675E — 5,2:1 */
+  --text-muted: 118 112 101; /* #767065 — era #9A9389 (2,8:1), agora 4,6:1 */
+
+  /* Semânticas como TEXTO: cumprem AA sobre o fundo e sobre a etiqueta clara. */
+  --success: 18 112 74; /* #12704A — 5,2:1 sobre a etiqueta verde */
+  --warning: 138 94 8; /* #8A5E08 — 5,0:1 sobre a etiqueta âmbar (era 2,1:1) */
+  --danger: 179 58 41; /* #B33A29 — 4,8:1 sobre a etiqueta terracota */
+  --info: 47 95 108; /* #2F5F6C — 6,0:1 sobre a etiqueta azul */
+  /* Dourados de texto (links e destaques). O #FAB347 fica para os fundos. */
+  --piquet-600: 150 96 10; /* #96600A — 5,3:1 sobre branco */
+  --piquet-700: 126 82 8; /* #7E5208 — 6,8:1 sobre branco */
 
   --success-light: 225 241 233; /* #E1F1E9 */
   --warning-light: 251 239 214; /* #FBEFD6 */
@@ -46,6 +75,17 @@
   --text-primary: 236 231 222; /* #ECE7DE */
   --text-secondary: 180 173 161; /* #B4ADA1 */
   --text-muted: 140 132 119; /* #8C8477 */
+
+  /* No escuro o problema é simétrico: tons mais claros, não mais escuros. */
+  --success: 63 191 138; /* #3FBF8A — 6,3:1 sobre a etiqueta verde escura */
+  --warning: 240 174 59; /* #F0AE3B — 6,9:1 */
+  /* Fica como estava: é a única semântica usada como FUNDO com texto branco
+     por cima (botão de confirmação destrutiva, contador do sino). Clareá-la
+     melhoraria o texto vermelho e estragaria o branco sobre vermelho. */
+  --danger: 214 80 59; /* #D6503B */
+  --info: 111 179 196; /* #6FB3C4 — 6,2:1 (era 3,1:1) */
+  --piquet-600: 250 200 115; /* #FAC873 */
+  --piquet-700: 250 179 71; /* #FAB347 — era um dourado escuro, 4,0:1 */
 
   --success-light: 22 45 36; /* verde escuro */
   --warning-light: 58 45 20; /* âmbar escuro */
