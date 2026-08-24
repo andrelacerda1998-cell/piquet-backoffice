@@ -84,7 +84,7 @@ function LeadsPageInner() {
    * ou pelos cartões. O que fica oculto é dito por baixo da lista, para não
    * parecer que desapareceu.
    */
-  const ESTADOS_ATIVOS: LeadStage[] = ["nao_iniciado", "orcamento_enviado"];
+  const ESTADOS_ATIVOS: LeadStage[] = ["nao_iniciado", "aguarda_resposta", "orcamento_enviado"];
   const byStage = leadStage === ""
     ? baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage))
     : leadStage === "todos"
@@ -399,7 +399,7 @@ function LeadsPageInner() {
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
                 <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | "todos" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
-                  <option value="">A trabalhar (novos + orçamento enviado)</option>
+                  <option value="">A trabalhar (novos, à espera e orçamentos)</option>
                   <option value="todos">Todos os estados</option>
                   {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
