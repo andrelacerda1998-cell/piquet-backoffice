@@ -19,10 +19,24 @@ describe("contarPorRota", () => {
     expect(r["/suporte"]).toBe(1);
   });
 
-  it("ignora o que depende de terceiros — 'media' não pede ação", () => {
+  it("ignora o que está à espera da decisão do cliente", () => {
     const r = contarPorRota([a("orcamento-sem-resposta-1", "media", "lead")]);
     expect(r["/leads"]).toBeUndefined();
     expect(r["/alertas"]).toBeUndefined();
+  });
+
+  it("ignora também o grupo dos orçamentos à espera do cliente", () => {
+    const r = contarPorRota([a("grupo-orcamentos-sem-resposta", "media", "leads", "9 pedidos à espera do cliente")]);
+    expect(r["/alertas"]).toBeUndefined();
+  });
+
+  it("conta trabalho nosso mesmo em urgência média — a fila de KYC é o caso real", () => {
+    // Contava-se só crítica e alta, e a fila de documentos de técnicos é média
+    // enquanto for pequena: ficavam técnicos parados à nossa espera, sem
+    // bolinha nenhuma no menu.
+    const r = contarPorRota([a("kyc-fila", "media", "kyc", "4 documentos de técnicos por aprovar")]);
+    expect(r["/tecnicos"]).toBe(1);
+    expect(r["/alertas"]).toBe(1);
   });
 
   it("um alerta agrupado conta pelos registos que representa", () => {
@@ -34,7 +48,7 @@ describe("contarPorRota", () => {
     const r = contarPorRota([
       a("grupo-leads-sem-resposta", "critica", "leads", "8 pedidos sem resposta"),
       a("kyc-fila", "alta", "kyc"),
-      a("orcamento-1", "media", "lead"),
+      a("orcamento-sem-resposta-1", "media", "lead"),
     ]);
     expect(r["/alertas"]).toBe(9);
   });
