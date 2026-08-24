@@ -34,7 +34,21 @@ export interface SinaisDoNegocio {
   pagamentosRecusados: number;
 }
 
-/** Limiares — num sítio só, para se poderem afinar sem caçar números pelo código. */
+/**
+ * Limiares e urgências — num sítio só, para se poderem afinar sem caçar
+ * números pelo código.
+ *
+ * REGRA DE URGÊNCIA: depende de QUEM TEM A BOLA.
+ *
+ * - Bola do nosso lado (responder a uma lead, aprovar um documento, pagar uma
+ *   fatura, arranjar uma integração): pode ser alta ou crítica — está parado
+ *   por nossa causa e resolve-se agindo.
+ * - Bola do lado do cliente (esperar que decida sobre um orçamento): NUNCA
+ *   passa de média, por muito tempo que demore. Não há nada a "resolver" com
+ *   urgência; é acompanhamento, e marcá-lo a vermelho ensina a ignorar o
+ *   vermelho — que é o que estraga um ecrã de alertas.
+ * - Prazos legais (impostos): crítica sempre, porque a consequência é coima.
+ */
 export const LIMITES = {
   /** Uma lead por responder passa a alerta ao fim de 1 dia; crítica aos 3. */
   leadDiasAlerta: 1,
@@ -46,9 +60,12 @@ export const LIMITES = {
   /** A partir de 1 documento já vale a pena aparecer; sobe de urgência com a fila. */
   documentosPendentes: 1,
   documentosPendentesAlta: 10,
-  /** Orçamento enviado sem resposta do cliente. */
-  orcamentoDiasAlerta: 1,
-  orcamentoDiasCritico: 3,
+  /**
+   * À espera da decisão do cliente. Só aparece ao fim de 3 dias — antes disso
+   * é o funil a funcionar, não um problema — e fica-se por "média": insistir é
+   * boa prática, não urgência.
+   */
+  aguardaClienteDias: 3,
   /** Recolha de anúncios parada há mais de 2 dias. */
   diasSemAnuncios: 2,
 } as const;
@@ -128,20 +145,24 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
     ));
   }
 
-  // --- Orçamentos enviados sem resposta ------------------------------------
+  // --- À espera da decisão do cliente --------------------------------------
+  // Média, e só depois de 3 dias: a bola está do lado do cliente. Um orçamento
+  // à espera não é uma falha nossa — é o funil a decorrer. Marcá-lo como
+  // crítico só ensinaria a ignorar os alertas a vermelho.
+  //
   // A data disponível é a de ENTRADA do pedido (não há registo de quando o
-  // estado mudou), por isso o texto diz "desde a entrada" — impreciso mas
-  // honesto; um orçamento parado dias continua a ser apanhado.
+  // estado mudou), por isso o texto fala do pedido e não do envio — impreciso
+  // mas honesto.
   for (const o of s.orcamentosSemResposta) {
     const dias = diasEntre(o.enviadoDesde, agoraMs);
-    if (dias < LIMITES.orcamentoDiasAlerta) continue;
+    if (dias < LIMITES.aguardaClienteDias) continue;
     alertas.push(novo(
       `orcamento-sem-resposta-${o.id}`,
-      "operacional",
-      dias >= LIMITES.orcamentoDiasCritico ? "critica" : "alta",
-      `Orçamento sem resposta (pedido com ${plural(dias, "dia", "dias")})`,
-      `${o.nome}${o.valor != null ? ` · ${o.valor.toFixed(2).replace(".", ",")} €` : ""} — enviado e sem decisão do cliente.`,
-      "Ligar ao cliente ou marcar como recusado em CRM & Leads.",
+      "marketing",
+      "media",
+      `À espera do cliente há ${plural(dias, "dia", "dias")}`,
+      `${o.nome}${o.valor != null ? ` · ${o.valor.toFixed(2).replace(".", ",")} €` : ""} — sem decisão desde que o pedido entrou.`,
+      "Vale a pena insistir, ou marcar como recusado se já não houver interesse.",
       o.enviadoDesde, "lead", o.id,
     ));
   }
