@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { useAsyncData } from "@/hooks/useDashboard";
+import { LEAD_LOSS_REASONS, lossReasonLabel, pedeMotivo, contarMotivos } from "@/lib/leadLossReasons";
 import { getLeads, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_STAGES_SEM_RECEITA, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import { categoryName } from "@/lib/categories";
@@ -136,12 +137,18 @@ function LeadsPageInner() {
     };
   })();
 
+  /** Onde se perde o negócio, no período filtrado. */
+  const motivosPerda = useMemo(
+    () => contarMotivos(baseFiltered.map((l) => ({ stage: l.stage, loss_reason: l.lossReason }))),
+    [baseFiltered],
+  );
+
   /** Exporta as leads visíveis (respeita os filtros) para CSV. */
   const exportLeads = () => {
     if (filteredLeads.length === 0) { toast("Sem pedidos para exportar.", "error"); return; }
     downloadCsv(
       `crm-leads-${leadMonth || "todos"}.csv`,
-      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Observações", "Estado", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
+      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Observações", "Estado", "Motivo da perda", "Detalhe do motivo", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
       filteredLeads.map((l) => [
         l.createdAt ? formatDate(l.createdAt) : "",
         l.name, l.phone || "", l.city || "",
@@ -149,6 +156,8 @@ function LeadsPageInner() {
         (l.message || "").replace(/\n/g, " · "),
         (l.notes || "").replace(/\n/g, " · "),
         LEAD_STAGE_LABEL[l.stage] ?? l.stage,
+        lossReasonLabel(l.lossReason),
+        (l.lossNote || "").replace(/\n/g, " · "),
         l.quoteValue != null ? String(l.quoteValue) : "",
         l.technicianValue != null ? String(l.technicianValue) : "",
         l.quoteValue != null ? String(Math.round((l.quoteValue - (l.technicianValue ?? 0)) * 100) / 100) : "",
@@ -234,8 +243,44 @@ function LeadsPageInner() {
 
   // Mudança rápida de estado pela tabela. Concluir passa pelo editar (precisa de
   // técnico + valor para criar o serviço).
+  /**
+   * Perder um pedido sem dizer porquê é como não o registar: 88% das leads
+   * acabam assim e não havia como saber se o problema é o preço, a demora ou
+   * a falta de técnico. Ao marcar recusado/reembolsado pergunta-se o motivo
+   * antes de gravar.
+   */
+  const [motivoPara, setMotivoPara] = useState<{ lead: Lead; stage: LeadStage } | null>(null);
+  const [motivoForm, setMotivoForm] = useState({ reason: "", note: "" });
+  const [aGravarMotivo, setAGravarMotivo] = useState(false);
+
+  const gravarComMotivo = async () => {
+    if (!motivoPara) return;
+    if (!motivoForm.reason) { toast("Escolhe o motivo.", "error"); return; }
+    const { lead, stage } = motivoPara;
+    setAGravarMotivo(true);
+    const antes = lead.stage;
+    setLeadRows((prev) => prev.map((l) => (l.id === lead.id
+      ? { ...l, stage, lossReason: motivoForm.reason, lossNote: motivoForm.note.trim() } : l)));
+    try {
+      await updateLead(lead.id, { stage, lossReason: motivoForm.reason, lossNote: motivoForm.note.trim() });
+      toast(`"${LEAD_STAGE_LABEL[stage]}" · ${lossReasonLabel(motivoForm.reason)}`);
+      setMotivoPara(null);
+      setMotivoForm({ reason: "", note: "" });
+    } catch (e) {
+      setLeadRows((prev) => prev.map((l) => (l.id === lead.id ? { ...l, stage: antes } : l)));
+      toast(e instanceof Error ? e.message : "Não foi possível atualizar o estado.", "error");
+    } finally { setAGravarMotivo(false); }
+  };
+
   const changeStage = async (lead: Lead, stage: LeadStage) => {
     if (stage === "concluido") { openEdit(lead, "concluido"); return; }
+    if (pedeMotivo(stage)) {
+      // Reabre com o motivo anterior, se já tinha um (mudar de recusado para
+      // reembolsado não deve obrigar a reescrever tudo).
+      setMotivoForm({ reason: lead.lossReason || "", note: lead.lossNote || "" });
+      setMotivoPara({ lead, stage });
+      return;
+    }
     setLeadRows((prev) => prev.map((l) => (l.id === lead.id ? { ...l, stage } : l)));
     try {
       await updateLead(lead.id, { stage });
@@ -386,6 +431,55 @@ function LeadsPageInner() {
                 <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
               </div>
             </div>
+
+            {/*
+              Onde se perde o negócio. É a razão de existir do campo de motivo:
+              os cartões acima dizem QUANTO se perde, isto diz PORQUÊ. Só
+              aparece quando há perdas no período filtrado.
+            */}
+            {motivosPerda.length > 0 && (
+              <div className="card p-4">
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                    Porque se perderam
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    {motivosPerda.reduce((n, m) => n + m.total, 0)} pedidos perdidos no período
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  {motivosPerda.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setLeadStage(leadStage === "recusado" ? "" : "recusado")}
+                      className="w-full flex items-center gap-3 group"
+                      title="Ver os pedidos recusados"
+                    >
+                      <span className={cn("text-xs w-44 shrink-0 text-left truncate",
+                        m.id === "sem_motivo" ? "text-text-muted italic" : "text-text-secondary")}>
+                        {m.label}
+                      </span>
+                      <span className="flex-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                        <span
+                          className={cn("block h-full rounded-full transition-all",
+                            m.id === "sem_motivo" ? "bg-text-muted/30" : "bg-piquet")}
+                          style={{ width: `${m.percentagem}%` }}
+                        />
+                      </span>
+                      <span className="text-xs tabular-nums text-text-primary w-14 text-right shrink-0">
+                        {m.total} · {m.percentagem}%
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {motivosPerda.some((m) => m.id === "sem_motivo") && (
+                  <p className="mt-2.5 text-[11px] text-text-muted">
+                    Os pedidos sem motivo são de antes de este campo existir. A partir de agora, marcar
+                    como recusado pergunta porquê.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}
             <div className="card p-3 space-y-3">
@@ -601,7 +695,56 @@ function LeadsPageInner() {
           );
         })()}
       </Modal>
-        </RouteGuard>
+          <Modal
+        open={motivoPara !== null}
+        onClose={() => setMotivoPara(null)}
+        title={motivoPara ? `Marcar como ${LEAD_STAGE_LABEL[motivoPara.stage]}` : ""}
+        subtitle={motivoPara ? `${motivoPara.lead.name} · porque é que este pedido não avançou?` : undefined}
+        footer={
+          <>
+            <button onClick={() => setMotivoPara(null)} className="btn-secondary">Cancelar</button>
+            <button onClick={gravarComMotivo} disabled={aGravarMotivo || !motivoForm.reason}
+              className="btn-primary disabled:opacity-60">
+              {aGravarMotivo ? "A guardar…" : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {/*
+            Lista de botões e não um dropdown: com 8 opções vêem-se todas de
+            uma vez, e a escolha é um clique em vez de dois.
+          */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {LEAD_LOSS_REASONS.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setMotivoForm({ ...motivoForm, reason: r.id })}
+                className={cn("text-left rounded-xl border px-3 py-2 transition-colors",
+                  motivoForm.reason === r.id
+                    ? "border-piquet/40 bg-piquet/10"
+                    : "border-surface-border hover:bg-surface-muted")}
+              >
+                <p className="text-sm font-medium text-text-primary">{r.label}</p>
+                <p className="text-[11px] text-text-muted">{r.hint}</p>
+              </button>
+            ))}
+          </div>
+          <Field label={motivoForm.reason === "outro" ? "Qual foi o motivo?" : "Detalhe (opcional)"}>
+            <input
+              value={motivoForm.note}
+              onChange={(e) => setMotivoForm({ ...motivoForm, note: e.target.value })}
+              placeholder={motivoForm.reason === "preco" ? "ex.: achou caro face a um concorrente" : "ex.: o que o cliente disse"}
+              className="input-field"
+            />
+          </Field>
+          <p className="text-[11px] text-text-muted">
+            Fica só no backoffice. Serve para saber onde se perde o negócio — hoje 88% dos pedidos
+            acabam aqui e não sabemos porquê.
+          </p>
+        </div>
+      </Modal>
+    </RouteGuard>
   );
 }
 
