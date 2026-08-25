@@ -235,7 +235,7 @@ export default function RecruitmentPage() {
                               <span className="text-xs font-mono text-text-secondary w-20 shrink-0 pt-0.5">{e.start}–{e.end}</span>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm text-text-primary">{e.title}</p>
-                                <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize mt-0.5", EVENT_TONE[e.type])}>{e.type.replace("_", " ")}</span>
+                                <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium capitalize mt-0.5", EVENT_TONE[e.type])}>{e.type.replace("_", " ")}</span>
                               </div>
                             </div>
                           ))}
@@ -261,7 +261,7 @@ export default function RecruitmentPage() {
                             <span className="font-mono text-xs text-text-secondary w-24 shrink-0">{e.start}–{e.end}</span>
                             <span className="text-text-secondary w-36 shrink-0 truncate">{e.person}</span>
                             <span className="flex-1 text-text-primary truncate">{e.title}</span>
-                            <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize shrink-0", EVENT_TONE[e.type])}>{e.type.replace("_", " ")}</span>
+                            <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium capitalize shrink-0", EVENT_TONE[e.type])}>{e.type.replace("_", " ")}</span>
                           </div>
                         ))}
                       </div>

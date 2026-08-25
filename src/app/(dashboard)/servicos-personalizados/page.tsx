@@ -262,7 +262,7 @@ function RequestDrawer({ req, technicians, onClose, onSetHours, onToggleTech, on
                         <button onClick={() => onToggleTech({ id: p.technicianId } as Technician)} className="text-text-muted hover:text-danger" title="Remover"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     )}
-                    {sent && idx === cheapestIdx && <span className="text-[10px] text-info font-medium shrink-0">mais barata</span>}
+                    {sent && idx === cheapestIdx && <span className="text-[11px] text-info font-medium shrink-0">mais barata</span>}
                   </div>
                 ))}
               </div>
@@ -287,7 +287,7 @@ function RequestDrawer({ req, technicians, onClose, onSetHours, onToggleTech, on
                         className={cn("w-full flex items-center gap-3 px-1 py-2 text-left hover:bg-surface-muted rounded transition-colors disabled:opacity-40",
                           picked && "bg-piquet/5")}
                       >
-                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold", picked ? "bg-piquet text-ink" : "bg-piquet/15 text-piquet-700")}>
+                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", picked ? "bg-piquet text-ink" : "bg-piquet/15 text-piquet-700")}>
                           {picked ? <Check className="h-4 w-4" /> : t.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                         </span>
                         <span className="min-w-0 flex-1">

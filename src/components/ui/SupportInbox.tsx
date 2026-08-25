@@ -288,7 +288,7 @@ export function SupportInbox() {
             <button onClick={criarExemplos} disabled={aSemear} className="btn-secondary mt-4 text-xs disabled:opacity-60">
               {aSemear ? "A criar…" : "Criar tickets de exemplo"}
             </button>
-            <p className="mt-1.5 text-[10px] text-text-muted">Para experimentar o ecrã. Apagam-se a qualquer momento.</p>
+            <p className="mt-1.5 text-[11px] text-text-muted">Para experimentar o ecrã. Apagam-se a qualquer momento.</p>
           </div>
         ) : (
           <div className="card px-4 py-10 text-center text-sm text-text-muted">Sem tickets neste filtro.</div>
@@ -329,7 +329,14 @@ export function SupportInbox() {
                         espera.tipo === "sem_resposta" && espera.urgente && "bg-danger-light/30",
                       )}
                     >
-                      <td className="px-4 py-3">
+                      {/*
+                        `w-full max-w-0` faz esta coluna absorver o espaço que
+                        sobra e encolher quando falta. Sem isso a tabela ficava
+                        mais larga do que o ecrã já num portátil de 1280px: a
+                        coluna "Ações" caía fora e só se chegava lá arrastando
+                        na horizontal, num ecrã que tem largura de sobra.
+                      */}
+                      <td className="px-4 py-3 w-full max-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           {t.unread > 0 && (
                             <span className="h-1.5 w-1.5 rounded-full bg-danger shrink-0" title={`${t.unread} por ler`} />
@@ -440,7 +447,7 @@ export function SupportInbox() {
                 const own = m.from === "agente";
                 return (
                   <div key={m.id} className={cn("flex gap-2.5", own && "flex-row-reverse")}>
-                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
                       own ? "bg-piquet/15 text-piquet-700" : "bg-surface-strong text-text-secondary")}>
                       {initials(m.authorName)}
                     </span>

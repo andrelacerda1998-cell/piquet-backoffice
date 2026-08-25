@@ -45,14 +45,24 @@
   --surface-strong: 199 188 169; /* #C7BCA9 */
 
   --text-primary: 28 26 23; /* #1C1A17 */
-  --text-secondary: 110 103 94; /* #6E675E — 5,2:1 */
-  --text-muted: 118 112 101; /* #767065 — era #9A9389 (2,8:1), agora 4,6:1 */
+  /*
+   * Os três degraus passam a cumprir AA sobre TODAS as superfícies claras,
+   * incluindo a mais escura delas (`surface-subtle`, usada nos cartões dentro
+   * de cartões). O `muted` cumpria sobre o fundo da página e falhava aí, com
+   * 4,17:1 — e é onde vivem os rótulos dos KPIs ("722 avaliações").
+   */
+  --text-secondary: 92 86 77; /* #5C564D — 6,2:1 no pior fundo claro */
+  --text-muted: 111 106 96; /* #6F6A60 — 4,6:1 no pior fundo claro */
 
   /* Semânticas como TEXTO: cumprem AA sobre o fundo e sobre a etiqueta clara. */
   --success: 18 112 74; /* #12704A — 5,2:1 sobre a etiqueta verde */
   --warning: 138 94 8; /* #8A5E08 — 5,0:1 sobre a etiqueta âmbar (era 2,1:1) */
   --danger: 179 58 41; /* #B33A29 — 4,8:1 sobre a etiqueta terracota */
   --info: 47 95 108; /* #2F5F6C — 6,0:1 sobre a etiqueta azul */
+  /* Texto POR CIMA de um vermelho cheio (botão destrutivo, contador do sino).
+     Segue o tema porque o próprio vermelho segue: claro escuro → texto branco;
+     escuro claro → texto escuro. */
+  --on-danger: 255 255 255;
   /* Dourados de texto (links e destaques). O #FAB347 fica para os fundos. */
   --piquet-600: 150 96 10; /* #96600A — 5,3:1 sobre branco */
   --piquet-700: 126 82 8; /* #7E5208 — 6,8:1 sobre branco */
@@ -74,15 +84,22 @@
 
   --text-primary: 236 231 222; /* #ECE7DE */
   --text-secondary: 180 173 161; /* #B4ADA1 */
-  --text-muted: 140 132 119; /* #8C8477 */
+  /* Mesmo acerto do tema claro: sobre `surface-subtle` dava 4,28:1, e é aí
+     que vivem os rótulos dos KPIs ("utilizadores ativos", "nas lojas"). */
+  --text-muted: 150 142 128; /* #968E80 — 4,9:1 no pior fundo escuro */
 
   /* No escuro o problema é simétrico: tons mais claros, não mais escuros. */
   --success: 63 191 138; /* #3FBF8A — 6,3:1 sobre a etiqueta verde escura */
   --warning: 240 174 59; /* #F0AE3B — 6,9:1 */
-  /* Fica como estava: é a única semântica usada como FUNDO com texto branco
-     por cima (botão de confirmação destrutiva, contador do sino). Clareá-la
-     melhoraria o texto vermelho e estragaria o branco sobre vermelho. */
-  --danger: 214 80 59; /* #D6503B */
+  /*
+   * Clareia como as outras. Antes ficava escuro (#D6503B) por causa do texto
+   * branco que lhe assenta por cima — e o preço era o texto VERMELHO das
+   * etiquetas a 3,7:1, ou seja "Crítica" e "Cancelado" mal legíveis no tema
+   * escuro. Resolve-se nos dois sentidos: o vermelho clareia (5,1:1 nas
+   * etiquetas) e o que assenta por cima dele passa a ser texto escuro.
+   */
+  --danger: 233 112 92; /* #E9705C */
+  --on-danger: 28 26 23; /* #1C1A17 — 5,7:1 sobre o vermelho claro */
   --info: 111 179 196; /* #6FB3C4 — 6,2:1 (era 3,1:1) */
   --piquet-600: 250 200 115; /* #FAC873 */
   --piquet-700: 250 179 71; /* #FAB347 — era um dourado escuro, 4,0:1 */
@@ -118,6 +135,18 @@
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-all duration-150 hover:bg-surface-muted hover:border-surface-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted;
+  }
+  /*
+   * Fila de filtros/etiquetas. No telemóvel corre na horizontal em vez de
+   * quebrar: sete filtros a três linhas empurravam a lista para fora do ecrã,
+   * e um ecrã que começa com um terço de controlos não deixa ver nada.
+   * A partir de sm volta a quebrar normalmente, que é o melhor com largura.
+   */
+  .chip-row {
+    @apply flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0;
+  }
+  .chip-row > * {
+    @apply shrink-0;
   }
   .input-field {
     @apply w-full rounded-xl border border-surface-border bg-surface px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-piquet focus:outline-none focus:ring-1 focus:ring-piquet;

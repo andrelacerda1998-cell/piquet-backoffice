@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calculatePiquetRevenue,
+  buildMetricValue,
   calculatePiquetRevenueWithoutVat,
   calculateVatFromRevenue,
   calculateEstimatedVat,
@@ -178,5 +179,14 @@ describe("Mock data consistency", () => {
       ["aprovado", "disponivel", "ativo"].includes(t.status)
     ).length;
     expect(active).toBeLessThanOrEqual(approved);
+  });
+});
+
+describe("buildMetricValue não fabrica histórico", () => {
+  it("não devolve sparkline inventada", () => {
+    // Desenhava-se uma curva interpolada entre o valor anterior e o atual,
+    // com ruído aleatório por cima: um sobe-e-desce que nunca aconteceu, em
+    // cada cartão de KPI do backoffice.
+    expect("sparkline" in buildMetricValue(100, 80)).toBe(false);
   });
 });

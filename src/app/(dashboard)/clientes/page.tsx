@@ -274,7 +274,7 @@ export default function CustomersPage() {
                 {sub === "resumo" && (
                   <div className="space-y-6">
                     {metrics && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                         <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
                         <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
                         <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
@@ -287,7 +287,7 @@ export default function CustomersPage() {
                       <ChartCard title="Novos vs recorrentes">
                         <BarChartComponent
                           data={(trend ?? []).map((d) => ({ name: d.name, novos: d.novos as number, recorrentes: d.recorrentes as number }))}
-                          bars={[{ key: "novos", color: "#FAB347", name: "Novos" }, { key: "recorrentes", color: "#1C1A17", name: "Recorrentes" }]}
+                          bars={[{ key: "novos", color: "#FAB347", name: "Novos" }, { key: "recorrentes", color: "#3E7C8C", name: "Recorrentes" }]}
                         />
                       </ChartCard>
                       <ChartCard title="Retenção por coorte"><BarChartComponent data={retention ?? []} /></ChartCard>
@@ -338,7 +338,7 @@ export default function CustomersPage() {
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
                           { id: "pode", label: "Podem pedir serviços" },

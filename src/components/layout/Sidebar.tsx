@@ -44,15 +44,22 @@ export function Sidebar() {
     if (NAV_SECONDARY.some((h) => pathname === h || (h !== "/" && pathname.startsWith(h)))) setShowMore(true);
   }, [pathname]);
 
-  const sidebarContent = (
+  /**
+   * `colapsado` é um parâmetro e não o estado global de propósito: recolher a
+   * barra é uma opção do computador. O painel do telemóvel usava o mesmo
+   * estado e, se a barra estivesse recolhida no portátil, o menu abria no
+   * telemóvel como uma tira de ícones sem texto — inútil, e sem forma óbvia de
+   * o desfazer a partir do telemóvel.
+   */
+  const sidebarContent = (colapsado: boolean) => (
     <>
       {/* Cabeçalho / wordmark */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-ink-border">
-        {!sidebarCollapsed ? (
+        {!colapsado ? (
           <Link href="/" className="flex items-center gap-1.5">
             <span className="font-bold text-lg tracking-tight text-white">Piquet</span>
             <span className="text-piquet text-xl leading-none">.</span>
-            <span className="ml-1.5 text-[10px] font-semibold tracking-[0.18em] text-ink-muted">ADMIN</span>
+            <span className="ml-1.5 text-[11px] font-semibold tracking-[0.18em] text-ink-muted">ADMIN</span>
           </Link>
         ) : (
           <Link href="/" className="mx-auto flex items-center">
@@ -66,9 +73,9 @@ export function Sidebar() {
             else toggleSidebar();
           }}
           className="p-1.5 rounded-lg hover:bg-ink-soft text-ink-muted hover:text-white transition-colors"
-          aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+          aria-label={colapsado ? "Expandir menu" : "Recolher menu"}
         >
-          {mobileSidebarOpen ? <X className="h-5 w-5" /> : <ChevronLeft className={cn("h-5 w-5 transition-transform", sidebarCollapsed && "rotate-180")} />}
+          {mobileSidebarOpen ? <X className="h-5 w-5" /> : <ChevronLeft className={cn("h-5 w-5 transition-transform", colapsado && "rotate-180")} />}
         </button>
       </div>
 
@@ -90,17 +97,17 @@ export function Sidebar() {
                   isActive(href)
                     ? "bg-piquet text-ink font-semibold shadow-sm"
                     : "text-ink-muted hover:bg-ink-soft hover:text-white",
-                  sidebarCollapsed && "justify-center px-2"
+                  colapsado && "justify-center px-2"
                 )}
-                title={sidebarCollapsed ? item.label : undefined}
+                title={colapsado ? item.label : undefined}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {!colapsado && <span className="truncate">{item.label}</span>}
                 {/*
                   Recolhido, o menu só tem ícones: aí a bolinha vira um ponto
                   sobre o ícone — o número não caberia e ficaria ilegível.
                 */}
-                {badge > 0 && (sidebarCollapsed ? (
+                {badge > 0 && (colapsado ? (
                   <span
                     className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ink-alert ring-2 ring-ink-deep"
                     aria-hidden
@@ -127,7 +134,7 @@ export function Sidebar() {
           const secondary = NAV_SECONDARY.filter(canSee);
 
           // Recolhido (só ícones): mostra tudo em lista, sem "Mais".
-          if (sidebarCollapsed) return [...primary, ...secondary].map(renderLink);
+          if (colapsado) return [...primary, ...secondary].map(renderLink);
 
           return (
             <>
@@ -154,11 +161,11 @@ export function Sidebar() {
       {/* Rodapé / utilizador */}
       {user && (
         <div className="border-t border-ink-border p-3">
-          <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
+          <div className={cn("flex items-center gap-3", colapsado && "justify-center")}>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-piquet text-ink text-sm font-bold">
               {user.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
             </span>
-            {!sidebarCollapsed && (
+            {!colapsado && (
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">{user.name}</p>
                 <p className="truncate text-xs text-ink-muted">{ROLE_LABELS[user.role]}</p>
@@ -179,7 +186,7 @@ export function Sidebar() {
           sidebarCollapsed ? "w-[68px]" : "w-64"
         )}
       >
-        {sidebarContent}
+        {sidebarContent(sidebarCollapsed)}
       </aside>
 
       {/* Mobile overlay */}
@@ -194,7 +201,7 @@ export function Sidebar() {
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {sidebarContent}
+        {sidebarContent(false)}
       </aside>
     </>
   );

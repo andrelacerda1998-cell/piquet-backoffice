@@ -1,13 +1,22 @@
+/** Mesmo motivo do `numberFormatter`: via-se "8596,72 €" ao lado de "42 296,66 €". */
 const currencyFormatter = new Intl.NumberFormat("pt-PT", {
   style: "currency",
   currency: "EUR",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  useGrouping: true,
 });
 
+/**
+ * `useGrouping: true` é explícito de propósito. Por omissão o pt-PT agrupa a
+ * partir de cinco algarismos, e no mesmo cartão via-se "18 420" ao lado de
+ * "5240" — o mesmo tipo de número escrito de duas maneiras, o que obriga a
+ * olhar duas vezes para comparar.
+ */
 const numberFormatter = new Intl.NumberFormat("pt-PT", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
+  useGrouping: true,
 });
 
 const decimalFormatter = new Intl.NumberFormat("pt-PT", {

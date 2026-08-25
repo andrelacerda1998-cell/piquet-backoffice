@@ -45,6 +45,18 @@ export function ChartCard({ title, subtitle, children, className, action, icon: 
   );
 }
 
+/**
+ * Legenda do Recharts com o rótulo em texto legível.
+ *
+ * Por omissão, o Recharts pinta o rótulo com a cor da série: no dourado da
+ * marca sobre branco dava 1,81:1 — a legenda de um gráfico deixava de se ler
+ * precisamente no gráfico mais usado. O quadradinho de cor continua a fazer a
+ * ligação à série; as letras voltam à cor do texto.
+ */
+const rotuloLegivel = (valor: React.ReactNode) => (
+  <span className="text-sm text-text-secondary align-middle">{valor}</span>
+);
+
 function ChartTooltip({ active, payload, label, formatter }: {
   active?: boolean;
   payload?: Array<{ value: number; name: string; color: string }>;
@@ -56,9 +68,16 @@ function ChartTooltip({ active, payload, label, formatter }: {
   return (
     <div className="bg-surface border border-surface-border rounded-lg shadow-elevated p-3 text-sm">
       <p className="font-medium text-text-primary mb-1">{label}</p>
+      {/*
+        A cor da série vai para um ponto, não para as letras. O texto pintado
+        da cor da linha dava 1,8:1 no dourado da marca sobre branco — a cor
+        identifica bem uma forma cheia e identifica mal um traço fino como é
+        uma letra. É o mesmo que a legenda do gráfico circular já fazia.
+      */}
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }} className="text-text-secondary">
-          {p.name}: {fmt(p.value)}
+        <p key={i} className="flex items-center gap-1.5 text-text-secondary">
+          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.color }} />
+          {p.name}: <span className="text-text-primary font-medium">{fmt(p.value)}</span>
         </p>
       ))}
     </div>
@@ -85,7 +104,7 @@ export function LineChartComponent({ data, dataKey = "value", height = 280, curr
         <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
         <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
-        <Legend />
+        <Legend formatter={rotuloLegivel} />
         {lineConfigs.map((l) => (
           <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={false} name={l.name} />
         ))}
@@ -112,7 +131,7 @@ export function BarChartComponent({ data, dataKey = "value", height = 280, curre
         <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
         <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
-        <Legend />
+        <Legend formatter={rotuloLegivel} />
         {barConfigs.map((b) => (
           <Bar key={b.key} dataKey={b.key} fill={b.color} radius={[4, 4, 0, 0]} name={b.name} />
         ))}
@@ -261,7 +280,15 @@ export function FunnelChartComponent({ data }: {
               style={{ width: `${Math.max(10, (step.count / (data[0]?.count || 1)) * 100)}%` }}
             >
               {step.conversionRate !== undefined && (
-                <span className="text-xs font-medium text-text-primary">{step.conversionRate.toFixed(1)}%</span>
+                /*
+                  `text-ink` e não `text-text-primary`: a percentagem está POR
+                  CIMA da barra dourada, que é dourada nos dois temas. No tema
+                  escuro o texto principal é quase branco e ficava a 1,47:1
+                  sobre o dourado — o número que dá sentido ao funil era o que
+                  menos se lia. Sobre a marca, o texto é sempre escuro, tal
+                  como nos botões primários.
+                */
+                <span className="text-xs font-semibold text-ink">{step.conversionRate.toFixed(1)}%</span>
               )}
             </div>
           </div>

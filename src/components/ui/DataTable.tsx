@@ -166,7 +166,73 @@ export function DataTable<T extends object>({
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      {/*
+        Telemóvel: cada linha vira um cartão.
+
+        A tabela vivia num `overflow-x-auto`: num ecrã de 375px viam-se duas
+        das oito colunas e, para ler UMA linha, era preciso arrastar para o
+        lado várias vezes — e ao arrastar perdia-se de vista a que linha
+        pertencia o valor. Empilhado, vê-se a linha toda de uma vez.
+
+        A tabela real fica a partir de `md`, onde há mesmo largura para ela.
+      */}
+      <div className="md:hidden space-y-2">
+        {data.length === 0 ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-2 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-subtle text-text-muted">
+              <Inbox className="h-5 w-5" />
+            </span>
+            <p className="text-sm text-text-secondary">{emptyMessage}</p>
+          </div>
+        ) : (
+          data.map((row) => {
+            const key = rowKey(row);
+            const [principal, ...resto] = visibleColumns;
+            const conteudo = (col: Column<T>) =>
+              col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? "—");
+            return (
+              <div
+                key={key}
+                onClick={() => onRowClick?.(row)}
+                className={cn(
+                  "card p-3.5",
+                  onRowClick && "cursor-pointer active:bg-surface-muted transition-colors",
+                  selected.has(key) && "ring-1 ring-piquet/40",
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  {selectable && (
+                    <input
+                      type="checkbox" className="accent-piquet mt-1 shrink-0"
+                      checked={selected.has(key)}
+                      onChange={() => toggleRow(key)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Selecionar linha"
+                    />
+                  )}
+                  {/* A primeira coluna é o título do cartão: é ela que
+                      identifica a linha (data, nome, número). */}
+                  {principal && (
+                    <p className="font-semibold text-text-primary min-w-0 flex-1">{conteudo(principal)}</p>
+                  )}
+                </div>
+                {resto.length > 0 && (
+                  <dl className="mt-2 space-y-1">
+                    {resto.map((col) => (
+                      <div key={col.key} className="flex items-baseline justify-between gap-3">
+                        <dt className="text-[11px] uppercase tracking-[0.06em] text-text-muted shrink-0">{col.label}</dt>
+                        <dd className="text-sm text-text-primary text-right min-w-0">{conteudo(col)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="card overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

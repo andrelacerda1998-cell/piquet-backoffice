@@ -355,7 +355,7 @@ export default function MarketingPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {([
                         { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
-                        { app: "App Profissional", cor: "#1C1A17", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
+                        { app: "App Profissional", cor: "#3E7C8C", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
                       ]).map((x) => (
                         <div key={x.app} className="rounded-xl border border-surface-border p-3">
                           <div className="flex items-center gap-2">

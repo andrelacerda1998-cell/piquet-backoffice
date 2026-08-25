@@ -168,7 +168,7 @@ function Chat({ service }: { service: ServiceRequest }) {
         <div key={i} className={cn("flex", m.from === "cliente" ? "justify-start" : "justify-end")}>
           <div className={cn("max-w-[80%] rounded-2xl px-3 py-2 text-sm",
             m.from === "cliente" ? "bg-surface-subtle text-text-primary" : "bg-piquet/15 text-text-primary")}>
-            <p className="text-[10px] uppercase tracking-wide text-text-muted mb-0.5">{m.from}</p>
+            <p className="text-[11px] uppercase tracking-wide text-text-muted mb-0.5">{m.from}</p>
             {m.text}
           </div>
         </div>

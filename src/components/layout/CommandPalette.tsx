@@ -163,7 +163,7 @@ export function CommandPalette() {
             placeholder="Procurar módulos, serviços, clientes, técnicos, faturas…"
             className="w-full bg-transparent py-3.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
           />
-          <kbd className="hidden sm:block text-[10px] font-medium text-text-muted border border-surface-border rounded px-1.5 py-0.5">ESC</kbd>
+          <kbd className="hidden sm:block text-[11px] font-medium text-text-muted border border-surface-border rounded px-1.5 py-0.5">ESC</kbd>
         </div>
 
         <div className="max-h-80 overflow-y-auto py-2">

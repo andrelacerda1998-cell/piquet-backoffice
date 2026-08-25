@@ -28,13 +28,27 @@ const ROTA_POR_ENTIDADE: Record<string, string> = {
   imposto: "/financeiro",
 };
 
-/** Urgências que valem uma bolinha. "media" é acompanhamento, não ação. */
-const CONTAM = new Set(["critica", "alta"]);
+/**
+ * O que NÃO vale uma bolinha: o que depende de terceiros.
+ *
+ * A primeira versão contava só "crítica" e "alta". Parecia razoável e estava
+ * errada: a fila de documentos de técnicos por aprovar é "média" enquanto for
+ * pequena, e é trabalho inteiramente nosso — técnicos parados à espera de nós
+ * para poderem trabalhar. Ficavam sem bolinha nenhuma.
+ *
+ * O critério certo é o mesmo das regras dos alertas: QUEM TEM A BOLA. Conta
+ * tudo o que se resolve deste lado, seja qual for a urgência; fica de fora só
+ * o que está à espera da decisão de um cliente, onde não há nada a fazer além
+ * de esperar.
+ */
+const NAO_CONTAM = ["orcamento-sem-resposta-", "grupo-orcamentos-sem-resposta"];
+
+const contaParaBadge = (a: DashboardAlert) => !NAO_CONTAM.some((p) => a.id.startsWith(p));
 
 export function contarPorRota(alertas: DashboardAlert[]): Record<string, number> {
   const contas: Record<string, number> = {};
   for (const a of alertas) {
-    if (!CONTAM.has(a.priority)) continue;
+    if (!contaParaBadge(a)) continue;
     const rota = ROTA_POR_ENTIDADE[a.entityType ?? ""];
     if (!rota) continue;
     /**
@@ -45,7 +59,7 @@ export function contarPorRota(alertas: DashboardAlert[]): Record<string, number>
     contas[rota] = (contas[rota] ?? 0) + quantosRepresenta(a);
   }
   // Alertas: o total do que está à nossa espera, venha de onde vier.
-  const total = alertas.filter((a) => CONTAM.has(a.priority))
+  const total = alertas.filter(contaParaBadge)
     .reduce((s, a) => s + quantosRepresenta(a), 0);
   if (total > 0) contas["/alertas"] = total;
   return contas;

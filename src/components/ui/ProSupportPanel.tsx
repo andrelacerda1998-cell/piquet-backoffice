@@ -167,7 +167,7 @@ export function ProSupportPanel({ onUnreadChange }: { onUnreadChange?: (n: numbe
                   )}
                 >
                   <p className="whitespace-pre-wrap">{m.text}</p>
-                  <p className={cn("mt-1 text-[10px]", m.fromPro ? "text-text-muted" : "text-white/70")}>
+                  <p className={cn("mt-1 text-[11px]", m.fromPro ? "text-text-muted" : "text-white/70")}>
                     {m.fromPro ? selected.proName.split(" ")[0] : "Equipa Piquet"} · {formatDateTime(m.time)}
                   </p>
                 </div>

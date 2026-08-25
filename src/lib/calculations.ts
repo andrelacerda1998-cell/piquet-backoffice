@@ -234,8 +234,21 @@ export function buildMetricValue(
     previousValue,
     changePercent: calculateChangePercent(value, previousValue),
     trend: calculateMetricTrend(value, previousValue, invertTrend),
-    // Sparkline determinística que liga o mês anterior ao atual (sem flicker).
-    sparkline: trendSparkline(previousValue, value, value),
+    /*
+     * Sem sparkline.
+     *
+     * Havia uma: `trendSparkline(anterior, atual)` desenhava uma curva a
+     * interpolar entre os dois valores E somava-lhe ruído aleatório. Ou seja,
+     * o gráfico minúsculo em cada cartão de KPI era uma forma INVENTADA — não
+     * era o histórico da métrica, e o sobe-e-desce que se via ali nunca
+     * aconteceu. Num ecrã cuja regra é "zero em vez de ficção", era a única
+     * coisa que fabricava dados à vista de todos.
+     *
+     * Quem tiver uma série real continua a poder passá-la no `MetricValue`; o
+     * cartão desenha-a na mesma. O que deixa de existir é a série inventada
+     * por omissão — e, de caminho, o espaço morto que ela ocupava nos cartões
+     * onde saía uma linha reta.
+     */
     goal,
     tooltip,
   };

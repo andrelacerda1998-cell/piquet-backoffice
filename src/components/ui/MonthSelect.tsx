@@ -1,6 +1,7 @@
 "use client";
 
 import { useFilterStore } from "@/stores";
+import { getPeriodLabel } from "@/lib/formatters";
 import { TODAY } from "@/lib/today";
 import { CalendarDays } from "lucide-react";
 
@@ -50,7 +51,13 @@ export function MonthSelect() {
         className="input-field text-sm w-auto py-1.5 pr-8"
         aria-label="Selecionar mês"
       >
-        <option value="">Período atual</option>
+        {/*
+          A opção vazia diz o MESMO que o seletor da barra de topo, porque é o
+          mesmo filtro. Dizia "Período atual" enquanto a barra dizia "Últimos
+          30 dias": dois controlos lado a lado, com rótulos diferentes, a
+          descrever o mesmo estado — e ninguém sabia qual mandava.
+        */}
+        <option value="">{getPeriodLabel(filters.period === "personalizado" ? "ultimos_30_dias" : filters.period)}</option>
         {MONTHS.map((m) => (
           <option key={m.key} value={m.key}>{m.label}</option>
         ))}

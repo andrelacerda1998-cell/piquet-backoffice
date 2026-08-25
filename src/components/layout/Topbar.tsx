@@ -100,7 +100,7 @@ export function Topbar() {
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Filtros</span>
             {activeCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-piquet rounded-full text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-piquet rounded-full text-[11px] font-bold flex items-center justify-center">
                 {activeCount}
               </span>
             )}

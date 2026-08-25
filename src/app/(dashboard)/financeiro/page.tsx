@@ -349,9 +349,9 @@ export default function FinancePage() {
       <div>
         <p className="font-medium flex items-center gap-1.5">
           {r.vendor}
-          {r.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">Outlook</span>}
+          {r.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[11px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted">Outlook</span>}
           {r.recurrence !== "nenhuma" && (
-            <span title="Fatura recorrente — ao ser paga, a próxima é gerada automaticamente" className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded bg-info-light text-info">
+            <span title="Fatura recorrente — ao ser paga, a próxima é gerada automaticamente" className="inline-flex items-center gap-0.5 text-[11px] px-1 py-0.5 rounded bg-info-light text-info">
               <RefreshCw className="h-2.5 w-2.5" /> {INVOICE_RECURRENCE_LABELS[r.recurrence]}
             </span>
           )}
@@ -471,7 +471,7 @@ export default function FinancePage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate flex items-center gap-1.5">
                           {inv.vendor}
-                          {inv.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[10px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted shrink-0">Outlook</span>}
+                          {inv.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[11px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted shrink-0">Outlook</span>}
                         </p>
                         <p className="text-xs text-text-muted">
                           {inv.dueDate
@@ -482,7 +482,7 @@ export default function FinancePage() {
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
                           <p className="font-semibold text-sm">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
-                          <span className={cn("inline-block text-[10px] px-1.5 py-0.5 rounded-full capitalize", getStatusColor(inv.status))}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
+                          <span className={cn("inline-block text-[11px] px-1.5 py-0.5 rounded-full capitalize", getStatusColor(inv.status))}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
                         </div>
                         <button onClick={() => markInvoicePaid(inv)} className="text-xs text-success hover:underline whitespace-nowrap">Marcar paga</button>
                       </div>
@@ -500,8 +500,17 @@ export default function FinancePage() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
               </div>
+              {/*
+                A grelha ajusta-se ao ESPAÇO, não ao tamanho do ecrã. Eram seis
+                colunas fixas: num portátil de 1280px a área de conteúdo tem
+                ~950px, o que dava ~112px de texto por cartão para valores como
+                "42 296,66 €", que precisam de 137px — os números saíam fora da
+                caixa. Um `lg:`/`xl:` não resolvia, porque o que falta é
+                largura DENTRO da coluna e não no ecrã: a barra lateral pode
+                estar aberta ou recolhida.
+              */}
               {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                   <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
                   <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
                   <MetricCard title="Receita s/ IVA" metric={buildMetricValue(summary.piquetRevenueWithoutVat, summary.piquetRevenueWithoutVat)} hideDelta format="currency" />
@@ -721,7 +730,7 @@ export default function FinancePage() {
                                 <ChevronRight className={cn("h-3.5 w-3.5 text-text-muted transition-transform", openMonth === m.month && "rotate-90")} />
                                 {m.label}
                               </span>
-                              {i === 0 && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-piquet/15 text-piquet-700">atual</span>}
+                              {i === 0 && <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-piquet/15 text-piquet-700">atual</span>}
                             </td>
                             <td className="p-3 text-right tabular-nums">{formatCurrency(m.recurringCosts)}</td>
                             <td className="p-3 text-right tabular-nums">{m.teamCosts > 0 ? formatCurrency(m.teamCosts) : <span className="text-text-muted">—</span>}</td>
@@ -928,7 +937,7 @@ export default function FinancePage() {
                           <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{s.label}</span>
                           {r.isTest && (
                             <span title="Pagamento de teste do programador (<10 €) — fora dos totais e do GMV."
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
                               Teste
                             </span>
                           )}

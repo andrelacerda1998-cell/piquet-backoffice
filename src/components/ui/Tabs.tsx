@@ -63,7 +63,7 @@ export function Tabs({ tabs, active, onChange, className, variant = "underline" 
             {t.count !== undefined && (
               <span
                 className={cn(
-                  "ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                  "ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
                   isActive ? "bg-piquet/15 text-piquet-700" : "bg-surface-subtle text-text-secondary"
                 )}
               >
