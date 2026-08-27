@@ -687,29 +687,17 @@ function LeadsPageInner() {
         {viewing && (() => {
           const { service, urgency, urgent } = parseLeadMessage(viewing.message || "");
           const catName = categoryName(viewing.categoryId);
+          // Descrição livre do cliente (o único campo que os factos abaixo não
+          // cobrem). A mensagem inteira já aparece na conversa — não se repete.
+          const descricao = (viewing.message || "").match(/\*?\s*descri[çc][ãa]o\s*:\*?\s*([\s\S]+?)(?:\n\s*_|\n\s*\*|$)/i)?.[1]?.trim() ?? "";
           // O telefone só com dígitos (e indicativo PT quando vier local) para o
           // link do WhatsApp; o texto mostra o número tal como foi recebido.
           const digitos = (viewing.phone || "").replace(/\D/g, "");
           const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
           return (
             <div className="space-y-4">
-              {/* A mensagem, em primeiro plano: é o motivo de abrir isto. */}
-              <div className="rounded-xl border border-surface-border bg-surface-subtle p-4">
-                <div className="flex items-center gap-1.5 mb-2 text-text-muted">
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">Mensagem recebida</span>
-                  {urgent && (
-                    <span className="ml-auto inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-[11px] font-semibold text-danger">
-                      Urgente
-                    </span>
-                  )}
-                </div>
-                {(viewing.message || "").trim()
-                  ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-text-primary">{viewing.message}</p>
-                  : <p className="text-sm text-text-muted">Sem mensagem registada.</p>}
-              </div>
-
-              {/* Os factos do pedido, um golpe de vista. */}
+              {/* Os factos do pedido, um golpe de vista. A mensagem completa
+                  está na conversa abaixo — aqui só o essencial, sem repetir. */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 {(catName || service) && (
                   <div>
@@ -751,9 +739,15 @@ function LeadsPageInner() {
                 )}
               </div>
 
-              {/* A descrição livre já vai dentro da mensagem inteira acima; só se
-                  mostra aqui em separado se houver, para quem quiser o essencial
-                  sem o cabeçalho "Serviço/Urgência". */}
+              {/* Descrição livre do cliente, quando a mensagem a traz. */}
+              {descricao && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Descrição</p>
+                  <p className="whitespace-pre-wrap text-sm text-text-primary">{descricao}</p>
+                </div>
+              )}
+
+              {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (
                 <div className="rounded-xl border border-surface-border p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
