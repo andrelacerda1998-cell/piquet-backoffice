@@ -669,7 +669,7 @@ function LeadsPageInner() {
         subtitle={viewing
           ? `Recebido a ${formatDate(viewing.createdAt)} · via ${viewing.source === "whatsapp" ? "WhatsApp" : viewing.source === "landing" || viewing.source === "website" ? "landing page" : viewing.source}`
           : undefined}
-        size="lg"
+        size="full"
         footer={
           <>
             <button onClick={() => setViewing(null)} className="btn-secondary text-sm">Fechar</button>
@@ -695,9 +695,11 @@ function LeadsPageInner() {
           const digitos = (viewing.phone || "").replace(/\D/g, "");
           const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
           return (
-            <div className="space-y-4">
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-6 space-y-4 lg:space-y-0">
+              {/* Coluna esquerda: os detalhes do pedido. */}
+              <div className="space-y-4">
               {/* Os factos do pedido, um golpe de vista. A mensagem completa
-                  está na conversa abaixo — aqui só o essencial, sem repetir. */}
+                  está na conversa ao lado — aqui só o essencial, sem repetir. */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 {(catName || service) && (
                   <div>
@@ -754,10 +756,11 @@ function LeadsPageInner() {
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}
+              </div>
 
-              {/* A conversa de WhatsApp, com o campo de resposta (um só sítio
-                  para responder). O modelo genérico entra pelo botão "Inserir
-                  modelo" do composer. Só aparece quando há telefone. */}
+              {/* Coluna direita: a conversa de WhatsApp com o campo de resposta
+                  (um só sítio para responder). O modelo genérico entra pelo
+                  botão "Inserir modelo". Só aparece quando há telefone. */}
               <WhatsappConversa
                 leadId={viewing.id}
                 temTelefone={Boolean(viewing.phone)}

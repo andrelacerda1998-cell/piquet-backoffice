@@ -87,7 +87,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
       </div>
 
       {/* Histórico */}
-      <div className="max-h-72 overflow-y-auto px-3 py-3 space-y-2 bg-surface">
+      <div className="max-h-72 lg:max-h-[46vh] overflow-y-auto px-3 py-3 space-y-2 bg-surface">
         {carregando ? (
           <p className="text-sm text-text-muted text-center py-4">A carregar conversa…</p>
         ) : msgs.length === 0 ? (
@@ -130,7 +130,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && podeEnviar) { e.preventDefault(); enviar(); } }}
-          rows={3}
+          rows={4}
           placeholder="Escreve a resposta…"
           className="input-field resize-y text-sm w-full"
         />
