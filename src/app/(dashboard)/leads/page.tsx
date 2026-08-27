@@ -34,6 +34,38 @@ function parseLeadMessage(message: string): { service: string; urgency: string; 
 /** Link click-to-chat do WhatsApp a partir de um número (só dígitos). */
 const waHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
 
+/** Primeiro nome (para tratamento pessoal na resposta). */
+const primeiroNome = (nome: string) => (nome || "").trim().split(/\s+/)[0] || "";
+
+/**
+ * Mensagem genérica de resposta a uma lead, com os dados preenchidos
+ * automaticamente (nome, serviço, localização). Os campos em falta são
+ * omitidos com elegância em vez de deixarem "[Serviço]" no texto.
+ */
+function mensagemGenerica(lead: Lead): string {
+  const nome = primeiroNome(lead.name);
+  const { service } = parseLeadMessage(lead.message || "");
+  const servico = categoryName(lead.categoryId) || service || "";
+  const local = lead.city && lead.city !== "—" ? lead.city : "";
+  const saudacao = nome ? `Olá, ${nome}.` : "Olá.";
+  const pedido = servico
+    ? `o seu pedido de ${servico}${local ? ` em ${local}` : ""}`
+    : `o seu pedido${local ? ` em ${local}` : ""}`;
+  return [
+    saudacao,
+    "",
+    "Obrigado pelo seu contacto com a Piquet.",
+    "",
+    `Recebemos ${pedido} e já estamos a verificar a disponibilidade de um técnico para o ajudar.`,
+    "",
+    "Entraremos em contacto consigo assim que tivermos disponibilidade confirmada.",
+    "",
+    "Obrigado,",
+    "",
+    "Equipa Piquet",
+  ].join("\n");
+}
+
 
 /**
  * CRM de pedidos de serviço — leads da landing (piquetapp.com) e do WhatsApp.
@@ -187,6 +219,14 @@ function LeadsPageInner() {
   // escreveu estava só dentro do "Editar", uma caixa entre doze campos, e
   // ninguém a encontrava. Abrir a linha mostra-a inteira, de imediato.
   const [viewing, setViewing] = useState<Lead | null>(null);
+  // Rascunho da resposta rápida — preenchido com a mensagem genérica ao abrir
+  // uma lead, editável antes de copiar/enviar.
+  const [resposta, setResposta] = useState("");
+  useEffect(() => { setResposta(viewing ? mensagemGenerica(viewing) : ""); }, [viewing]);
+  const copiarResposta = async () => {
+    try { await navigator.clipboard.writeText(resposta); toast("Mensagem copiada."); }
+    catch { toast("Não foi possível copiar.", "error"); }
+  };
   /**
    * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
@@ -743,6 +783,29 @@ function LeadsPageInner() {
                 <div className="rounded-xl border border-surface-border p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
+                </div>
+              )}
+
+              {/* Resposta rápida: mensagem genérica já preenchida com os dados
+                  da lead. Editável; copiar ou abrir no WhatsApp com o texto. */}
+              {viewing.phone && (
+                <div className="rounded-xl border border-surface-border p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Resposta rápida</p>
+                    <button onClick={() => setResposta(mensagemGenerica(viewing))} className="text-xs text-text-muted hover:text-text-primary">Repor modelo</button>
+                  </div>
+                  <textarea value={resposta} onChange={(e) => setResposta(e.target.value)} rows={11}
+                    className="input-field w-full resize-y text-sm leading-relaxed" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={copiarResposta} className="btn-secondary text-xs py-1.5">Copiar</button>
+                    {waNumero && (
+                      <a href={`https://wa.me/${waNumero}?text=${encodeURIComponent(resposta)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="btn-primary text-xs py-1.5 inline-flex items-center gap-1.5">
+                        <MessageCircle className="h-3.5 w-3.5" /> Abrir no WhatsApp
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
 
