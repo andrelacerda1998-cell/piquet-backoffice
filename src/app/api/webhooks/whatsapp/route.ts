@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
-import { extrairDadosLead, mensagemBoasVindas } from "@/lib/leadReply";
+import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "@/lib/leadReply";
 
 /**
  * Webhook do WhatsApp Business (Meta Cloud API). Cada mensagem recebida no
@@ -99,7 +99,6 @@ export async function POST(req: Request) {
           // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens
           // do mesmo cliente enchiam o CRM com dez pedidos iguais.
           let leadId: string | null = null;
-          let leadNova = false;
           const { data: existente } = await db
             .from("leads").select("id").eq("phone", phone)
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -110,22 +109,21 @@ export async function POST(req: Request) {
               name: nome, phone, message: texto, source: "whatsapp", stage: "nao_iniciado",
             }).select("id").single();
             leadId = (nova?.id as string) ?? null;
-            leadNova = Boolean(nova?.id);
           }
 
-          // É a PRIMEIRA mensagem recebida deste contacto? A resposta
-          // automática dispara aqui, e não em "lead nova", porque o formulário
-          // da landing cria a lead pelo /api/leads ANTES de o cliente enviar no
-          // WhatsApp — a lead já existe quando a mensagem chega. O que marca o
-          // primeiro contacto é não haver ainda nenhuma entrada na conversa.
-          let primeiraEntrada = leadNova;
-          try {
-            const { count } = await db
-              .from("whatsapp_messages")
-              .select("id", { count: "exact", head: true })
-              .eq("phone", phone).eq("direction", "in");
-            primeiraEntrada = (count ?? 0) === 0;
-          } catch { /* tabela não migrada — usa o leadNova como aproximação */ }
+          // Esta mensagem já foi processada? A Meta reenvia o webhook até
+          // receber 200; a `wa_message_id` é única por mensagem, por isso serve
+          // de guarda para não responder duas vezes ao mesmo pedido.
+          let jaProcessada = false;
+          if (m.id) {
+            try {
+              const { count } = await db
+                .from("whatsapp_messages")
+                .select("id", { count: "exact", head: true })
+                .eq("wa_message_id", m.id);
+              jaProcessada = (count ?? 0) > 0;
+            } catch { /* tabela não migrada — segue como não processada */ }
+          }
 
           // A mensagem na conversa. `wa_message_id` é único: se a Meta reenviar
           // o webhook (fá-lo até receber 200), a mesma mensagem não entra duas
@@ -141,12 +139,13 @@ export async function POST(req: Request) {
             }, { onConflict: "wa_message_id", ignoreDuplicates: true });
           } catch { /* tabela ainda não migrada — a lead já entrou */ }
 
-          // Resposta automática de boas-vindas — no PRIMEIRO contacto do
-          // cliente (mesmo que a lead já existisse do /api/leads) e só se o
-          // WhatsApp estiver ligado. Como o cliente acabou de escrever, a
-          // janela de 24h está aberta: é texto livre, sem modelo pago. Uma
-          // falha de envio nunca parte o webhook.
-          if (primeiraEntrada && leadId && WHATSAPP_ENABLED) {
+          // Resposta automática de boas-vindas — só quando a mensagem é um
+          // pedido do formulário da landing (não um "olá" solto), só uma vez
+          // por mensagem (guarda `jaProcessada`) e só com o WhatsApp ligado.
+          // Como o cliente acabou de escrever, a janela de 24h está aberta: é
+          // texto livre, sem modelo pago. Uma falha de envio nunca parte o
+          // webhook.
+          if (eFormularioLanding(texto) && !jaProcessada && leadId && WHATSAPP_ENABLED) {
             try {
               const corpo = mensagemBoasVindas(extrairDadosLead(texto, nome));
               const { waMessageId } = await enviarTextoWhatsapp(phone, corpo);

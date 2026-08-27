@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { extrairDadosLead, mensagemBoasVindas } from "./leadReply";
+import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "./leadReply";
+
+const MSG_LANDING = [
+  "*Novo pedido de serviço — Site Piquet*",
+  "",
+  "*Nome:* Andre Lacerda",
+  "*Contacto:* 932429907",
+  "*Localização:* Cascais",
+  "*Serviço:* Canalização",
+  "*Urgência:* Urgente (hoje ou amanhã)",
+  "*Descrição:* teste",
+  "",
+  "_Enviado através do formulário de pedido em piquetapp.com_",
+].join("\n");
+
+describe("eFormularioLanding", () => {
+  it("reconhece a mensagem do formulário da landing", () => {
+    expect(eFormularioLanding(MSG_LANDING)).toBe(true);
+  });
+  it("ignora uma mensagem solta de WhatsApp", () => {
+    expect(eFormularioLanding("olá, preciso de um canalizador")).toBe(false);
+    expect(eFormularioLanding("Serviço: Canalização")).toBe(false); // sem marcador do formulário
+  });
+});
 
 describe("extrairDadosLead", () => {
   it("lê o formato do formulário da landing entregue por WhatsApp", () => {

@@ -34,6 +34,22 @@ export function primeiroNome(nome: string): string {
 }
 
 /**
+ * A mensagem veio do formulário de pedido da landing (piquetapp.com)?
+ * Reconhece-se pelo marcador do formulário ("Novo pedido de serviço — Site
+ * Piquet" / "piquetapp.com") mais pelo menos um campo estruturado. É o gatilho
+ * da resposta automática — um "olá" solto não a dispara.
+ */
+export function eFormularioLanding(message: string): boolean {
+  const m = (message || "").toLowerCase();
+  const temMarcador =
+    m.includes("piquetapp.com") ||
+    m.includes("novo pedido de serviço") ||
+    m.includes("novo pedido de servico");
+  const temCampo = /\*?\s*(nome|servi[çc]o)\s*:/i.test(message || "");
+  return temMarcador && temCampo;
+}
+
+/**
  * A mensagem genérica de resposta. Os campos em falta são omitidos com
  * elegância — nunca deixa "[Serviço]" ou "[Localização]" no texto.
  */
