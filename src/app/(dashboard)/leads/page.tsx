@@ -695,7 +695,7 @@ function LeadsPageInner() {
           const digitos = (viewing.phone || "").replace(/\D/g, "");
           const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
           return (
-            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-6 space-y-4 lg:space-y-0">
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-6 space-y-4 lg:space-y-0 lg:h-full">
               {/* Coluna esquerda: os detalhes do pedido. */}
               <div className="space-y-4">
               {/* Os factos do pedido, um golpe de vista. A mensagem completa

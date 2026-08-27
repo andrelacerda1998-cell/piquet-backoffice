@@ -85,14 +85,14 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
           : "Este contacto ainda não escreveu pelo WhatsApp, por isso não dá para enviar pela app. Usa o “Abrir no WhatsApp” para lhe escrever a partir do teu.";
 
   return (
-    <div className="rounded-xl border border-surface-border overflow-hidden">
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-border bg-surface-muted/50">
+    <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-border bg-surface-muted/50 shrink-0">
         <MessageCircle className="h-4 w-4 text-success" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Conversa de WhatsApp</span>
       </div>
 
-      {/* Histórico */}
-      <div className="max-h-72 lg:max-h-[46vh] overflow-y-auto px-3 py-3 space-y-2 bg-surface">
+      {/* Histórico — cresce para ocupar a altura disponível. */}
+      <div className="flex-1 min-h-[200px] overflow-y-auto px-3 py-3 space-y-2 bg-surface">
         {carregando ? (
           <p className="text-sm text-text-muted text-center py-4">A carregar conversa…</p>
         ) : msgs.length === 0 ? (
@@ -130,7 +130,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
           editável (para compor/copiar mesmo com a janela fechada); o envio
           pela app só quando dá, e há sempre o "Abrir no WhatsApp" como
           alternativa. */}
-      <div className="border-t border-surface-border p-2 bg-surface-muted/30 space-y-2">
+      <div className="border-t border-surface-border p-2 bg-surface-muted/30 space-y-2 shrink-0">
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
