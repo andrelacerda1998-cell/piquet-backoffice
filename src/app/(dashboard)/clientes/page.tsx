@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Users } from "lucide-react";
+import { Users, UserPlus } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -324,6 +324,11 @@ export default function CustomersPage() {
           eyebrow="Pessoas"
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
           subtitle={`${metrics?.registered ?? 0} clientes registados`}
+          actions={
+            <a href="/leads" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+              <UserPlus className="h-4 w-4" /> Pipeline de leads
+            </a>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />

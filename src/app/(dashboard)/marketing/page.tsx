@@ -428,7 +428,7 @@ export default function MarketingPage() {
             )}
             <SubTabs
               tabs={[
-                { id: "funil", label: "Funil" },
+                { id: "funil", label: "Funil de marketing" },
                 { id: "canais", label: "Canais" },
                 { id: "cac", label: "CAC por canal" },
                 { id: "investimento", label: "Investimento" },

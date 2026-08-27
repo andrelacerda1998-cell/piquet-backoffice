@@ -21,7 +21,7 @@ import { uploadChatImage } from "@/lib/uploadChatImage";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X, MessagesSquare } from "lucide-react";
+import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X, MessagesSquare, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
@@ -66,6 +66,11 @@ export default function TeamPage() {
           eyebrow="Equipa"
           title={<>Equipa <DemoBadge endpoint="/team/messages" /></>}
           subtitle="Conversas internas e agenda dos colaboradores"
+          actions={
+            <a href="/tarefas" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+              <ListChecks className="h-4 w-4" /> As minhas tarefas
+            </a>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />

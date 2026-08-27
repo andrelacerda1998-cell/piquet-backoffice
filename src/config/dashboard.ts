@@ -93,7 +93,7 @@ export const NAV_ITEMS = [
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
-  { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
+  { href: "/tarefas", label: "As minhas tarefas", icon: "ListChecks" },
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   // Separadores dentro dos grupos acima (consolidação 2026-07-20). Fora do
   // menu, mas acessíveis por ⌘K e por URL (deep-link ?tab=).
@@ -103,7 +103,7 @@ export const NAV_ITEMS = [
   { href: "/servicos?tab=qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
-  { href: "/chat?tab=tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
+  { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
   // Operacional próprio, ainda fora do menu.
   { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
 ] as const;
@@ -112,10 +112,13 @@ export const NAV_ITEMS = [
 // relacionados em separadores (ex.: Técnicos inclui Recrutamento; Financeiro
 // inclui Impostos e RH; Equipa inclui Tarefas e Desenvolvimento). Nada é
 // apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
+// Menu enxuto: Clientes é o hub de pessoas (absorve o CRM & Leads como
+// destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
+// tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
-  "/", "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento",
-  "/tarefas", "/configuracao",
+  "/", "/?tab=objetivos", "/?tab=relatorios",
+  "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
+  "/marketing", "/suporte", "/chat", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -123,7 +126,7 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
 // Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
 export const NAV_DEEPLINKS: string[] = [
-  "/?tab=objetivos", "/?tab=relatorios",
+  "/leads", "/desenvolvimento", "/tarefas",
   "/servicos?tab=personalizados", "/servicos?tab=qualidade",
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",

@@ -18,7 +18,7 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart, Code2 } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
@@ -149,7 +149,7 @@ export default function ProdutoPage() {
   const TABS: TabDef[] = [
     { id: "apps", label: "Apps" },
     { id: "bugs", label: "Bugs", count: (bugs ?? []).filter((b) => b.status !== "resolvido").length },
-    { id: "funil", label: "Funil (app)" },
+    { id: "funil", label: "Funil do produto" },
     { id: "logs", label: "Logs" },
     { id: "integracoes", label: "Integrações" },
   ];
@@ -185,6 +185,11 @@ export default function ProdutoPage() {
           eyebrow="Produto"
           title="Produto"
           subtitle="App Cliente, App Profissional, bugs, logs e integrações"
+          actions={
+            <a href="/desenvolvimento" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+              <Code2 className="h-4 w-4" /> Desenvolvimento
+            </a>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
