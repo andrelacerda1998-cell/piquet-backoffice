@@ -34,7 +34,9 @@ export async function GET(req: Request) {
 
 // --- Mensagens recebidas ---------------------------------------------------
 interface WaContact { profile?: { name?: string }; wa_id?: string }
-interface WaMessage { from?: string; type?: string; text?: { body?: string }; button?: { text?: string }; interactive?: { list_reply?: { title?: string }; button_reply?: { title?: string } } }
+interface WaMessage { id?: string; from?: string; type?: string; timestamp?: string; text?: { body?: string }; button?: { text?: string }; interactive?: { list_reply?: { title?: string }; button_reply?: { title?: string } } }
+// A Meta manda estes para dizer que uma mensagem NOSSA foi entregue/lida/falhou.
+interface WaStatus { id?: string; status?: string; }
 
 /** Extrai o texto legível de vários tipos de mensagem (texto/botão/lista). */
 function messageText(m: WaMessage): string {
@@ -67,25 +69,62 @@ export async function POST(req: Request) {
   if (!SUPABASE_ENABLED) return NextResponse.json({ ok: true });
 
   try {
-    const entries = (payload as { entry?: { changes?: { value?: { contacts?: WaContact[]; messages?: WaMessage[] } }[] }[] }).entry ?? [];
-    const rows: Record<string, string>[] = [];
+    const db = supabaseAdmin();
+    const entries = (payload as { entry?: { changes?: { value?: { contacts?: WaContact[]; messages?: WaMessage[]; statuses?: WaStatus[] } }[] }[] }).entry ?? [];
     for (const e of entries) {
       for (const ch of e.changes ?? []) {
         const v = ch.value ?? {};
+
+        // --- Updates de estado das NOSSAS mensagens (entregue/lido/falhou) ---
+        // Casa-se pelo id da Meta. Não bloqueia nada se a coluna/tabela ainda
+        // não existir (migração por correr).
+        for (const st of v.statuses ?? []) {
+          if (!st.id || !st.status) continue;
+          try {
+            await db.from("whatsapp_messages").update({ status: st.status }).eq("wa_message_id", st.id);
+          } catch { /* tabela ainda não migrada — ignora */ }
+        }
+
+        // --- Mensagens recebidas do cliente ---
         const nameByPhone = new Map((v.contacts ?? []).map((c) => [c.wa_id ?? "", c.profile?.name ?? ""]));
         for (const m of v.messages ?? []) {
-          const phone = m.from ?? "";
-          rows.push({
-            name: (nameByPhone.get(phone) ?? "").slice(0, 200),
-            phone: phone.slice(0, 50),
-            message: messageText(m).slice(0, 2000),
-            source: "whatsapp",
-            stage: "nao_iniciado",
-          });
+          const phone = (m.from ?? "").slice(0, 50);
+          if (!phone) continue;
+          const nome = (nameByPhone.get(phone) ?? "").slice(0, 200);
+          const texto = messageText(m).slice(0, 2000);
+
+          // A lead: reutiliza a mais recente deste telefone, ou cria uma nova.
+          // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens
+          // do mesmo cliente enchiam o CRM com dez pedidos iguais.
+          let leadId: string | null = null;
+          const { data: existente } = await db
+            .from("leads").select("id").eq("phone", phone)
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          if (existente?.id) {
+            leadId = existente.id as string;
+          } else {
+            const { data: nova } = await db.from("leads").insert({
+              name: nome, phone, message: texto, source: "whatsapp", stage: "nao_iniciado",
+            }).select("id").single();
+            leadId = (nova?.id as string) ?? null;
+          }
+
+          // A mensagem na conversa. `wa_message_id` é único: se a Meta reenviar
+          // o webhook (fá-lo até receber 200), a mesma mensagem não entra duas
+          // vezes. Se a tabela ainda não existir, a lead já ficou criada acima.
+          try {
+            await db.from("whatsapp_messages").upsert({
+              lead_id: leadId,
+              phone,
+              direction: "in",
+              body: texto,
+              wa_message_id: m.id ?? null,
+              status: "received",
+            }, { onConflict: "wa_message_id", ignoreDuplicates: true });
+          } catch { /* tabela ainda não migrada — a lead já entrou */ }
         }
       }
     }
-    if (rows.length) await supabaseAdmin().from("leads").insert(rows);
   } catch {
     // não propaga — o webhook responde sempre 200
   }

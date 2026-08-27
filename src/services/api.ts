@@ -385,6 +385,8 @@ export function isDemoEndpoint(endpoint: string): boolean {
   // Métodos de pagamento do cliente — real (tabela payshop_payment_methods
   // do Laravel), mas o path tem o id do cliente, não bate com REAL_DATA.
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
+  // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
+  if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
   return true;
 }
 
@@ -428,6 +430,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/budget\/[^/]+$/.test(path)) return true; // editar/apagar linha do orçamento
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
+  if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex

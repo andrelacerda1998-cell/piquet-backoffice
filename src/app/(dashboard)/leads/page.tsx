@@ -15,6 +15,7 @@ import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib
 import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 
 /**
  * A landing escreve "Serviço: X · Urgência: Y\n<descrição>". Separa as partes
@@ -667,6 +668,10 @@ function LeadsPageInner() {
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}
+
+              {/* A conversa de WhatsApp, com o campo de resposta. Só aparece
+                  quando há um telefone para onde escrever. */}
+              <WhatsappConversa leadId={viewing.id} temTelefone={Boolean(viewing.phone)} />
             </div>
           );
         })()}
