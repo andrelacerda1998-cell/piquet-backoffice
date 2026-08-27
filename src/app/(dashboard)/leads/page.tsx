@@ -219,14 +219,6 @@ function LeadsPageInner() {
   // escreveu estava só dentro do "Editar", uma caixa entre doze campos, e
   // ninguém a encontrava. Abrir a linha mostra-a inteira, de imediato.
   const [viewing, setViewing] = useState<Lead | null>(null);
-  // Rascunho da resposta rápida — preenchido com a mensagem genérica ao abrir
-  // uma lead, editável antes de copiar/enviar.
-  const [resposta, setResposta] = useState("");
-  useEffect(() => { setResposta(viewing ? mensagemGenerica(viewing) : ""); }, [viewing]);
-  const copiarResposta = async () => {
-    try { await navigator.clipboard.writeText(resposta); toast("Mensagem copiada."); }
-    catch { toast("Não foi possível copiar.", "error"); }
-  };
   /**
    * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
@@ -786,32 +778,15 @@ function LeadsPageInner() {
                 </div>
               )}
 
-              {/* Resposta rápida: mensagem genérica já preenchida com os dados
-                  da lead. Editável; copiar ou abrir no WhatsApp com o texto. */}
-              {viewing.phone && (
-                <div className="rounded-xl border border-surface-border p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Resposta rápida</p>
-                    <button onClick={() => setResposta(mensagemGenerica(viewing))} className="text-xs text-text-muted hover:text-text-primary">Repor modelo</button>
-                  </div>
-                  <textarea value={resposta} onChange={(e) => setResposta(e.target.value)} rows={11}
-                    className="input-field w-full resize-y text-sm leading-relaxed" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={copiarResposta} className="btn-secondary text-xs py-1.5">Copiar</button>
-                    {waNumero && (
-                      <a href={`https://wa.me/${waNumero}?text=${encodeURIComponent(resposta)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="btn-primary text-xs py-1.5 inline-flex items-center gap-1.5">
-                        <MessageCircle className="h-3.5 w-3.5" /> Abrir no WhatsApp
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* A conversa de WhatsApp, com o campo de resposta. Só aparece
-                  quando há um telefone para onde escrever. */}
-              <WhatsappConversa leadId={viewing.id} temTelefone={Boolean(viewing.phone)} />
+              {/* A conversa de WhatsApp, com o campo de resposta (um só sítio
+                  para responder). O modelo genérico entra pelo botão "Inserir
+                  modelo" do composer. Só aparece quando há telefone. */}
+              <WhatsappConversa
+                leadId={viewing.id}
+                temTelefone={Boolean(viewing.phone)}
+                modelo={mensagemGenerica(viewing)}
+                waNumero={waNumero}
+              />
             </div>
           );
         })()}

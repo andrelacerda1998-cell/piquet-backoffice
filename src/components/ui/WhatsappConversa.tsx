@@ -24,7 +24,14 @@ function EstadoMsg({ status }: { status: string }) {
   return <Check className="h-3 w-3 text-text-muted" aria-label="Enviada" />;
 }
 
-export function WhatsappConversa({ leadId, temTelefone }: { leadId: string; temTelefone: boolean }) {
+export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
+  leadId: string;
+  temTelefone: boolean;
+  /** Mensagem-modelo pré-preenchida (nome/serviço/localização) para inserir. */
+  modelo?: string;
+  /** Número (só dígitos, com indicativo) para o link wa.me de recurso. */
+  waNumero?: string;
+}) {
   const [conversa, setConversa] = useState<Conversa | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [texto, setTexto] = useState("");
@@ -114,28 +121,44 @@ export function WhatsappConversa({ leadId, temTelefone }: { leadId: string; temT
         <div ref={fimRef} />
       </div>
 
-      {/* Composer */}
-      <div className="border-t border-surface-border p-2 bg-surface-muted/30">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enviar(); } }}
-            rows={2}
-            disabled={!podeEnviar || aEnviar}
-            placeholder={podeEnviar ? "Escreve a resposta… (⌘/Ctrl + Enter para enviar)" : "Resposta indisponível"}
-            className="input-field resize-y text-sm flex-1 disabled:opacity-60"
-          />
-          <button
-            onClick={enviar}
-            disabled={!podeEnviar || aEnviar || !texto.trim()}
-            className="btn-primary text-sm shrink-0 disabled:opacity-50"
-            title={podeEnviar ? "Enviar pelo WhatsApp" : "Envio indisponível"}
-          >
-            <Send className="h-4 w-4" />
-          </button>
+      {/* Composer — um único sítio para responder. O campo está sempre
+          editável (para compor/copiar mesmo com a janela fechada); o envio
+          pela app só quando dá, e há sempre o "Abrir no WhatsApp" como
+          alternativa. */}
+      <div className="border-t border-surface-border p-2 bg-surface-muted/30 space-y-2">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && podeEnviar) { e.preventDefault(); enviar(); } }}
+          rows={3}
+          placeholder="Escreve a resposta…"
+          className="input-field resize-y text-sm w-full"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          {modelo && (
+            <button onClick={() => setTexto(modelo)} className="btn-secondary text-xs py-1.5">Inserir modelo</button>
+          )}
+          {podeEnviar && (
+            <button
+              onClick={enviar}
+              disabled={aEnviar || !texto.trim()}
+              className="btn-primary text-xs py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50"
+              title="Enviar pelo WhatsApp (⌘/Ctrl + Enter)"
+            >
+              <Send className="h-3.5 w-3.5" /> Enviar
+            </button>
+          )}
+          {waNumero && (
+            <a
+              href={`https://wa.me/${waNumero}${texto.trim() ? `?text=${encodeURIComponent(texto)}` : ""}`}
+              target="_blank" rel="noopener noreferrer"
+              className={cn("text-xs py-1.5 inline-flex items-center gap-1.5", podeEnviar ? "btn-secondary" : "btn-primary")}
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> Abrir no WhatsApp
+            </a>
+          )}
         </div>
-        {nota && <p className="mt-1.5 text-[11px] text-text-muted">{nota}</p>}
+        {nota && <p className="text-[11px] text-text-muted">{nota}</p>}
       </div>
     </div>
   );
