@@ -668,6 +668,47 @@ export async function updateLeadStage(id: string, stage: LeadStage): Promise<{ s
 
 export interface NewLead { name: string; phone: string; city: string; message: string; source?: string }
 
+/** Uma mensagem de WhatsApp na conversa de uma lead. */
+export interface WaMensagem {
+  id: string;
+  direction: "in" | "out";
+  body: string;
+  status: string;
+  error: string;
+  sentBy: string;
+  createdAt: string;
+}
+
+/** A conversa de WhatsApp de uma lead, mais o estado do canal. */
+export interface Conversa {
+  messages: WaMensagem[];
+  /** Há chaves da Meta na Vercel para poder enviar? */
+  configured: boolean;
+  /** Ainda se pode responder em texto livre (< 24h da última entrada)? */
+  windowOpen: boolean;
+  /** A migração da tabela já correu? */
+  migrated: boolean;
+}
+
+/** Lê a conversa de WhatsApp de uma lead. Sem backend, devolve vazio. */
+export async function getLeadMessages(id: string): Promise<Conversa> {
+  return apiGet<Conversa>(
+    `/marketing/leads/${id}/messages`,
+    () => ({ messages: [], configured: false, windowOpen: false, migrated: false }),
+  ).then((r) => r.data);
+}
+
+/**
+ * Envia uma resposta pelo WhatsApp. Lança com a mensagem do servidor quando não
+ * dá (canal por ligar, janela de 24h fechada, ou a Meta recusou) — o ecrã
+ * mostra esse motivo em vez de fingir que enviou.
+ */
+export async function sendLeadMessage(id: string, body: string): Promise<WaMensagem> {
+  return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { body }, () => {
+    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
+  }).then((r) => r.data);
+}
+
 /** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
 export async function deleteLead(id: string): Promise<void> {
   await apiDelete(`/marketing/leads/${id}`, () => null);
