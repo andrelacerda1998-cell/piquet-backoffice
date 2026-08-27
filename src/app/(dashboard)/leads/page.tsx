@@ -445,7 +445,7 @@ function LeadsPageInner() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        {["Data", "Nome", "Telefone", "Cidade", "Origem", "Categoria", "Estado", "Orçamento", "Mensagem"].map((h) => (
+                        {["Data", "Nome", "Telefone", "Cidade", "Categoria", "Estado", "Orçamento"].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -457,7 +457,7 @@ function LeadsPageInner() {
                           .filter((l) => !q2 || `${l.name} ${l.phone} ${l.city} ${l.message} ${l.source}`.toLowerCase().includes(q2))
                           .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
                         if (rows.length === 0) return (
-                          <tr><td colSpan={9} className="px-4 py-8 text-center text-text-muted">Nenhuma lead encontrada.</td></tr>
+                          <tr><td colSpan={7} className="px-4 py-8 text-center text-text-muted">Nenhuma lead encontrada.</td></tr>
                         );
                         return rows.map((l) => (
                           <tr key={l.id} onClick={() => setViewing(l)} className="hover:bg-surface-subtle cursor-pointer transition-colors">
@@ -472,11 +472,9 @@ function LeadsPageInner() {
                               ) : <span className="text-text-muted">—</span>}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{l.city && l.city !== "—" ? l.city : <span className="text-text-muted">—</span>}</td>
-                            <td className="px-4 py-3 whitespace-nowrap"><span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary capitalize">{l.source || "website"}</span></td>
                             <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{categoryName(l.categoryId) || <span className="text-text-muted">—</span>}</td>
                             <td className="px-4 py-3 whitespace-nowrap"><span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(l.stage))}>{LEAD_STAGE_LABEL[l.stage] ?? l.stage}</span></td>
                             <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">{l.quoteValue != null ? formatCurrency(l.quoteValue) : <span className="text-text-muted">—</span>}</td>
-                            <td className="px-4 py-3 max-w-[260px] truncate text-text-secondary" title={l.message || undefined}>{l.message || <span className="text-text-muted">—</span>}</td>
                           </tr>
                         ));
                       })()}
