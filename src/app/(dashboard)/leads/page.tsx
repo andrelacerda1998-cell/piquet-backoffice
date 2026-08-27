@@ -448,6 +448,7 @@ function LeadsPageInner() {
                         {["Data", "Nome", "Telefone", "Cidade", "Categoria", "Estado", "Orçamento"].map((h) => (
                           <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted whitespace-nowrap">{h}</th>
                         ))}
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -457,7 +458,7 @@ function LeadsPageInner() {
                           .filter((l) => !q2 || `${l.name} ${l.phone} ${l.city} ${l.message} ${l.source}`.toLowerCase().includes(q2))
                           .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
                         if (rows.length === 0) return (
-                          <tr><td colSpan={7} className="px-4 py-8 text-center text-text-muted">Nenhuma lead encontrada.</td></tr>
+                          <tr><td colSpan={8} className="px-4 py-8 text-center text-text-muted">Nenhuma lead encontrada.</td></tr>
                         );
                         return rows.map((l) => (
                           <tr key={l.id} onClick={() => setViewing(l)} className="hover:bg-surface-subtle cursor-pointer transition-colors">
@@ -475,6 +476,12 @@ function LeadsPageInner() {
                             <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{categoryName(l.categoryId) || <span className="text-text-muted">—</span>}</td>
                             <td className="px-4 py-3 whitespace-nowrap"><span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(l.stage))}>{LEAD_STAGE_LABEL[l.stage] ?? l.stage}</span></td>
                             <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">{l.quoteValue != null ? formatCurrency(l.quoteValue) : <span className="text-text-muted">—</span>}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button onClick={(e) => { e.stopPropagation(); removeLead(l); }} title="Eliminar lead"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
                           </tr>
                         ));
                       })()}

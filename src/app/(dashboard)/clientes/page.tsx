@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,11 +19,11 @@ import {
   type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
 import { CreditCard, Smartphone, Trash2 } from "lucide-react";
-import { type Complaint } from "@/services/extrasService";
+import { type Complaint, getLeads, deleteLead, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
 import { getServices } from "@/services/dashboardService";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate, formatCurrency, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -48,6 +48,30 @@ export default function CustomersPage() {
     () => getCustomers(1, 100, undefined, true),
     []
   );
+  // Leads (contactos da landing / WhatsApp) — potenciais clientes, antes de
+  // se registarem na app. Fonte diferente dos clientes registados (Supabase
+  // vs Laravel), por isso vivem num sub-separador próprio com a origem à vista.
+  const { data: leadsData, refetch: refetchLeads } = useAsyncData(() => getLeads(), []);
+  const [leadRows, setLeadRows] = useState<Lead[]>([]);
+  useEffect(() => { setLeadRows(leadsData ?? []); }, [leadsData]);
+  const [leadSearch, setLeadSearch] = useState("");
+  const removeLeadRow = async (lead: Lead) => {
+    const label = lead.name || lead.phone || "esta lead";
+    if (!window.confirm(`Eliminar a lead de "${label}"?`)) return;
+    const prev = leadRows;
+    setLeadRows((rows) => rows.filter((l) => l.id !== lead.id));
+    try { await deleteLead(lead.id); toast("Lead eliminada."); refetchLeads(); }
+    catch { setLeadRows(prev); toast("Não foi possível eliminar a lead.", "error"); }
+  };
+  const origemLabel = (s: string) =>
+    s === "whatsapp" ? "WhatsApp" : s === "landing" || s === "website" ? "Landing page" : (s || "—");
+  const leadsFiltradas = useMemo(() => {
+    const q = leadSearch.trim().toLowerCase();
+    return leadRows
+      .filter((l) => !q || `${l.name} ${l.phone} ${l.city} ${l.source}`.toLowerCase().includes(q))
+      .slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }, [leadRows, leadSearch]);
+
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
   const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
   const { data: retention } = useAsyncData(() => getRetentionData(), []);
@@ -242,6 +266,25 @@ export default function CustomersPage() {
       : <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleBlock(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button> },
   ];
 
+  const leadColumns: Column<Lead>[] = [
+    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name || "—"}</span> },
+    { key: "phone", label: "Telefone", render: (r) => r.phone || <span className="text-text-muted">—</span> },
+    { key: "city", label: "Cidade", render: (r) => r.city && r.city !== "—" ? r.city : <span className="text-text-muted">—</span> },
+    { key: "source", label: "Origem", render: (r) => (
+      <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">{origemLabel(r.source)}</span>
+    ) },
+    { key: "stage", label: "Estado", render: (r) => (
+      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.stage))}>{LEAD_STAGE_LABEL[r.stage] ?? r.stage}</span>
+    ) },
+    { key: "createdAt", label: "Recebida", render: (r) => r.createdAt ? formatDate(r.createdAt) : "—" },
+    { key: "acao", label: "", render: (r) => (
+      <button onClick={(e) => { e.stopPropagation(); removeLeadRow(r); }} title="Eliminar lead"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    ) },
+  ];
+
   const blockedColumns: Column<RealCustomer>[] = [
     { key: "name", label: "Cliente", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "email", label: "Email", render: (r) => r.email ?? "—" },
@@ -330,6 +373,7 @@ export default function CustomersPage() {
         {tab === "lista" && (
           <SubTabs tabs={[
             { id: "todos", label: "Todos" },
+            { id: "leads", label: "Leads", count: leadRows.length },
             { id: "bloqueados", label: "Bloqueados", count: blockedCustomers?.total ?? 0 },
           ]}>
             {(sub) => (
@@ -380,6 +424,19 @@ export default function CustomersPage() {
                         {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
                       </>
                     )}
+                  </div>
+                )}
+                {sub === "leads" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <SearchInput value={leadSearch} onChange={setLeadSearch} className="max-w-sm" placeholder="Pesquisar leads..." />
+                      <span className="text-sm text-text-secondary">
+                        <b className="text-text-primary tabular-nums">{leadsFiltradas.length}</b> {leadsFiltradas.length === 1 ? "lead" : "leads"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-muted">Contactos recebidos da landing page e do WhatsApp, antes de se registarem na app. Geridos em detalhe no CRM &amp; Leads.</p>
+                    <DataTable columns={leadColumns} data={leadsFiltradas} keyField="id"
+                      emptyMessage="Sem leads recebidas ainda." />
                   </div>
                 )}
                 {sub === "bloqueados" && (
