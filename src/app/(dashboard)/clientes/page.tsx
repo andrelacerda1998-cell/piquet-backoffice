@@ -37,10 +37,6 @@ export default function CustomersPage() {
   // Lista real de clientes (App\Filament\Resources\CustomerResource migrado)
   // -- sem sort do lado do servidor (o Filament só ordenava name/created_at
   // por clique de coluna, e não vale a pena replicar já).
-  const { data: customers, loading, refetch: refetchCustomers } = useAsyncData(
-    () => getCustomers(page, pageSize, debouncedSearch || undefined),
-    [page, pageSize, debouncedSearch]
-  );
   // Clientes bloqueados (soft-delete real) -- separado do "Todos" tal como o
   // Filament faz com o TrashedFilter, para o separador "Bloqueados" e a
   // contagem no TabDef não dependerem da paginação da lista principal.
@@ -50,11 +46,10 @@ export default function CustomersPage() {
   );
   // Leads (contactos da landing / WhatsApp) — potenciais clientes, antes de
   // se registarem na app. Fonte diferente dos clientes registados (Supabase
-  // vs Laravel), por isso vivem num sub-separador próprio com a origem à vista.
+  // vs Laravel), mas mostradas na mesma tabela "Base de dados" com a origem.
   const { data: leadsData, refetch: refetchLeads } = useAsyncData(() => getLeads(), []);
   const [leadRows, setLeadRows] = useState<Lead[]>([]);
   useEffect(() => { setLeadRows(leadsData ?? []); }, [leadsData]);
-  const [leadSearch, setLeadSearch] = useState("");
   const removeLeadRow = async (lead: Lead) => {
     const label = lead.name || lead.phone || "esta lead";
     if (!window.confirm(`Eliminar a lead de "${label}"?`)) return;
@@ -65,12 +60,6 @@ export default function CustomersPage() {
   };
   const origemLabel = (s: string) =>
     s === "whatsapp" ? "WhatsApp" : s === "landing" || s === "website" ? "Landing page" : (s || "—");
-  const leadsFiltradas = useMemo(() => {
-    const q = leadSearch.trim().toLowerCase();
-    return leadRows
-      .filter((l) => !q || `${l.name} ${l.phone} ${l.city} ${l.source}`.toLowerCase().includes(q))
-      .slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  }, [leadRows, leadSearch]);
 
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
   const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
@@ -132,19 +121,15 @@ export default function CustomersPage() {
     }
   };
 
-  // Filtro "pode pedir serviços". Como a lista é paginada pelo servidor,
-  // filtrar só a página daria contagens erradas — com filtro ativo carrega-se
-  // a lista completa e conta-se sobre o total.
+  // Filtro "pode pedir serviços". A vista "Base de dados" funde clientes
+  // registados + leads do lado do cliente, por isso carrega-se a lista
+  // completa de clientes (não só uma página) — o seed foi apagado, são poucos.
   const [reqFilter, setReqFilter] = useState<"" | "pode" | "nao_pode">("");
-  const { data: allCustomers, loading: allCustomersLoading } = useAsyncData(
-    () => (reqFilter ? getCustomers(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
-    [reqFilter, debouncedSearch]
+  const LIST_CAP = 1000;
+  const { data: allCustomers, loading: allCustomersLoading, refetch: refetchCustomers } = useAsyncData(
+    () => getCustomers(1, LIST_CAP, debouncedSearch || undefined),
+    [debouncedSearch]
   );
-  const reqFiltered = useMemo(() => {
-    const list = allCustomers?.data ?? [];
-    if (!reqFilter) return [];
-    return list.filter((c) => (reqFilter === "pode" ? c.can_request_service : !c.can_request_service));
-  }, [allCustomers, reqFilter]);
   const reqCounts = useMemo(() => {
     const list = allCustomers?.data ?? [];
     return {
@@ -153,6 +138,39 @@ export default function CustomersPage() {
       carregados: list.length,
     };
   }, [allCustomers]);
+
+  // Linhas unificadas da "Base de dados": clientes registados (App) + leads
+  // (Landing page / WhatsApp), com a origem à vista. Fontes diferentes
+  // (Laravel vs Supabase) mas mostradas na mesma tabela, como pedido.
+  type UnifiedRow =
+    | { kind: "customer"; _id: string; date: string; customer: RealCustomer }
+    | { kind: "lead"; _id: string; date: string; lead: Lead };
+  const unifiedRows = useMemo<UnifiedRow[]>(() => {
+    const custs: UnifiedRow[] = (allCustomers?.data ?? []).map((c) => ({
+      kind: "customer", _id: `c-${c.id}`, date: c.created_at ?? "", customer: c,
+    }));
+    const lds: UnifiedRow[] = leadRows.map((l) => ({
+      kind: "lead", _id: `l-${l.id}`, date: l.createdAt ?? "", lead: l,
+    }));
+    const q = debouncedSearch.trim().toLowerCase();
+    const matches = (r: UnifiedRow) => {
+      if (reqFilter) {
+        // "Pode pedir serviços" só se aplica a clientes — leads ficam de fora.
+        if (r.kind !== "customer") return false;
+        if (reqFilter === "pode" && !r.customer.can_request_service) return false;
+        if (reqFilter === "nao_pode" && r.customer.can_request_service) return false;
+      }
+      if (!q) return true;
+      const hay = r.kind === "customer"
+        ? `${r.customer.name} ${r.customer.email} ${r.customer.phone_number} ${r.customer.nif}`
+        : `${r.lead.name} ${r.lead.phone} ${r.lead.city} ${r.lead.source}`;
+      return hay.toLowerCase().includes(q);
+    };
+    return [...custs, ...lds].filter(matches).sort((a, b) => b.date.localeCompare(a.date));
+  }, [allCustomers, leadRows, reqFilter, debouncedSearch]);
+  const unifiedTotalPages = Math.max(1, Math.ceil(unifiedRows.length / pageSize));
+  const unifiedPage = Math.min(page, unifiedTotalPages);
+  const unifiedPageRows = unifiedRows.slice((unifiedPage - 1) * pageSize, unifiedPage * pageSize);
 
   // Métodos de pagamento guardados — migrado do Filament
   // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
@@ -210,7 +228,7 @@ export default function CustomersPage() {
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
-    { id: "lista", label: "Lista" },
+    { id: "lista", label: "Base de dados" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
   ];
 
@@ -236,49 +254,45 @@ export default function CustomersPage() {
     ) : <span className="text-text-muted text-xs">—</span> },
   ];
 
-  // Colunas do CustomerResource::table() do Filament (avatar/nif/email/telefone/
-  // canRequestService/created_at) -- sem os campos fictícios que a lista mock
-  // tinha (cidade, origem, valor gasto, avaliação, ...).
-  const columns: Column<RealCustomer>[] = [
-    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
-    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
-    { key: "email", label: "Email", render: (r) => (
-      <span className="inline-flex items-center gap-1.5">
-        {r.email ?? "—"}
-        {r.email && !r.email_verified && <span title="Email não verificado" className="text-warning">⚠</span>}
+  const unifiedColumns: Column<UnifiedRow>[] = [
+    { key: "name", label: "Nome", render: (r) => (
+      <span className="font-medium">{(r.kind === "customer" ? r.customer.name : r.lead.name) || "—"}</span>
+    ) },
+    { key: "contacto", label: "Contacto", render: (r) => {
+      const phone = r.kind === "customer" ? r.customer.phone_number : r.lead.phone;
+      const email = r.kind === "customer" ? r.customer.email : "";
+      return (
+        <div className="min-w-0">
+          {email && <p className="truncate text-text-secondary">{email}</p>}
+          {phone ? <p className="text-xs text-text-muted">{phone}</p> : (!email && <span className="text-text-muted">—</span>)}
+        </div>
+      );
+    } },
+    { key: "city", label: "Cidade", render: (r) => {
+      const city = r.kind === "lead" ? r.lead.city : "";
+      return city && city !== "—" ? <span className="text-text-secondary">{city}</span> : <span className="text-text-muted">—</span>;
+    } },
+    { key: "origem", label: "Origem", render: (r) => (
+      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        r.kind === "customer" ? "bg-piquet/12 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
+        {r.kind === "customer" ? "App" : origemLabel(r.lead.source)}
       </span>
     ) },
-    { key: "phone_number", label: "Contacto", render: (r) => (
-      <span className="inline-flex items-center gap-1.5">
-        {r.phone_number ?? "—"}
-        {r.phone_number && !r.phone_verified && <span title="Telefone não verificado" className="text-warning">⚠</span>}
-      </span>
+    { key: "estado", label: "Estado", render: (r) => r.kind === "customer" ? (
+      r.customer.blocked_at
+        ? <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-xs font-medium text-danger">Bloqueado</span>
+        : <span title={r.customer.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
+            className={cn("font-bold", r.customer.can_request_service ? "text-success" : "text-text-muted")}>{r.customer.can_request_service ? "✓" : "—"}</span>
+    ) : (
+      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.lead.stage))}>{LEAD_STAGE_LABEL[r.lead.stage] ?? r.lead.stage}</span>
     ) },
-    { key: "can_request_service", label: "Pode pedir", render: (r) => (
-      <span title={r.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
-        className={cn("font-bold", r.can_request_service ? "text-success" : "text-text-muted")}>
-        {r.can_request_service ? "✓" : "—"}
-      </span>
-    ) },
-    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
-    { key: "acao", label: "", render: (r) => r.blocked_at
-      ? <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleRestore(r); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
-      : <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleBlock(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button> },
-  ];
-
-  const leadColumns: Column<Lead>[] = [
-    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name || "—"}</span> },
-    { key: "phone", label: "Telefone", render: (r) => r.phone || <span className="text-text-muted">—</span> },
-    { key: "city", label: "Cidade", render: (r) => r.city && r.city !== "—" ? r.city : <span className="text-text-muted">—</span> },
-    { key: "source", label: "Origem", render: (r) => (
-      <span className="inline-flex items-center rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">{origemLabel(r.source)}</span>
-    ) },
-    { key: "stage", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.stage))}>{LEAD_STAGE_LABEL[r.stage] ?? r.stage}</span>
-    ) },
-    { key: "createdAt", label: "Recebida", render: (r) => r.createdAt ? formatDate(r.createdAt) : "—" },
-    { key: "acao", label: "", render: (r) => (
-      <button onClick={(e) => { e.stopPropagation(); removeLeadRow(r); }} title="Eliminar lead"
+    { key: "date", label: "Registo", render: (r) => r.date ? formatDate(r.date) : "—" },
+    { key: "acao", label: "", render: (r) => r.kind === "customer" ? (
+      r.customer.blocked_at
+        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleBlock(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
+    ) : (
+      <button onClick={(e) => { e.stopPropagation(); removeLeadRow(r.lead); }} title="Eliminar lead"
         className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
         <Trash2 className="h-4 w-4" />
       </button>
@@ -373,7 +387,6 @@ export default function CustomersPage() {
         {tab === "lista" && (
           <SubTabs tabs={[
             { id: "todos", label: "Todos" },
-            { id: "leads", label: "Leads", count: leadRows.length },
             { id: "bloqueados", label: "Bloqueados", count: blockedCustomers?.total ?? 0 },
           ]}>
             {(sub) => (
@@ -381,14 +394,14 @@ export default function CustomersPage() {
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
-                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar nome, telefone, cidade..." />
                       <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
                           { id: "pode", label: "Podem pedir serviços" },
                           { id: "nao_pode", label: "Não podem" },
                         ] as const).map((f) => (
-                          <button key={f.id} onClick={() => setReqFilter(f.id)}
+                          <button key={f.id} onClick={() => { setReqFilter(f.id); setPage(1); }}
                             className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
                               reqFilter === f.id
                                 ? "border-piquet/30 bg-piquet/15 text-piquet-700"
@@ -403,40 +416,18 @@ export default function CustomersPage() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-xs text-text-muted">Clica numa linha para abrir o perfil do cliente.</p>
-
-                    {reqFilter ? (
-                      <>
-                        <p className="text-sm text-text-secondary">
-                          <b className="text-text-primary tabular-nums">{reqFiltered.length}</b>{" "}
-                          {reqFiltered.length === 1
-                            ? (reqFilter === "pode" ? "pode pedir serviços" : "não pode pedir serviços")
-                            : (reqFilter === "pode" ? "podem pedir serviços" : "não podem pedir serviços")}
-                          {reqCounts.carregados > 0 && ` · de ${reqCounts.carregados} clientes`}
-                        </p>
-                        <DataTable columns={columns} data={reqFiltered} keyField="id" loading={allCustomersLoading}
-                          onRowClick={setSelectedCustomer}
-                          emptyMessage={reqFilter === "pode" ? "Nenhum cliente pode pedir serviços." : "Todos os clientes podem pedir serviços 🎉"} />
-                      </>
-                    ) : (
-                      <>
-                        <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} onRowClick={setSelectedCustomer} />
-                        {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
-                      </>
+                    <p className="text-sm text-text-secondary">
+                      <b className="text-text-primary tabular-nums">{unifiedRows.length}</b> {unifiedRows.length === 1 ? "registo" : "registos"}
+                      {" · "}clientes da app e leads (landing / WhatsApp) juntos. Clica num cliente para abrir o perfil.
+                    </p>
+                    {reqCounts.carregados >= LIST_CAP && (
+                      <p className="text-xs text-warning">A mostrar os primeiros {LIST_CAP} clientes registados — há mais na base de dados.</p>
                     )}
-                  </div>
-                )}
-                {sub === "leads" && (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <SearchInput value={leadSearch} onChange={setLeadSearch} className="max-w-sm" placeholder="Pesquisar leads..." />
-                      <span className="text-sm text-text-secondary">
-                        <b className="text-text-primary tabular-nums">{leadsFiltradas.length}</b> {leadsFiltradas.length === 1 ? "lead" : "leads"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-text-muted">Contactos recebidos da landing page e do WhatsApp, antes de se registarem na app. Geridos em detalhe no CRM &amp; Leads.</p>
-                    <DataTable columns={leadColumns} data={leadsFiltradas} keyField="id"
-                      emptyMessage="Sem leads recebidas ainda." />
+                    <DataTable columns={unifiedColumns} data={unifiedPageRows} keyField="_id"
+                      loading={allCustomersLoading}
+                      onRowClick={(r) => { if (r.kind === "customer") setSelectedCustomer(r.customer); }}
+                      emptyMessage="Sem clientes nem leads ainda." />
+                    <Pagination page={unifiedPage} totalPages={unifiedTotalPages} total={unifiedRows.length} pageSize={pageSize} onPageChange={setPage} />
                   </div>
                 )}
                 {sub === "bloqueados" && (
