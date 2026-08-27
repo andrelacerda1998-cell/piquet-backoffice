@@ -18,8 +18,9 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart, Code2 } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { DevPanel } from "@/app/(dashboard)/desenvolvimento/DevPanel";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
   info: "bg-surface-subtle text-text-secondary",
@@ -152,6 +153,7 @@ export default function ProdutoPage() {
     { id: "funil", label: "Funil do produto" },
     { id: "logs", label: "Logs" },
     { id: "integracoes", label: "Integrações" },
+    { id: "desenvolvimento", label: "Desenvolvimento" },
   ];
 
   const bugColumns: Column<Bug>[] = [
@@ -184,12 +186,7 @@ export default function ProdutoPage() {
           icon={LineChart}
           eyebrow="Produto"
           title="Produto"
-          subtitle="App Cliente, App Profissional, bugs, logs e integrações"
-          actions={
-            <a href="/desenvolvimento" className="btn-secondary text-sm inline-flex items-center gap-1.5">
-              <Code2 className="h-4 w-4" /> Desenvolvimento
-            </a>
-          }
+          subtitle="App Cliente, App Profissional, bugs, logs, integrações e desenvolvimento"
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -475,6 +472,8 @@ export default function ProdutoPage() {
             )}
           </div>
         )}
+
+        {tab === "desenvolvimento" && <DevPanel />}
       </div>
     </RouteGuard>
   );

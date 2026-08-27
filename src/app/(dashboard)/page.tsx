@@ -21,7 +21,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale } from "lucide-react";
+import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale, FileText } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -386,6 +386,20 @@ export default function OverviewPage() {
               })}
             </div>
           )}
+        </div>
+
+        {/* Atalhos para as outras vistas da Visão Geral, para ficarem à mão. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button onClick={() => setTab("objetivos")} className="card p-4 text-left hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700 shrink-0"><Target className="h-5 w-5" /></span>
+            <div className="min-w-0"><p className="font-semibold text-text-primary">Objetivos do ano</p><p className="text-xs text-text-muted">Metas e progresso</p></div>
+            <ArrowRight className="h-4 w-4 text-text-muted ml-auto" />
+          </button>
+          <button onClick={() => setTab("relatorios")} className="card p-4 text-left hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-info-light text-info shrink-0"><FileText className="h-5 w-5" /></span>
+            <div className="min-w-0"><p className="font-semibold text-text-primary">Relatórios</p><p className="text-xs text-text-muted">Exportações e análises</p></div>
+            <ArrowRight className="h-4 w-4 text-text-muted ml-auto" />
+          </button>
         </div>
         </div>
         )}
