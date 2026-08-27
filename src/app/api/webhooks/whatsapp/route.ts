@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
+import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
+import { extrairDadosLead, mensagemBoasVindas } from "@/lib/leadReply";
 
 /**
  * Webhook do WhatsApp Business (Meta Cloud API). Cada mensagem recebida no
@@ -97,6 +99,7 @@ export async function POST(req: Request) {
           // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens
           // do mesmo cliente enchiam o CRM com dez pedidos iguais.
           let leadId: string | null = null;
+          let leadNova = false;
           const { data: existente } = await db
             .from("leads").select("id").eq("phone", phone)
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -107,6 +110,7 @@ export async function POST(req: Request) {
               name: nome, phone, message: texto, source: "whatsapp", stage: "nao_iniciado",
             }).select("id").single();
             leadId = (nova?.id as string) ?? null;
+            leadNova = Boolean(nova?.id);
           }
 
           // A mensagem na conversa. `wa_message_id` é único: se a Meta reenviar
@@ -122,6 +126,23 @@ export async function POST(req: Request) {
               status: "received",
             }, { onConflict: "wa_message_id", ignoreDuplicates: true });
           } catch { /* tabela ainda não migrada — a lead já entrou */ }
+
+          // Resposta automática de boas-vindas — só no PRIMEIRO contacto (lead
+          // nova) e só se o WhatsApp estiver ligado. Como o cliente acabou de
+          // escrever, a janela de 24h está aberta: é texto livre, sem precisar
+          // de modelo pago. Uma falha de envio nunca parte o webhook.
+          if (leadNova && leadId && WHATSAPP_ENABLED) {
+            try {
+              const corpo = mensagemBoasVindas(extrairDadosLead(texto, nome));
+              const { waMessageId } = await enviarTextoWhatsapp(phone, corpo);
+              try {
+                await db.from("whatsapp_messages").insert({
+                  lead_id: leadId, phone, direction: "out", body: corpo,
+                  wa_message_id: waMessageId || null, status: "sent", sent_by: "auto",
+                });
+              } catch { /* tabela não migrada — a mensagem saiu na mesma */ }
+            } catch { /* envio falhou — não propaga */ }
+          }
         }
       }
     }

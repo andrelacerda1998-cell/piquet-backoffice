@@ -16,6 +16,7 @@ import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
+import { mensagemBoasVindas } from "@/lib/leadReply";
 
 /**
  * A landing escreve "Serviço: X · Urgência: Y\n<descrição>". Separa as partes
@@ -34,36 +35,18 @@ function parseLeadMessage(message: string): { service: string; urgency: string; 
 /** Link click-to-chat do WhatsApp a partir de um número (só dígitos). */
 const waHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
 
-/** Primeiro nome (para tratamento pessoal na resposta). */
-const primeiroNome = (nome: string) => (nome || "").trim().split(/\s+/)[0] || "";
-
 /**
- * Mensagem genérica de resposta a uma lead, com os dados preenchidos
- * automaticamente (nome, serviço, localização). Os campos em falta são
- * omitidos com elegância em vez de deixarem "[Serviço]" no texto.
+ * Mensagem genérica de resposta a uma lead — mesmo texto que o webhook envia
+ * automaticamente (ver src/lib/leadReply.ts). Aqui usam-se os campos já
+ * estruturados da lead (categoria, cidade); no webhook extraem-se do texto.
  */
 function mensagemGenerica(lead: Lead): string {
-  const nome = primeiroNome(lead.name);
   const { service } = parseLeadMessage(lead.message || "");
-  const servico = categoryName(lead.categoryId) || service || "";
-  const local = lead.city && lead.city !== "—" ? lead.city : "";
-  const saudacao = nome ? `Olá, ${nome}.` : "Olá.";
-  const pedido = servico
-    ? `o seu pedido de ${servico}${local ? ` em ${local}` : ""}`
-    : `o seu pedido${local ? ` em ${local}` : ""}`;
-  return [
-    saudacao,
-    "",
-    "Obrigado pelo seu contacto com a Piquet.",
-    "",
-    `Recebemos ${pedido} e já estamos a verificar a disponibilidade de um técnico para o ajudar.`,
-    "",
-    "Entraremos em contacto consigo assim que tivermos disponibilidade confirmada.",
-    "",
-    "Obrigado,",
-    "",
-    "Equipa Piquet",
-  ].join("\n");
+  return mensagemBoasVindas({
+    nome: lead.name,
+    servico: categoryName(lead.categoryId) || service || "",
+    localizacao: lead.city && lead.city !== "—" ? lead.city : "",
+  });
 }
 
 
