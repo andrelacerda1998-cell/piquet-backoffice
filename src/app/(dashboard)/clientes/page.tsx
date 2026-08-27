@@ -14,7 +14,7 @@ import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import {
-  getCustomers, getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend,
+  getCustomers, getAllCustomers, getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend,
   blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
   type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
@@ -122,15 +122,14 @@ export default function CustomersPage() {
 
   // Filtro "pode pedir serviços". A vista "Base de dados" funde clientes
   // registados + leads do lado do cliente, por isso carrega-se a lista
-  // completa de clientes (não só uma página) — o seed foi apagado, são poucos.
+  // COMPLETA de clientes (todas as páginas — o backend limita per_page a 100).
   const [reqFilter, setReqFilter] = useState<"" | "pode" | "nao_pode">("");
-  const LIST_CAP = 1000;
   const { data: allCustomers, loading: allCustomersLoading, refetch: refetchCustomers } = useAsyncData(
-    () => getCustomers(1, LIST_CAP, debouncedSearch || undefined),
+    () => getAllCustomers(debouncedSearch || undefined),
     [debouncedSearch]
   );
   const reqCounts = useMemo(() => {
-    const list = allCustomers?.data ?? [];
+    const list = allCustomers ?? [];
     return {
       pode: list.filter((c) => c.can_request_service).length,
       nao_pode: list.filter((c) => !c.can_request_service).length,
@@ -145,7 +144,7 @@ export default function CustomersPage() {
     | { kind: "customer"; _id: string; date: string; customer: RealCustomer }
     | { kind: "lead"; _id: string; date: string; lead: Lead };
   const unifiedRows = useMemo<UnifiedRow[]>(() => {
-    const custs: UnifiedRow[] = (allCustomers?.data ?? []).map((c) => ({
+    const custs: UnifiedRow[] = (allCustomers ?? []).map((c) => ({
       kind: "customer", _id: `c-${c.id}`, date: c.created_at ?? "", customer: c,
     }));
     const lds: UnifiedRow[] = leadRows.map((l) => ({
@@ -176,7 +175,7 @@ export default function CustomersPage() {
   const origemDistribuicao = useMemo(() => {
     const counts = new Map<string, number>();
     const add = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
-    (allCustomers?.data ?? []).forEach(() => add("App"));
+    (allCustomers ?? []).forEach(() => add("App"));
     leadRows.forEach((l) => add(origemLabel(l.source)));
     return [...counts.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [allCustomers, leadRows]);
@@ -432,9 +431,6 @@ export default function CustomersPage() {
                       <b className="text-text-primary tabular-nums">{unifiedRows.length}</b> {unifiedRows.length === 1 ? "registo" : "registos"}
                       {" · "}clientes da app e leads (landing / WhatsApp) juntos. Clica num cliente para abrir o perfil.
                     </p>
-                    {reqCounts.carregados >= LIST_CAP && (
-                      <p className="text-xs text-warning">A mostrar os primeiros {LIST_CAP} clientes registados — há mais na base de dados.</p>
-                    )}
                     <DataTable columns={unifiedColumns} data={unifiedPageRows} keyField="_id"
                       loading={allCustomersLoading}
                       onRowClick={(r) => { if (r.kind === "customer") setSelectedCustomer(r.customer); }}

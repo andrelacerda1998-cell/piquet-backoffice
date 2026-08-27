@@ -54,6 +54,25 @@ export async function getCustomers(
 }
 
 /**
+ * Todos os clientes de uma vez — para a vista "Base de dados" que funde
+ * clientes + leads do lado do cliente. O backend limita `per_page` a 100, por
+ * isso pede-se a 1ª página, lê-se quantas há, e puxam-se as restantes em
+ * paralelo. À escala atual (poucos milhares no máximo) é perfeitamente viável.
+ */
+export async function getAllCustomers(search?: string): Promise<RealCustomer[]> {
+  const PER = 100;
+  const first = await getCustomers(1, PER, search);
+  const all = [...first.data];
+  if (first.totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, i) => getCustomers(i + 2, PER, search))
+    );
+    rest.forEach((r) => all.push(...r.data));
+  }
+  return all;
+}
+
+/**
  * Bloquear = soft-delete real do User no Laravel (sem conceito nativo de
  * "bloqueado"). Reativar = restore do soft-delete. Ambas ações reais, tal
  * como os pagamentos/documentos KYC -- não são formulários locais.
