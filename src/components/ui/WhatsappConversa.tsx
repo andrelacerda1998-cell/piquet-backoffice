@@ -71,13 +71,18 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
   const msgs = conversa?.messages ?? [];
   const podeEnviar = Boolean(conversa?.configured && conversa?.windowOpen);
 
-  // A nota por baixo do campo, conforme o que impede (ou não) o envio.
+  // A nota por baixo do campo, conforme o que impede (ou não) o envio livre
+  // pela app. Distingue "o cliente nunca escreveu" (janela nunca abriu) de
+  // "já passaram 24h desde a última mensagem" — são situações diferentes.
+  const temEntrada = msgs.some((m) => m.direction === "in");
   const nota =
     !conversa?.configured
       ? "O WhatsApp ainda não está ligado — assim que as chaves da Meta estiverem na Vercel, respondes daqui."
-      : !conversa?.windowOpen
-        ? "Passaram mais de 24h desde a última mensagem do cliente. O WhatsApp só permite reabrir com uma mensagem-modelo aprovada pela Meta."
-        : "";
+      : conversa?.windowOpen
+        ? ""
+        : temEntrada
+          ? "Passaram mais de 24h desde a última mensagem do cliente. Para lhe escrever livremente, usa o “Abrir no WhatsApp”."
+          : "Este contacto ainda não escreveu pelo WhatsApp, por isso não dá para enviar pela app. Usa o “Abrir no WhatsApp” para lhe escrever a partir do teu.";
 
   return (
     <div className="rounded-xl border border-surface-border overflow-hidden">
