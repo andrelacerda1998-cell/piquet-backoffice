@@ -14,7 +14,7 @@ import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import {
-  getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend,
+  getCustomers, getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend,
   blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
   type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
@@ -62,7 +62,6 @@ export default function CustomersPage() {
     s === "whatsapp" ? "WhatsApp" : s === "landing" || s === "website" ? "Landing page" : (s || "—");
 
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
-  const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
   const { data: retention } = useAsyncData(() => getRetentionData(), []);
   const { data: trend } = useAsyncData(() => getNewVsRecurringTrend(), []);
   // Sem sistema de reclamações no Laravel nem no Filament -- lista de notas
@@ -162,7 +161,7 @@ export default function CustomersPage() {
       }
       if (!q) return true;
       const hay = r.kind === "customer"
-        ? `${r.customer.name} ${r.customer.email} ${r.customer.phone_number} ${r.customer.nif}`
+        ? `${r.customer.name} ${r.customer.email} ${r.customer.phone_number} ${r.customer.nif} ${r.customer.city ?? ""}`
         : `${r.lead.name} ${r.lead.phone} ${r.lead.city} ${r.lead.source}`;
       return hay.toLowerCase().includes(q);
     };
@@ -171,6 +170,16 @@ export default function CustomersPage() {
   const unifiedTotalPages = Math.max(1, Math.ceil(unifiedRows.length / pageSize));
   const unifiedPage = Math.min(page, unifiedTotalPages);
   const unifiedPageRows = unifiedRows.slice((unifiedPage - 1) * pageSize, unifiedPage * pageSize);
+
+  // Distribuição por origem real (a app não regista canal de aquisição, mas
+  // sabemos donde veio cada pessoa): registados = App; leads = Landing / WhatsApp.
+  const origemDistribuicao = useMemo(() => {
+    const counts = new Map<string, number>();
+    const add = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
+    (allCustomers?.data ?? []).forEach(() => add("App"));
+    leadRows.forEach((l) => add(origemLabel(l.source)));
+    return [...counts.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [allCustomers, leadRows]);
 
   // Métodos de pagamento guardados — migrado do Filament
   // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
@@ -269,7 +278,7 @@ export default function CustomersPage() {
       );
     } },
     { key: "city", label: "Cidade", render: (r) => {
-      const city = r.kind === "lead" ? r.lead.city : "";
+      const city = r.kind === "lead" ? r.lead.city : (r.customer.city ?? "");
       return city && city !== "—" ? <span className="text-text-secondary">{city}</span> : <span className="text-text-muted">—</span>;
     } },
     { key: "origem", label: "Origem", render: (r) => (
@@ -352,9 +361,12 @@ export default function CustomersPage() {
                   </div>
                 )}
                 {sub === "origem" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Clientes por origem"><BarChartComponent data={bySource ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por origem"><DonutChartComponent data={bySource ?? []} centerLabel="Clientes" /></ChartCard>
+                  <div className="space-y-3">
+                    <p className="text-xs text-text-muted">Donde vieram os contactos: registados na app + leads da landing e do WhatsApp.</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Por origem"><BarChartComponent data={origemDistribuicao} /></ChartCard>
+                      <ChartCard title="Distribuição por origem"><DonutChartComponent data={origemDistribuicao} centerLabel="Contactos" /></ChartCard>
+                    </div>
                   </div>
                 )}
                 {sub === "localizacao" && (

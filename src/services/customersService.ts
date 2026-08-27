@@ -21,6 +21,8 @@ export interface RealCustomer {
   email_verified: boolean;
   phone_verified: boolean;
   can_request_service: boolean;
+  /** Cidade da morada principal do cliente (pode ser null se não a preencheu). */
+  city: string | null;
   blocked_at: string | null;
   created_at: string | null;
 }

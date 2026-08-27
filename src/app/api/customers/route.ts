@@ -11,6 +11,7 @@ export interface AdminCustomer {
   email_verified: boolean;
   phone_verified: boolean;
   can_request_service: boolean;
+  city: string | null;
   blocked_at: string | null;
   created_at: string | null;
 }
