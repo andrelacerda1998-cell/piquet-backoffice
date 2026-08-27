@@ -117,7 +117,7 @@ export const NAV_ITEMS = [
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
   "/", "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/suporte", "/chat", "/configuracao",
+  "/marketing", "/leads", "/suporte", "/chat", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -125,7 +125,7 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
 // Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
 export const NAV_DEEPLINKS: string[] = [
-  "/leads", "/desenvolvimento", "/tarefas",
+  "/desenvolvimento", "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados", "/servicos?tab=qualidade",
   "/tecnicos?tab=recrutamento",
