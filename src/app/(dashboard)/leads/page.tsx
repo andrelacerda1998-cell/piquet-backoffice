@@ -13,7 +13,7 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn, downloadCsv } from "@/lib/utils";
-import { Trash2, Search, MessageCircle, Headphones } from "lucide-react";
+import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 /**
@@ -180,6 +180,10 @@ function LeadsPageInner() {
   const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
   const [editing, setEditing] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
+  // Ver o pedido SEM entrar em modo de edição: a mensagem que o cliente
+  // escreveu estava só dentro do "Editar", uma caixa entre doze campos, e
+  // ninguém a encontrava. Abrir a linha mostra-a inteira, de imediato.
+  const [viewing, setViewing] = useState<Lead | null>(null);
   /**
    * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
@@ -377,12 +381,13 @@ function LeadsPageInner() {
     ) : <span className="text-text-muted">—</span> },
     { key: "stage", label: "Estado", render: (r) => (
       <select value={r.stage} onChange={(e) => changeStage(r, e.target.value as LeadStage)}
+        onClick={(e) => e.stopPropagation()}
         className={cn("text-xs font-medium rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-2 focus:ring-piquet", getStatusColor(r.stage))}>
         {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
     ) },
     { key: "acoes", label: "", render: (r) => (
-      <div className="flex items-center justify-end gap-1.5">
+      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
         {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1">✓ serviço</span>}
         <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
         <button onClick={() => removeLead(r)} title="Eliminar pedido"
@@ -550,9 +555,122 @@ function LeadsPageInner() {
               })}
             </div>
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
+              onRowClick={setViewing}
               emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
           </div>
       </div>
+
+      {/*
+        Ver o pedido — só leitura.
+
+        A mensagem que o cliente escreveu na landing estava acessível apenas
+        dentro do "Editar", uma caixa discreta no meio de doze campos de
+        gestão. Quem só queria LER o pedido não a encontrava. Clicar na linha
+        abre isto: a mensagem inteira, em primeiro plano, sem risco de mexer
+        em nada. Editar continua a um clique, no rodapé.
+      */}
+      <Modal
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing ? (viewing.name || viewing.phone || "Pedido") : ""}
+        subtitle={viewing
+          ? `Recebido a ${formatDate(viewing.createdAt)} · via ${viewing.source === "whatsapp" ? "WhatsApp" : viewing.source === "landing" || viewing.source === "website" ? "landing page" : viewing.source}`
+          : undefined}
+        size="lg"
+        footer={
+          <>
+            <button onClick={() => setViewing(null)} className="btn-secondary text-sm">Fechar</button>
+            {viewing && (
+              <button
+                onClick={() => { const l = viewing; setViewing(null); openEdit(l); }}
+                className="btn-primary text-sm inline-flex items-center gap-1.5"
+              >
+                <Pencil className="h-4 w-4" /> Editar
+              </button>
+            )}
+          </>
+        }
+      >
+        {viewing && (() => {
+          const { service, urgency, urgent } = parseLeadMessage(viewing.message || "");
+          const catName = categoryName(viewing.categoryId);
+          // O telefone só com dígitos (e indicativo PT quando vier local) para o
+          // link do WhatsApp; o texto mostra o número tal como foi recebido.
+          const digitos = (viewing.phone || "").replace(/\D/g, "");
+          const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
+          return (
+            <div className="space-y-4">
+              {/* A mensagem, em primeiro plano: é o motivo de abrir isto. */}
+              <div className="rounded-xl border border-surface-border bg-surface-subtle p-4">
+                <div className="flex items-center gap-1.5 mb-2 text-text-muted">
+                  <MessageCircle className="h-4 w-4" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">Mensagem recebida</span>
+                  {urgent && (
+                    <span className="ml-auto inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-[11px] font-semibold text-danger">
+                      Urgente
+                    </span>
+                  )}
+                </div>
+                {(viewing.message || "").trim()
+                  ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-text-primary">{viewing.message}</p>
+                  : <p className="text-sm text-text-muted">Sem mensagem registada.</p>}
+              </div>
+
+              {/* Os factos do pedido, um golpe de vista. */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {(catName || service) && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                    <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
+                  </div>
+                )}
+                {urgency && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Urgência</p>
+                    <p className={cn("text-sm mt-0.5", urgent ? "text-danger font-medium" : "text-text-primary")}>{urgency}</p>
+                  </div>
+                )}
+                {viewing.city && viewing.city !== "—" && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Cidade</p>
+                    <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5 text-text-muted" /> {viewing.city}
+                    </p>
+                  </div>
+                )}
+                {viewing.phone && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Telefone</p>
+                    <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 text-text-muted" /> {viewing.phone}
+                      {waNumero && (
+                        <a
+                          href={`https://wa.me/${waNumero}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-piquet-700 hover:underline text-xs"
+                        >
+                          WhatsApp
+                        </a>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* A descrição livre já vai dentro da mensagem inteira acima; só se
+                  mostra aqui em separado se houver, para quem quiser o essencial
+                  sem o cabeçalho "Serviço/Urgência". */}
+              {viewing.notes?.trim() && (
+                <div className="rounded-xl border border-surface-border p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
+                  <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
 
       <Modal
         open={showLead}
