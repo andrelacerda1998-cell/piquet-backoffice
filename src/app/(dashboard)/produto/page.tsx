@@ -20,7 +20,6 @@ import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
-import { DevPanel } from "@/app/(dashboard)/desenvolvimento/DevPanel";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
   info: "bg-surface-subtle text-text-secondary",
@@ -153,7 +152,6 @@ export default function ProdutoPage() {
     { id: "funil", label: "Funil do produto" },
     { id: "logs", label: "Logs" },
     { id: "integracoes", label: "Integrações" },
-    { id: "desenvolvimento", label: "Desenvolvimento" },
   ];
 
   const bugColumns: Column<Bug>[] = [
@@ -186,7 +184,7 @@ export default function ProdutoPage() {
           icon={LineChart}
           eyebrow="Produto"
           title="Produto"
-          subtitle="App Cliente, App Profissional, bugs, logs, integrações e desenvolvimento"
+          subtitle="App Cliente, App Profissional, bugs, logs e integrações"
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -473,7 +471,6 @@ export default function ProdutoPage() {
           </div>
         )}
 
-        {tab === "desenvolvimento" && <DevPanel />}
       </div>
     </RouteGuard>
   );
