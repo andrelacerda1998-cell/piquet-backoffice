@@ -616,11 +616,23 @@ function LeadsPageInner() {
         }
       >
         {viewing && (() => {
-          const { service, urgency, urgent } = parseLeadMessage(viewing.message || "");
+          const parsed = parseLeadMessage(viewing.message || "");
+          const { service, urgency, urgent } = parsed;
           const catName = categoryName(viewing.categoryId);
-          // Descrição livre do cliente (o único campo que os factos abaixo não
-          // cobrem). A mensagem inteira já aparece na conversa — não se repete.
-          const descricao = (viewing.message || "").match(/\*?\s*descri[çc][ãa]o\s*:\*?\s*([\s\S]+?)(?:\n\s*_|\n\s*\*|$)/i)?.[1]?.trim() ?? "";
+          /**
+           * Descrição livre do cliente — o que ele realmente escreveu, e o único
+           * campo que os factos abaixo não cobrem.
+           *
+           * Há DOIS formatos de mensagem e ambos têm de funcionar:
+           *  - WhatsApp:  "*Descrição:* texto"  (rótulo explícito)
+           *  - Landing:   "Servico: X · Urgencia: Y\ntexto"  (sem rótulo — é o
+           *               que vem depois da 1ª linha, que o parseLeadMessage já dá)
+           * Só se procurava o rótulo, por isso as leads da landing apareciam sem
+           * descrição nenhuma e o pedido do cliente ficava invisível.
+           */
+          const descricao =
+            (viewing.message || "").match(/\*?\s*descri[çc][ãa]o\s*:\*?\s*([\s\S]+?)(?:\n\s*_|\n\s*\*|$)/i)?.[1]?.trim()
+            || parsed.description;
           // O telefone só com dígitos (e indicativo PT quando vier local) para o
           // link do WhatsApp; o texto mostra o número tal como foi recebido.
           const digitos = (viewing.phone || "").replace(/\D/g, "");

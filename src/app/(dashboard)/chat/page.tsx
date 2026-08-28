@@ -534,9 +534,11 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {filtered.length === 0 && <p className="text-sm text-text-muted py-6 text-center col-span-full">Sem tarefas para este membro.</p>}
         {filtered.map((t) => {
-          const Icon = STATUS_ICON[t.status];
+          // Estado desconhecido (ex.: vindo do realtime) não pode deitar a aba
+          // abaixo: sem fallback, `<Icon />` com undefined rebenta a página.
+          const Icon = STATUS_ICON[t.status] ?? Circle;
           const d = daysUntil(t.due);
-          const next = NEXT_STATUS[t.status];
+          const next = NEXT_STATUS[t.status] ?? null;
           return (
             <div key={t.id} className={cn("card p-4 space-y-2.5", t.status === "concluida" && "opacity-70")}>
               <div className="flex items-start justify-between gap-2">
