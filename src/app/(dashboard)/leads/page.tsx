@@ -71,8 +71,6 @@ function LeadsPageInner() {
   const [leadStage, setLeadStage] = useState<"" | "todos" | LeadStage>("");
   const [leadCategory, setLeadCategory] = useState("");
   const [leadSource, setLeadSource] = useState("");
-  const [vista, setVista] = useState<"crm" | "bd">("crm");
-  const [bdSearch, setBdSearch] = useState("");
   // O mês atual está sempre na lista (mesmo sem leads), por ser o valor por omissão.
   const currentMonth = new Date().toISOString().slice(0, 7);
   const leadMonths = Array.from(new Set([currentMonth, ...leadRows.map((l) => (l.createdAt || "").slice(0, 7))].filter(Boolean))).sort().reverse();
@@ -430,82 +428,16 @@ function LeadsPageInner() {
         />
 
           <div className="space-y-4">
-            {/* Toggle CRM / Base de dados */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex rounded-lg border border-border overflow-hidden text-sm">
-                <button onClick={() => setVista("crm")} className={cn("px-4 py-1.5 font-medium transition-colors", vista === "crm" ? "bg-piquet text-white" : "text-text-secondary hover:bg-surface-subtle")}>CRM</button>
-                <button onClick={() => setVista("bd")} className={cn("px-4 py-1.5 font-medium transition-colors", vista === "bd" ? "bg-piquet text-white" : "text-text-secondary hover:bg-surface-subtle")}>Base de dados</button>
-              </div>
+            {/* Ações da página. A vista "Base de dados" foi removida: esses
+                registos vivem agora em Clientes → Todos os registos. */}
+            <div className="flex items-center justify-end gap-3">
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={exportLeads} className="btn-secondary text-sm">Exportar CSV</button>
                 <button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar pedido</button>
               </div>
             </div>
 
-            {vista === "bd" ? (
-              /* ── Vista Base de dados ─────────────────────────────────── */
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                    <input value={bdSearch} onChange={(e) => setBdSearch(e.target.value)} placeholder="Pesquisar nome, telefone, cidade, pedido…" className="input-field pl-9" />
-                  </div>
-                  <span className="text-sm text-text-secondary">{(() => {
-                    const q2 = bdSearch.trim().toLowerCase();
-                    const count = leadRows.filter((l) => !q2 || `${l.name} ${l.phone} ${l.city} ${l.message} ${l.source}`.toLowerCase().includes(q2)).length;
-                    return <><b className="text-text-primary tabular-nums">{count}</b> lead{count !== 1 ? "s" : ""}</>;
-                  })()}</span>
-                </div>
-                <div className="card overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        {["Data", "Nome", "Telefone", "Cidade", "Categoria", "Estado", "Orçamento"].map((h) => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted whitespace-nowrap">{h}</th>
-                        ))}
-                        <th className="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {(() => {
-                        const q2 = bdSearch.trim().toLowerCase();
-                        const rows = leadRows
-                          .filter((l) => !q2 || `${l.name} ${l.phone} ${l.city} ${l.message} ${l.source}`.toLowerCase().includes(q2))
-                          .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-                        if (rows.length === 0) return (
-                          <tr><td colSpan={8} className="px-4 py-8 text-center text-text-muted">Nenhuma lead encontrada.</td></tr>
-                        );
-                        return rows.map((l) => (
-                          <tr key={l.id} onClick={() => setViewing(l)} className="hover:bg-surface-subtle cursor-pointer transition-colors">
-                            <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{l.createdAt ? formatDate(l.createdAt) : "—"}</td>
-                            <td className="px-4 py-3 font-medium text-text-primary max-w-[160px] truncate">{l.name || "—"}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {l.phone ? (
-                                <div className="flex items-center gap-1.5">
-                                  <a href={`tel:${l.phone.replace(/\s/g,"")}`} onClick={(e)=>e.stopPropagation()} className="text-text-secondary hover:text-piquet-700 hover:underline">{l.phone}</a>
-                                  <a href={waHref(l.phone)} target="_blank" rel="noopener noreferrer" onClick={(e)=>e.stopPropagation()} title="WhatsApp" className="text-success hover:text-success/80"><MessageCircle className="h-3.5 w-3.5" /></a>
-                                </div>
-                              ) : <span className="text-text-muted">—</span>}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{l.city && l.city !== "—" ? l.city : <span className="text-text-muted">—</span>}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-text-secondary">{categoryName(l.categoryId) || <span className="text-text-muted">—</span>}</td>
-                            <td className="px-4 py-3 whitespace-nowrap"><span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(l.stage))}>{LEAD_STAGE_LABEL[l.stage] ?? l.stage}</span></td>
-                            <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">{l.quoteValue != null ? formatCurrency(l.quoteValue) : <span className="text-text-muted">—</span>}</td>
-                            <td className="px-4 py-3 text-right">
-                              <button onClick={(e) => { e.stopPropagation(); removeLead(l); }} title="Eliminar lead"
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-            /* ── Vista CRM ────────────────────────────────────────────── */
+            {/* ── Vista CRM ────────────────────────────────────────────── */}
             <>
             {/* Números do período filtrado — valor do pipeline e o que falta responder. */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -649,7 +581,6 @@ function LeadsPageInner() {
               onRowClick={setViewing}
               emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
             </>
-            )}
           </div>
       </div>
 
