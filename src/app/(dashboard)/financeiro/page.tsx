@@ -37,8 +37,8 @@ import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/li
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
-import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
+import { cn, copiarParaAreaDeTransferencia } from "@/lib/utils";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet, Copy } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS: TabDef[] = [
@@ -829,8 +829,10 @@ export default function FinancePage() {
                 // quantos vieram e mostra-se "—" enquanto não vierem nenhuns.
                 const comTotais = itens.filter((v) => v.total_invoiced != null);
                 const faturado = comTotais.reduce((s, v) => s + (v.total_invoiced ?? 0), 0);
-                const comissao = itens.filter((v) => v.commission != null).reduce((s, v) => s + (v.commission ?? 0), 0);
                 const temTotais = comTotais.length > 0;
+                // Comissão real: saldo da carteira do sistema (onde o backend
+                // deposita amount - amount_for_vendor a cada serviço fechado).
+                const comissaoSistema = systemProfit?.wallet_balance ?? 0;
                 return (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -839,20 +841,23 @@ export default function FinancePage() {
                       <MetricCard title="A pagar (s/ IVA)" metric={buildMetricValue(semIVA(aPagar, iva), semIVA(aPagar, iva))} format="currency" />
                       <MetricCard title="IVA incluído" metric={buildMetricValue(parcelaIVA(aPagar, iva), parcelaIVA(aPagar, iva))} format="currency" />
                     </div>
-                    {temTotais ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <MetricCard title="Faturado via Piquet (c/ IVA)" metric={buildMetricValue(faturado, faturado)} format="currency" />
-                        <MetricCard title="Faturado via Piquet (s/ IVA)" metric={buildMetricValue(semIVA(faturado, iva), semIVA(faturado, iva))} format="currency" />
-                        <MetricCard title="Comissão Piquet (c/ IVA)" metric={buildMetricValue(comissao, comissao)} format="currency" />
-                        <MetricCard title="Comissão Piquet (s/ IVA)" metric={buildMetricValue(semIVA(comissao, iva), semIVA(comissao, iva))} format="currency" />
-                      </div>
-                    ) : (
-                      <p className="text-xs text-text-muted">
-                        Total faturado e comissão ainda não aparecem: a carteira do técnico só guarda a
-                        parte dele, e esses valores têm de vir do backend. Assim que o endpoint os expuser,
-                        preenchem-se aqui sozinhos — em vez de mostrar um número estimado.
-                      </p>
-                    )}
+                    {/*
+                      Comissão da Piquet. Vem da CARTEIRA DO SISTEMA, que é onde
+                      o backend deposita `amount - amount_for_vendor` a cada
+                      serviço fechado — ou seja, é a comissão a sério, não uma
+                      percentagem estimada sobre o saldo dos técnicos.
+                    */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricCard title="Comissão Piquet (c/ IVA)" metric={buildMetricValue(comissaoSistema, comissaoSistema)} hideDelta format="currency" />
+                      <MetricCard title="Comissão Piquet (s/ IVA)" metric={buildMetricValue(semIVA(comissaoSistema, iva), semIVA(comissaoSistema, iva))} hideDelta format="currency" />
+                      {temTotais && <MetricCard title="Faturado via Piquet (c/ IVA)" metric={buildMetricValue(faturado, faturado)} hideDelta format="currency" />}
+                      {temTotais && <MetricCard title="Faturado via Piquet (s/ IVA)" metric={buildMetricValue(semIVA(faturado, iva), semIVA(faturado, iva))} hideDelta format="currency" />}
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      Comissão = saldo acumulado na carteira do sistema (o que a Piquet ganhou por serviço
+                      fechado, já líquido do que é do técnico).
+                      {!temTotais && " O total faturado por técnico aparece assim que o backend o expuser."}
+                    </p>
                   </>
                 );
               })()}
@@ -862,7 +867,25 @@ export default function FinancePage() {
                   columns={[
                     { key: "vendor_name", label: "Vendor", render: (r: VendorPayment) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
                     { key: "iban", label: "IBAN", render: (r: VendorPayment) => r.iban
-                      ? <span className="font-mono text-xs">{r.iban}</span>
+                      ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-xs">{r.iban}</span>
+                          {/* Copia sem os espaços de formatação — é assim que o
+                              homebanking o quer, e reescrevê-lo à mão é onde se
+                              engana um dígito. */}
+                          <button
+                            onClick={async () => {
+                              const ok = await copiarParaAreaDeTransferencia((r.iban ?? "").replace(/\s/g, ""));
+                              toast(ok ? "IBAN copiado." : "Não foi possível copiar o IBAN.", ok ? "success" : "error");
+                            }}
+                            title="Copiar IBAN"
+                            aria-label={`Copiar IBAN de ${r.vendor_name ?? "técnico"}`}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-primary transition-colors shrink-0"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      )
                       : <span className="text-text-muted text-xs">Sem IBAN</span> },
                     { key: "balance", label: "A pagar (c/ IVA)", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
                     { key: "balance_sem_iva", label: "A pagar (s/ IVA)", render: (r: VendorPayment) => (
