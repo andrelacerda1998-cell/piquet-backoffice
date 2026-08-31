@@ -891,16 +891,20 @@ export default function FinancePage() {
                     { key: "balance_sem_iva", label: "A pagar (s/ IVA)", render: (r: VendorPayment) => (
                       <span className="whitespace-nowrap">{formatCurrency(semIVA(r.balance, DEFAULT_TAX_CONFIG.vatRate))}</span>
                     ) },
-                    { key: "total_invoiced", label: "Faturado via Piquet", render: (r: VendorPayment) => r.total_invoiced == null
+                    /* Faturado e comissão em colunas separadas para c/ e s/ IVA,
+                       tal como o "A pagar" acima — mesma leitura em toda a tabela. */
+                    { key: "total_invoiced", label: "Faturado (c/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
                       ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap">{formatCurrency(r.total_invoiced)}
-                          <span className="block text-xs text-text-muted">{formatCurrency(semIVA(r.total_invoiced, DEFAULT_TAX_CONFIG.vatRate))} s/ IVA</span>
-                        </span> },
-                    { key: "commission", label: "Comissão Piquet", render: (r: VendorPayment) => r.commission == null
+                      : <span className="whitespace-nowrap">{formatCurrency(r.total_invoiced)}</span> },
+                    { key: "total_invoiced_sem_iva", label: "Faturado (s/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
                       ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap">{formatCurrency(r.commission)}
-                          <span className="block text-xs text-text-muted">{formatCurrency(semIVA(r.commission, DEFAULT_TAX_CONFIG.vatRate))} s/ IVA</span>
-                        </span> },
+                      : <span className="whitespace-nowrap">{formatCurrency(semIVA(r.total_invoiced, DEFAULT_TAX_CONFIG.vatRate))}</span> },
+                    { key: "commission", label: "Comissão Piquet (c/ IVA)", render: (r: VendorPayment) => r.commission == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap font-medium">{formatCurrency(r.commission)}</span> },
+                    { key: "commission_sem_iva", label: "Comissão Piquet (s/ IVA)", render: (r: VendorPayment) => r.commission == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap font-medium">{formatCurrency(semIVA(r.commission, DEFAULT_TAX_CONFIG.vatRate))}</span> },
                     { key: "acao", label: "", render: (r: VendorPayment) => (
                       <button
                         disabled={!r.iban || payingId === r.id}
