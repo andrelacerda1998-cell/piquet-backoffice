@@ -31,7 +31,7 @@ import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
 import { getVendorPayments, payVendor, type VendorPayment } from "@/services/vendorPaymentsService";
-import { buildMetricValue, semIVA, parcelaIVA } from "@/lib/calculations";
+import { buildMetricValue, semIVA } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
@@ -816,49 +816,46 @@ export default function FinancePage() {
               técnico por técnico × mês); "Processar" grava o registo do pagamento. */}
           {tab === "pagamentos" && (
             <div className="space-y-6">
-              <p className="text-sm text-text-secondary max-w-2xl">
-                Saldo por pagar a cada vendor (ledger interno). &ldquo;Pagar&rdquo; notifica o vendor e zera o saldo — a
-                transferência bancária em si é feita manualmente pelo admin com o IBAN abaixo <DemoBadge endpoint="/vendor-payments" />
-              </p>
               {(() => {
                 const itens = vendorPayments?.items ?? [];
                 const iva = DEFAULT_TAX_CONFIG.vatRate;
                 const aPagar = itens.reduce((s, v) => s + v.balance, 0);
                 // Totais só existem depois de o backend os expor; somar nulls
-                // daria 0 € e passaria por número real — por isso conta-se
-                // quantos vieram e mostra-se "—" enquanto não vierem nenhuns.
+                // daria 0 € e passaria por número real.
                 const comTotais = itens.filter((v) => v.total_invoiced != null);
                 const faturado = comTotais.reduce((s, v) => s + (v.total_invoiced ?? 0), 0);
-                const temTotais = comTotais.length > 0;
                 // Comissão real: saldo da carteira do sistema (onde o backend
                 // deposita amount - amount_for_vendor a cada serviço fechado).
                 const comissaoSistema = systemProfit?.wallet_balance ?? 0;
+                /*
+                  Uma faixa só, em vez de duas filas de cartões mais dois
+                  parágrafos. Os seis números liam-se todos da mesma maneira e
+                  ocupavam meio ecrã antes da lista — que é onde está o trabalho.
+                  O "c/ IVA" fica em destaque e o líquido logo por baixo.
+                */
+                const stat = (label: string, comIva: number, destaque = false) => (
+                  <div key={label} className="min-w-[130px]">
+                    <p className="text-xs text-text-secondary">{label}</p>
+                    <p className={cn("text-xl font-bold tabular-nums leading-tight",
+                      destaque ? "text-success" : "text-text-primary")}>{formatCurrency(comIva)}</p>
+                    <p className="text-[11px] text-text-muted tabular-nums">{formatCurrency(semIVA(comIva, iva))} s/ IVA</p>
+                  </div>
+                );
                 return (
-                  <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <MetricCard title="Técnicos com saldo" metric={buildMetricValue(itens.length, itens.length)} />
-                      <MetricCard title="A pagar (c/ IVA)" metric={buildMetricValue(aPagar, aPagar)} format="currency" />
-                      <MetricCard title="A pagar (s/ IVA)" metric={buildMetricValue(semIVA(aPagar, iva), semIVA(aPagar, iva))} format="currency" />
-                      <MetricCard title="IVA incluído" metric={buildMetricValue(parcelaIVA(aPagar, iva), parcelaIVA(aPagar, iva))} format="currency" />
+                  <div className="card px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-4">
+                    <div className="min-w-[110px]">
+                      <p className="text-xs text-text-secondary">Técnicos com saldo</p>
+                      <p className="text-xl font-bold text-text-primary tabular-nums leading-tight">{itens.length}</p>
+                      <p className="text-[11px] text-text-muted">a aguardar transferência</p>
                     </div>
-                    {/*
-                      Comissão da Piquet. Vem da CARTEIRA DO SISTEMA, que é onde
-                      o backend deposita `amount - amount_for_vendor` a cada
-                      serviço fechado — ou seja, é a comissão a sério, não uma
-                      percentagem estimada sobre o saldo dos técnicos.
-                    */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <MetricCard title="Comissão Piquet (c/ IVA)" metric={buildMetricValue(comissaoSistema, comissaoSistema)} hideDelta format="currency" />
-                      <MetricCard title="Comissão Piquet (s/ IVA)" metric={buildMetricValue(semIVA(comissaoSistema, iva), semIVA(comissaoSistema, iva))} hideDelta format="currency" />
-                      {temTotais && <MetricCard title="Faturado via Piquet (c/ IVA)" metric={buildMetricValue(faturado, faturado)} hideDelta format="currency" />}
-                      {temTotais && <MetricCard title="Faturado via Piquet (s/ IVA)" metric={buildMetricValue(semIVA(faturado, iva), semIVA(faturado, iva))} hideDelta format="currency" />}
-                    </div>
-                    <p className="text-xs text-text-muted">
-                      Comissão = saldo acumulado na carteira do sistema (o que a Piquet ganhou por serviço
-                      fechado, já líquido do que é do técnico).
-                      {!temTotais && " O total faturado por técnico aparece assim que o backend o expuser."}
+                    {stat("A pagar", aPagar)}
+                    {stat("Comissão Piquet", comissaoSistema, true)}
+                    {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
+                    <p className="text-[11px] text-text-muted max-w-xs ml-auto">
+                      Comissão = carteira do sistema. &ldquo;Pagar&rdquo; zera o saldo e avisa o técnico;
+                      a transferência é feita à mão com o IBAN. <DemoBadge endpoint="/vendor-payments" />
                     </p>
-                  </>
+                  </div>
                 );
               })()}
               <div>
