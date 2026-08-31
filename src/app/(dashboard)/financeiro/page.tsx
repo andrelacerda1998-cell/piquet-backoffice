@@ -31,7 +31,8 @@ import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
 import { getVendorPayments, payVendor, type VendorPayment } from "@/services/vendorPaymentsService";
-import { buildMetricValue } from "@/lib/calculations";
+import { buildMetricValue, semIVA, parcelaIVA } from "@/lib/calculations";
+import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
@@ -819,10 +820,42 @@ export default function FinancePage() {
                 Saldo por pagar a cada vendor (ledger interno). &ldquo;Pagar&rdquo; notifica o vendor e zera o saldo — a
                 transferência bancária em si é feita manualmente pelo admin com o IBAN abaixo <DemoBadge endpoint="/vendor-payments" />
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Vendors com saldo" metric={buildMetricValue(vendorPayments?.items.length ?? 0, vendorPayments?.items.length ?? 0)} />
-                <MetricCard title="Total por pagar" metric={buildMetricValue((vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0), (vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0))} format="currency" />
-              </div>
+              {(() => {
+                const itens = vendorPayments?.items ?? [];
+                const iva = DEFAULT_TAX_CONFIG.vatRate;
+                const aPagar = itens.reduce((s, v) => s + v.balance, 0);
+                // Totais só existem depois de o backend os expor; somar nulls
+                // daria 0 € e passaria por número real — por isso conta-se
+                // quantos vieram e mostra-se "—" enquanto não vierem nenhuns.
+                const comTotais = itens.filter((v) => v.total_invoiced != null);
+                const faturado = comTotais.reduce((s, v) => s + (v.total_invoiced ?? 0), 0);
+                const comissao = itens.filter((v) => v.commission != null).reduce((s, v) => s + (v.commission ?? 0), 0);
+                const temTotais = comTotais.length > 0;
+                return (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricCard title="Técnicos com saldo" metric={buildMetricValue(itens.length, itens.length)} />
+                      <MetricCard title="A pagar (c/ IVA)" metric={buildMetricValue(aPagar, aPagar)} format="currency" />
+                      <MetricCard title="A pagar (s/ IVA)" metric={buildMetricValue(semIVA(aPagar, iva), semIVA(aPagar, iva))} format="currency" />
+                      <MetricCard title="IVA incluído" metric={buildMetricValue(parcelaIVA(aPagar, iva), parcelaIVA(aPagar, iva))} format="currency" />
+                    </div>
+                    {temTotais ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <MetricCard title="Faturado via Piquet (c/ IVA)" metric={buildMetricValue(faturado, faturado)} format="currency" />
+                        <MetricCard title="Faturado via Piquet (s/ IVA)" metric={buildMetricValue(semIVA(faturado, iva), semIVA(faturado, iva))} format="currency" />
+                        <MetricCard title="Comissão Piquet (c/ IVA)" metric={buildMetricValue(comissao, comissao)} format="currency" />
+                        <MetricCard title="Comissão Piquet (s/ IVA)" metric={buildMetricValue(semIVA(comissao, iva), semIVA(comissao, iva))} format="currency" />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-text-muted">
+                        Total faturado e comissão ainda não aparecem: a carteira do técnico só guarda a
+                        parte dele, e esses valores têm de vir do backend. Assim que o endpoint os expuser,
+                        preenchem-se aqui sozinhos — em vez de mostrar um número estimado.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               <div>
                 <h2 className="font-semibold mb-3">Pagamentos a vendors</h2>
                 <DataTable
@@ -831,7 +864,20 @@ export default function FinancePage() {
                     { key: "iban", label: "IBAN", render: (r: VendorPayment) => r.iban
                       ? <span className="font-mono text-xs">{r.iban}</span>
                       : <span className="text-text-muted text-xs">Sem IBAN</span> },
-                    { key: "balance", label: "Saldo", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                    { key: "balance", label: "A pagar (c/ IVA)", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                    { key: "balance_sem_iva", label: "A pagar (s/ IVA)", render: (r: VendorPayment) => (
+                      <span className="whitespace-nowrap">{formatCurrency(semIVA(r.balance, DEFAULT_TAX_CONFIG.vatRate))}</span>
+                    ) },
+                    { key: "total_invoiced", label: "Faturado via Piquet", render: (r: VendorPayment) => r.total_invoiced == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap">{formatCurrency(r.total_invoiced)}
+                          <span className="block text-xs text-text-muted">{formatCurrency(semIVA(r.total_invoiced, DEFAULT_TAX_CONFIG.vatRate))} s/ IVA</span>
+                        </span> },
+                    { key: "commission", label: "Comissão Piquet", render: (r: VendorPayment) => r.commission == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap">{formatCurrency(r.commission)}
+                          <span className="block text-xs text-text-muted">{formatCurrency(semIVA(r.commission, DEFAULT_TAX_CONFIG.vatRate))} s/ IVA</span>
+                        </span> },
                     { key: "acao", label: "", render: (r: VendorPayment) => (
                       <button
                         disabled={!r.iban || payingId === r.id}

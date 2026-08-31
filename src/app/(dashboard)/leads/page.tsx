@@ -439,36 +439,40 @@ function LeadsPageInner() {
 
             {/* ── Vista CRM ────────────────────────────────────────────── */}
             <>
-            {/* Números do período filtrado — valor do pipeline e o que falta responder. */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Valor em pipeline</p>
-                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">soma dos orçamentos</p>
+            {/*
+              Números do período, numa faixa só. Eram quatro cartões altos que
+              empurravam a lista para fora do ecrã — e três deles mostram 0
+              enquanto não houver orçamentos. O que exige ação ("por responder")
+              fica destacado; o resto é contexto e lê-se de relance.
+            */}
+            <div className="card px-4 py-3 flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div className={cn("flex items-baseline gap-2", crm.porResponder > 0 && "order-first")}>
+                <span className={cn("text-xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>
+                  {crm.porResponder}
+                </span>
+                <span className="text-xs text-text-secondary">por responder</span>
               </div>
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Comissão prevista</p>
-                <p className="mt-1 text-2xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">orçamento − técnico</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</span>
+                <span className="text-xs text-text-secondary">em pipeline</span>
               </div>
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Taxa de conversão</p>
-                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">{crm.executadas} de {crm.total} executadas</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</span>
+                <span className="text-xs text-text-secondary">comissão prevista</span>
               </div>
-              <div className={cn("card p-4", crm.porResponder > 0 && "border-l-[3px] border-l-warning")}>
-                <p className="text-xs text-text-secondary">Por responder</p>
-                <p className={cn("mt-1 text-2xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>{crm.porResponder}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</span>
+                <span className="text-xs text-text-secondary">conversão · {crm.executadas}/{crm.total}</span>
               </div>
             </div>
 
             {/*
-              Onde se perde o negócio. É a razão de existir do campo de motivo:
-              os cartões acima dizem QUANTO se perde, isto diz PORQUÊ. Só
-              aparece quando há perdas no período filtrado.
+              Onde se perde o negócio. Só aparece quando há pelo menos um motivo
+              REAL registado: enquanto tudo o que existe são pedidos antigos "sem
+              motivo", o painel ocupava meio ecrã para dizer "100% sem motivo" —
+              informação nenhuma. Volta sozinho assim que se registarem motivos.
             */}
-            {motivosPerda.length > 0 && (
+            {motivosPerda.some((m) => m.id !== "sem_motivo") && (
               <div className="card p-4">
                 <div className="flex items-baseline justify-between gap-3 mb-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
@@ -523,11 +527,8 @@ function LeadsPageInner() {
                   <option value="">Todos os meses</option>
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
-                <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | "todos" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
-                  <option value="">A trabalhar (novos e à espera de resposta)</option>
-                  <option value="todos">Todos os estados</option>
-                  {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
+                {/* O estado filtra-se pelos chips por baixo — um dropdown a
+                    fazer o mesmo era escolha a dobrar. */}
                 <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
                   <option value="">Todas as categorias</option>
                   {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -563,16 +564,27 @@ function LeadsPageInner() {
               </div>
             </div>
 
-            {/* Cartões de estado — clicáveis para filtrar por esse estado. */}
-            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-              {LEAD_STAGES.map((s) => {
-                const active = leadStage === s.id;
+            {/*
+              Estados como chips. Eram seis cartões altos (duas filas, quase
+              todos a zero) que empurravam a lista para baixo e repetiam o
+              dropdown de estado. Em chip, o mesmo filtro e as mesmas contagens
+              cabem numa linha — e são o único sítio onde se escolhe o estado.
+            */}
+            <div className="chip-row">
+              {([
+                { id: "" as const, label: "A trabalhar", total: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
+                ...LEAD_STAGES.map((s) => ({ id: s.id, label: s.label, total: baseFiltered.filter((l) => l.stage === s.id).length })),
+                { id: "todos" as const, label: "Todos", total: baseFiltered.length },
+              ]).map((c) => {
+                const active = leadStage === c.id;
                 return (
-                  <button key={s.id} onClick={() => setLeadStage(active ? "" : s.id)}
-                    className={cn("card p-3 text-left transition-shadow hover:shadow-elevated",
-                      active && "ring-2 ring-piquet border-piquet")}>
-                    <p className="text-xs text-text-secondary">{s.label}</p>
-                    <p className="text-xl font-bold text-text-primary tabular-nums">{baseFiltered.filter((l) => l.stage === s.id).length}</p>
+                  <button key={c.id || "ativos"} onClick={() => setLeadStage(c.id)}
+                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
+                      active
+                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
+                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
+                    {c.label}
+                    <span className={cn("tabular-nums text-xs", active ? "opacity-80" : "text-text-muted")}>{c.total}</span>
                   </button>
                 );
               })}
