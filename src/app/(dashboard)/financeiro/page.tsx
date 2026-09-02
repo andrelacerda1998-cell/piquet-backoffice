@@ -24,6 +24,8 @@ import {
   type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
   type InvoiceRecurrence,
   getTreasury, addTreasuryBalance,
+  refundAppPayment,
+  cancelAppPaymentHold,
 } from "@/services/financeService";
 import { buildMonthlyPlan, type PlanItem } from "@/lib/budgetPlan";
 import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService";
@@ -91,7 +93,24 @@ export default function FinancePage() {
   const { data: cashFlow } = useAsyncData(() => getCashFlowForecast(cashFlowScenario), [cashFlowScenario]);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
-  const { data: appPay } = useAsyncData(() => getAppPayments(), []);
+  const { data: appPay, refetch: refetchAppPay } = useAsyncData(() => getAppPayments(), []);
+  /*
+    Reembolsar / libertar cativo. São operações sobre dinheiro real, por isso
+    passam sempre por confirmação e o botão só aparece no estado em que a ação
+    faz sentido: reembolsar só o que já foi cobrado, libertar só o que está
+    cativo. O backend recusa na mesma se o serviço associado ainda estiver
+    vivo -- aí o caminho certo é cancelar o serviço em Operações.
+  */
+  const [payToRefund, setPayToRefund] = useState<AppPayment | null>(null);
+  const [payToRelease, setPayToRelease] = useState<AppPayment | null>(null);
+  const doRefund = async (p: AppPayment) => {
+    try { await refundAppPayment(p.id); toast(`Reembolso de ${formatCurrency(p.amount)} enviado ao Payshop.`); refetchAppPay(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error"); }
+  };
+  const doRelease = async (p: AppPayment) => {
+    try { await cancelAppPaymentHold(p.id); toast(`Cativo de ${formatCurrency(p.amount)} libertado.`); refetchAppPay(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro ao libertar o cativo.", "error"); }
+  };
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
   const { data: vendorPayments, loading: vendorPaymentsLoading, refetch: refetchVendorPayments } = useAsyncData(() => getVendorPayments(), []);
@@ -215,6 +234,14 @@ export default function FinancePage() {
       return ad < bd ? -1 : ad > bd ? 1 : 0;
     });
   const totalOutstanding = openInvoices.reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
+
+  // Faturas de custos (company_invoices): o total emitido e a parte já vencida.
+  // "Em atraso" conta só o que falta pagar de faturas cujo vencimento passou --
+  // uma parcial em atraso pesa pelo que resta, não pelo valor cheio.
+  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
+  const totalOverdue = openInvoices
+    .filter((i) => i.overdue)
+    .reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
 
   // Vista da lista de faturas. Uma fatura paga sai da frente assim que é
   // marcada — o trabalho é pagar o que falta —, mas fica acessível em "Pagas"
@@ -452,9 +479,19 @@ export default function FinancePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricCard title="GMV do mês" metric={buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão Piquet" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
-                  <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" />
+                  <MetricCard title="Comissão Piquet do mês" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
+                  {/*
+                    Faturas são CUSTOS (company_invoices), não receita -- por isso
+                    ficam a seguir ao GMV e não misturadas com ele. Sem comparação
+                    mensal: o total é acumulado e um "+0%" seria inventado.
+                  */}
+                  <MetricCard title="Total das faturas" metric={buildMetricValue(totalInvoiced, totalInvoiced)} format="currency" hideDelta />
+                  <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
+                    className={cn(totalOverdue > 0 && "border-danger/40")} />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                  <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" deltaLabel="vs ano ant." />
+                  <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" deltaLabel="vs ano ant." />
                 </div>
               </div>
 
@@ -824,9 +861,12 @@ export default function FinancePage() {
                 // daria 0 € e passaria por número real.
                 const comTotais = itens.filter((v) => v.total_invoiced != null);
                 const faturado = comTotais.reduce((s, v) => s + (v.total_invoiced ?? 0), 0);
-                // Comissão real: saldo da carteira do sistema (onde o backend
-                // deposita amount - amount_for_vendor a cada serviço fechado).
-                const comissaoSistema = systemProfit?.wallet_balance ?? 0;
+                // Comissão: soma do que o backend devolve por técnico
+                // (amount - amount_for_vendor de cada serviço fechado). NÃO se
+                // usa a carteira do sistema -- esse saldo é caixa acumulada da
+                // Piquet e não corresponde à comissão desta lista de técnicos.
+                const comComissao = itens.filter((v) => v.commission != null);
+                const comissao = comComissao.reduce((s, v) => s + (v.commission ?? 0), 0);
                 /*
                   Uma faixa só, em vez de duas filas de cartões mais dois
                   parágrafos. Os seis números liam-se todos da mesma maneira e
@@ -849,10 +889,10 @@ export default function FinancePage() {
                       <p className="text-[11px] text-text-muted">a aguardar transferência</p>
                     </div>
                     {stat("A pagar", aPagar)}
-                    {stat("Comissão Piquet", comissaoSistema, true)}
+                    {comComissao.length > 0 && stat("Comissão Piquet", comissao, true)}
                     {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
                     <p className="text-[11px] text-text-muted max-w-xs ml-auto">
-                      Comissão = carteira do sistema. &ldquo;Pagar&rdquo; zera o saldo e avisa o técnico;
+                      &ldquo;Pagar&rdquo; zera o saldo e avisa o técnico;
                       a transferência é feita à mão com o IBAN. <DemoBadge endpoint="/vendor-payments" />
                     </p>
                   </div>
@@ -1014,6 +1054,13 @@ export default function FinancePage() {
                         </span>
                       );
                     } },
+                    { key: "acoes", label: "", render: (r: AppPayment) => (
+                      r.state === "pago" ? (
+                        <button onClick={() => setPayToRefund(r)} className="text-xs text-danger hover:underline whitespace-nowrap">Reembolsar</button>
+                      ) : r.state === "cativado" ? (
+                        <button onClick={() => setPayToRelease(r)} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Libertar cativo</button>
+                      ) : <span className="text-text-muted">—</span>
+                    ) },
                   ]}
                   data={appPay.payments}
                   keyField="id"
@@ -1172,6 +1219,37 @@ export default function FinancePage() {
             </Field>
           </div>
         </Modal>
+
+        <ConfirmDialog
+          open={!!payToRefund}
+          onClose={() => setPayToRefund(null)}
+          onConfirm={async () => { if (payToRefund) { await doRefund(payToRefund); setPayToRefund(null); } }}
+          title="Reembolsar pagamento"
+          tone="danger"
+          confirmLabel="Reembolsar"
+          description={payToRefund && (
+            <>
+              Vais devolver <b className="text-text-primary">{formatCurrency(payToRefund.amount)}</b> ao cliente
+              <b className="text-text-primary"> {payToRefund.customer}</b>, pelo mesmo meio de pagamento ({payToRefund.method}).
+              O dinheiro sai da conta da Piquet e a operação não se desfaz.
+            </>
+          )}
+        />
+
+        <ConfirmDialog
+          open={!!payToRelease}
+          onClose={() => setPayToRelease(null)}
+          onConfirm={async () => { if (payToRelease) { await doRelease(payToRelease); setPayToRelease(null); } }}
+          title="Libertar valor cativo"
+          confirmLabel="Libertar"
+          description={payToRelease && (
+            <>
+              Os <b className="text-text-primary">{formatCurrency(payToRelease.amount)}</b> reservados na conta de
+              <b className="text-text-primary"> {payToRelease.customer}</b> deixam de estar bloqueados. Não é um reembolso:
+              este dinheiro nunca chegou a ser cobrado. Depois de libertado, cobrar exige um pagamento novo.
+            </>
+          )}
+        />
 
         <ConfirmDialog
           open={!!invToRemove}
