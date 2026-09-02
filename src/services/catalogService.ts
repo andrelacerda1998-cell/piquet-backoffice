@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 
 /**
  * Catálogo (tipos de serviço) + Categorias — migrado do Filament
@@ -94,5 +94,15 @@ export async function createServiceType(input: ServiceTypeInput): Promise<Servic
 export async function updateServiceType(id: number, patch: Partial<ServiceTypeInput>): Promise<ServiceType> {
   return apiPut<ServiceType>(`/services-types/${id}`, patch, () => {
     throw new Error("Catálogo precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+/**
+ * Elimina um tipo de serviço. SoftDelete no backend — o histórico de serviços
+ * continua a resolver o nome; o que desaparece é a oferta no catálogo e na app.
+ */
+export async function deleteServiceType(id: number): Promise<{ id: number; deleted: boolean }> {
+  return apiDelete<{ id: number; deleted: boolean }>(`/services-types/${id}`, () => {
+    throw new Error("Eliminar tipos de serviço precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }

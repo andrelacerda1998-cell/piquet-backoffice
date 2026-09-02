@@ -13,3 +13,19 @@ export const PUT = withStaff(async (req, { params }) => {
     return apiErr(e instanceof ApiError ? e.message : "Erro ao atualizar o tipo de serviço.", e instanceof ApiError ? e.status : 500);
   }
 });
+
+/**
+ * DELETE /api/services-types/:id — remove o tipo de serviço do catálogo.
+ * SoftDelete no backend: o histórico de serviços continua a resolver o nome.
+ */
+export const DELETE = withStaff(async (_req, { params }) => {
+  try {
+    const data = await laravelAdminRequest<{ id: number; deleted: boolean }>(
+      `/v1/admin/services-types/${params.id}`,
+      { method: "DELETE" },
+    );
+    return apiOk(data);
+  } catch (e) {
+    return apiErr(e instanceof ApiError ? e.message : "Erro ao eliminar o tipo de serviço.", e instanceof ApiError ? e.status : 500);
+  }
+});

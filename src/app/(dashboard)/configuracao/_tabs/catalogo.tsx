@@ -13,12 +13,14 @@ import {
   getServiceTypes,
   updateOperationArea,
   updateServiceType,
+  deleteServiceType,
   type OperationArea,
   type ServiceType,
 } from "@/services/catalogService";
 import { toast } from "@/stores";
 import { DemoBadge } from "@/components/ui/DemoBadge";
-import { Plus, Wrench, Pencil } from "lucide-react";
+import { Plus, Wrench, Pencil, Trash2, Search } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 /**
  * Catálogo (tipos de serviço) + Categorias — migrado do Filament
@@ -43,6 +45,11 @@ async function loadCatalog() {
 function CatalogoContent() {
   const { data, loading, error, refetch } = useAsyncData(loadCatalog, []);
 
+  // Procura local: o catálogo cabe todo em memória (dezenas de tipos), por
+  // isso filtra-se aqui em vez de ir ao servidor a cada tecla.
+  const [busca, setBusca] = useState("");
+  const [typeToDelete, setTypeToDelete] = useState<ServiceType | null>(null);
+
   const [areaModal, setAreaModal] = useState<{ open: boolean; editing: OperationArea | null; name: string }>({
     open: false,
     editing: null,
@@ -62,6 +69,18 @@ function CatalogoContent() {
 
   const areas = useMemo(() => data?.areas ?? [], [data]);
   const types = useMemo(() => data?.types ?? [], [data]);
+
+  // Procura pelo nome do serviço e pelo nome da categoria -- procurar
+  // "canalização" tem de trazer os serviços dessa categoria, não só um tipo
+  // que por acaso tenha a palavra no nome.
+  const tiposFiltrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return types;
+    return types.filter((t) =>
+      (t.name ?? "").toLowerCase().includes(q) ||
+      (t.operation_area_name ?? "").toLowerCase().includes(q)
+    );
+  }, [types, busca]);
 
   if (loading && !data) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -106,6 +125,11 @@ function CatalogoContent() {
 
   const parseLines = (text: string) => text.split("\n").map((l) => l.trim()).filter(Boolean);
 
+  const removeType = async (t: ServiceType) => {
+    try { await deleteServiceType(t.id); toast(`"${t.name}" eliminado do catálogo.`); refetch(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro ao eliminar.", "error"); }
+  };
+
   const saveType = async () => {
     const name = typeModal.name.trim();
     if (!name) { toast("Indica o nome do tipo de serviço.", "error"); return; }
@@ -149,9 +173,15 @@ function CatalogoContent() {
     {
       key: "actions", label: "",
       render: (r) => (
-        <button onClick={() => openEditType(r)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline">
-          <Pencil className="h-3.5 w-3.5" /> Editar
-        </button>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={() => openEditType(r)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline">
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </button>
+          <button onClick={() => setTypeToDelete(r)} title="Eliminar tipo de serviço"
+            className="text-text-muted hover:text-danger transition-colors">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -195,10 +225,44 @@ function CatalogoContent() {
 
         {/* Tipos de serviço */}
         <div>
-          <h3 className="font-semibold mb-3">Tipos de serviço</h3>
-          <DataTable columns={columns} data={types} keyField="id" emptyMessage="Ainda sem tipos de serviço." />
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 className="font-semibold">Tipos de serviço</h3>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Procurar serviço ou categoria…"
+                className="input-field pl-9"
+              />
+            </div>
+          </div>
+          <DataTable
+            columns={columns}
+            data={tiposFiltrados}
+            keyField="id"
+            emptyMessage={busca ? `Nenhum serviço encontrado para “${busca}”.` : "Ainda sem tipos de serviço."}
+          />
+          {busca && (
+            <p className="text-xs text-text-muted mt-2">{tiposFiltrados.length} de {types.length} tipos</p>
+          )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!typeToDelete}
+        onClose={() => setTypeToDelete(null)}
+        onConfirm={async () => { if (typeToDelete) { await removeType(typeToDelete); setTypeToDelete(null); } }}
+        title="Eliminar tipo de serviço"
+        tone="danger"
+        confirmLabel="Eliminar"
+        description={typeToDelete && (
+          <>
+            <b className="text-text-primary">{typeToDelete.name}</b> deixa de estar disponível no catálogo e na app.
+            Os serviços já realizados com este tipo mantêm-se no histórico.
+          </>
+        )}
+      />
 
       {/* Categoria: criar/editar */}
       <Modal
