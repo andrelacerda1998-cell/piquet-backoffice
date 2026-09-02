@@ -235,10 +235,9 @@ export default function FinancePage() {
     });
   const totalOutstanding = openInvoices.reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
 
-  // Faturas de custos (company_invoices): o total emitido e a parte já vencida.
-  // "Em atraso" conta só o que falta pagar de faturas cujo vencimento passou --
-  // uma parcial em atraso pesa pelo que resta, não pelo valor cheio.
-  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
+  // Faturas de custos (company_invoices) ainda por liquidar. "Em atraso" é o
+  // subconjunto já vencido -- ambos contam o que FALTA pagar, por isso uma
+  // parcial pesa pelo remanescente e não pelo valor cheio.
   const totalOverdue = openInvoices
     .filter((i) => i.overdue)
     .reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
@@ -485,7 +484,7 @@ export default function FinancePage() {
                     ficam a seguir ao GMV e não misturadas com ele. Sem comparação
                     mensal: o total é acumulado e um "+0%" seria inventado.
                   */}
-                  <MetricCard title="Total das faturas" metric={buildMetricValue(totalInvoiced, totalInvoiced)} format="currency" hideDelta />
+                  <MetricCard title="Faturas por pagar" metric={buildMetricValue(totalOutstanding, totalOutstanding)} format="currency" hideDelta />
                   <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
                     className={cn(totalOverdue > 0 && "border-danger/40")} />
                 </div>
