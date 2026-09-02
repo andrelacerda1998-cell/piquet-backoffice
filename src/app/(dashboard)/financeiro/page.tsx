@@ -489,10 +489,6 @@ export default function FinancePage() {
                   <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
                     className={cn(totalOverdue > 0 && "border-danger/40")} />
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                  <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" deltaLabel="vs ano ant." />
-                  <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" deltaLabel="vs ano ant." />
-                </div>
               </div>
 
               {/* Próximas faturas a pagar */}
