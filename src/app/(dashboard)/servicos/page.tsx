@@ -213,18 +213,24 @@ export default function ServicesPage() {
 
         {tab === "pedidos" && (
           <div className="space-y-4">
-            {/* Sub-abas por estado do fluxo operacional */}
-            <div className="chip-row">
-              {STATUS_GROUPS.map((g) => (
-                <button key={g.id} onClick={() => { setStatusGroup(g.id); setPage(1); }}
-                  className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                    statusGroup === g.id ? "bg-piquet/15 text-piquet-700 border-piquet/30" : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                  {g.label}
-                </button>
-              ))}
-            </div>
+            {/*
+              O estado passou de sete chips a um filtro. A fila ocupava uma
+              linha inteira acima da pesquisa e dos outros filtros, e lia-se
+              como sub-abas -- quando é, na prática, mais um critério de
+              filtragem. Agora está com os restantes, na mesma linha.
+            */}
             <div className="flex flex-wrap items-center gap-3">
               <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar serviços..." />
+              <select
+                value={statusGroup}
+                onChange={(e) => { setStatusGroup(e.target.value); setPage(1); }}
+                className="input-field w-auto"
+                aria-label="Filtrar por estado"
+              >
+                {STATUS_GROUPS.map((g) => (
+                  <option key={g.id} value={g.id}>{g.id === "todos" ? "Todos os estados" : g.label}</option>
+                ))}
+              </select>
               <FilterBar className="flex-1 min-w-[240px]" />
             </div>
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
@@ -277,13 +283,15 @@ export default function ServicesPage() {
         {tab === "desempenho" && opMetrics && (
           <div className="space-y-6">
             <DemoBadge endpoint="/services/operational-metrics" />
-            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-              <MetricCard title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, opMetrics.avgResponseTime)} hideDelta />
-              <MetricCard title="Tempo encontrar técnico" metric={buildMetricValue(opMetrics.avgTechnicianFindTime, opMetrics.avgTechnicianFindTime)} hideDelta />
-              <MetricCard title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, opMetrics.completionRate)} hideDelta format="percent" />
-              <MetricCard title="Taxa cancelamento" metric={buildMetricValue(opMetrics.cancellationRate, opMetrics.cancellationRate)} hideDelta format="percent" />
-              <MetricCard title="Sem técnico" metric={buildMetricValue(opMetrics.noTechnicianRate, opMetrics.noTechnicianRate)} hideDelta format="percent" />
-              <MetricCard title="Em atraso" metric={buildMetricValue(opMetrics.overdueServices, opMetrics.overdueServices)} hideDelta />
+            {/* Uma linha só: as taxas de conclusão, cancelamento e sem técnico
+                somam ~100% -- vê-las juntas é a leitura, separá-las não é. */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <MetricCard compact title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, opMetrics.avgResponseTime)} hideDelta />
+              <MetricCard compact title="Tempo encontrar téc." metric={buildMetricValue(opMetrics.avgTechnicianFindTime, opMetrics.avgTechnicianFindTime)} hideDelta />
+              <MetricCard compact title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, opMetrics.completionRate)} hideDelta format="percent" />
+              <MetricCard compact title="Taxa cancelamento" metric={buildMetricValue(opMetrics.cancellationRate, opMetrics.cancellationRate)} hideDelta format="percent" />
+              <MetricCard compact title="Sem técnico" metric={buildMetricValue(opMetrics.noTechnicianRate, opMetrics.noTechnicianRate)} hideDelta format="percent" />
+              <MetricCard compact title="Em atraso" metric={buildMetricValue(opMetrics.overdueServices, opMetrics.overdueServices)} hideDelta />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ChartCard title="Estados dos serviços">

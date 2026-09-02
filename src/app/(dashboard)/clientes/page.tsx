@@ -338,13 +338,16 @@ export default function CustomersPage() {
                 {sub === "resumo" && (
                   <div className="space-y-6">
                     {metrics && (
-                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
-                        <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
-                        <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
-                        <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
-                        <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
+                      /* Uma linha só (cartões `compact`): estes números lêem-se
+                         em conjunto — registados vs ativos vs recorrentes só
+                         diz alguma coisa comparado lado a lado. */
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        <MetricCard compact title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
+                        <MetricCard compact title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
+                        <MetricCard compact title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
+                        <MetricCard compact title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
+                        <MetricCard compact title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
+                        <MetricCard compact title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
                       </div>
                     )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -367,11 +370,11 @@ export default function CustomersPage() {
                     </div>
                   </div>
                 )}
+                {/* Só o circular: as barras e o donut liam os MESMOS `byLocation`. */}
                 {sub === "localizacao" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Clientes por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por localização"><DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" /></ChartCard>
-                  </div>
+                  <ChartCard title="Cidades com mais clientes" subtitle="Distribuição por localização">
+                    <DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" />
+                  </ChartCard>
                 )}
               </>
             )}

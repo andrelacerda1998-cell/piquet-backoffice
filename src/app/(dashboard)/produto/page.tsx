@@ -93,19 +93,32 @@ export default function ProdutoPage() {
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
 
-  // Funil da app (Mixpanel): período à escolha — atalhos + meses de calendário.
-  const [funnelPeriod, setFunnelPeriod] = useState("30d");
+  /*
+    Funil da app (Mixpanel): período à escolha — meses de calendário + atalhos.
+    Por omissão o MÊS CORRENTE, e não "últimos 30 dias": o mês é a unidade em
+    que o negócio é lido em todo o resto do backoffice (GMV, comissão,
+    faturas), e uma janela deslizante nunca bate certo com esses números.
+  */
+  const mesCorrente = useMemo(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+  const [funnelPeriod, setFunnelPeriod] = useState(mesCorrente);
   const funnelOptions = useMemo(() => {
-    const opts: { value: string; label: string }[] = [
-      { value: "30d", label: "Últimos 30 dias" },
-      { value: "90d", label: "Últimos 90 dias" },
-      { value: "ano", label: "Este ano" },
-    ];
+    const opts: { value: string; label: string }[] = [];
     const now = new Date();
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1);
-      opts.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}` });
+      opts.push({
+        value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}${i === 0 ? " (mês atual)" : ""}`,
+      });
     }
+    opts.push(
+      { value: "30d", label: "Últimos 30 dias" },
+      { value: "90d", label: "Últimos 90 dias" },
+      { value: "ano", label: "Este ano" },
+    );
     return opts;
   }, []);
   const funnelRange = useMemo(() => {
@@ -115,9 +128,12 @@ export default function ProdutoPage() {
     if (funnelPeriod === "90d") return { from: iso(new Date(Date.now() - 90 * 864e5)), to: iso(now) };
     if (funnelPeriod === "ano") return { from: `${now.getUTCFullYear()}-01-01`, to: iso(now) };
     const [y, m] = funnelPeriod.split("-").map(Number);
+    // No mês a decorrer o fim é HOJE: pedir até ao último dia do mês era pedir
+    // dias que ainda não aconteceram.
+    if (funnelPeriod === mesCorrente) return { from: `${funnelPeriod}-01`, to: iso(now) };
     const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
     return { from: `${funnelPeriod}-01`, to: `${funnelPeriod}-${String(last).padStart(2, "0")}` };
-  }, [funnelPeriod]);
+  }, [funnelPeriod, mesCorrente]);
   const { data: funnel, loading: funnelLoading } = useAsyncData(() => getAppFunnel(funnelRange.from, funnelRange.to), [funnelPeriod]);
 
   // Totais e variação mês-a-mês derivados das séries de crescimento.
@@ -440,8 +456,12 @@ export default function ProdutoPage() {
                     {funnel.steps.map((s, i) => (
                       <div key={i} className="py-2">
                         <div className="flex items-baseline justify-between gap-3 mb-1">
+                          {/* O nome cru do evento fica à vista: sem ele não se
+                              sabe QUE evento do Mixpanel alimenta cada passo,
+                              e o rótulo bonito esconde exatamente isso. */}
                           <p className="text-sm font-medium text-text-primary truncate">
                             <span className="text-text-muted mr-1.5">{i + 1}.</span>{stepLabel(s.event)}
+                            <code className="ml-2 text-[11px] font-normal text-text-muted">{s.event}</code>
                           </p>
                           <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
                             <span className="text-sm font-semibold">{formatNumber(s.count)}</span>
@@ -463,7 +483,13 @@ export default function ProdutoPage() {
                         </div>
                       </div>
                     ))}
-                    <p className="text-xs text-text-muted pt-2">A percentagem é sobre o topo do funil; a seta é a queda face ao passo anterior — vermelho quando cai mais de metade.</p>
+                    <p className="text-xs text-text-muted pt-2">
+                      Os passos são os eventos do Mixpanel listados a cinzento
+                      (<code className="text-text-secondary">{funnel.steps.map((s) => s.event).join(", ")}</code>),
+                      definidos no funil <b className="text-text-secondary">{funnel.name || funnel.funnelId}</b> — para
+                      mudar quais se detetam, edita esse funil no Mixpanel.
+                      A percentagem é sobre o topo; a seta é a queda face ao passo anterior, vermelha quando cai mais de metade.
+                    </p>
                   </div>
                 );
               })()

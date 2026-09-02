@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getFinanceGmv, getUnitEconomics, getFinanceSummary } from "@/services/financeService";
 import { getGoals, getLeads } from "@/services/extrasService";
+import { getServiceCounts } from "@/services/dashboardService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -145,6 +146,7 @@ export default function OverviewPage() {
   // perdemos dinheiro?") e a resposta estava só no Financeiro.
   const { data: fin } = useAsyncData(() => getFinanceSummary({ period: "este_mes" }), []);
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
+  const { data: svcCounts } = useAsyncData(() => getServiceCounts(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
   const { data: leads } = useAsyncData(() => getLeads(), []);
@@ -303,6 +305,24 @@ export default function OverviewPage() {
               metric={buildMetricValue(gmvYear, gmvPrevYear, false, undefined, "Tudo o que passou pela plataforma desde 1 de janeiro (Payshop cobrado + serviços concluídos).")} />
             <MetricCard title="Comissão Piquet (ano)" format="currency" deltaLabel="vs ano ant."
               metric={buildMetricValue(commissionYear, commissionPrevYear, false, undefined, "A parte do GMV que é receita da Piquet (25%), acumulada desde 1 de janeiro.")} />
+          </div>
+
+          {/*
+            Volume de trabalho, ao lado do dinheiro. Executados contam-se pela
+            data de conclusão e agendados pela data marcada -- um serviço
+            agendado para dezembro é volume de dezembro, não deste mês. Por
+            isso o "agendados no ano" olha para o ano inteiro, futuro incluído.
+          */}
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">Serviços</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+            <MetricCard compact title="Executados no mês" hideDelta
+              metric={buildMetricValue(svcCounts?.mes.executados ?? 0, svcCounts?.mes.executados ?? 0, false, undefined, "Serviços concluídos com data de conclusão dentro do mês corrente.")} />
+            <MetricCard compact title="Agendados no mês" hideDelta
+              metric={buildMetricValue(svcCounts?.mes.agendados ?? 0, svcCounts?.mes.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do mês corrente e ainda por concluir.")} />
+            <MetricCard compact title="Executados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.executados ?? 0, svcCounts?.ano.executados ?? 0, false, undefined, "Serviços concluídos desde 1 de janeiro.")} />
+            <MetricCard compact title="Agendados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.agendados ?? 0, svcCounts?.ano.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do ano corrente e ainda por concluir — inclui os que estão no futuro.")} />
           </div>
 
           {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}

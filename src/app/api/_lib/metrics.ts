@@ -214,3 +214,34 @@ export function projectEndOfPeriod(current: number, period: MetricPeriod, now = 
   const elapsed = (now.getTime() - start) / (end - start);
   return elapsed > 0 ? current / elapsed : current;
 }
+
+/**
+ * Contagem de serviços EXECUTADOS e AGENDADOS num intervalo.
+ *
+ * São duas datas diferentes de propósito:
+ * - executados conta por `completed_at` (quando o trabalho foi feito);
+ * - agendados conta por `scheduled_at` (quando VAI ser feito).
+ * Contar as duas coisas pela mesma data juntava trabalho passado com futuro
+ * na mesma célula — um serviço agendado para dezembro não pertence a novembro.
+ *
+ * "Agendado" são os estados em que já há compromisso mas ainda não houve
+ * execução; um serviço já concluído deixa de contar como agendado, senão o
+ * mesmo serviço aparecia nas duas contas.
+ */
+const ESTADOS_AGENDADOS = ["pago", "agendado", "tecnico_encontrado", "em_execucao"];
+
+export async function serviceCountsForPeriod(
+  startIso: string,
+  endIso: string,
+): Promise<{ executados: number; agendados: number }> {
+  const admin = supabaseAdmin();
+  const [exec, agend] = await Promise.all([
+    admin.from("services").select("id", { count: "exact", head: true })
+      .eq("status", "concluido").gte("completed_at", startIso).lt("completed_at", endIso),
+    admin.from("services").select("id", { count: "exact", head: true })
+      .in("status", ESTADOS_AGENDADOS).gte("scheduled_at", startIso).lt("scheduled_at", endIso),
+  ]);
+  if (exec.error) throw new Error(exec.error.message);
+  if (agend.error) throw new Error(agend.error.message);
+  return { executados: exec.count ?? 0, agendados: agend.count ?? 0 };
+}

@@ -116,7 +116,11 @@ export const NAV_ITEMS = [
 // destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
-  "/", "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
+  "/", "/alertas", "/servicos",
+  // Qualidade na barra lateral (pedido do André): é uma leitura recorrente e
+  // estava só a um ⌘K, logo na prática ninguém lá chegava.
+  "/servicos?tab=qualidade",
+  "/clientes", "/tecnicos", "/financeiro", "/produto",
   "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
@@ -127,7 +131,7 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 export const NAV_DEEPLINKS: string[] = [
   "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
-  "/servicos?tab=personalizados", "/servicos?tab=qualidade",
+  "/servicos?tab=personalizados",
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
   "/despacho",

@@ -10,12 +10,12 @@ import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
+import { ChartCard, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
 } from "@/services/vendorsService";
 
@@ -59,7 +59,6 @@ export default function TechniciansPage() {
     []
   );
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
-  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
   // Cobertura por técnico — os técnicos declaram na própria app onde
@@ -427,7 +426,6 @@ export default function TechniciansPage() {
                         <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
                         <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
                         <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
-                        <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
                       </div>
                     )}
                     <div>
@@ -436,11 +434,13 @@ export default function TechniciansPage() {
                     </div>
                   </div>
                 )}
+                {/* Só o circular: as barras e o donut liam os MESMOS `byCategory`,
+                    lado a lado. Duas leituras do mesmo número não acrescentam
+                    nada — e a proporção é o que interessa aqui. */}
                 {sub === "categoria" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Técnicos por categoria" subtitle="Áreas de operação em que estão registados"><BarChartComponent data={byCategory ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por categoria"><DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" /></ChartCard>
-                  </div>
+                  <ChartCard title="Distribuição de técnicos por categoria" subtitle="Áreas de operação em que estão registados">
+                    <DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" />
+                  </ChartCard>
                 )}
                 {sub === "cobertura" && (
                   <div className="space-y-5">
@@ -566,12 +566,12 @@ export default function TechniciansPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                      <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
-                        <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                      </ChartCard>
-                    </div>
+                    {/*
+                      Saíram daqui dois gráficos que repetiam o que já está em
+                      cima: "Técnicos por zona" era a coluna Técnicos da tabela
+                      de Zonas abertas, e o heatmap "Procura vs oferta" era o
+                      painel "Onde falta gente" outra vez, noutra forma.
+                    */}
                   </div>
                 )}
                 {sub === "mapa" && (

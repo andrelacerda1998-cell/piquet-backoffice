@@ -380,3 +380,24 @@ export async function getDepartmentHealth(): Promise<DepartmentHealth[]> {
     return data;
   }).then((r) => r.data);
 }
+
+/* ==================== CONTAGEM DE SERVIÇOS (Visão Geral) ==================== */
+
+export interface ServiceCounts {
+  mes: { executados: number; agendados: number };
+  ano: { executados: number; agendados: number };
+}
+
+/**
+ * Serviços executados e agendados, no mês e no ano corrente.
+ *
+ * Sem fallback fictício: zeros aqui são zeros verdadeiros (não há serviços
+ * nesse período), e inventar contagens num cartão de contagem seria mentir
+ * sobre a operação.
+ */
+export async function getServiceCounts(): Promise<ServiceCounts> {
+  return apiGet<ServiceCounts>("/services/counts", () => ({
+    mes: { executados: 0, agendados: 0 },
+    ano: { executados: 0, agendados: 0 },
+  })).then((r) => r.data);
+}
