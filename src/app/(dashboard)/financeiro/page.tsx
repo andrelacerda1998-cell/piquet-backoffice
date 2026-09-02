@@ -522,34 +522,34 @@ export default function FinancePage() {
                     </div>
                   ))}
                 </div>
-                {openInvoices.length > 0 && (
+                {openInvoices.length > 6 && (
                   <p className="text-xs text-text-muted mt-2">
-                    {openInvoices.length} fatura(s) por pagar · total em falta <b className="text-text-primary">{formatCurrency(totalOutstanding)}</b>
-                    {openInvoices.length > 6 && " · mostrando as 6 mais próximas"}
+                    A mostrar as 6 mais próximas de {openInvoices.length}.
                   </p>
                 )}
               </div>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
-              </div>
               {/*
-                A grelha ajusta-se ao ESPAÇO, não ao tamanho do ecrã. Eram seis
-                colunas fixas: num portátil de 1280px a área de conteúdo tem
-                ~950px, o que dava ~112px de texto por cartão para valores como
-                "42 296,66 €", que precisam de 137px — os números saíam fora da
-                caixa. Um `lg:`/`xl:` não resolvia, porque o que falta é
-                largura DENTRO da coluna e não no ecrã: a barra lateral pode
-                estar aberta ou recolhida.
+                Eram seis cartões; ficam três.
+                - "Receita s/ IVA" era `Receita Piquet / 1,23` — uma divisão à
+                  vista, não uma métrica.
+                - "IVA" saía deste mesmo `summary` fictício, e a aba Impostos e
+                  RH já mostra o IVA REAL (da comissão cobrada e das faturas de
+                  custo). Dois IVAs diferentes no mesmo backoffice, um deles
+                  inventado, é pior do que um só.
+                - "Runway" repetia-se tal e qual na Tesouraria, logo a seguir.
+                A grelha ajusta-se ao ESPAÇO e não ao tamanho do ecrã: a barra
+                lateral pode estar aberta ou recolhida, e valores como
+                "42 296,66 €" precisam de ~137px de texto.
               */}
               {summary && (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                  <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
-                  <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
-                  <MetricCard title="Receita s/ IVA" metric={buildMetricValue(summary.piquetRevenueWithoutVat, summary.piquetRevenueWithoutVat)} hideDelta format="currency" />
-                  <MetricCard title="IVA" metric={buildMetricValue(summary.vat, summary.vat)} hideDelta format="currency" />
-                  <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
-                  <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
+                  <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+                    <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
+                    <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
+                    <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
