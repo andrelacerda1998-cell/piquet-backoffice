@@ -10,12 +10,12 @@ import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, DonutChartComponent } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
-  getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
 } from "@/services/vendorsService";
 
@@ -58,6 +58,7 @@ export default function TechniciansPage() {
     () => getVendors(1, 100, undefined, true),
     []
   );
+  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
@@ -566,12 +567,12 @@ export default function TechniciansPage() {
                       />
                     </div>
 
-                    {/*
-                      Saíram daqui dois gráficos que repetiam o que já está em
-                      cima: "Técnicos por zona" era a coluna Técnicos da tabela
-                      de Zonas abertas, e o heatmap "Procura vs oferta" era o
-                      painel "Onde falta gente" outra vez, noutra forma.
-                    */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
+                      <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
+                        <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
+                      </ChartCard>
+                    </div>
                   </div>
                 )}
                 {sub === "mapa" && (

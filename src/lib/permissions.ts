@@ -98,7 +98,7 @@ export function hasAnyPermission(role: UserRole, permissions: Permission[]): boo
 
 export function canAccessRoute(role: UserRole, route: string): boolean {
   /*
-    Entradas de menu como "/servicos?tab=qualidade" apontam para um separador
+    Entradas de menu como "/financeiro?tab=impostos" apontam para um separador
     do mesmo ecrã. Sem tirar a query, o `route` não existia em
     ROUTE_PERMISSIONS e a função devolvia `true` -- ou seja, um separador de
     um ecrã restrito ficava visível para toda a gente. A permissão é a do

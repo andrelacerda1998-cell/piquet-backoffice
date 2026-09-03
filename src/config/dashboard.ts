@@ -84,6 +84,7 @@ export const NAV_ITEMS = [
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
+  { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
@@ -100,7 +101,6 @@ export const NAV_ITEMS = [
   { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
-  { href: "/servicos?tab=qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
@@ -117,9 +117,10 @@ export const NAV_ITEMS = [
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
   "/", "/alertas", "/servicos",
-  // Qualidade na barra lateral (pedido do André): é uma leitura recorrente e
-  // estava só a um ⌘K, logo na prática ninguém lá chegava.
-  "/servicos?tab=qualidade",
+  // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
+  // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
+  // coisas era o mesmo conteúdo em dois sítios.
+  "/qualidade",
   "/clientes", "/tecnicos", "/financeiro", "/produto",
   "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento", "/configuracao",
 ];

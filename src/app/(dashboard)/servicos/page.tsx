@@ -9,7 +9,6 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
 import ServicosPersonalizadosPage from "../servicos-personalizados/page";
-import QualidadePage from "../qualidade/page";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ChartCard, DonutChartComponent, FunnelChartComponent } from "@/components/charts/Charts";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
@@ -97,7 +96,6 @@ export default function ServicesPage() {
     { id: "incidentes", label: "Incidentes", count: (incidents ?? []).filter((i) => i.status !== "resolvido").length },
     { id: "desempenho", label: "Desempenho (SLA)" },
     { id: "personalizados", label: "Pedidos personalizados" },
-    { id: "qualidade", label: "Qualidade" },
   ];
 
   const createService = async () => {
@@ -309,7 +307,6 @@ export default function ServicesPage() {
         )}
 
         {tab === "personalizados" && <ServicosPersonalizadosPage />}
-        {tab === "qualidade" && <QualidadePage />}
 
         {/* Modal — registar / editar serviço concluído */}
         <Modal
