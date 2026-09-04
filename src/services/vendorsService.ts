@@ -67,6 +67,19 @@ export interface RealVendor {
   vat_regime?: string | null;          // ex.: "isento_art53", "normal"
   withholding_tax?: boolean | null;    // retenção na fonte
   withholding_rate?: number | null;
+  /**
+   * Dados da empresa (CompanySection do Filament).
+   *
+   * `invoice_workspace` é o workspace de faturação no InvoiceXpress: sem ele a
+   * Piquet NÃO consegue emitir fatura em nome do técnico no fim do serviço --
+   * por isso `null` aqui é um bloqueio de negócio, não um detalhe cosmético.
+   * `invoice_workspace_blocker` diz porque é que ainda não se pode criar
+   * (null = pode); vem calculado do servidor porque depende de relações
+   * (documentos aprovados, morada fiscal) que a listagem não envia.
+   */
+  company_name?: string | null;
+  invoice_workspace?: string | null;
+  invoice_workspace_blocker?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
@@ -127,6 +140,20 @@ export async function setVendorAtValidation(id: number, valid: boolean): Promise
   await apiPut(`/technicians/${id}/at-validation`, { valid }, () => {
     throw new Error("Validar o subutilizador AT precisa da API de admin do Laravel configurada.");
   });
+}
+
+/**
+ * Cria o workspace de faturação (InvoiceXpress) do técnico.
+ *
+ * É o passo que falta para a Piquet poder emitir fatura em nome dele quando o
+ * serviço fecha. O backend valida as mesmas condições do Filament (contacto
+ * verificado, documentos aprovados, IBAN, morada fiscal) e devolve a razão
+ * exata quando recusa -- não se replicam aqui, sob pena de divergirem.
+ */
+export async function createVendorInvoiceWorkspace(id: number): Promise<RealVendor> {
+  return apiPost<RealVendor>(`/technicians/${id}/invoice-workspace`, {}, () => {
+    throw new Error("Criar o workspace de faturação precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
 }
 
 /**

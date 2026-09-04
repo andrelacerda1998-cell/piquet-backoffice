@@ -12,6 +12,13 @@ export interface AdminVendor {
   can_accept_service: boolean;
   at_valid: boolean;
   at_validated_at: string | null;
+  at_user?: string | null;
+  company_name?: string | null;
+  iban?: string | null;
+  /** Workspace de faturação (InvoiceXpress). `null` = ainda não criado. */
+  invoice_workspace?: string | null;
+  /** Porque é que ainda não se pode criar o workspace (`null` = pode). */
+  invoice_workspace_blocker?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;

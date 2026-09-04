@@ -16,6 +16,7 @@ import { useTabParam } from "@/hooks/useTabParam";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
 } from "@/services/vendorsService";
 
@@ -229,6 +230,26 @@ export default function TechniciansPage() {
   // não o enviar de todo) — aceitamos qualquer um.
   const atUser = (v: RealVendor) => v.at_username || v.at_user || v.at_subuser || null;
   const [atSaving, setAtSaving] = useState(false);
+  /*
+    Criar o workspace de faturação. É o passo sem o qual a Piquet não consegue
+    emitir fatura em nome do técnico quando o serviço fecha -- daí estar aqui
+    e não escondido numa lista de ações.
+  */
+  const [wsSaving, setWsSaving] = useState(false);
+  const criarWorkspace = async (v: RealVendor) => {
+    setWsSaving(true);
+    try {
+      const atualizado = await createVendorInvoiceWorkspace(v.id);
+      toast(`Workspace de faturação criado para ${v.name ?? "o técnico"}.`);
+      setProfileVendor(atualizado);
+      refetchVendors();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao criar o workspace.", "error");
+    } finally {
+      setWsSaving(false);
+    }
+  };
+
   const setAtValidation = async (v: RealVendor, valid: boolean) => {
     setAtSaving(true);
     try {
@@ -924,6 +945,54 @@ export default function TechniciansPage() {
                           {atSaving ? "A gravar…" : "Validar"}
                         </button>
                       )}
+                    </div>
+                  </div>
+
+                  {/* ---------------------- Dados da empresa ---------------------- */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Dados da empresa</p>
+                      {!v.invoice_workspace && (
+                        <button
+                          disabled={wsSaving || Boolean(v.invoice_workspace_blocker)}
+                          onClick={() => criarWorkspace(v)}
+                          title={v.invoice_workspace_blocker ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
+                          className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {wsSaving ? "A criar…" : "Criar workspace de faturação"}
+                        </button>
+                      )}
+                    </div>
+                    {/*
+                      Sem workspace não há fatura possível no fim do serviço --
+                      por isso é aviso a sério e não uma linha cinzenta. Quando
+                      o backend diz porquê, mostra-se a razão dele em vez de
+                      uma frase genérica: as condições (contacto verificado,
+                      documentos, IBAN, morada fiscal) mudam caso a caso.
+                    */}
+                    {!v.invoice_workspace && (
+                      <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+                        <p className="text-xs text-text-secondary">
+                          <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
+                          {v.invoice_workspace_blocker
+                            ? v.invoice_workspace_blocker
+                            : "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
+                        </p>
+                      </div>
+                    )}
+                    <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
+                      {[
+                        ["Workspace de faturação", v.invoice_workspace ?? "—"],
+                        ["Nome da empresa", v.company_name ?? "—"],
+                        ["Subutilizador AT", utilizador ?? "—"],
+                        ["AT válido", v.at_valid ? "Sim" : "Não"],
+                        ["AT validado em", v.at_validated_at ? formatDate(v.at_validated_at) : "—"],
+                      ].map(([rotulo, valor]) => (
+                        <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
+                          <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
+                          <span className="text-sm text-text-primary text-right truncate">{valor}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
