@@ -820,6 +820,30 @@ export default function TechniciansPage() {
           const nomeFiscal = v.billing_name || v.fiscal_name || null;
           const temFaturacao = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime);
 
+          /*
+            Há workspace de faturação?
+
+            Três respostas, não duas -- e a diferença importa. `undefined` é o
+            backend a NÃO enviar o campo (a versão em produção ainda não o
+            expõe); `null`/"" é o backend a dizer que não existe. Tratar as
+            duas como "não existe" punha um aviso vermelho e um botão ativo em
+            técnicos que já têm workspace, e clicar dava erro.
+
+            E há uma prova indireta: `can_accept_service` é calculado no
+            Laravel e EXIGE invoice_workspace != null (Vendor::canAcceptService).
+            Se o técnico pode aceitar serviços, o workspace existe -- mesmo que
+            o seu nome não venha na resposta.
+          */
+          const wsDesconhecido = v.invoice_workspace === undefined;
+          const temWorkspace = Boolean(v.invoice_workspace) || (wsDesconhecido && v.can_accept_service);
+          const podeCriarWs = !temWorkspace && !wsDesconhecido && !v.invoice_workspace_blocker;
+          const wsMotivo = temWorkspace
+            ? null
+            : wsDesconhecido
+              ? "O backend em produção ainda não devolve o workspace de faturação, por isso não dá para saber se existe. Criar às cegas podia duplicá-lo."
+              : v.invoice_workspace_blocker
+                ?? null;
+
           /** Rótulo curto do que falta ou está feito — o essencial de relance. */
           const chip = (ok: boolean, texto: string) => (
             <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
@@ -920,109 +944,85 @@ export default function TechniciansPage() {
                   )}
                 </div>
 
-                {/* --------------------- AT + dados + faturação -------------------- */}
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT</p>
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
-                      <div className="min-w-0">
-                        <p className={cn("text-sm font-medium", atUi.tone)}>{atUi.symbol} {atUi.label}</p>
-                        <p className="text-xs text-text-secondary truncate"
-                          title={utilizador ? undefined : "A API devolve só at_valid e at_validated_at. Falta expor at_username no VendorController."}>
-                          {utilizador
-                            ? <><span className="font-mono text-text-primary">{utilizador}</span>
-                                {v.at_validated_at && ` · ${formatDate(v.at_validated_at)}`}</>
-                            : "Identificador não enviado pelo backend"}
-                        </p>
-                      </div>
+                {/* ------------------- Faturação: AT + empresa + dados ------------------ */}
+                {/*
+                  Uma tabela só, não três blocos. O subutilizador AT aparecia em
+                  cima E outra vez nos dados da empresa (identificador, válido,
+                  validado em) -- as mesmas três linhas duas vezes eram metade
+                  do scroll deste painel.
+                */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Faturação e dados</p>
+                    <div className="flex items-center gap-2">
                       {at === "validado" ? (
                         <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
-                          className="text-xs text-warning hover:underline disabled:opacity-50 shrink-0">Retirar</button>
+                          className="text-xs text-warning hover:underline disabled:opacity-50">Retirar AT</button>
                       ) : (
                         <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
                           title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
-                          className="btn-primary text-xs py-1 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
-                          {atSaving ? "A gravar…" : "Validar"}
+                          className="btn-secondary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                          {atSaving ? "A gravar…" : "Validar AT"}
                         </button>
                       )}
-                    </div>
-                  </div>
-
-                  {/* ---------------------- Dados da empresa ---------------------- */}
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Dados da empresa</p>
-                      {!v.invoice_workspace && (
+                      {!temWorkspace && (
                         <button
-                          disabled={wsSaving || Boolean(v.invoice_workspace_blocker)}
+                          disabled={wsSaving || !podeCriarWs}
                           onClick={() => criarWorkspace(v)}
-                          title={v.invoice_workspace_blocker ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
+                          title={wsMotivo ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
                           className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          {wsSaving ? "A criar…" : "Criar workspace de faturação"}
+                          {wsSaving ? "A criar…" : "Criar workspace"}
                         </button>
                       )}
                     </div>
-                    {/*
-                      Sem workspace não há fatura possível no fim do serviço --
-                      por isso é aviso a sério e não uma linha cinzenta. Quando
-                      o backend diz porquê, mostra-se a razão dele em vez de
-                      uma frase genérica: as condições (contacto verificado,
-                      documentos, IBAN, morada fiscal) mudam caso a caso.
-                    */}
-                    {!v.invoice_workspace && (
-                      <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
-                        <p className="text-xs text-text-secondary">
-                          <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
-                          {v.invoice_workspace_blocker
-                            ? v.invoice_workspace_blocker
-                            : "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
-                        </p>
-                      </div>
-                    )}
-                    <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
-                      {[
-                        ["Workspace de faturação", v.invoice_workspace ?? "—"],
-                        ["Nome da empresa", v.company_name ?? "—"],
-                        ["Subutilizador AT", utilizador ?? "—"],
-                        ["AT válido", v.at_valid ? "Sim" : "Não"],
-                        ["AT validado em", v.at_validated_at ? formatDate(v.at_validated_at) : "—"],
-                      ].map(([rotulo, valor]) => (
-                        <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
-                          <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
-                          <span className="text-sm text-text-primary text-right truncate">{valor}</span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Dados</p>
-                    <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
-                      {[
-                        ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
-                        ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
-                        ["Nome fiscal", nomeFiscal ?? "—"],
-                        ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
-                        ["IBAN", v.iban ? `${v.iban.slice(0, 8)}••••${v.iban.slice(-4)}` : "—"],
-                        ["Regime de IVA", v.vat_regime
-                          ? `${v.vat_regime}${v.withholding_tax != null ? (v.withholding_tax ? ` · retenção ${v.withholding_rate ?? "?"}%` : " · sem retenção") : ""}`
-                          : "—"],
-                      ].map(([rotulo, valor]) => (
-                        <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
-                          <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
-                          <span className="text-sm text-text-primary text-right truncate">{valor}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {!temFaturacao && (
-                      /* Uma linha, não uma caixa de seis. O detalhe fica no tooltip. */
-                      <p className="text-[11px] text-text-muted cursor-help"
-                        title="A API de admin devolve 12 campos por técnico e nenhum é de faturação. Falta no VendorController: morada + código postal, IBAN, regime de IVA/retenção e nome fiscal.">
-                        Dados de faturação por enviar pelo backend — está no quadro do Rodrigo.
+                  {/* Sem workspace não há fatura possível no fim do serviço --
+                      é aviso a sério, e diz a razão que o backend dá. */}
+                  {!temWorkspace && (
+                    <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+                      <p className="text-xs text-text-secondary">
+                        <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
+                        {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
                       </p>
-                    )}
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
+                    {([
+                      ["Workspace de faturação", temWorkspace
+                        ? (v.invoice_workspace ?? "Existe (nome não enviado)")
+                        : "—"],
+                      ["Nome da empresa", v.company_name ?? "—"],
+                      ["Subutilizador AT", utilizador
+                        ? <span key="at-user" className="font-mono">{utilizador}</span>
+                        : "—"],
+                      ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
+                        {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
+                      ["NIF", v.nif || "—"],
+                      ["Nome fiscal", nomeFiscal ?? "—"],
+                      ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
+                      ["IBAN", v.iban ? <span key="iban" className="font-mono text-xs">{v.iban}</span> : "—"],
+                      ["Regime de IVA", v.vat_regime
+                        ? `${v.vat_regime}${v.withholding_tax != null ? (v.withholding_tax ? ` · retenção ${v.withholding_rate ?? "?"}%` : " · sem retenção") : ""}`
+                        : "—"],
+                      ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
+                      ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
+                    ] as [string, React.ReactNode][]).map(([rotulo, valor]) => (
+                      <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
+                        <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
+                        <span className="text-sm text-text-primary text-right truncate">{valor}</span>
+                      </div>
+                    ))}
                   </div>
+
+                  {!temFaturacao && (
+                    <p className="text-[11px] text-text-muted cursor-help"
+                      title="A API de admin devolve 12 campos por técnico e nenhum é de faturação. Falta no VendorController: morada + código postal, IBAN, regime de IVA/retenção e nome fiscal.">
+                      Dados de faturação por enviar pelo backend — está no quadro do Rodrigo.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
