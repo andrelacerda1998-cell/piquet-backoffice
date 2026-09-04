@@ -818,7 +818,7 @@ export default function TechniciansPage() {
           const utilizador = atUser(v);
           const morada = v.address || v.billing_address || null;
           // A designação fiscal é a própria company_name -- não há coluna
-          // separada no backend (nem vat_regime/withholding, ver nota na tabela).
+          // separada no backend.
           const temFaturacao = Boolean(v.company_name || morada || v.postal_code || v.city || v.iban);
 
           /*
@@ -1002,14 +1002,6 @@ export default function TechniciansPage() {
                       ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
                         {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
                       ["NIF", v.nif || "—"],
-                      /*
-                        Sem "Nome fiscal" nem "Regime de IVA": não são campos
-                        por enviar, são campos que NÃO EXISTEM na base de dados
-                        do backend (não há coluna vat_regime, withholding_tax
-                        nem fiscal_name em vendors/users; a designação fiscal é
-                        a própria company_name). Linhas que nunca poderiam
-                        encher, a fazer o painel parecer incompleto para sempre.
-                      */
                       ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
                       ["IBAN", v.iban ? <span key="iban" className="font-mono text-xs">{v.iban}</span> : "—"],
                       ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
@@ -1032,6 +1024,22 @@ export default function TechniciansPage() {
                     backend" sem mais mandava procurar um problema que não
                     existe.
                   */}
+                  {/*
+                    O que a API devolve MESMO, para este técnico.
+                    Quando um campo aparece vazio no painel, a pergunta é
+                    sempre a mesma -- "o backend não manda, ou manda com outro
+                    nome?" -- e discutir isso de memória não leva a lado
+                    nenhum. Aqui vê-se a resposta crua, sem sair do ecrã.
+                  */}
+                  <details>
+                    <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-primary">
+                      Dados brutos da API ({Object.keys(v).length} campos)
+                    </summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2 text-[11px] leading-snug text-text-secondary">
+                      {JSON.stringify(v, null, 2)}
+                    </pre>
+                  </details>
+
                   {!temFaturacao && !v.company_name && (
                     <p className="text-[11px] text-text-muted cursor-help"
                       title="Os dados existem na base de dados do Laravel; o VendorController ainda não os devolve na API de admin. Já implementado na branch feat/admin-payment-refund-cancel, por publicar.">
