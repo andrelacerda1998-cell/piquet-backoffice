@@ -817,8 +817,9 @@ export default function TechniciansPage() {
           const atUi = AT_STATE_UI[at];
           const utilizador = atUser(v);
           const morada = v.address || v.billing_address || null;
-          const nomeFiscal = v.billing_name || v.fiscal_name || null;
-          const temFaturacao = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime);
+          // A designação fiscal é a própria company_name -- não há coluna
+          // separada no backend (nem vat_regime/withholding, ver nota na tabela).
+          const temFaturacao = Boolean(v.company_name || morada || v.postal_code || v.city || v.iban);
 
           /*
             Há workspace de faturação?
@@ -1001,12 +1002,16 @@ export default function TechniciansPage() {
                       ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
                         {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
                       ["NIF", v.nif || "—"],
-                      ["Nome fiscal", nomeFiscal ?? "—"],
+                      /*
+                        Sem "Nome fiscal" nem "Regime de IVA": não são campos
+                        por enviar, são campos que NÃO EXISTEM na base de dados
+                        do backend (não há coluna vat_regime, withholding_tax
+                        nem fiscal_name em vendors/users; a designação fiscal é
+                        a própria company_name). Linhas que nunca poderiam
+                        encher, a fazer o painel parecer incompleto para sempre.
+                      */
                       ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
                       ["IBAN", v.iban ? <span key="iban" className="font-mono text-xs">{v.iban}</span> : "—"],
-                      ["Regime de IVA", v.vat_regime
-                        ? `${v.vat_regime}${v.withholding_tax != null ? (v.withholding_tax ? ` · retenção ${v.withholding_rate ?? "?"}%` : " · sem retenção") : ""}`
-                        : "—"],
                       ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
                       ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
                     ] as [string, React.ReactNode][]).map(([rotulo, valor]) => (
@@ -1017,10 +1022,20 @@ export default function TechniciansPage() {
                     ))}
                   </div>
 
-                  {!temFaturacao && (
+                  {/*
+                    Aviso preciso, e só quando se aplica. As colunas existem
+                    todas na BD (company_name, at_user, iban, invoice_workspace
+                    e a morada FISCAL_ADDRESS): o que falta é o
+                    VendorController::present() as devolver, o que já está
+                    escrito na branch feat/admin-payment-refund-cancel e à
+                    espera de deploy da RW Interactive. Dizer "por enviar pelo
+                    backend" sem mais mandava procurar um problema que não
+                    existe.
+                  */}
+                  {!temFaturacao && !v.company_name && (
                     <p className="text-[11px] text-text-muted cursor-help"
-                      title="A API de admin devolve 12 campos por técnico e nenhum é de faturação. Falta no VendorController: morada + código postal, IBAN, regime de IVA/retenção e nome fiscal.">
-                      Dados de faturação por enviar pelo backend — está no quadro do Rodrigo.
+                      title="Os dados existem na base de dados do Laravel; o VendorController ainda não os devolve na API de admin. Já implementado na branch feat/admin-payment-refund-cancel, por publicar.">
+                      Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
                     </p>
                   )}
                 </div>
