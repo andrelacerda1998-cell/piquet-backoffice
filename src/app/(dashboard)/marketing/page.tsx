@@ -5,7 +5,7 @@ import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
+import { ChartCard, FunnelChartComponent, BarChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
@@ -361,85 +361,10 @@ export default function MarketingPage() {
                       </p>
                     </div>
                   </div>
-
-                  {/* Custo por download, por app — só com o investimento que
-                      identifica a app; o resto fica de fora do cálculo. */}
-                  <div className="space-y-2">
-                    <SectionHeader title="Custo por download" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {([
-                        { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
-                        { app: "App Profissional", cor: "#3E7C8C", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
-                      ]).map((x) => (
-                        <div key={x.app} className="rounded-xl border border-surface-border p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
-                            <p className="text-sm font-medium text-text-secondary">{x.app}</p>
-                          </div>
-                          <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
-                            {x.cpd != null ? formatCurrency(x.cpd) : "—"}
-                          </p>
-                          <p className="text-[11px] text-text-muted">
-                            {x.gasto > 0
-                              ? <>{formatCurrency(x.gasto)} em campanhas dela ÷ {x.dl.toLocaleString("pt-PT")} downloads</>
-                              : <>sem campanhas identificadas para esta app · {x.dl.toLocaleString("pt-PT")} downloads no período</>}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    {resumo.spendGeral > 0 && (
-                      <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
-                        {formatCurrency(resumo.spendGeral)} foram para campanhas que não identificam app (tráfego para o
-                        site, notoriedade, landing pages) — ficam de fora destes custos, para não inflacionar nenhum.
-                        Contando tudo, o custo por download é {resumo.cpdTotal != null ? formatCurrency(resumo.cpdTotal) : "—"}.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Onde foi o dinheiro */}
-                  {Object.keys(resumo.plataformas).length > 0 && (
-                    <div className="space-y-2">
-                      <SectionHeader title="Por plataforma" />
-                      {Object.entries(resumo.plataformas).sort((a, b) => b[1] - a[1]).map(([plat, valor]) => (
-                        <div key={plat}>
-                          <div className="flex items-baseline justify-between text-sm">
-                            <span className="font-medium text-text-primary capitalize">{plat}</span>
-                            <span className="text-text-secondary tabular-nums">
-                              {formatCurrency(valor)} · {resumo.spend > 0 ? Math.round((valor / resumo.spend) * 100) : 0}%
-                            </span>
-                          </div>
-                          <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
-                            <div className="h-full rounded-full bg-piquet"
-                              style={{ width: `${resumo.spend > 0 ? (valor / resumo.spend) * 100 : 0}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               )}
             </div>
 
-            {/* Detalhe mensal */}
-            {spendMeses.length > 0 && (
-              <div>
-                <SectionHeader title="Detalhe por mês" />
-                <DataTable
-                  columns={[
-                    { key: "month", label: "Mês", render: (m: SpendMonth) => <span className="font-medium capitalize">{nomeMes(m.month)}</span> },
-                    { key: "spend", label: "Investido", render: (m: SpendMonth) => formatCurrency(m.spend) },
-                    { key: "impressions", label: "Impressões", render: (m: SpendMonth) => m.impressions.toLocaleString("pt-PT") },
-                    { key: "clicks", label: "Cliques", render: (m: SpendMonth) => m.clicks.toLocaleString("pt-PT") },
-                    { key: "ctr", label: "CTR", render: (m: SpendMonth) => m.impressions > 0 ? `${((m.clicks / m.impressions) * 100).toFixed(2).replace(".", ",")}%` : "—" },
-                    { key: "leads", label: "Leads", render: (m: SpendMonth) => m.leads },
-                    { key: "cpl", label: "Custo/lead", render: (m: SpendMonth) => m.leads > 0 ? formatCurrency(m.spend / m.leads) : "—" },
-                  ]}
-                  data={[...spendMeses].reverse()}
-                  keyField="month"
-                  emptyMessage="Sem investimento registado."
-                />
-              </div>
-            )}
             <SubTabs
               tabs={[
                 { id: "campanhas", label: "Campanhas" },
@@ -571,10 +496,94 @@ export default function MarketingPage() {
                     informação a mais, é informação errada.
                   */}
                   {sub === "cac" && <RoasReal />}
+                  {/*
+                    Tudo o que é sobre investimento vive AQUI.
+                    "Custo por download", "Por plataforma" e "Detalhe por mês"
+                    estavam ACIMA das sub-abas, logo apareciam em todas — meio
+                    ecrã sempre ocupado com o mesmo, mesmo quando se tinha
+                    vindo ver o funil ou o ROAS. E havia uma sub-aba chamada
+                    "Investimento" a poucos centímetros disso.
+                    No topo fica só a linha de números (investido, leads, custo
+                    por lead, cliques), que é contexto para tudo o resto.
+                  */}
                   {sub === "investimento" && (
-                    <ChartCard title="Distribuição do investimento por canal">
-                      <DonutChartComponent data={(channels ?? []).map((c) => ({ name: c.name, value: c.investment }))} currency centerLabel="Investido" />
-                    </ChartCard>
+                    <div className="space-y-6">
+
+                  {/* Custo por download, por app — só com o investimento que
+                      identifica a app; o resto fica de fora do cálculo. */}
+                  <div className="space-y-2">
+                    <SectionHeader title="Custo por download" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {([
+                        { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
+                        { app: "App Profissional", cor: "#3E7C8C", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
+                      ]).map((x) => (
+                        <div key={x.app} className="rounded-xl border border-surface-border p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
+                            <p className="text-sm font-medium text-text-secondary">{x.app}</p>
+                          </div>
+                          <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
+                            {x.cpd != null ? formatCurrency(x.cpd) : "—"}
+                          </p>
+                          <p className="text-[11px] text-text-muted">
+                            {x.gasto > 0
+                              ? <>{formatCurrency(x.gasto)} em campanhas dela ÷ {x.dl.toLocaleString("pt-PT")} downloads</>
+                              : <>sem campanhas identificadas para esta app · {x.dl.toLocaleString("pt-PT")} downloads no período</>}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {resumo.spendGeral > 0 && (
+                      <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
+                        {formatCurrency(resumo.spendGeral)} foram para campanhas que não identificam app (tráfego para o
+                        site, notoriedade, landing pages) — ficam de fora destes custos, para não inflacionar nenhum.
+                        Contando tudo, o custo por download é {resumo.cpdTotal != null ? formatCurrency(resumo.cpdTotal) : "—"}.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Onde foi o dinheiro */}
+                  {Object.keys(resumo.plataformas).length > 0 && (
+                    <div className="space-y-2">
+                      <SectionHeader title="Por plataforma" />
+                      {Object.entries(resumo.plataformas).sort((a, b) => b[1] - a[1]).map(([plat, valor]) => (
+                        <div key={plat}>
+                          <div className="flex items-baseline justify-between text-sm">
+                            <span className="font-medium text-text-primary capitalize">{plat}</span>
+                            <span className="text-text-secondary tabular-nums">
+                              {formatCurrency(valor)} · {resumo.spend > 0 ? Math.round((valor / resumo.spend) * 100) : 0}%
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                            <div className="h-full rounded-full bg-piquet"
+                              style={{ width: `${resumo.spend > 0 ? (valor / resumo.spend) * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+            {/* Detalhe mensal */}
+            {spendMeses.length > 0 && (
+              <div>
+                <SectionHeader title="Detalhe por mês" />
+                <DataTable
+                  columns={[
+                    { key: "month", label: "Mês", render: (m: SpendMonth) => <span className="font-medium capitalize">{nomeMes(m.month)}</span> },
+                    { key: "spend", label: "Investido", render: (m: SpendMonth) => formatCurrency(m.spend) },
+                    { key: "impressions", label: "Impressões", render: (m: SpendMonth) => m.impressions.toLocaleString("pt-PT") },
+                    { key: "clicks", label: "Cliques", render: (m: SpendMonth) => m.clicks.toLocaleString("pt-PT") },
+                    { key: "ctr", label: "CTR", render: (m: SpendMonth) => m.impressions > 0 ? `${((m.clicks / m.impressions) * 100).toFixed(2).replace(".", ",")}%` : "—" },
+                    { key: "leads", label: "Leads", render: (m: SpendMonth) => m.leads },
+                    { key: "cpl", label: "Custo/lead", render: (m: SpendMonth) => m.leads > 0 ? formatCurrency(m.spend / m.leads) : "—" },
+                  ]}
+                  data={[...spendMeses].reverse()}
+                  keyField="month"
+                  emptyMessage="Sem investimento registado."
+                />
+              </div>
+            )}
+                    </div>
                   )}
                 </>
               )}
