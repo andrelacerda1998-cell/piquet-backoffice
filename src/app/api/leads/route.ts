@@ -164,7 +164,9 @@ async function enviarConfirmacao(
   try {
     const dados = extrairDadosLead(message, nome);
     const primeiro = primeiroNome(dados.nome || nome);
-    if (!primeiro) return;
+    // Sem nome não se envia -- mas também não se desaparece: passa pelo catch
+    // para ficar registado que esta lead não foi avisada, e porquê.
+    if (!primeiro) throw new Error("Lead sem nome utilizável — o modelo exige o primeiro nome.");
 
     const local = dados.localizacao.trim();
     const servico = dados.servico.trim() || "assistência";
@@ -182,8 +184,33 @@ async function enviarConfirmacao(
       sent_by: "automático",
     });
   } catch (e) {
-    // Não há utilizador a quem reportar -- isto corre depois de a resposta
-    // sair. Fica no log para se ver no painel de erros da Vercel.
+    /*
+      A falha fica na conversa da lead, não só no log.
+
+      Isto corre depois de a resposta sair, por isso não há utilizador a quem
+      responder -- mas há quem abra a lead a seguir. Quando o envio falhava em
+      silêncio, essa pessoa via "Sem mensagens de WhatsApp neste contacto",
+      exactamente o mesmo que vê numa lead a que nunca se tentou escrever, e
+      ficava a pensar que o cliente já tinha sido avisado. Aconteceu: a lead
+      do dia 7/9 às 14:56 nunca recebeu nada e nada no backoffice o dizia.
+
+      Um registo falhado é a diferença entre "ninguém lhe escreveu" e
+      "tentou-se e correu mal, liga-lhe tu". O painel já mostra o erro.
+    */
+    const motivo = e instanceof Error ? e.message : String(e);
     console.error("[leads] falha ao enviar confirmação WhatsApp:", e);
+    try {
+      await supabaseAdmin().from("whatsapp_messages").insert({
+        lead_id: leadId,
+        phone,
+        direction: "out",
+        body: "[modelo pedido_recebido_piquet] não chegou a ser entregue",
+        status: "failed",
+        error: motivo.slice(0, 500),
+        sent_by: "automático",
+      });
+    } catch {
+      // Se nem isto grava, resta o log -- não vale a pena deitar o pedido fora.
+    }
   }
 }
