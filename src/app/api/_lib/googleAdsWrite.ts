@@ -495,3 +495,47 @@ export async function mudarEstadoGoogle(resourceName: string, estado: "ENABLED" 
   if (!recurso) throw new Error(`Recurso não suportado: ${resourceName}`);
   await mutate(recurso, [{ update: { resourceName, status: estado }, updateMask: "status" }]);
 }
+
+/* ====================== MODELO DE ACOMPANHAMENTO ====================== */
+
+/**
+ * Modelo de acompanhamento ao nível da CONTA.
+ *
+ * É o que faz cada clique chegar à landing já com os UTM, sem ser preciso
+ * editar campanha a campanha. O `{campaignname}` é preenchido pela Google com
+ * o nome exato da campanha (já codificado), por isso casa sempre com o
+ * agregado `ad_metrics` — e continua a casar se a campanha for renomeada.
+ *
+ * O `{lpurl}` tem de vir primeiro: representa o URL final do anúncio, e é
+ * sobre ele que os parâmetros se acrescentam.
+ */
+export const MODELO_ACOMPANHAMENTO =
+  "{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignname}";
+
+export async function lerModeloAcompanhamento(): Promise<string | null> {
+  const linhas = await gaql<{ customer?: { trackingUrlTemplate?: string } }>(
+    "SELECT customer.tracking_url_template FROM customer LIMIT 1",
+  );
+  return linhas[0]?.customer?.trackingUrlTemplate ?? null;
+}
+
+/**
+ * Define o modelo na conta.
+ *
+ * O CustomerService é a exceção ao padrão do resto da API: recebe UMA
+ * `operation` (singular), não uma lista — por isso não passa pelo `mutate()`
+ * genérico deste ficheiro.
+ */
+export async function definirModeloAcompanhamento(modelo: string): Promise<string> {
+  const cid = customerId();
+  await googleAdsRequest(`customers/${cid}:mutate`, {
+    operation: {
+      update: {
+        resourceName: `customers/${cid}`,
+        trackingUrlTemplate: modelo,
+      },
+      updateMask: "trackingUrlTemplate",
+    },
+  });
+  return modelo;
+}

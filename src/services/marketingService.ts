@@ -388,3 +388,23 @@ export async function casarLeadsComClientes() {
     () => { throw new Error("Casar leads precisa da API de admin do Laravel configurada."); },
   ).then((r) => r.data);
 }
+
+export interface ModeloAcompanhamento {
+  configured: boolean;
+  atual: string | null;
+  recomendado: string;
+  error: string | null;
+}
+
+/** Modelo de acompanhamento do Google Ads — carimba os UTM em cada clique. */
+export async function getModeloAcompanhamento(): Promise<ModeloAcompanhamento> {
+  return apiGet<ModeloAcompanhamento>("/marketing/google-ads/tracking", () => ({
+    configured: false, atual: null, recomendado: "", error: null,
+  })).then((r) => r.data);
+}
+
+export async function definirModeloAcompanhamento(modelo?: string) {
+  return apiPut<{ modelo: string }>("/marketing/google-ads/tracking", modelo ? { modelo } : {},
+    () => { throw new Error("Definir o modelo precisa do Google Ads configurado."); },
+  ).then((r) => r.data);
+}

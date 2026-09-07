@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getRoasReal, casarLeadsComClientes, type RoasLinha } from "@/services/marketingService";
+import {
+  getRoasReal, casarLeadsComClientes, getModeloAcompanhamento, definirModeloAcompanhamento,
+  type RoasLinha,
+} from "@/services/marketingService";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import { RefreshCw, Link2 } from "lucide-react";
+import { RefreshCw, Link2, CheckCircle2, AlertTriangle } from "lucide-react";
 
 /**
  * ROAS real: receita que os clientes pagaram, dividida pelo investimento.
@@ -66,6 +69,63 @@ function Tabela({ linhas, rotulo }: { linhas: RoasLinha[]; rotulo: string }) {
   );
 }
 
+/**
+ * Modelo de acompanhamento do Google Ads.
+ *
+ * Está aqui, e não nas definições, porque é a condição de que este painel
+ * depende: sem ele nenhum clique do Google chega à landing com a campanha, e
+ * o ROAS por campanha fica permanentemente vazio. Ver o painel e não ver isto
+ * seria olhar para tabelas vazias sem saber porquê.
+ */
+function ModeloGoogle() {
+  const { data, loading, refetch } = useAsyncData(() => getModeloAcompanhamento(), []);
+  const [aGravar, setAGravar] = useState(false);
+
+  const definir = async () => {
+    setAGravar(true);
+    try {
+      await definirModeloAcompanhamento();
+      toast("Modelo de acompanhamento definido na conta Google Ads.");
+      refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao definir o modelo.", "error");
+    } finally {
+      setAGravar(false);
+    }
+  };
+
+  if (!data || loading) return null;
+  const certo = data.atual != null && data.atual.includes("utm_campaign={campaignname}");
+
+  return (
+    <div className={cn("rounded-xl border-l-[3px] px-4 py-3 space-y-2",
+      certo ? "border-l-success bg-success-light/20" : "border-l-warning bg-warning-light/25")}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-text-primary flex items-center gap-2">
+            {certo ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-warning" />}
+            Modelo de acompanhamento do Google Ads
+          </p>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {certo
+              ? "Cada clique do Google chega à landing com a campanha identificada."
+              : "Sem isto, os cliques do Google chegam sem campanha e caem todos em “direto”."}
+          </p>
+          <code className="mt-1 block text-[11px] text-text-muted break-all">
+            {data.atual || "(não definido)"}
+          </code>
+        </div>
+        {!certo && (
+          <button onClick={definir} disabled={aGravar} className="btn-primary text-sm shrink-0 disabled:opacity-50">
+            {aGravar ? "A definir…" : "Definir agora"}
+          </button>
+        )}
+      </div>
+      {data.error && <p className="text-xs text-danger">{data.error}</p>}
+    </div>
+  );
+}
+
 export function RoasReal() {
   const { data, loading, refetch } = useAsyncData(() => getRoasReal(), []);
   const [aCasar, setACasar] = useState(false);
@@ -110,6 +170,8 @@ export function RoasReal() {
           </button>
         </div>
       </div>
+
+      <ModeloGoogle />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="space-y-2">
