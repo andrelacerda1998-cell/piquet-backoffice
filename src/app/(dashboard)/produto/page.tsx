@@ -18,7 +18,7 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart, MessageCircle } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 const LOG_TONE: Record<SystemLog["level"], string> = {
@@ -348,6 +348,71 @@ export default function ProdutoPage() {
                 </div>
               </div>
             ))}
+
+            {/*
+              Número de WhatsApp, lido ao vivo da Meta.
+              Existe porque a pergunta "o nome já foi aprovado?" só tinha
+              resposta na consola do Facebook -- e é a diferença entre o
+              cliente ver "Piquet" ou ver um número desconhecido a ligar-lhe.
+            */}
+            {(health?.whatsappNumber || health?.whatsappNumberError) && (() => {
+              const n = health.whatsappNumber;
+              const st = (n?.nameStatus ?? "").toUpperCase();
+              const aprovado = st === "APPROVED";
+              const tom = aprovado
+                ? "bg-success-light text-success"
+                : st === "DECLINED"
+                  ? "bg-danger-light text-danger"
+                  : "bg-warning-light text-warning";
+              const rotulo = aprovado ? "Nome aprovado"
+                : st === "PENDING_REVIEW" ? "Nome em revisão"
+                : st === "DECLINED" ? "Nome recusado"
+                : st === "EXPIRED" ? "Aprovação expirada"
+                : st || "Sem estado";
+              const linha = (r: string, v: string | null | undefined) => (
+                <div key={r} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
+                  <span className="text-xs text-text-muted shrink-0">{r}</span>
+                  <span className="text-sm text-text-primary text-right truncate">{v || "—"}</span>
+                </div>
+              );
+              return (
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Número de WhatsApp</p>
+                  {health.whatsappNumberError ? (
+                    <div className="card p-4 border-l-[3px] border-l-danger">
+                      <p className="text-sm font-medium text-text-primary">Não foi possível ler o número na Meta</p>
+                      <p className="text-xs text-text-secondary mt-1">{health.whatsappNumberError}</p>
+                    </div>
+                  ) : n && (
+                    <div className="card p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-success-light text-success shrink-0">
+                            <MessageCircle className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-text-primary truncate">{n.verifiedName || "Sem nome definido"}</p>
+                            <p className="text-xs text-text-muted">{n.displayPhoneNumber || "—"}</p>
+                          </div>
+                        </div>
+                        <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium", tom)}>{rotulo}</span>
+                      </div>
+                      {!aprovado && (
+                        <p className="text-xs text-text-secondary">
+                          Enquanto o nome não estiver aprovado, os clientes veem o número em vez de
+                          &ldquo;{n.verifiedName || "Piquet"}&rdquo;. O envio e a receção de mensagens funcionam na mesma.
+                        </p>
+                      )}
+                      <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
+                        {linha("Qualidade", n.qualityRating)}
+                        {linha("Limite de conversas novas", n.messagingLimit)}
+                        {linha("Verificação do número", n.verificationStatus)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Pipelines de dados</p>

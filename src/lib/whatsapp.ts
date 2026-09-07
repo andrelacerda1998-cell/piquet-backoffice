@@ -58,3 +58,58 @@ export async function enviarTextoWhatsapp(phone: string, body: string): Promise<
   }
   return { waMessageId: data.messages?.[0]?.id ?? "" };
 }
+
+/**
+ * Estado do número na Meta: nome a mostrar, se já foi aprovado, qualidade e
+ * limite de envio.
+ *
+ * Lê-se do nó do PRÓPRIO número (`GET /{phone_number_id}`) e não da conta
+ * WhatsApp Business. É a diferença que torna isto possível sem configurar mais
+ * nada: o `WHATSAPP_PHONE_NUMBER_ID` já existe, o id da WABA não — e este nó
+ * devolve na mesma o `name_status`, que é a resposta a "já aprovaram o nome?".
+ */
+export interface EstadoNumeroWhatsapp {
+  displayPhoneNumber: string | null;
+  /** Nome que os clientes veem (ex.: "Piquet"). */
+  verifiedName: string | null;
+  /**
+   * APPROVED · PENDING_REVIEW · DECLINED · EXPIRED · NONE — o estado da revisão
+   * do nome. Enquanto não for APPROVED, o cliente vê o número em vez do nome.
+   */
+  nameStatus: string | null;
+  qualityRating: string | null;
+  /** Quantas conversas novas por dia a Meta permite iniciar. */
+  messagingLimit: string | null;
+  verificationStatus: string | null;
+}
+
+export async function estadoNumeroWhatsapp(): Promise<EstadoNumeroWhatsapp> {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) throw new Error("WhatsApp não configurado.");
+
+  const campos = [
+    "display_phone_number",
+    "verified_name",
+    "name_status",
+    "quality_rating",
+    "messaging_limit_tier",
+    "code_verification_status",
+  ].join(",");
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=${campos}&access_token=${encodeURIComponent(token)}`,
+    { cache: "no-store" },
+  );
+  const json = (await res.json()) as Record<string, string> & { error?: { message?: string } };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
+
+  return {
+    displayPhoneNumber: json.display_phone_number ?? null,
+    verifiedName: json.verified_name ?? null,
+    nameStatus: json.name_status ?? null,
+    qualityRating: json.quality_rating ?? null,
+    messagingLimit: json.messaging_limit_tier ?? null,
+    verificationStatus: json.code_verification_status ?? null,
+  };
+}

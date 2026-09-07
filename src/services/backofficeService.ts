@@ -122,9 +122,22 @@ export interface IntegrationJob {
   lastOkAt: string | null;
   consecutiveFailures: number;
 }
+/** Estado do número na Meta — ver `estadoNumeroWhatsapp` em lib/whatsapp.ts. */
+export interface WhatsappNumberStatus {
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  nameStatus: string | null;
+  qualityRating: string | null;
+  messagingLimit: string | null;
+  verificationStatus: string | null;
+}
+
 export interface IntegrationsStatus {
   jobs: IntegrationJob[];
   configured: Record<string, boolean>;
+  /** `null` quando o WhatsApp não está configurado ou a leitura falhou. */
+  whatsappNumber?: WhatsappNumberStatus | null;
+  whatsappNumberError?: string | null;
 }
 
 export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {

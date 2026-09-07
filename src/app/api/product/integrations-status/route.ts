@@ -5,6 +5,7 @@ import { googleConfigured } from "../../_lib/googleplay";
 import { metaConfigured } from "../../_lib/metaads";
 import { googleAdsConfigured } from "../../_lib/googleads";
 import { paylandsConfigured } from "../../_lib/paylands";
+import { WHATSAPP_ENABLED, estadoNumeroWhatsapp, type EstadoNumeroWhatsapp } from "@/lib/whatsapp";
 
 /**
  * GET /api/product/integrations-status — saúde REAL das pipelines de dados.
@@ -56,8 +57,26 @@ export const GET = withStaff(async () => {
     };
   });
 
+  /*
+    Estado do número de WhatsApp, lido ao vivo da Meta.
+    Best-effort: se a Meta estiver em baixo ou o token expirar, o painel de
+    integrações continua a mostrar tudo o resto -- uma falha aqui não pode
+    derrubar a página inteira.
+  */
+  let whatsappNumber: EstadoNumeroWhatsapp | null = null;
+  let whatsappNumberError: string | null = null;
+  if (WHATSAPP_ENABLED) {
+    try {
+      whatsappNumber = await estadoNumeroWhatsapp();
+    } catch (e) {
+      whatsappNumberError = e instanceof Error ? e.message : "Erro ao ler o número na Meta.";
+    }
+  }
+
   return apiOk({
     jobs,
+    whatsappNumber,
+    whatsappNumberError,
     // Que credenciais estão configuradas no servidor (não expõe valores).
     configured: {
       "App Store": appleConfigured(),
@@ -65,6 +84,7 @@ export const GET = withStaff(async () => {
       "Meta Ads": metaConfigured(),
       "Google Ads": googleAdsConfigured(),
       Paylands: paylandsConfigured(),
+      WhatsApp: WHATSAPP_ENABLED,
     },
   });
 });
