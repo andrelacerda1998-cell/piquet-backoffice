@@ -560,35 +560,17 @@ export default function MarketingPage() {
                       />
                     </ChartCard>
                   )}
-                  {sub === "cac" && (
-                    <div className="space-y-6">
-                      {/* ROAS real primeiro: é a resposta à pergunta que traz
-                          alguém a esta sub-aba. O CAC por canal abaixo vem do
-                          que as plataformas reportam, e é outra coisa. */}
-                      <RoasReal />
-                      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
-                        <b className="text-text-primary">CAC = investimento ÷ clientes adquiridos.</b> Custo de aquisição por cliente pagante, por canal.
-                      </div>
-                      <ChartCard title="CAC por canal" subtitle="Menor é melhor">
-                        <BarChartComponent
-                          data={(channels ?? []).map((c) => ({ name: c.name, value: (c as { cac?: number }).cac ?? 0 }))}
-                          bars={[{ key: "value", color: "#3E7C8C", name: "CAC" }]}
-                          currency
-                        />
-                      </ChartCard>
-                      <DataTable
-                        columns={[
-                          { key: "name", label: "Canal", render: (r) => <span className="font-medium">{r.name as string}</span> },
-                          { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
-                          { key: "customers", label: "Clientes", render: (r) => `${(r.customers as number) ?? 0}` },
-                          { key: "cac", label: "CAC", render: (r) => <span className="font-semibold">{formatCurrency((r.cac as number) ?? 0)}</span> },
-                          { key: "roas", label: "ROAS", render: (r) => `${((r.roas as number) ?? 0).toFixed(2)}x` },
-                        ]}
-                        data={(channels ?? []) as unknown as Record<string, unknown>[]}
-                        keyField="name"
-                      />
-                    </div>
-                  )}
+                  {/*
+                    Só o ROAS real. Havia aqui um segundo bloco de CAC/ROAS
+                    vindo do que as plataformas reportam, e os dois números
+                    contradiziam-se no mesmo ecrã: a tabela dizia "249 clientes"
+                    do Google quando o negócio inteiro tem 23 clientes
+                    pagantes. Eram conversões reportadas pela plataforma
+                    (visitas, instalações, eventos), não clientes — e ao lado
+                    de uma tabela que conta clientes a sério, isso não é
+                    informação a mais, é informação errada.
+                  */}
+                  {sub === "cac" && <RoasReal />}
                   {sub === "investimento" && (
                     <ChartCard title="Distribuição do investimento por canal">
                       <DonutChartComponent data={(channels ?? []).map((c) => ({ name: c.name, value: c.investment }))} currency centerLabel="Investido" />

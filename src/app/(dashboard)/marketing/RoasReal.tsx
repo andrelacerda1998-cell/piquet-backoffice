@@ -36,7 +36,8 @@ function Tabela({ linhas, rotulo }: { linhas: RoasLinha[]; rotulo: string }) {
             <th className="px-3 py-2 font-medium text-right">Leads</th>
             <th className="px-3 py-2 font-medium text-right">Clientes</th>
             <th className="px-3 py-2 font-medium text-right">Receita Piquet</th>
-            <th className="px-3 py-2 font-medium text-right">Investimento</th>
+            <th className="px-3 py-2 font-medium text-right">Investido</th>
+            <th className="px-3 py-2 font-medium text-right">CAC</th>
             <th className="px-3 py-2 font-medium text-right">ROAS</th>
           </tr>
         </thead>
@@ -49,6 +50,9 @@ function Tabela({ linhas, rotulo }: { linhas: RoasLinha[]; rotulo: string }) {
               <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCurrency(l.receita)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
                 {l.investimento ? formatCurrency(l.investimento) : "—"}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                {l.cac != null ? formatCurrency(l.cac) : "—"}
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {/* Traço quando o investimento é desconhecido: um "0,00×" diria
@@ -152,12 +156,11 @@ export function RoasReal() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold">ROAS real</h3>
-          <p className="text-xs text-text-secondary max-w-2xl">
-            Receita que os clientes <b className="text-text-primary">pagaram de facto</b> (Payshop), não as conversões
-            que as plataformas dizem ter. {t && (
-              <>Hoje: {t.leads} leads, {t.clientes} tornaram-se clientes, {formatCurrency(t.receita)} de receita atribuída.</>
-            )}
+          <h3 className="font-semibold">ROAS e CAC</h3>
+          <p className="text-xs text-text-secondary">
+            {t
+              ? <>{t.leads} leads · {t.clientes} clientes · {formatCurrency(t.receita)} de receita atribuída</>
+              : "Receita que os clientes pagaram, não as conversões reportadas."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -184,11 +187,13 @@ export function RoasReal() {
         </div>
       </div>
 
-      <p className="text-[11px] text-text-muted max-w-3xl">
-        Atribuição de <b className="text-text-secondary">primeiro toque</b>: conta a campanha que trouxe a pessoa pela
-        primeira vez, mesmo que ela tenha voltado depois por outro caminho. Leads sem origem aparecem como
-        &ldquo;direto&rdquo; — inclui boca-a-boca e quem escreveu o endereço à mão, e é informação, não uma falha.
-        Uma lead de hoje pode virar receita daqui a semanas, por isso campanhas recentes aparecem sempre subestimadas.
+      {/* Uma linha, com o resto no tooltip: o painel explicava-se em quatro
+          linhas de texto que competiam com os números que devia servir. */}
+      <p className="text-[11px] text-text-muted cursor-help"
+        title={"Primeiro toque: conta a campanha que trouxe a pessoa pela primeira vez, mesmo que tenha voltado depois por outro caminho.\n\n"
+          + "\"Direto\" são leads sem origem — boca-a-boca e quem escreveu o endereço à mão. É informação, não uma falha.\n\n"
+          + "Uma lead de hoje pode virar receita daqui a semanas, por isso campanhas recentes aparecem sempre subestimadas."}>
+        Primeiro toque · receita cobrada no Payshop · campanhas recentes aparecem subestimadas
       </p>
     </div>
   );
