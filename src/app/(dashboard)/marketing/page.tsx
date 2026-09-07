@@ -255,9 +255,16 @@ export default function MarketingPage() {
     { key: "recommendation", label: "Recomendação", render: (r) => <StatusBadge status={(r.recommendation as string) === "Escalar" ? "ativo" : (r.recommendation as string) === "Desativar" ? "cancelado_cliente" : "em_analise"} label={r.recommendation as string} /> },
   ];
 
+  /*
+    Uma aba só para campanhas e desempenho.
+    Eram duas — "Desempenho" e "Campanhas" — a responder à mesma pergunta:
+    "o dinheiro que gasto está a render?". Separá-las obrigava a saltar entre
+    abas para ver o investimento de um lado e a campanha que o gastou do
+    outro. As sub-abas continuam, porque essas separam mesmo (funil, canais,
+    ROAS, investimento são leituras diferentes).
+  */
   const TABS: TabDef[] = [
-    { id: "desempenho", label: "Desempenho" },
-    { id: "campanhas", label: "Campanhas", count: campanhasAtivas.length },
+    { id: "desempenho", label: "Campanhas e desempenho", count: campanhasAtivas.length },
     { id: "comunicacao", label: "Comunicação" },
   ];
 
@@ -435,6 +442,7 @@ export default function MarketingPage() {
             )}
             <SubTabs
               tabs={[
+                { id: "campanhas", label: "Campanhas" },
                 { id: "funil", label: "Funil de marketing" },
                 { id: "canais", label: "Canais" },
                 { id: "cac", label: "CAC por canal" },
@@ -443,68 +451,8 @@ export default function MarketingPage() {
             >
               {(sub) => (
                 <>
-                  {sub === "funil" && (
-                    <ChartCard title="Funil de marketing">
-                      <FunnelChartComponent data={(funnel ?? []).map((s) => ({ name: s.name, count: s.count, conversionRate: s.conversionRate }))} />
-                    </ChartCard>
-                  )}
-                  {sub === "canais" && (
-                    <ChartCard title="Performance por canal" subtitle="Investimento vs receita">
-                      <BarChartComponent
-                        data={(channels ?? []).map((c) => ({ name: c.name, investimento: c.investment, receita: c.revenue }))}
-                        bars={[{ key: "investimento", color: "#D6503B", name: "Investimento" }, { key: "receita", color: "#FAB347", name: "Receita" }]}
-                        currency
-                      />
-                    </ChartCard>
-                  )}
-                  {sub === "cac" && (
-                    <div className="space-y-6">
-                      {/* ROAS real primeiro: é a resposta à pergunta que traz
-                          alguém a esta sub-aba. O CAC por canal abaixo vem do
-                          que as plataformas reportam, e é outra coisa. */}
-                      <RoasReal />
-                      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
-                        <b className="text-text-primary">CAC = investimento ÷ clientes adquiridos.</b> Custo de aquisição por cliente pagante, por canal.
-                      </div>
-                      <ChartCard title="CAC por canal" subtitle="Menor é melhor">
-                        <BarChartComponent
-                          data={(channels ?? []).map((c) => ({ name: c.name, value: (c as { cac?: number }).cac ?? 0 }))}
-                          bars={[{ key: "value", color: "#3E7C8C", name: "CAC" }]}
-                          currency
-                        />
-                      </ChartCard>
-                      <DataTable
-                        columns={[
-                          { key: "name", label: "Canal", render: (r) => <span className="font-medium">{r.name as string}</span> },
-                          { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
-                          { key: "customers", label: "Clientes", render: (r) => `${(r.customers as number) ?? 0}` },
-                          { key: "cac", label: "CAC", render: (r) => <span className="font-semibold">{formatCurrency((r.cac as number) ?? 0)}</span> },
-                          { key: "roas", label: "ROAS", render: (r) => `${((r.roas as number) ?? 0).toFixed(2)}x` },
-                        ]}
-                        data={(channels ?? []) as unknown as Record<string, unknown>[]}
-                        keyField="name"
-                      />
-                    </div>
-                  )}
-                  {sub === "investimento" && (
-                    <ChartCard title="Distribuição do investimento por canal">
-                      <DonutChartComponent data={(channels ?? []).map((c) => ({ name: c.name, value: c.investment }))} currency centerLabel="Investido" />
-                    </ChartCard>
-                  )}
-                </>
-              )}
-            </SubTabs>
-          </div>
-        )}
-
-        {/*
-          Sem sub-abas. Uma aba "Campanhas" com uma sub-aba "Campanhas" era um
-          nivel de navegacao que nao separava nada -- e escondia os criativos
-          atras de um clique que ninguem dava. Campanhas e criativos sao a
-          mesma pergunta vista de dois angulos: vivem no mesmo ecra.
-        */}
-        {tab === "campanhas" && (
-          <div className="space-y-8">
+                  {sub === "campanhas" && (
+                    <div className="space-y-8">
               <div className="space-y-3">
                 {/*
                   Antes esta legenda explicava faixas de ROAS aplicadas a
@@ -596,10 +544,63 @@ export default function MarketingPage() {
                   </div>
                 </details>
               </div>
+                    </div>
+                  )}
+                  {sub === "funil" && (
+                    <ChartCard title="Funil de marketing">
+                      <FunnelChartComponent data={(funnel ?? []).map((s) => ({ name: s.name, count: s.count, conversionRate: s.conversionRate }))} />
+                    </ChartCard>
+                  )}
+                  {sub === "canais" && (
+                    <ChartCard title="Performance por canal" subtitle="Investimento vs receita">
+                      <BarChartComponent
+                        data={(channels ?? []).map((c) => ({ name: c.name, investimento: c.investment, receita: c.revenue }))}
+                        bars={[{ key: "investimento", color: "#D6503B", name: "Investimento" }, { key: "receita", color: "#FAB347", name: "Receita" }]}
+                        currency
+                      />
+                    </ChartCard>
+                  )}
+                  {sub === "cac" && (
+                    <div className="space-y-6">
+                      {/* ROAS real primeiro: é a resposta à pergunta que traz
+                          alguém a esta sub-aba. O CAC por canal abaixo vem do
+                          que as plataformas reportam, e é outra coisa. */}
+                      <RoasReal />
+                      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
+                        <b className="text-text-primary">CAC = investimento ÷ clientes adquiridos.</b> Custo de aquisição por cliente pagante, por canal.
+                      </div>
+                      <ChartCard title="CAC por canal" subtitle="Menor é melhor">
+                        <BarChartComponent
+                          data={(channels ?? []).map((c) => ({ name: c.name, value: (c as { cac?: number }).cac ?? 0 }))}
+                          bars={[{ key: "value", color: "#3E7C8C", name: "CAC" }]}
+                          currency
+                        />
+                      </ChartCard>
+                      <DataTable
+                        columns={[
+                          { key: "name", label: "Canal", render: (r) => <span className="font-medium">{r.name as string}</span> },
+                          { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
+                          { key: "customers", label: "Clientes", render: (r) => `${(r.customers as number) ?? 0}` },
+                          { key: "cac", label: "CAC", render: (r) => <span className="font-semibold">{formatCurrency((r.cac as number) ?? 0)}</span> },
+                          { key: "roas", label: "ROAS", render: (r) => `${((r.roas as number) ?? 0).toFixed(2)}x` },
+                        ]}
+                        data={(channels ?? []) as unknown as Record<string, unknown>[]}
+                        keyField="name"
+                      />
+                    </div>
+                  )}
+                  {sub === "investimento" && (
+                    <ChartCard title="Distribuição do investimento por canal">
+                      <DonutChartComponent data={(channels ?? []).map((c) => ({ name: c.name, value: c.investment }))} currency centerLabel="Investido" />
+                    </ChartCard>
+                  )}
+                </>
+              )}
+            </SubTabs>
           </div>
         )}
 
-                {tab === "comunicacao" && (
+        {tab === "comunicacao" && (
           <SubTabs tabs={[
             { id: "push", label: "Push" },
             { id: "codigos", label: "Códigos de desconto" },
