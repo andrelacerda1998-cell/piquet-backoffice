@@ -61,6 +61,13 @@ export interface GoogleAnuncio {
   /** Display: URLs das imagens. Vazio em Pesquisa — não há imagem nenhuma. */
   imagens: string[];
   finalUrl: string | null;
+  /**
+   * De onde veio esta linha: um anúncio normal (`ad`) ou um asset group de
+   * Performance Max (`asset_group`). O PMax não tem anúncios — tem grupos de
+   * recursos que a Google combina sozinha —, por isso as ações disponíveis
+   * são diferentes e a UI precisa de saber distinguir.
+   */
+  origem: "ad" | "asset_group";
 }
 
 interface LinhaAnuncio {
@@ -78,6 +85,14 @@ interface LinhaAnuncio {
         descriptions?: { text?: string }[];
         marketingImages?: { asset?: string }[];
         squareMarketingImages?: { asset?: string }[];
+      };
+      // Campanhas de App (Google Play): outro formato ainda, com os textos e
+      // as imagens em `app_ad`. Vêm da mesma tabela ad_group_ad, por isso
+      // bastam mais campos no SELECT.
+      appAd?: {
+        headlines?: { text?: string }[];
+        descriptions?: { text?: string }[];
+        images?: { asset?: string }[];
       };
     };
   };
@@ -108,6 +123,9 @@ export async function listarAnunciosGoogle(): Promise<GoogleAnuncio[]> {
            ad_group_ad.ad.responsive_display_ad.descriptions,
            ad_group_ad.ad.responsive_display_ad.marketing_images,
            ad_group_ad.ad.responsive_display_ad.square_marketing_images,
+           ad_group_ad.ad.app_ad.headlines,
+           ad_group_ad.ad.app_ad.descriptions,
+           ad_group_ad.ad.app_ad.images,
            ad_group.id, ad_group.name,
            campaign.id, campaign.name, campaign.advertising_channel_type
     FROM ad_group_ad
@@ -118,7 +136,8 @@ export async function listarAnunciosGoogle(): Promise<GoogleAnuncio[]> {
   const refs = new Set<string>();
   for (const l of linhas) {
     const rda = l.adGroupAd?.ad?.responsiveDisplayAd;
-    for (const im of [...(rda?.marketingImages ?? []), ...(rda?.squareMarketingImages ?? [])]) {
+    const app = l.adGroupAd?.ad?.appAd;
+    for (const im of [...(rda?.marketingImages ?? []), ...(rda?.squareMarketingImages ?? []), ...(app?.images ?? [])]) {
       if (im.asset) refs.add(im.asset);
     }
   }
@@ -137,11 +156,12 @@ export async function listarAnunciosGoogle(): Promise<GoogleAnuncio[]> {
     }
   }
 
-  return linhas.map((l) => {
+  const normais: GoogleAnuncio[] = linhas.map((l) => {
     const ad = l.adGroupAd?.ad;
     const rsa = ad?.responsiveSearchAd;
     const rda = ad?.responsiveDisplayAd;
-    const imagens = [...(rda?.marketingImages ?? []), ...(rda?.squareMarketingImages ?? [])]
+    const app = ad?.appAd;
+    const imagens = [...(rda?.marketingImages ?? []), ...(rda?.squareMarketingImages ?? []), ...(app?.images ?? [])]
       .map((im) => (im.asset ? urlPorAsset.get(im.asset) : undefined))
       .filter((u): u is string => Boolean(u));
     return {
@@ -155,10 +175,85 @@ export async function listarAnunciosGoogle(): Promise<GoogleAnuncio[]> {
       campaignName: l.campaign?.name ?? null,
       adGroupId: l.adGroup?.id ?? null,
       adGroupName: l.adGroup?.name ?? null,
-      titulos: (rsa?.headlines ?? rda?.headlines ?? []).map((h) => h.text ?? "").filter(Boolean),
-      descricoes: (rsa?.descriptions ?? rda?.descriptions ?? []).map((d) => d.text ?? "").filter(Boolean),
+      titulos: (rsa?.headlines ?? rda?.headlines ?? app?.headlines ?? []).map((h) => h.text ?? "").filter(Boolean),
+      descricoes: (rsa?.descriptions ?? rda?.descriptions ?? app?.descriptions ?? []).map((d) => d.text ?? "").filter(Boolean),
       imagens,
       finalUrl: ad?.finalUrls?.[0] ?? null,
+      origem: "ad" as const,
+    };
+  });
+
+  return [...normais, ...(await listarAssetGroupsPMax(urlPorAsset))];
+}
+
+/**
+ * Asset groups de Performance Max.
+ *
+ * O PMax não tem `ad_group_ad`: os criativos vivem em `asset_group`, e as
+ * imagens e textos ligam-se por `asset_group_asset` com um `field_type`
+ * (MARKETING_IMAGE, HEADLINE, DESCRIPTION…). São duas queries — a dos grupos e
+ * a dos recursos — porque a Google não deixa juntar as duas num só GAQL.
+ *
+ * Sem isto, as campanhas PMax apareciam na lista com os cartões vazios: a
+ * consulta a `ad_group_ad` não as devolve de todo.
+ */
+async function listarAssetGroupsPMax(urlsJaLidas: Map<string, string>): Promise<GoogleAnuncio[]> {
+  const grupos = await gaql<{
+    assetGroup?: { id?: string; name?: string; status?: string; resourceName?: string };
+    campaign?: { id?: string; name?: string; advertisingChannelType?: string };
+  }>(`
+    SELECT asset_group.id, asset_group.name, asset_group.status, asset_group.resource_name,
+           campaign.id, campaign.name, campaign.advertising_channel_type
+    FROM asset_group
+    WHERE asset_group.status != 'REMOVED'
+    LIMIT 100`);
+  if (grupos.length === 0) return [];
+
+  const recursos = await gaql<{
+    assetGroupAsset?: { fieldType?: string };
+    asset?: { resourceName?: string; textAsset?: { text?: string }; imageAsset?: { fullSize?: { url?: string } } };
+    assetGroup?: { id?: string };
+  }>(`
+    SELECT asset_group_asset.field_type, asset_group.id,
+           asset.resource_name, asset.text_asset.text, asset.image_asset.full_size.url
+    FROM asset_group_asset
+    WHERE asset_group_asset.status != 'REMOVED'
+    LIMIT 500`);
+
+  const porGrupo = new Map<string, { titulos: string[]; descricoes: string[]; imagens: string[] }>();
+  for (const r of recursos) {
+    const gid = r.assetGroup?.id;
+    if (!gid) continue;
+    const alvo = porGrupo.get(gid) ?? { titulos: [], descricoes: [], imagens: [] };
+    const campo = r.assetGroupAsset?.fieldType ?? "";
+    const texto = r.asset?.textAsset?.text;
+    const url = r.asset?.imageAsset?.fullSize?.url
+      ?? (r.asset?.resourceName ? urlsJaLidas.get(r.asset.resourceName) : undefined);
+    if (campo.includes("HEADLINE") && texto) alvo.titulos.push(texto);
+    else if (campo.includes("DESCRIPTION") && texto) alvo.descricoes.push(texto);
+    else if (url) alvo.imagens.push(url);
+    porGrupo.set(gid, alvo);
+  }
+
+  return grupos.map((g) => {
+    const id = g.assetGroup?.id ?? "";
+    const partes = porGrupo.get(id) ?? { titulos: [], descricoes: [], imagens: [] };
+    return {
+      id,
+      resourceName: g.assetGroup?.resourceName ?? "",
+      name: g.assetGroup?.name ?? `Grupo de recursos ${id}`,
+      status: g.assetGroup?.status ?? "",
+      canal: g.campaign?.advertisingChannelType ?? "PERFORMANCE_MAX",
+      tipo: "ASSET_GROUP",
+      campaignId: g.campaign?.id ?? null,
+      campaignName: g.campaign?.name ?? null,
+      adGroupId: null,
+      adGroupName: null,
+      titulos: partes.titulos,
+      descricoes: partes.descricoes,
+      imagens: partes.imagens,
+      finalUrl: null,
+      origem: "asset_group" as const,
     };
   });
 }
@@ -391,7 +486,12 @@ export async function criarAnuncioDisplay(input: {
 export async function mudarEstadoGoogle(resourceName: string, estado: "ENABLED" | "PAUSED"): Promise<void> {
   const tipo = resourceName.split("/")[2];
   const recurso =
-    tipo === "adGroupAds" ? "adGroupAds" : tipo === "adGroups" ? "adGroups" : tipo === "campaigns" ? "campaigns" : null;
+    tipo === "adGroupAds" ? "adGroupAds"
+      : tipo === "adGroups" ? "adGroups"
+      : tipo === "campaigns" ? "campaigns"
+      // PMax: pausa-se o grupo de recursos, não um anúncio (não existe).
+      : tipo === "assetGroups" ? "assetGroups"
+      : null;
   if (!recurso) throw new Error(`Recurso não suportado: ${resourceName}`);
   await mutate(recurso, [{ update: { resourceName, status: estado }, updateMask: "status" }]);
 }

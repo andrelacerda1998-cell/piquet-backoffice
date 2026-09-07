@@ -24,6 +24,7 @@ function estadoUI(status: string): { label: string; tone: string } {
   return { label: e || "—", tone: "bg-surface-subtle text-text-muted" };
 }
 
+/** PMax não tem anúncios: tem grupos de recursos. O rótulo tem de o dizer. */
 const CANAL_LABEL: Record<string, string> = {
   SEARCH: "Pesquisa",
   DISPLAY: "Display",
@@ -109,7 +110,9 @@ export function AnunciosGoogle() {
               {grupo.canal === "SEARCH" ? <Search className="h-3 w-3" /> : <ImgIcon className="h-3 w-3" />}
               {CANAL_LABEL[grupo.canal] ?? grupo.canal}
             </span>
-            <span className="text-[11px] text-text-muted">· {grupo.itens.length} anúncio(s)</span>
+            <span className="text-[11px] text-text-muted">
+              · {grupo.itens.length} {grupo.itens[0]?.origem === "asset_group" ? "grupo(s) de recursos" : "anúncio(s)"}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -142,7 +145,9 @@ export function AnunciosGoogle() {
                         {st.label}
                       </span>
                     </div>
-                    {a.adGroupName && <p className="text-[11px] text-text-muted truncate">{a.adGroupName}</p>}
+                    {a.origem === "asset_group"
+                      ? <p className="text-[11px] text-text-muted">Grupo de recursos · a Google combina os elementos</p>
+                      : a.adGroupName && <p className="text-[11px] text-text-muted truncate">{a.adGroupName}</p>}
                     {a.descricoes[0] && <p className="text-xs text-text-secondary line-clamp-2">{a.descricoes[0]}</p>}
                     <div className="pt-1 mt-auto">
                       <button onClick={() => alternar(a)} disabled={aMudar === a.id}

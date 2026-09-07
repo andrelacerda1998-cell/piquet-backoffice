@@ -289,6 +289,7 @@ export interface GoogleAnuncioUI {
   campaignId: string | null; campaignName: string | null;
   adGroupId: string | null; adGroupName: string | null;
   titulos: string[]; descricoes: string[]; imagens: string[]; finalUrl: string | null;
+  origem: "ad" | "asset_group";
 }
 
 export async function getAnunciosGoogle(): Promise<{ configured: boolean; ads: GoogleAnuncioUI[]; error: string | null }> {
