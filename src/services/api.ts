@@ -163,6 +163,14 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/refresh",
   // Diagnóstico: que contas de anúncios o token do Google consegue ver.
   "/marketing/google-access",
+  // Criação de anúncios na Meta (escrita). São REAIS por definição: um mock
+  // que devolvesse "criado" fazia acreditar que o anúncio estava no ar.
+  "/marketing/ads/options",
+  "/marketing/ads/campaigns",
+  "/marketing/ads/adsets",
+  "/marketing/ads/creatives",
+  "/marketing/ads/ads",
+  "/marketing/ads/status",
   "/alerts",
   "/alerts/snooze",
   // Fase 5 — Equipa (chat, agenda e tarefas)
@@ -291,6 +299,12 @@ const REAL_DATA = new Set<string>([
   "/marketing/campaigns",
   "/marketing/metrics",
   "/marketing/channels",
+  "/marketing/ads/options",
+  "/marketing/ads/campaigns",
+  "/marketing/ads/adsets",
+  "/marketing/ads/creatives",
+  "/marketing/ads/ads",
+  "/marketing/ads/status",
   "/marketing/creatives",
   "/marketing/leads", // Formulário da landing → POST /api/leads → tabela leads.
   "/finance/app-payments",
