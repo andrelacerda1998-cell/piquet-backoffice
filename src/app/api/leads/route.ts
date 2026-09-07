@@ -62,7 +62,31 @@ export async function POST(req: Request) {
     resolveCategoryId(body.category ?? body.categoryId ?? body.category_id ?? body.service ?? body.servico) ||
     categoryFromMessage(clip(body.message, 2000));
 
+  /*
+    Atribuição: de onde veio esta lead.
+
+    Os UTM podem ser reescritos por encurtadores e redirecionamentos; o `gclid`
+    e o `fbclid` não, e por isso valem como fonte de verdade quando existem.
+    Guardam-se os dois — a vista `lead_attribution` deduz o canal do
+    identificador de clique quando o utm_source falta.
+
+    Campos vazios ficam vazios: "direto" é uma conclusão a tirar na leitura,
+    não um valor a inventar na escrita.
+  */
+  const atribuicao: Record<string, string> = {
+    utm_source: clip(body.utm_source, 100),
+    utm_medium: clip(body.utm_medium, 100),
+    utm_campaign: clip(body.utm_campaign, 200),
+    utm_content: clip(body.utm_content, 200),
+    utm_term: clip(body.utm_term, 200),
+    gclid: clip(body.gclid, 300),
+    fbclid: clip(body.fbclid, 300),
+    landing_page: clip(body.landing_page, 500),
+    referrer: clip(body.referrer, 500),
+  };
+
   const lead: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(atribuicao).filter(([, v]) => v)),
     name: clip(body.name, 200),
     email: clip(body.email, 200),
     phone: clip(body.phone, 50),
