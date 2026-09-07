@@ -295,3 +295,69 @@ export async function criarAnuncio(input: { nome: string; conjuntoId: string; cr
 export async function mudarEstado(objetoId: string, estado: "ACTIVE" | "PAUSED"): Promise<{ success?: boolean }> {
   return metaPost<{ success?: boolean }>(objetoId, { status: estado });
 }
+
+/* ============================ ANÚNCIOS EXISTENTES ============================ */
+
+export interface MetaAnuncio {
+  id: string;
+  name: string;
+  status: string;
+  effectiveStatus: string;
+  campaignId: string | null;
+  campaignName: string | null;
+  adsetName: string | null;
+  creativeId: string | null;
+  /** Miniatura servida pela Meta. Expira — não guardar, ler sempre. */
+  thumbnailUrl: string | null;
+  imageUrl: string | null;
+  texto: string | null;
+  titulo: string | null;
+}
+
+interface AnuncioBruto {
+  id: string;
+  name?: string;
+  status?: string;
+  effective_status?: string;
+  campaign?: { id?: string; name?: string };
+  adset?: { name?: string };
+  creative?: {
+    id?: string;
+    thumbnail_url?: string;
+    image_url?: string;
+    object_story_spec?: { link_data?: { message?: string; name?: string } };
+  };
+}
+
+/**
+ * Anúncios da conta, com campanha e miniatura do criativo.
+ *
+ * Uma chamada só, com os campos aninhados — pedir os criativos à parte dava
+ * N+1 e a Meta limita fortemente o número de pedidos por hora.
+ *
+ * As URLs de imagem que a Meta devolve são assinadas e EXPIRAM. Por isso não
+ * se guardam em lado nenhum: lê-se de cada vez que o ecrã abre.
+ */
+export async function listarAnuncios(): Promise<MetaAnuncio[]> {
+  const { accountId } = credenciais();
+  const r = await metaGet<{ data?: AnuncioBruto[] }>(`${accountId}/ads`, {
+    fields:
+      "id,name,status,effective_status,campaign{id,name},adset{name}," +
+      "creative{id,thumbnail_url,image_url,object_story_spec}",
+    limit: "200",
+  });
+  return (r.data ?? []).map((a) => ({
+    id: a.id,
+    name: a.name ?? "(sem nome)",
+    status: a.status ?? "",
+    effectiveStatus: a.effective_status ?? "",
+    campaignId: a.campaign?.id ?? null,
+    campaignName: a.campaign?.name ?? null,
+    adsetName: a.adset?.name ?? null,
+    creativeId: a.creative?.id ?? null,
+    thumbnailUrl: a.creative?.thumbnail_url ?? null,
+    imageUrl: a.creative?.image_url ?? a.creative?.thumbnail_url ?? null,
+    texto: a.creative?.object_story_spec?.link_data?.message ?? null,
+    titulo: a.creative?.object_story_spec?.link_data?.name ?? null,
+  }));
+}

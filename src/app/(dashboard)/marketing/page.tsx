@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
+import { CriativosMeta } from "./CriativosMeta";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
@@ -553,17 +554,22 @@ export default function MarketingPage() {
                   </div>
                 )}
                 {sub === "criativos" && (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-xs text-text-secondary">
-                        Criativos a correr. Novos anúncios são criados <b className="text-text-primary">em pausa</b> —
-                        nada gasta orçamento sem uma activação deliberada.
+                  <div className="space-y-6">
+                    <CriativosMeta onCriar={() => setCriarAnuncioAberto(true)} />
+                    {/*
+                      A tabela abaixo NÃO é por criativo, apesar de estar nesta
+                      aba desde sempre: vem da tabela `campaigns` (agregado do
+                      ad_metrics) e traz uma linha por CAMPANHA, com o formato
+                      "Imagem" escrito no código. O título passa a dizê-lo. Os
+                      números são reais — o rótulo é que não era.
+                    */}
+                    <div>
+                      <h3 className="font-semibold mb-1">Desempenho por campanha</h3>
+                      <p className="text-xs text-text-secondary mb-3">
+                        Investimento, CTR e ROAS agregados por campanha — não por criativo individual.
                       </p>
-                      <button onClick={() => setCriarAnuncioAberto(true)} className="btn-primary text-sm">
-                        <Plus className="h-4 w-4" /> Criar anúncio
-                      </button>
+                      <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
                     </div>
-                    <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
                   </div>
                 )}
               </>

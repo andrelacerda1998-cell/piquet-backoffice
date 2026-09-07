@@ -166,6 +166,7 @@ const LIVE_EXACT = new Set<string>([
   // Criação de anúncios na Meta (escrita). São REAIS por definição: um mock
   // que devolvesse "criado" fazia acreditar que o anúncio estava no ar.
   "/marketing/ads/options",
+  "/marketing/ads/list",
   "/marketing/ads/campaigns",
   "/marketing/ads/adsets",
   "/marketing/ads/creatives",
@@ -300,6 +301,7 @@ const REAL_DATA = new Set<string>([
   "/marketing/metrics",
   "/marketing/channels",
   "/marketing/ads/options",
+  "/marketing/ads/list",
   "/marketing/ads/campaigns",
   "/marketing/ads/adsets",
   "/marketing/ads/creatives",

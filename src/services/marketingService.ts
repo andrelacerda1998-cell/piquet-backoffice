@@ -266,3 +266,18 @@ export async function criarAnuncioMeta(input: { nome?: string; conjuntoId: strin
 export async function mudarEstadoMeta(id: string, estado: "ACTIVE" | "PAUSED") {
   return apiPut<{ id: string; estado: string }>("/marketing/ads/status", { id, estado }, semMock("Mudar o estado")).then((r) => r.data);
 }
+
+export interface MetaAnuncioUI {
+  id: string; name: string; status: string; effectiveStatus: string;
+  campaignId: string | null; campaignName: string | null; adsetName: string | null;
+  creativeId: string | null; thumbnailUrl: string | null; imageUrl: string | null;
+  texto: string | null; titulo: string | null;
+}
+
+/** Anúncios reais da conta Meta, com imagem do criativo. */
+export async function getAnunciosMeta(): Promise<{ configured: boolean; ads: MetaAnuncioUI[]; error: string | null }> {
+  return apiGet<{ configured: boolean; ads: MetaAnuncioUI[]; error: string | null }>(
+    "/marketing/ads/list",
+    () => ({ configured: false, ads: [], error: null }),
+  ).then((r) => r.data);
+}
