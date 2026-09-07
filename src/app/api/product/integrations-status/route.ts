@@ -5,7 +5,7 @@ import { googleConfigured } from "../../_lib/googleplay";
 import { metaConfigured } from "../../_lib/metaads";
 import { googleAdsConfigured } from "../../_lib/googleads";
 import { paylandsConfigured } from "../../_lib/paylands";
-import { WHATSAPP_ENABLED, estadoNumeroWhatsapp, type EstadoNumeroWhatsapp } from "@/lib/whatsapp";
+import { WHATSAPP_ENABLED, estadoNumeroWhatsapp, modelosWhatsapp, type EstadoNumeroWhatsapp, type ModeloWhatsapp } from "@/lib/whatsapp";
 
 /**
  * GET /api/product/integrations-status — saúde REAL das pipelines de dados.
@@ -65,18 +65,21 @@ export const GET = withStaff(async () => {
   */
   let whatsappNumber: EstadoNumeroWhatsapp | null = null;
   let whatsappNumberError: string | null = null;
+  let whatsappTemplates: ModeloWhatsapp[] | null = null;
   if (WHATSAPP_ENABLED) {
-    try {
-      whatsappNumber = await estadoNumeroWhatsapp();
-    } catch (e) {
-      whatsappNumberError = e instanceof Error ? e.message : "Erro ao ler o número na Meta.";
-    }
+    // Em paralelo e com falhas independentes: os modelos falharem não pode
+    // esconder o estado do número, nem o contrário.
+    const [numero, modelos] = await Promise.allSettled([estadoNumeroWhatsapp(), modelosWhatsapp()]);
+    if (numero.status === "fulfilled") whatsappNumber = numero.value;
+    else whatsappNumberError = numero.reason instanceof Error ? numero.reason.message : "Erro ao ler o número na Meta.";
+    if (modelos.status === "fulfilled") whatsappTemplates = modelos.value;
   }
 
   return apiOk({
     jobs,
     whatsappNumber,
     whatsappNumberError,
+    whatsappTemplates,
     // Que credenciais estão configuradas no servidor (não expõe valores).
     configured: {
       "App Store": appleConfigured(),

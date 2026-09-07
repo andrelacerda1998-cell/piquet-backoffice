@@ -113,3 +113,58 @@ export async function estadoNumeroWhatsapp(): Promise<EstadoNumeroWhatsapp> {
     verificationStatus: json.code_verification_status ?? null,
   };
 }
+
+/**
+ * Conta WhatsApp Business (WABA) da Piquet.
+ *
+ * Não é uma credencial — é um identificador público da conta; sem o token não
+ * dá para fazer nada com ele, por isso pode viver no código. Está aqui, e não
+ * só no ambiente, porque não existe caminho na Graph API do
+ * `phone_number_id` para a WABA: sem este número escrito, a única forma de o
+ * obter é ir à consola do Facebook copiá-lo à mão.
+ * A variável de ambiente, se existir, ganha.
+ */
+export const WHATSAPP_WABA_ID = process.env.WHATSAPP_WABA_ID || "1730246919105992";
+
+export interface ModeloWhatsapp {
+  id: string;
+  name: string;
+  /** APPROVED · PENDING · REJECTED · PAUSED · DISABLED */
+  status: string;
+  category: string | null;
+  language: string | null;
+  /** Porque foi recusado (a Meta manda "NONE" quando não há recusa). */
+  rejectedReason: string | null;
+}
+
+/**
+ * Modelos de mensagem da conta. São o que permite ESCREVER PRIMEIRO a um
+ * cliente — sem um modelo aprovado, o WhatsApp só deixa responder nas 24h
+ * seguintes a uma mensagem dele, e as leads da landing nunca escrevem.
+ */
+export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
+  const token = process.env.WHATSAPP_TOKEN;
+  if (!token) throw new Error("WhatsApp não configurado.");
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_WABA_ID}/message_templates` +
+      `?fields=name,status,category,language,rejected_reason&limit=50&access_token=${encodeURIComponent(token)}`,
+    { cache: "no-store" },
+  );
+  const json = (await res.json()) as {
+    data?: { id: string; name: string; status: string; category?: string; language?: string; rejected_reason?: string }[];
+    error?: { message?: string };
+  };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
+
+  return (json.data ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    status: t.status,
+    category: t.category ?? null,
+    language: t.language ?? null,
+    // "NONE" é a forma da Meta dizer "não foi recusado" — vira null para não
+    // aparecer um motivo de recusa em modelos que estão bem.
+    rejectedReason: t.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : null,
+  }));
+}

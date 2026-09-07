@@ -132,12 +132,23 @@ export interface WhatsappNumberStatus {
   verificationStatus: string | null;
 }
 
+/** Modelo de mensagem — ver `modelosWhatsapp` em lib/whatsapp.ts. */
+export interface WhatsappTemplate {
+  id: string;
+  name: string;
+  status: string;
+  category: string | null;
+  language: string | null;
+  rejectedReason: string | null;
+}
+
 export interface IntegrationsStatus {
   jobs: IntegrationJob[];
   configured: Record<string, boolean>;
   /** `null` quando o WhatsApp não está configurado ou a leitura falhou. */
   whatsappNumber?: WhatsappNumberStatus | null;
   whatsappNumberError?: string | null;
+  whatsappTemplates?: WhatsappTemplate[] | null;
 }
 
 export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {

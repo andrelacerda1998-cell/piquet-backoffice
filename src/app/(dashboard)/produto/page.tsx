@@ -414,6 +414,48 @@ export default function ProdutoPage() {
               );
             })()}
 
+            {/*
+              Modelos de mensagem. Estão aqui, colados ao número, porque são a
+              outra metade da mesma pergunta: o número diz se os clientes veem
+              "Piquet", e os modelos dizem se lhes conseguimos ESCREVER
+              PRIMEIRO -- sem um modelo aprovado, as leads da landing (que
+              nunca escrevem) ficam sem resposta automática.
+            */}
+            {(health?.whatsappTemplates?.length ?? 0) > 0 && (
+              <div className="mb-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Modelos de mensagem</p>
+                <div className="card divide-y divide-surface-border">
+                  {health!.whatsappTemplates!.map((t) => {
+                    const st = (t.status || "").toUpperCase();
+                    const tom = st === "APPROVED" ? "bg-success-light text-success"
+                      : st === "REJECTED" ? "bg-danger-light text-danger"
+                      : st === "PENDING" ? "bg-warning-light text-warning"
+                      : "bg-surface-subtle text-text-secondary";
+                    const rotulo = st === "APPROVED" ? "Aprovado"
+                      : st === "PENDING" ? "Em revisão"
+                      : st === "REJECTED" ? "Recusado"
+                      : st === "PAUSED" ? "Pausado"
+                      : st || "—";
+                    return (
+                      <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate font-mono">{t.name}</p>
+                          <p className="text-xs text-text-muted">
+                            {[t.category, t.language].filter(Boolean).join(" · ") || "—"}
+                            {t.rejectedReason && <span className="text-danger"> · {t.rejectedReason}</span>}
+                          </p>
+                        </div>
+                        <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium shrink-0", tom)}>{rotulo}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-text-muted mt-2">
+                  Um modelo aprovado é o que permite iniciar conversa com quem nunca escreveu — o caso das leads da landing.
+                </p>
+              </div>
+            )}
+
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Pipelines de dados</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
