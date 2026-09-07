@@ -490,98 +490,96 @@ export default function MarketingPage() {
           </div>
         )}
 
+        {/*
+          Sem sub-abas. Uma aba "Campanhas" com uma sub-aba "Campanhas" era um
+          nivel de navegacao que nao separava nada -- e escondia os criativos
+          atras de um clique que ninguem dava. Campanhas e criativos sao a
+          mesma pergunta vista de dois angulos: vivem no mesmo ecra.
+        */}
         {tab === "campanhas" && (
-          <SubTabs tabs={[{ id: "campanhas", label: "Campanhas" }, { id: "criativos", label: "Criativos" }]}>
-            {(sub) => (
-              <>
-                {sub === "campanhas" && (
-                  <div className="space-y-3">
-                    {/*
-                      Antes esta legenda explicava faixas de ROAS aplicadas a
-                      todas as campanhas por igual — o que marcava as de
-                      notoriedade como "Má" por terem 0,00×. Cada objetivo tem
-                      agora a sua métrica, e o desempenho é comparado só entre
-                      campanhas com o mesmo objetivo.
-                    */}
-                    <div className="rounded-xl bg-surface-subtle/60 px-3 py-2.5 text-xs text-text-secondary space-y-1">
-                      <p>
-                        <span className="font-medium text-text-primary">Cada objetivo é avaliado pela sua métrica:</span>{" "}
-                        instalações pelo custo por instalação · leads pelo custo por lead · tráfego pelo custo por clique ·
-                        notoriedade pelo custo por mil pessoas (CPM).
-                      </p>
-                      <p className="text-text-muted">
-                        O <strong>desempenho</strong> compara cada campanha com a mediana das outras do mesmo objetivo —
-                        não com metas de mercado, que não teríamos como fundamentar. O ROAS só aparece onde há receita medida.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-1.5">
-                        {([
-                          { id: "ativas", label: "A correr", n: campanhasAtivas.length },
-                          { id: "concluidas", label: "Concluídas", n: campanhasConcluidas.length },
-                          { id: "todas", label: "Todas", n: (campaigns ?? []).length },
-                        ] as const).map((o) => (
-                          <button
-                            key={o.id}
-                            onClick={() => setEstadoCampanhas(o.id)}
-                            className={cn(
-                              "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                              estadoCampanhas === o.id
-                                ? "bg-piquet text-white"
-                                : "bg-surface-subtle text-text-secondary hover:text-text-primary",
-                            )}
-                          >
-                            {o.label} <span className="opacity-70">{o.n}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-text-muted">
-                        {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos
-                        {estadoCampanhas === "ativas" && campanhasConcluidas.length > 0 &&
-                          ` · ${campanhasConcluidas.length} concluídas escondidas`}
-                      </p>
-                    </div>
-                    <DataTable
-                      columns={campaignColumns}
-                      data={campanhasVisiveis}
-                      keyField="id"
-                      emptyMessage={
-                        estadoCampanhas === "ativas"
-                          ? "Nenhuma campanha a correr neste momento."
-                          : "Sem campanhas neste estado."
-                      }
-                    />
+          <div className="space-y-8">
+              <div className="space-y-3">
+                {/*
+                  Antes esta legenda explicava faixas de ROAS aplicadas a
+                  todas as campanhas por igual — o que marcava as de
+                  notoriedade como "Má" por terem 0,00×. Cada objetivo tem
+                  agora a sua métrica, e o desempenho é comparado só entre
+                  campanhas com o mesmo objetivo.
+                */}
+                <div className="rounded-xl bg-surface-subtle/60 px-3 py-2.5 text-xs text-text-secondary space-y-1">
+                  <p>
+                    <span className="font-medium text-text-primary">Cada objetivo é avaliado pela sua métrica:</span>{" "}
+                    instalações pelo custo por instalação · leads pelo custo por lead · tráfego pelo custo por clique ·
+                    notoriedade pelo custo por mil pessoas (CPM).
+                  </p>
+                  <p className="text-text-muted">
+                    O <strong>desempenho</strong> compara cada campanha com a mediana das outras do mesmo objetivo —
+                    não com metas de mercado, que não teríamos como fundamentar. O ROAS só aparece onde há receita medida.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    {([
+                      { id: "ativas", label: "A correr", n: campanhasAtivas.length },
+                      { id: "concluidas", label: "Concluídas", n: campanhasConcluidas.length },
+                      { id: "todas", label: "Todas", n: (campaigns ?? []).length },
+                    ] as const).map((o) => (
+                      <button
+                        key={o.id}
+                        onClick={() => setEstadoCampanhas(o.id)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                          estadoCampanhas === o.id
+                            ? "bg-piquet text-white"
+                            : "bg-surface-subtle text-text-secondary hover:text-text-primary",
+                        )}
+                      >
+                        {o.label} <span className="opacity-70">{o.n}</span>
+                      </button>
+                    ))}
                   </div>
-                )}
-                {sub === "criativos" && (
-                  <div className="space-y-6">
-                    <Anuncios onCriar={() => setCriarAnuncioAberto(true)} />
-                    {/*
-                      A tabela abaixo NÃO é por criativo, apesar de estar nesta
-                      aba desde sempre: vem da tabela `campaigns` (agregado do
-                      ad_metrics) e traz uma linha por CAMPANHA, com o formato
-                      "Imagem" escrito no código. O título passa a dizê-lo. Os
-                      números são reais — o rótulo é que não era.
-                    */}
-                    {/* Recolhida: são números agregados, outra natureza da
-                        grelha de criativos acima, e estavam a competir por
-                        atenção com ela. */}
-                    <details className="pt-2">
-                      <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
-                        Desempenho por campanha (investimento, CTR, ROAS)
-                      </summary>
-                      <div className="mt-3">
-                        <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
-                      </div>
-                    </details>
+                  <p className="text-xs text-text-muted">
+                    {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos
+                    {estadoCampanhas === "ativas" && campanhasConcluidas.length > 0 &&
+                      ` · ${campanhasConcluidas.length} concluídas escondidas`}
+                  </p>
+                </div>
+                <DataTable
+                  columns={campaignColumns}
+                  data={campanhasVisiveis}
+                  keyField="id"
+                  emptyMessage={
+                    estadoCampanhas === "ativas"
+                      ? "Nenhuma campanha a correr neste momento."
+                      : "Sem campanhas neste estado."
+                  }
+                />
+              </div>
+              <div className="space-y-6">
+                <Anuncios onCriar={() => setCriarAnuncioAberto(true)} />
+                {/*
+                  A tabela abaixo NÃO é por criativo, apesar de estar nesta
+                  aba desde sempre: vem da tabela `campaigns` (agregado do
+                  ad_metrics) e traz uma linha por CAMPANHA, com o formato
+                  "Imagem" escrito no código. O título passa a dizê-lo. Os
+                  números são reais — o rótulo é que não era.
+                */}
+                {/* Recolhida: são números agregados, outra natureza da
+                    grelha de criativos acima, e estavam a competir por
+                    atenção com ela. */}
+                <details className="pt-2">
+                  <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
+                    Desempenho por campanha (investimento, CTR, ROAS)
+                  </summary>
+                  <div className="mt-3">
+                    <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
                   </div>
-                )}
-              </>
-            )}
-          </SubTabs>
+                </details>
+              </div>
+          </div>
         )}
 
-        {tab === "comunicacao" && (
+                {tab === "comunicacao" && (
           <SubTabs tabs={[
             { id: "push", label: "Push" },
             { id: "codigos", label: "Códigos de desconto" },

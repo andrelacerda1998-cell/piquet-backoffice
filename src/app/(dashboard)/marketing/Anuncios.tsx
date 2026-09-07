@@ -10,7 +10,8 @@ import {
 } from "@/services/marketingService";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import { Plus, Play, Pause, AlertTriangle, RefreshCw, ImageOff } from "lucide-react";
+import { Plus, Play, Pause, AlertTriangle, RefreshCw, ImageOff, ChevronRight } from "lucide-react";
+import { SearchInput } from "@/components/ui/DataTable";
 
 /**
  * Anúncios das duas plataformas, num só sítio.
@@ -77,6 +78,10 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
   const { data: meta, loading: loadMeta, refetch: refetchMeta } = useAsyncData(() => getAnunciosMeta(), []);
   const { data: google, loading: loadGoogle, refetch: refetchGoogle } = useAsyncData(() => getAnunciosGoogle(), []);
   const [filtro, setFiltro] = useState<"todas" | Plataforma>("todas");
+  const [busca, setBusca] = useState("");
+  // Campanhas recolhidas por omissão: são ~180 anúncios, um por campanha.
+  // Abertas todas, o ecrã era uma coluna de cartões com centenas de metros.
+  const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [aMudar, setAMudar] = useState<string | null>(null);
 
   const loading = loadMeta || loadGoogle;
@@ -143,15 +148,21 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
     return out;
   }, [meta, google]);
 
-  const visiveis = filtro === "todas" ? anuncios : anuncios.filter((a) => a.plataforma === filtro);
+  const visiveis = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return anuncios.filter((a) =>
+      (filtro === "todas" || a.plataforma === filtro) &&
+      (!q || a.nome.toLowerCase().includes(q) || a.campanhaNome.toLowerCase().includes(q))
+    );
+  }, [anuncios, filtro, busca]);
 
   const grupos = useMemo(() => {
-    const m = new Map<string, { nome: string; plataforma: Plataforma; canal: string; itens: Anuncio[] }>();
+    const m = new Map<string, { chave: string; nome: string; plataforma: Plataforma; canal: string; itens: Anuncio[] }>();
     for (const a of visiveis) {
       const canal = a.plataforma === "google"
         ? (google?.ads.find((g) => `google:${g.campaignId ?? "sem"}` === a.campanhaChave)?.canal ?? "")
         : "";
-      const atual = m.get(a.campanhaChave) ?? { nome: a.campanhaNome, plataforma: a.plataforma, canal, itens: [] };
+      const atual = m.get(a.campanhaChave) ?? { chave: a.campanhaChave, nome: a.campanhaNome, plataforma: a.plataforma, canal, itens: [] };
       atual.itens.push(a);
       m.set(a.campanhaChave, atual);
     }
@@ -166,7 +177,7 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
   const contagem = (p: Plataforma) => anuncios.filter((a) => a.plataforma === p).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Um cabeçalho só: filtro, atualizar e criar. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
@@ -186,6 +197,7 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <SearchInput value={busca} onChange={setBusca} className="w-56" placeholder="Campanha ou anúncio…" />
           <button onClick={recarregar} className="btn-secondary text-sm" title="Voltar a ler das plataformas">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </button>
@@ -209,64 +221,84 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
         <p className="text-sm text-text-secondary">Sem anúncios a mostrar.</p>
       )}
 
-      {grupos.map((g) => (
-        <div key={`${g.plataforma}-${g.nome}`} className="space-y-2">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <Selo p={g.plataforma} />
-            <p className="text-sm font-medium text-text-primary">{g.nome}</p>
-            {g.canal && <span className="text-[11px] text-text-muted">{CANAL[g.canal] ?? g.canal}</span>}
-            <span className="text-[11px] text-text-muted">· {g.itens.length}</span>
-          </div>
+      {grupos.map((g) => {
+        const aberta = abertas.has(g.chave);
+        const aCorrer = g.itens.filter((i) => i.activo).length;
+        return (
+          <div key={g.chave} className="rounded-xl border border-surface-border overflow-hidden">
+            {/* Linha da campanha: clicável, com as miniaturas em ponto pequeno
+                para se perceber o que lá está sem abrir. */}
+            <button
+              onClick={() => setAbertas((s) => {
+                const n = new Set(s);
+                if (n.has(g.chave)) n.delete(g.chave); else n.add(g.chave);
+                return n;
+              })}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-muted/50 transition-colors"
+            >
+              <ChevronRight className={cn("h-4 w-4 text-text-muted shrink-0 transition-transform", aberta && "rotate-90")} />
+              <Selo p={g.plataforma} />
+              <span className="text-sm font-medium text-text-primary truncate flex-1">{g.nome}</span>
+              {g.canal && <span className="text-[11px] text-text-muted shrink-0 hidden sm:inline">{CANAL[g.canal] ?? g.canal}</span>}
+              {!aberta && (
+                <span className="hidden md:flex items-center gap-1 shrink-0">
+                  {g.itens.slice(0, 4).map((a) => (
+                    a.imagem
+                      ? <Image key={a.chave} src={a.imagem} alt="" width={28} height={28} unoptimized className="h-7 w-7 rounded object-cover" />
+                      : <span key={a.chave} className="h-7 w-7 rounded bg-surface-subtle" />
+                  ))}
+                </span>
+              )}
+              <span className="text-[11px] text-text-muted shrink-0 tabular-nums">
+                {aCorrer > 0 ? `${aCorrer}/${g.itens.length} a correr` : `${g.itens.length} em pausa`}
+              </span>
+            </button>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {g.itens.map((a) => (
-              <div key={a.chave} className="card overflow-hidden flex flex-col">
-                {a.imagem ? (
-                  <Image src={a.imagem} alt={a.nome} width={400} height={300} unoptimized
-                    className="w-full aspect-[4/3] object-cover" />
-                ) : a.titulos.length > 0 ? (
-                  /* Pesquisa: os títulos SÃO o criativo. Uma moldura vazia
-                     sugeriria que falta lá uma imagem, e não falta. */
-                  <div className="aspect-[4/3] bg-surface-subtle/60 px-3 py-3 space-y-1 overflow-hidden">
-                    {a.titulos.slice(0, 4).map((t, i) => (
-                      <p key={i} className={cn("text-sm truncate", i === 0 ? "text-piquet-700 font-medium" : "text-text-secondary")}>{t}</p>
-                    ))}
-                    {a.titulos.length > 4 && (
-                      <p className="text-[11px] text-text-muted">+{a.titulos.length - 4} títulos</p>
+            {aberta && (
+              <div className="border-t border-surface-border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {g.itens.map((a) => (
+                  <div key={a.chave} className="rounded-lg border border-surface-border overflow-hidden flex flex-col">
+                    {a.imagem ? (
+                      <Image src={a.imagem} alt={a.nome} width={300} height={225} unoptimized
+                        className="w-full aspect-[4/3] object-cover" />
+                    ) : a.titulos.length > 0 ? (
+                      <div className="aspect-[4/3] bg-surface-subtle/60 px-2.5 py-2 space-y-0.5 overflow-hidden">
+                        {a.titulos.slice(0, 4).map((t, i) => (
+                          <p key={i} className={cn("text-xs truncate", i === 0 ? "text-piquet-700 font-medium" : "text-text-secondary")}>{t}</p>
+                        ))}
+                        {a.titulos.length > 4 && <p className="text-[10px] text-text-muted">+{a.titulos.length - 4}</p>}
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-[4/3] bg-surface-subtle flex items-center justify-center text-text-muted">
+                        <ImageOff className="h-4 w-4" />
+                      </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="w-full aspect-[4/3] bg-surface-subtle flex flex-col items-center justify-center gap-1 text-text-muted">
-                    <ImageOff className="h-5 w-5" />
-                    <span className="text-[11px]">Sem pré-visualização</span>
-                  </div>
-                )}
-
-                <div className="p-3 space-y-1.5 flex-1 flex flex-col">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-text-primary line-clamp-2">{a.nome}</p>
-                    <span className={cn("shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium", a.estado.tone)}>
-                      {a.estado.label}
-                    </span>
-                  </div>
-                  {a.subtitulo && <p className="text-[11px] text-text-muted line-clamp-1">{a.subtitulo}</p>}
-                  {a.texto && <p className="text-xs text-text-secondary line-clamp-2">{a.texto}</p>}
-                  {a.alternar && (
-                    <div className="pt-1 mt-auto">
-                      <button onClick={() => mudar(a.chave, a.alternar!, a.activo)} disabled={aMudar === a.chave}
-                        className={cn("text-xs inline-flex items-center gap-1.5 hover:underline disabled:opacity-50",
-                          a.activo ? "text-warning" : "text-success")}>
-                        {a.activo ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                        {aMudar === a.chave ? "A gravar…" : a.activo ? "Pausar" : "Activar"}
-                      </button>
+                    <div className="p-2 space-y-1 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <p className="text-xs font-medium text-text-primary line-clamp-2">{a.nome}</p>
+                        <span className={cn("shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium", a.estado.tone)}>
+                          {a.estado.label}
+                        </span>
+                      </div>
+                      {a.alternar && (
+                        <div className="pt-0.5 mt-auto">
+                          <button onClick={() => mudar(a.chave, a.alternar!, a.activo)} disabled={aMudar === a.chave}
+                            className={cn("text-[11px] inline-flex items-center gap-1 hover:underline disabled:opacity-50",
+                              a.activo ? "text-warning" : "text-success")}>
+                            {a.activo ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                            {aMudar === a.chave ? "A gravar…" : a.activo ? "Pausar" : "Activar"}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
+
     </div>
   );
 }
