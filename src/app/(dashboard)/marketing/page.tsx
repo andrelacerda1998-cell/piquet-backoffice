@@ -18,8 +18,7 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
-import { CriativosMeta } from "./CriativosMeta";
-import { AnunciosGoogle } from "./AnunciosGoogle";
+import { Anuncios } from "./Anuncios";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
@@ -556,8 +555,7 @@ export default function MarketingPage() {
                 )}
                 {sub === "criativos" && (
                   <div className="space-y-6">
-                    <CriativosMeta onCriar={() => setCriarAnuncioAberto(true)} />
-                    <AnunciosGoogle />
+                    <Anuncios onCriar={() => setCriarAnuncioAberto(true)} />
                     {/*
                       A tabela abaixo NÃO é por criativo, apesar de estar nesta
                       aba desde sempre: vem da tabela `campaigns` (agregado do
@@ -565,13 +563,17 @@ export default function MarketingPage() {
                       "Imagem" escrito no código. O título passa a dizê-lo. Os
                       números são reais — o rótulo é que não era.
                     */}
-                    <div>
-                      <h3 className="font-semibold mb-1">Desempenho por campanha</h3>
-                      <p className="text-xs text-text-secondary mb-3">
-                        Investimento, CTR e ROAS agregados por campanha — não por criativo individual.
-                      </p>
-                      <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
-                    </div>
+                    {/* Recolhida: são números agregados, outra natureza da
+                        grelha de criativos acima, e estavam a competir por
+                        atenção com ela. */}
+                    <details className="pt-2">
+                      <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
+                        Desempenho por campanha (investimento, CTR, ROAS)
+                      </summary>
+                      <div className="mt-3">
+                        <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
+                      </div>
+                    </details>
                   </div>
                 )}
               </>
