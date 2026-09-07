@@ -350,3 +350,41 @@ export async function criarAnuncioDisplayUI(input: {
 export async function mudarEstadoGoogleUI(resourceName: string, estado: "ENABLED" | "PAUSED") {
   return apiPut<{ resourceName: string; estado: string }>("/marketing/google-ads/status", { resourceName, estado }, semMockGoogle("Mudar o estado")).then((r) => r.data);
 }
+
+/* ==================== ROAS REAL (atribuicao de leads) ==================== */
+
+export interface RoasLinha {
+  nome: string;
+  leads: number;
+  clientes: number;
+  gmv: number;
+  receita: number;
+  investimento?: number;
+  /** `null` quando nao se conhece o investimento daquela campanha. */
+  roas?: number | null;
+  cpl?: number | null;
+  cac?: number | null;
+}
+
+export interface RoasReal {
+  porCampanha: RoasLinha[];
+  porCanal: RoasLinha[];
+  totais: { leads: number; clientes: number; receita: number };
+}
+
+/**
+ * ROAS calculado a partir do que os clientes pagaram, nao do que a plataforma
+ * diz ter convertido. Ver /api/marketing/roas.
+ */
+export async function getRoasReal(): Promise<RoasReal> {
+  return apiGet<RoasReal>("/marketing/roas", () => ({
+    porCampanha: [], porCanal: [], totais: { leads: 0, clientes: 0, receita: 0 },
+  })).then((r) => r.data);
+}
+
+export async function casarLeadsComClientes() {
+  return apiPost<{ clientes: number; leadsPorCasar: number; casadas: number; ambiguas: number; semTelefoneUtil: number }>(
+    "/marketing/attribution/match", {},
+    () => { throw new Error("Casar leads precisa da API de admin do Laravel configurada."); },
+  ).then((r) => r.data);
+}

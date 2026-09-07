@@ -1,0 +1,133 @@
+"use client";
+
+import { useState } from "react";
+import { useAsyncData } from "@/hooks/useDashboard";
+import { getRoasReal, casarLeadsComClientes, type RoasLinha } from "@/services/marketingService";
+import { formatCurrency } from "@/lib/formatters";
+import { toast } from "@/stores";
+import { cn } from "@/lib/utils";
+import { RefreshCw, Link2 } from "lucide-react";
+
+/**
+ * ROAS real: receita que os clientes pagaram, dividida pelo investimento.
+ *
+ * A diferença para o ROAS que a Meta e a Google mostram é a fonte da receita.
+ * Elas contam as conversões que conseguem ver e atribuir; isto conta o
+ * dinheiro que entrou no Payshop, vindo de pessoas cujas leads trouxeram uma
+ * campanha identificada. É mais baixo e mais verdadeiro.
+ *
+ * Também é mais lento a encher: uma lead de hoje pode virar receita daqui a
+ * semanas. Números de campanhas recentes leem-se com essa reserva.
+ */
+
+function Tabela({ linhas, rotulo }: { linhas: RoasLinha[]; rotulo: string }) {
+  if (linhas.length === 0) {
+    return <p className="text-sm text-text-secondary">Ainda sem dados por {rotulo.toLowerCase()}.</p>;
+  }
+  return (
+    <div className="rounded-xl border border-surface-border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-surface-subtle/60 text-text-muted">
+          <tr className="text-left">
+            <th className="px-3 py-2 font-medium">{rotulo}</th>
+            <th className="px-3 py-2 font-medium text-right">Leads</th>
+            <th className="px-3 py-2 font-medium text-right">Clientes</th>
+            <th className="px-3 py-2 font-medium text-right">Receita Piquet</th>
+            <th className="px-3 py-2 font-medium text-right">Investimento</th>
+            <th className="px-3 py-2 font-medium text-right">ROAS</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-surface-border/60">
+          {linhas.map((l) => (
+            <tr key={l.nome} className="hover:bg-surface-muted/40">
+              <td className="px-3 py-2 text-text-primary">{l.nome}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{l.leads}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{l.clientes}</td>
+              <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCurrency(l.receita)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                {l.investimento ? formatCurrency(l.investimento) : "—"}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {/* Traço quando o investimento é desconhecido: um "0,00×" diria
+                    "gastámos e não rendeu", que é outra afirmação. */}
+                {l.roas == null ? (
+                  <span className="text-text-muted" title="Investimento desta campanha desconhecido">—</span>
+                ) : (
+                  <span className={cn("font-semibold", l.roas >= 1 ? "text-success" : "text-warning")}>
+                    {l.roas.toFixed(2)}×
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function RoasReal() {
+  const { data, loading, refetch } = useAsyncData(() => getRoasReal(), []);
+  const [aCasar, setACasar] = useState(false);
+
+  const casar = async () => {
+    setACasar(true);
+    try {
+      const r = await casarLeadsComClientes();
+      toast(
+        `${r.casadas} lead(s) ligadas a clientes` +
+        (r.ambiguas ? ` · ${r.ambiguas} com telefone repetido, por atribuir` : ""),
+      );
+      refetch();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao casar leads.", "error");
+    } finally {
+      setACasar(false);
+    }
+  };
+
+  const t = data?.totais;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold">ROAS real</h3>
+          <p className="text-xs text-text-secondary max-w-2xl">
+            Receita que os clientes <b className="text-text-primary">pagaram de facto</b> (Payshop), não as conversões
+            que as plataformas dizem ter. {t && (
+              <>Hoje: {t.leads} leads, {t.clientes} tornaram-se clientes, {formatCurrency(t.receita)} de receita atribuída.</>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={casar} disabled={aCasar} className="btn-secondary text-sm disabled:opacity-50"
+            title="Procura, pelo telefone, que leads já são clientes">
+            <Link2 className="h-4 w-4" /> {aCasar ? "A ligar…" : "Ligar leads a clientes"}
+          </button>
+          <button onClick={refetch} className="btn-secondary text-sm">
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Por canal</p>
+          <Tabela linhas={data?.porCanal ?? []} rotulo="Canal" />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Por campanha</p>
+          <Tabela linhas={data?.porCampanha ?? []} rotulo="Campanha" />
+        </div>
+      </div>
+
+      <p className="text-[11px] text-text-muted max-w-3xl">
+        Atribuição de <b className="text-text-secondary">primeiro toque</b>: conta a campanha que trouxe a pessoa pela
+        primeira vez, mesmo que ela tenha voltado depois por outro caminho. Leads sem origem aparecem como
+        &ldquo;direto&rdquo; — inclui boca-a-boca e quem escreveu o endereço à mão, e é informação, não uma falha.
+        Uma lead de hoje pode virar receita daqui a semanas, por isso campanhas recentes aparecem sempre subestimadas.
+      </p>
+    </div>
+  );
+}

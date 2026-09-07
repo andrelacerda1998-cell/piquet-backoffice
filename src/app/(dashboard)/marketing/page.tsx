@@ -19,6 +19,7 @@ import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshC
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
+import { RoasReal } from "./RoasReal";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
@@ -457,7 +458,11 @@ export default function MarketingPage() {
                     </ChartCard>
                   )}
                   {sub === "cac" && (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                      {/* ROAS real primeiro: é a resposta à pergunta que traz
+                          alguém a esta sub-aba. O CAC por canal abaixo vem do
+                          que as plataformas reportam, e é outra coisa. */}
+                      <RoasReal />
                       <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
                         <b className="text-text-primary">CAC = investimento ÷ clientes adquiridos.</b> Custo de aquisição por cliente pagante, por canal.
                       </div>
