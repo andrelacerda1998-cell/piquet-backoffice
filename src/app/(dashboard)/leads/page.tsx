@@ -200,6 +200,14 @@ function LeadsPageInner() {
   // escreveu estava só dentro do "Editar", uma caixa entre doze campos, e
   // ninguém a encontrava. Abrir a linha mostra-a inteira, de imediato.
   const [viewing, setViewing] = useState<Lead | null>(null);
+  /*
+    Entradas de WhatsApp da lead aberta: null enquanto não se sabe.
+    Serve para decidir se a mensagem recebida precisa de ser mostrada à
+    esquerda ou se já está visível na conversa à direita. Enquanto for null
+    não se mostra nada — mais vale esperar um instante do que piscar um
+    bloco que desaparece.
+  */
+  const [entradasWa, setEntradasWa] = useState<number | null>(null);
   /**
    * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
@@ -590,7 +598,7 @@ function LeadsPageInner() {
               })}
             </div>
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
-              onRowClick={setViewing}
+              onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
               emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
             </>
           </div>
@@ -653,7 +661,12 @@ function LeadsPageInner() {
             WhatsApp). Ficava-se com uma lead sem se ver o que a pessoa pediu.
           */
           const mensagemCrua = (viewing.message || "").trim();
-          const mostrarCrua = !descricao && mensagemCrua.length > 0;
+          /*
+            Só quando a conversa não a mostra. Uma lead do WhatsApp traz em
+            `message` a própria mensagem que está no histórico ao lado, e
+            repeti-la era dizer duas vezes a mesma coisa no mesmo ecrã.
+          */
+          const mostrarCrua = !descricao && mensagemCrua.length > 0 && entradasWa === 0;
           // O telefone só com dígitos (e indicativo PT quando vier local) para o
           // link do WhatsApp; o texto mostra o número tal como foi recebido.
           const digitos = (viewing.phone || "").replace(/\D/g, "");
@@ -736,6 +749,7 @@ function LeadsPageInner() {
                 temTelefone={Boolean(viewing.phone)}
                 modelo={mensagemGenerica(viewing)}
                 waNumero={waNumero}
+                onEntradas={setEntradasWa}
               />
             </div>
           );

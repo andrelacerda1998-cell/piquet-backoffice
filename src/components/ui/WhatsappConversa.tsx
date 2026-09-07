@@ -24,9 +24,16 @@ function EstadoMsg({ status }: { status: string }) {
   return <Check className="h-3 w-3 text-text-muted" aria-label="Enviada" />;
 }
 
-export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
+export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntradas }: {
   leadId: string;
   temTelefone: boolean;
+  /*
+    Quantas mensagens o cliente escreveu. Quem abre a lead precisa de saber
+    isto para não repetir ao lado a mensagem que já está aqui no histórico —
+    e para a mostrar quando aqui não há nada. É reportado sempre, mesmo sem
+    telefone (aí este painel não chega a aparecer).
+  */
+  onEntradas?: (n: number) => void;
   /** Mensagem-modelo pré-preenchida (nome/serviço/localização) para inserir. */
   modelo?: string;
   /** Número (só dígitos, com indicativo) para o link wa.me de recurso. */
@@ -47,6 +54,13 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero }: {
       .finally(() => { if (vivo) setCarregando(false); });
     return () => { vivo = false; };
   }, [leadId]);
+
+  const reportar = useRef(onEntradas);
+  reportar.current = onEntradas;
+  useEffect(() => {
+    if (carregando) return;
+    reportar.current?.((conversa?.messages ?? []).filter((m) => m.direction === "in").length);
+  }, [conversa, carregando]);
 
   // Rola para a última mensagem sempre que a conversa muda.
   useEffect(() => { fimRef.current?.scrollIntoView({ block: "nearest" }); }, [conversa?.messages.length]);
