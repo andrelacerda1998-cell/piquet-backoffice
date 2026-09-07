@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 import { eDuplicado, JANELA_MESMA_MENSAGEM_MIN } from "@/lib/leadDedupe";
+import { WHATSAPP_ENABLED, enviarModeloLead } from "@/lib/whatsapp";
+import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
 
 /**
  * POST /api/leads — receção PÚBLICA de leads do formulário da landing page
@@ -96,9 +98,68 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, duplicate: true }, { status: 200, headers: CORS });
   }
 
-  const { error } = await supabaseAdmin().from("leads").insert(lead);
+  const { data: criada, error } = await supabaseAdmin().from("leads").insert(lead).select("id").single();
   if (error) {
     return NextResponse.json({ ok: false, error: "erro ao guardar" }, { status: 500, headers: CORS });
   }
+
+  /*
+    Confirmação automática ao cliente, pelo WhatsApp.
+
+    Vive aqui e não no webhook porque a landing deixou de encaminhar o
+    formulário para o WhatsApp: o cliente já não escreve, logo o webhook nunca
+    dispara. O modelo aprovado `pedido_recebido_piquet` é o que permite
+    escrever primeiro; sem ele, a janela das 24h nunca abre e a lead ficava
+    sem resposta.
+
+    Nunca bloqueia a resposta ao formulário: o cliente já viu "Pedido
+    recebido" no site, e uma falha do WhatsApp não pode transformar isso num
+    erro nem atrasar o ecrã. Falhar aqui custa uma mensagem, não a lead.
+  */
+  const leadId = (criada as { id: string } | null)?.id ?? null;
+  if (WHATSAPP_ENABLED && lead.phone) {
+    void enviarConfirmacao(leadId, lead.phone, lead.name, lead.message);
+  }
+
   return NextResponse.json({ ok: true }, { status: 201, headers: CORS });
+}
+
+/**
+ * Envia o modelo e regista a mensagem no histórico da lead.
+ *
+ * Sem nome não se envia: a Meta rejeita parâmetros vazios, e um "Olá, ." é
+ * pior do que não escrever. O serviço tem sempre valor -- cai em
+ * "assistência" quando a mensagem não o identifica.
+ */
+async function enviarConfirmacao(
+  leadId: string | null,
+  phone: string,
+  nome: string,
+  message: string,
+): Promise<void> {
+  try {
+    const dados = extrairDadosLead(message, nome);
+    const primeiro = primeiroNome(dados.nome || nome);
+    if (!primeiro) return;
+
+    const local = dados.localizacao.trim();
+    const servico = dados.servico.trim() || "assistência";
+    const pedido = local ? `${servico} em ${local}` : servico;
+
+    const { waMessageId } = await enviarModeloLead(phone, primeiro, pedido);
+
+    await supabaseAdmin().from("whatsapp_messages").insert({
+      lead_id: leadId,
+      phone,
+      direction: "out",
+      body: `[modelo pedido_recebido_piquet] ${primeiro} · ${pedido}`,
+      wa_message_id: waMessageId || null,
+      status: "sent",
+      sent_by: "automático",
+    });
+  } catch (e) {
+    // Não há utilizador a quem reportar -- isto corre depois de a resposta
+    // sair. Fica no log para se ver no painel de erros da Vercel.
+    console.error("[leads] falha ao enviar confirmação WhatsApp:", e);
+  }
 }

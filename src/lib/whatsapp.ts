@@ -168,3 +168,56 @@ export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
     rejectedReason: t.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : null,
   }));
 }
+
+/**
+ * Modelo aprovado que permite ESCREVER PRIMEIRO a um cliente.
+ *
+ * Sem um modelo, o WhatsApp só deixa responder nas 24h seguintes a uma
+ * mensagem do cliente — e as leads da landing nunca escrevem, porque o
+ * formulário deixou de as encaminhar para o WhatsApp. É isto que repõe a
+ * resposta automática que existia antes.
+ *
+ * `{{1}}` = primeiro nome · `{{2}}` = serviço (+ localização, quando há).
+ */
+export const MODELO_LEAD = { nome: "pedido_recebido_piquet", idioma: "pt_PT" } as const;
+
+/**
+ * Envia o modelo. Os parâmetros NUNCA podem ir vazios — a Meta rejeita o
+ * pedido —, por isso é o chamador que garante que ambos têm conteúdo.
+ */
+export async function enviarModeloLead(
+  to: string,
+  primeiroNome: string,
+  pedido: string,
+): Promise<{ waMessageId: string }> {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) throw new Error("WhatsApp não configurado.");
+  if (!primeiroNome.trim() || !pedido.trim()) {
+    throw new Error("Modelo exige nome e pedido preenchidos.");
+  }
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: normalizarTelefone(to),
+      type: "template",
+      template: {
+        name: MODELO_LEAD.nome,
+        language: { code: MODELO_LEAD.idioma },
+        components: [{
+          type: "body",
+          parameters: [
+            { type: "text", text: primeiroNome.trim() },
+            { type: "text", text: pedido.trim() },
+          ],
+        }],
+      },
+    }),
+  });
+  const json = (await res.json()) as { messages?: { id: string }[]; error?: { message?: string } };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
+  return { waMessageId: json.messages?.[0]?.id ?? "" };
+}
