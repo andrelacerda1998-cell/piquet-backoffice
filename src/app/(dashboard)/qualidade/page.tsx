@@ -14,7 +14,9 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import { getQuality, type QualityData } from "@/services/extrasService";
 import { getTechnicians } from "@/services/techniciansService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatPercent } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatPercent, formatCurrency } from "@/lib/formatters";
+import { getVendorNoShows, declareVendorNoShow, type NoShowService } from "@/services/noShowsService";
+import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import type { Technician } from "@/types";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -35,6 +37,26 @@ export default function QualityPage() {
   const { data, loading, error, refetch } = useAsyncData(() => getQuality(), []);
   const { data: techs } = useAsyncData(() => getTechnicians(1, 100), []);
 
+  // Faltas de técnicos — endpoint real do Laravel, sem mock: isto tira
+  // dinheiro a pessoas, e uma lista inventada seria um botão que "funciona"
+  // sem fazer nada.
+  const { data: noShows, refetch: refetchNoShows } = useAsyncData(() => getVendorNoShows(), []);
+  const [declaringId, setDeclaringId] = useState<number | null>(null);
+  const declareNow = async (r: NoShowService) => {
+    const custo = formatCurrency(r.penalty_if_declared / 100);
+    if (!confirm(`Dar o serviço #${r.service_id} como falta de ${r.vendor.name ?? "este técnico"}?\n\nIsto cobra-lhe ${custo} (metade do que ia receber), cancela o serviço e reembolsa o cliente. O técnico é notificado com o valor. Não se desfaz.`)) return;
+    setDeclaringId(r.service_id);
+    try {
+      const res = await declareVendorNoShow(r.service_id);
+      toast(`Falta registada — ${formatCurrency(res.service.penalty / 100)} cobrados a ${r.vendor.name ?? "técnico"}.`);
+      refetchNoShows();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível registar a falta.", "error");
+    } finally {
+      setDeclaringId(null);
+    }
+  };
+
   if (loading && !data) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
@@ -49,6 +71,46 @@ export default function QualityPage() {
     { id: "visao", label: "Visão geral" },
     { id: "baixa", label: "Baixa avaliação", count: lowRated.length },
     { id: "indicadores", label: "Indicadores" },
+    { id: "faltas", label: "Faltas", count: noShows?.suspected.length || undefined },
+  ];
+
+  const when = (r: NoShowService) => r.scheduled_day
+    ? `${formatDate(r.scheduled_day)}${r.scheduled_time ? ` · ${r.scheduled_time.slice(0, 5)}` : ""}`
+    : "—";
+
+  const suspectedColumns: Column<NoShowService>[] = [
+    { key: "service_id", label: "Serviço", render: (r) => <span className="font-mono text-xs">#{r.service_id}</span> },
+    { key: "service_type", label: "Tipo", render: (r) => <span className="font-medium">{r.service_type ?? "—"}</span> },
+    { key: "when", label: "Marcado para", render: when },
+    { key: "vendor", label: "Técnico", render: (r) => (
+      <div><div className="font-medium">{r.vendor.name ?? "—"}</div><div className="text-xs text-text-muted">{r.vendor.phone_number ?? ""}</div></div>
+    ) },
+    { key: "customer", label: "Cliente", render: (r) => (
+      <div><div>{r.customer?.name ?? "—"}</div><div className="text-xs text-text-muted">{r.customer?.phone_number ?? ""}</div></div>
+    ) },
+    { key: "on_the_way", label: "A caminho?", render: (r) => r.on_the_way_at
+      ? <span className="text-warning">{formatDateTime(r.on_the_way_at)}</span>
+      : <span className="text-danger font-medium">Nunca saiu</span> },
+    { key: "penalty", label: "Penalização", render: (r) => <span className="whitespace-nowrap font-semibold">{formatCurrency(r.penalty_if_declared / 100)}</span> },
+    { key: "acao", label: "", render: (r) => (
+      <button
+        disabled={declaringId === r.service_id}
+        onClick={() => declareNow(r)}
+        className="btn-primary text-xs py-1 disabled:opacity-50 whitespace-nowrap"
+      >
+        {declaringId === r.service_id ? "A registar…" : "Dar como falta"}
+      </button>
+    ) },
+  ];
+
+  const declaredColumns: Column<NoShowService>[] = [
+    { key: "service_id", label: "Serviço", render: (r) => <span className="font-mono text-xs">#{r.service_id}</span> },
+    { key: "service_type", label: "Tipo", render: (r) => <span className="font-medium">{r.service_type ?? "—"}</span> },
+    { key: "when", label: "Marcado para", render: when },
+    { key: "vendor", label: "Técnico", render: (r) => r.vendor.name ?? "—" },
+    { key: "customer", label: "Cliente", render: (r) => r.customer?.name ?? "—" },
+    { key: "declared", label: "Declarada em", render: (r) => r.vendor_no_show_at ? formatDateTime(r.vendor_no_show_at) : "—" },
+    { key: "penalty", label: "Cobrado", render: (r) => <span className="whitespace-nowrap font-semibold text-danger">{formatCurrency((r.vendor_no_show_penalty ?? 0) / 100)}</span> },
   ];
 
   const columns: Column<Complaint>[] = [
@@ -116,6 +178,33 @@ export default function QualityPage() {
             </div>
             <p className="text-sm text-text-secondary">Técnicos com avaliação abaixo de 4 estrelas — candidatos a formação, acompanhamento ou suspensão.</p>
             <DataTable columns={lowRatedColumns} data={lowRated} keyField="id" emptyMessage="Nenhum técnico abaixo de 4★ 🎉" />
+          </div>
+        )}
+
+        {tab === "faltas" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <MetricCard title="Suspeitas por rever" metric={buildMetricValue(noShows?.suspected.length ?? 0, noShows?.suspected.length ?? 0)} hideDelta />
+              <MetricCard title="Faltas declaradas" metric={buildMetricValue(noShows?.declared.length ?? 0, noShows?.declared.length ?? 0)} hideDelta />
+              <MetricCard title="Penalização" metric={buildMetricValue(Math.round((noShows?.penalty_ratio ?? 0.5) * 100), Math.round((noShows?.penalty_ratio ?? 0.5) * 100))} hideDelta format="percent" />
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-1">Suspeitas de falta</h3>
+              <p className="text-sm text-text-secondary mb-3">
+                Serviços cuja hora passou e o técnico nunca marcou &quot;Cheguei&quot; (últimos 7 dias). Antes de dar como falta, liga ao técnico e ao cliente:
+                metade destes casos é o cliente que não estava em casa ou uma morada errada — e a penalização não se desfaz.
+              </p>
+              <DataTable columns={suspectedColumns} data={noShows?.suspected ?? []} keyField="service_id" emptyMessage="Nenhuma suspeita por rever 🎉" />
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-1">Faltas declaradas</h3>
+              <p className="text-sm text-text-secondary mb-3">
+                O técnico foi cobrado em metade do que ia receber, o serviço cancelado e o cliente reembolsado. As contestações chegam como tickets em Suporte, com o número do serviço no assunto.
+              </p>
+              <DataTable columns={declaredColumns} data={noShows?.declared ?? []} keyField="service_id" emptyMessage="Sem faltas declaradas" />
+            </div>
           </div>
         )}
 

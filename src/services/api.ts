@@ -229,6 +229,8 @@ const LIVE_EXACT = new Set<string>([
   "/vendor-documents",
   // Fase 10 — Pagamentos a vendors (idem, via Laravel)
   "/vendor-payments",
+  // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
+  "/vendor-no-shows",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
   // sem apagar, ver notas nos controllers)
   "/services-types",
@@ -368,6 +370,8 @@ const REAL_DATA = new Set<string>([
   "/vendor-documents",
   // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
   "/vendor-payments",
+  // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
+  "/vendor-no-shows",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
   "/customers/trend",
   "/customers/retention",
