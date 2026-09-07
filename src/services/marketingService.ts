@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./api";
+import { apiGet, apiPost, apiPut } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices } from "@/lib/filters";
 import { calculateCPL, calculateCAC, calculateROAS } from "@/lib/calculations";
@@ -196,4 +196,73 @@ export async function refreshAdSpend(): Promise<RefreshResult> {
   return apiPost<RefreshResult>("/marketing/refresh", {}, () => {
     throw new Error("Atualizar os anúncios precisa do backend configurado.");
   }).then((r) => r.data);
+}
+
+/* ==================== CRIAÇÃO DE ANÚNCIOS (Meta Marketing API) ==================== */
+
+/**
+ * Escrita na conta de anúncios da Meta. Sem fallback de demonstração em
+ * NENHUMA destas funções, ao contrário do resto deste ficheiro: um mock que
+ * devolvesse "criado" sem criar nada levava alguém a pensar que o anúncio
+ * estava no ar. Aqui, se não está ligado, tem de falhar alto.
+ */
+
+export interface AdsOptions {
+  configured: boolean;
+  pages: { id: string; name: string }[];
+  campaigns: { id: string; name: string; status: string; objective: string | null }[];
+  adsets: { id: string; name: string; status: string; campaign_id: string }[];
+  objectives: readonly { id: string; label: string }[];
+  /** Razão pela qual a conta não pôde ser lida (falta de ads_management, tipicamente). */
+  error: string | null;
+}
+
+export async function getAdsOptions(): Promise<AdsOptions> {
+  return apiGet<AdsOptions>("/marketing/ads/options", () => ({
+    configured: false, pages: [], campaigns: [], adsets: [], objectives: [], error: null,
+  })).then((r) => r.data);
+}
+
+const semMock = (o: string) => () => {
+  throw new Error(`${o} precisa da Meta Marketing API configurada com permissão ads_management.`);
+};
+
+export async function criarCampanhaMeta(input: { nome: string; objetivo: string; orcamentoDiario?: number }) {
+  return apiPost<{ id: string }>("/marketing/ads/campaigns", input, semMock("Criar campanhas")).then((r) => r.data);
+}
+
+export async function criarConjuntoMeta(input: {
+  campanhaId: string; nome: string; orcamentoDiario?: number;
+  paises?: string[]; idadeMin?: number; idadeMax?: number; generos?: number[];
+}) {
+  return apiPost<{ id: string }>("/marketing/ads/adsets", input, semMock("Criar conjuntos")).then((r) => r.data);
+}
+
+/**
+ * Carrega a imagem. Não passa pelo `apiPost` porque este envia JSON e a Meta
+ * precisa de multipart — o ficheiro seguiria como "[object Object]".
+ */
+export async function carregarImagemMeta(file: File): Promise<{ hash: string; url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("filename", file.name);
+  const res = await fetch("/api/marketing/ads/image", { method: "POST", body: form, credentials: "include" });
+  const json = (await res.json()) as { data?: { hash: string; url: string }; error?: string };
+  if (!res.ok || !json.data) throw new Error(json.error || "Erro ao carregar a imagem.");
+  return json.data;
+}
+
+export async function criarCriativoMeta(input: {
+  nome?: string; paginaId: string; imagemHash: string;
+  texto: string; titulo?: string; descricao?: string; link: string; cta?: string;
+}) {
+  return apiPost<{ id: string }>("/marketing/ads/creatives", input, semMock("Criar criativos")).then((r) => r.data);
+}
+
+export async function criarAnuncioMeta(input: { nome?: string; conjuntoId: string; criativoId: string }) {
+  return apiPost<{ id: string }>("/marketing/ads/ads", input, semMock("Criar anúncios")).then((r) => r.data);
+}
+
+export async function mudarEstadoMeta(id: string, estado: "ACTIVE" | "PAUSED") {
+  return apiPut<{ id: string; estado: string }>("/marketing/ads/status", { id, estado }, semMock("Mudar o estado")).then((r) => r.data);
 }

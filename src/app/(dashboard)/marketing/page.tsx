@@ -17,11 +17,14 @@ import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { CriarAnuncio } from "./CriarAnuncio";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
 
 export default function MarketingPage() {
+  // Assistente de criação de anúncios na Meta (ver CriarAnuncio.tsx).
+  const [criarAnuncioAberto, setCriarAnuncioAberto] = useState(false);
   const [tab, setTab] = useState("desempenho");
   /**
    * Incrementa ao fim de uma recolha manual. TUDO o que vem de `ad_metrics`
@@ -550,7 +553,18 @@ export default function MarketingPage() {
                   </div>
                 )}
                 {sub === "criativos" && (
-                  <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-text-secondary">
+                        Criativos a correr. Novos anúncios são criados <b className="text-text-primary">em pausa</b> —
+                        nada gasta orçamento sem uma activação deliberada.
+                      </p>
+                      <button onClick={() => setCriarAnuncioAberto(true)} className="btn-primary text-sm">
+                        <Plus className="h-4 w-4" /> Criar anúncio
+                      </button>
+                    </div>
+                    <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
+                  </div>
                 )}
               </>
             )}
@@ -590,6 +604,7 @@ export default function MarketingPage() {
           </SubTabs>
         )}
 
+        <CriarAnuncio open={criarAnuncioAberto} onClose={() => setCriarAnuncioAberto(false)} />
       </div>
     </RouteGuard>
   );
