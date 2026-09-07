@@ -26,6 +26,8 @@ import type { MarketingCampaign } from "@/types";
 export default function MarketingPage() {
   // Assistente de criação de anúncios na Meta (ver CriarAnuncio.tsx).
   const [criarAnuncioAberto, setCriarAnuncioAberto] = useState(false);
+  // Campanha cujos criativos se quer ver, escolhida na tabela de campanhas.
+  const [campanhaParaAbrir, setCampanhaParaAbrir] = useState<string | null>(null);
   const [tab, setTab] = useState("desempenho");
   /**
    * Incrementa ao fim de uma recolha manual. TUDO o que vem de `ad_metrics`
@@ -544,10 +546,14 @@ export default function MarketingPage() {
                       ` · ${campanhasConcluidas.length} concluídas escondidas`}
                   </p>
                 </div>
+                {/* Clicar numa campanha abre os criativos dela na lista
+                    abaixo, em vez de haver uma segunda lista só para isto. */}
+                <p className="text-[11px] text-text-muted">Clica numa campanha para ver os criativos dela.</p>
                 <DataTable
                   columns={campaignColumns}
                   data={campanhasVisiveis}
                   keyField="id"
+                  onRowClick={(c) => setCampanhaParaAbrir(c.campaignName)}
                   emptyMessage={
                     estadoCampanhas === "ativas"
                       ? "Nenhuma campanha a correr neste momento."
@@ -556,7 +562,16 @@ export default function MarketingPage() {
                 />
               </div>
               <div className="space-y-6">
-                <Anuncios onCriar={() => setCriarAnuncioAberto(true)} />
+                <Anuncios
+                  onCriar={() => setCriarAnuncioAberto(true)}
+                  abrirCampanha={campanhaParaAbrir}
+                  onAbertaCampanha={(encontrada) => {
+                    if (!encontrada) {
+                      toast("Esta campanha não tem criativos ativos na conta de anúncios.", "info");
+                    }
+                    setCampanhaParaAbrir(null);
+                  }}
+                />
                 {/*
                   A tabela abaixo NÃO é por criativo, apesar de estar nesta
                   aba desde sempre: vem da tabela `campaigns` (agregado do

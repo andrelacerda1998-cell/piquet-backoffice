@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useAsyncData } from "@/hooks/useDashboard";
 import {
@@ -74,7 +74,21 @@ function Selo({ p }: { p: Plataforma }) {
   );
 }
 
-export function Anuncios({ onCriar }: { onCriar: () => void }) {
+export function Anuncios({
+  onCriar,
+  abrirCampanha,
+  onAbertaCampanha,
+}: {
+  onCriar: () => void;
+  /**
+   * Nome da campanha a abrir, vindo da tabela de campanhas acima. Clicar numa
+   * campanha lá em cima abre o grupo dela aqui em baixo, em vez de existir uma
+   * segunda lista de criativos só para esse caso.
+   */
+  abrirCampanha?: string | null;
+  /** Avisa quem pediu que a campanha foi (ou não) encontrada. */
+  onAbertaCampanha?: (encontrada: boolean) => void;
+}) {
   const { data: meta, loading: loadMeta, refetch: refetchMeta } = useAsyncData(() => getAnunciosMeta(), []);
   const { data: google, loading: loadGoogle, refetch: refetchGoogle } = useAsyncData(() => getAnunciosGoogle(), []);
   const [filtro, setFiltro] = useState<"todas" | Plataforma>("todas");
@@ -83,6 +97,7 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
   // Abertas todas, o ecrã era uma coluna de cartões com centenas de metros.
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const [aMudar, setAMudar] = useState<string | null>(null);
+  const refs = useRef(new Map<string, HTMLDivElement | null>());
 
   const loading = loadMeta || loadGoogle;
   const recarregar = () => { refetchMeta(); refetchGoogle(); };
@@ -169,6 +184,25 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
     return [...m.values()];
   }, [visiveis, google]);
 
+  /*
+    Abrir a campanha pedida pela tabela de cima.
+    Compara-se pelo NOME porque é o único campo comum: a tabela de campanhas
+    vem do agregado `ad_metrics` e não guarda os ids da Meta/Google. Quando não
+    há correspondência, avisa-se quem pediu em vez de abrir nada em silêncio —
+    campanhas antigas do agregado podem já não existir na conta.
+  */
+  useEffect(() => {
+    if (!abrirCampanha) return;
+    const alvo = grupos.find((g) => g.nome.trim().toLowerCase() === abrirCampanha.trim().toLowerCase());
+    onAbertaCampanha?.(Boolean(alvo));
+    if (!alvo) return;
+    setAbertas((s) => new Set(s).add(alvo.chave));
+    // O scroll espera o render da expansão, senão salta para a posição antiga.
+    requestAnimationFrame(() => {
+      refs.current.get(alvo.chave)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [abrirCampanha, grupos, onAbertaCampanha]);
+
   const erros = [
     meta?.error ? { p: "Meta", msg: meta.error } : null,
     google?.error ? { p: "Google Ads", msg: google.error } : null,
@@ -225,7 +259,11 @@ export function Anuncios({ onCriar }: { onCriar: () => void }) {
         const aberta = abertas.has(g.chave);
         const aCorrer = g.itens.filter((i) => i.activo).length;
         return (
-          <div key={g.chave} className="rounded-xl border border-surface-border overflow-hidden">
+          <div
+            key={g.chave}
+            ref={(el) => { refs.current.set(g.chave, el); }}
+            className="rounded-xl border border-surface-border overflow-hidden"
+          >
             {/* Linha da campanha: clicável, com as miniaturas em ponto pequeno
                 para se perceber o que lá está sem abrir. */}
             <button
