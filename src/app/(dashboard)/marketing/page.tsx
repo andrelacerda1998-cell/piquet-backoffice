@@ -19,6 +19,7 @@ import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshC
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { CriativosMeta } from "./CriativosMeta";
+import { AnunciosGoogle } from "./AnunciosGoogle";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
@@ -556,6 +557,7 @@ export default function MarketingPage() {
                 {sub === "criativos" && (
                   <div className="space-y-6">
                     <CriativosMeta onCriar={() => setCriarAnuncioAberto(true)} />
+                    <AnunciosGoogle />
                     {/*
                       A tabela abaixo NÃO é por criativo, apesar de estar nesta
                       aba desde sempre: vem da tabela `campaigns` (agregado do

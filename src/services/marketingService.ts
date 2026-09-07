@@ -281,3 +281,71 @@ export async function getAnunciosMeta(): Promise<{ configured: boolean; ads: Met
     () => ({ configured: false, ads: [], error: null }),
   ).then((r) => r.data);
 }
+
+/* ==================== GOOGLE ADS (leitura + escrita) ==================== */
+
+export interface GoogleAnuncioUI {
+  id: string; resourceName: string; name: string; status: string; canal: string; tipo: string;
+  campaignId: string | null; campaignName: string | null;
+  adGroupId: string | null; adGroupName: string | null;
+  titulos: string[]; descricoes: string[]; imagens: string[]; finalUrl: string | null;
+}
+
+export async function getAnunciosGoogle(): Promise<{ configured: boolean; ads: GoogleAnuncioUI[]; error: string | null }> {
+  return apiGet<{ configured: boolean; ads: GoogleAnuncioUI[]; error: string | null }>(
+    "/marketing/google-ads/list",
+    () => ({ configured: false, ads: [], error: null }),
+  ).then((r) => r.data);
+}
+
+export interface GoogleAdsOptions {
+  configured: boolean;
+  campaigns: { id: string; name: string; status: string; canal: string }[];
+  adGroups: { id: string; name: string; campaignId: string; status: string }[];
+  error: string | null;
+}
+
+export async function getGoogleAdsOptions(): Promise<GoogleAdsOptions> {
+  return apiGet<GoogleAdsOptions>("/marketing/google-ads/options", () => ({
+    configured: false, campaigns: [], adGroups: [], error: null,
+  })).then((r) => r.data);
+}
+
+const semMockGoogle = (o: string) => () => {
+  throw new Error(`${o} precisa do Google Ads com Acesso Básico ao developer token.`);
+};
+
+export async function criarCampanhaGoogleUI(input: { nome: string; canal: "SEARCH" | "DISPLAY"; orcamentoDiario: number }) {
+  return apiPost<{ resourceName: string }>("/marketing/google-ads/campaigns", input, semMockGoogle("Criar campanhas")).then((r) => r.data);
+}
+
+export async function criarGrupoGoogleUI(input: { campanhaResourceName: string; nome: string; cpcMaximo?: number }) {
+  return apiPost<{ resourceName: string }>("/marketing/google-ads/adgroups", input, semMockGoogle("Criar grupos")).then((r) => r.data);
+}
+
+export async function carregarImagemGoogleUI(file: File): Promise<{ resourceName: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("filename", file.name);
+  const res = await fetch("/api/marketing/google-ads/image", { method: "POST", body: form, credentials: "include" });
+  const json = (await res.json()) as { data?: { resourceName: string }; error?: string };
+  if (!res.ok || !json.data) throw new Error(json.error || "Erro ao carregar a imagem.");
+  return json.data;
+}
+
+export async function criarAnuncioPesquisaUI(input: {
+  grupoResourceName: string; titulos: string[]; descricoes: string[]; finalUrl: string; nome?: string;
+}) {
+  return apiPost<{ resourceName: string }>("/marketing/google-ads/search-ads", input, semMockGoogle("Criar anúncios")).then((r) => r.data);
+}
+
+export async function criarAnuncioDisplayUI(input: {
+  grupoResourceName: string; imagensResourceNames: string[]; logotipoResourceName: string;
+  tituloCurto: string; tituloLongo: string; descricao: string; nomeNegocio?: string; finalUrl: string; nome?: string;
+}) {
+  return apiPost<{ resourceName: string }>("/marketing/google-ads/display-ads", input, semMockGoogle("Criar anúncios")).then((r) => r.data);
+}
+
+export async function mudarEstadoGoogleUI(resourceName: string, estado: "ENABLED" | "PAUSED") {
+  return apiPut<{ resourceName: string; estado: string }>("/marketing/google-ads/status", { resourceName, estado }, semMockGoogle("Mudar o estado")).then((r) => r.data);
+}
