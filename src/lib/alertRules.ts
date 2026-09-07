@@ -51,7 +51,14 @@ export interface SinaisDoNegocio {
  */
 export const LIMITES = {
   /** Uma lead por responder passa a alerta ao fim de 1 dia; crítica aos 3. */
-  leadDiasAlerta: 1,
+  /*
+    0 e não 1: a bolinha existe para provocar ação, e numa marketplace de
+    serviços ao domicílio a ação urgente é responder HOJE. A regra antiga só
+    acendia no dia seguinte — precisamente depois de passar a janela em que
+    responder ainda ganha o cliente. Uma lead que entra às 22h e é vista de
+    manhã costuma já estar perdida.
+  */
+  leadDiasAlerta: 0,
   leadDiasCritico: 3,
   /** Um cron falha ocasionalmente; 3 vezes seguidas é avaria. */
   cronFalhasSeguidas: 3,
@@ -96,7 +103,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `lead-sem-resposta-${l.id}`,
       "marketing",
       dias >= LIMITES.leadDiasCritico ? "critica" : "alta",
-      `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
+      dias === 0 ? "Lead nova por responder" : `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
       `${l.nome} pediu contacto e continua no estado "Novo".`,
       "Abrir o pedido em CRM & Leads e responder ou marcar como recusado.",
       l.recebidaEm, "lead", l.id,

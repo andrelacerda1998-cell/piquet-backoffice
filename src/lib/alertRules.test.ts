@@ -16,10 +16,12 @@ describe("gerarAlertas", () => {
     expect(gerarAlertas(vazio, AGORA)).toEqual([]);
   });
 
-  it("uma lead de hoje ainda não é alerta", () => {
+  it("uma lead de hoje JÁ é alerta — é agora que responder ainda ganha o cliente", () => {
     const r = gerarAlertas({ ...vazio,
       leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(0) }] }, AGORA);
-    expect(r).toHaveLength(0);
+    expect(r).toHaveLength(1);
+    expect(r[0].priority).toBe("alta");
+    expect(r[0].title).toBe("Lead nova por responder");
   });
 
   it("lead por responder há 1 dia é alerta alto; há 3 dias é crítico", () => {

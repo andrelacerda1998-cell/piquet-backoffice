@@ -67,7 +67,7 @@ const CANAL: Record<string, string> = {
 /** Selo da plataforma — a cor distingue-as sem precisar de ler. */
 function Selo({ p }: { p: Plataforma }) {
   return (
-    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide",
+    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide",
       p === "meta" ? "bg-piquet/15 text-piquet-700" : "bg-info-light text-info")}>
       {p === "meta" ? "Meta" : "Google"}
     </span>
@@ -304,7 +304,7 @@ export function Anuncios({
                         {a.titulos.slice(0, 4).map((t, i) => (
                           <p key={i} className={cn("text-xs truncate", i === 0 ? "text-piquet-700 font-medium" : "text-text-secondary")}>{t}</p>
                         ))}
-                        {a.titulos.length > 4 && <p className="text-[10px] text-text-muted">+{a.titulos.length - 4}</p>}
+                        {a.titulos.length > 4 && <p className="text-[11px] text-text-muted">+{a.titulos.length - 4}</p>}
                       </div>
                     ) : (
                       <div className="w-full aspect-[4/3] bg-surface-subtle flex items-center justify-center text-text-muted">
@@ -314,7 +314,7 @@ export function Anuncios({
                     <div className="p-2 space-y-1 flex-1 flex flex-col">
                       <div className="flex items-start justify-between gap-1.5">
                         <p className="text-xs font-medium text-text-primary line-clamp-2">{a.nome}</p>
-                        <span className={cn("shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium", a.estado.tone)}>
+                        <span className={cn("shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium", a.estado.tone)}>
                           {a.estado.label}
                         </span>
                       </div>

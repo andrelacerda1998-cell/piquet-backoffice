@@ -645,6 +645,15 @@ function LeadsPageInner() {
           const descricao =
             (viewing.message || "").match(/\*?\s*descri[çc][ãa]o\s*:\*?\s*([\s\S]+?)(?:\n\s*_|\n\s*\*|$)/i)?.[1]?.trim()
             || parsed.description;
+          /*
+            Quando não há descrição livre, mostra-se a mensagem em bruto.
+            Sem isto, uma lead da landing cujo texto é só
+            "Servico: X · Urgencia: Y" não mostrava a mensagem em lado nenhum:
+            o bloco desaparecia e a conversa ao lado está vazia (não houve
+            WhatsApp). Ficava-se com uma lead sem se ver o que a pessoa pediu.
+          */
+          const mensagemCrua = (viewing.message || "").trim();
+          const mostrarCrua = !descricao && mensagemCrua.length > 0;
           // O telefone só com dígitos (e indicativo PT quando vier local) para o
           // link do WhatsApp; o texto mostra o número tal como foi recebido.
           const digitos = (viewing.phone || "").replace(/\D/g, "");
@@ -696,11 +705,17 @@ function LeadsPageInner() {
                 )}
               </div>
 
-              {/* Descrição livre do cliente, quando a mensagem a traz. */}
-              {descricao && (
+              {/* Descrição livre do cliente — ou, na falta dela, a mensagem
+                  tal como chegou. Nunca nada. */}
+              {(descricao || mostrarCrua) && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Descrição</p>
-                  <p className="whitespace-pre-wrap text-sm text-text-primary">{descricao}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
+                    {descricao ? "Descrição" : "Mensagem recebida"}
+                  </p>
+                  <p className={cn("whitespace-pre-wrap text-sm",
+                    descricao ? "text-text-primary" : "text-text-secondary")}>
+                    {descricao || mensagemCrua}
+                  </p>
                 </div>
               )}
 
