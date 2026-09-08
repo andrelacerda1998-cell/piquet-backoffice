@@ -121,3 +121,38 @@ export function fazCategoria(categoriasTecnico: string[], categoria: string): bo
     return t === alvo || t.includes(alvo) || alvo.includes(t) || (raiz.length >= 5 && t.startsWith(raiz));
   });
 }
+
+/**
+ * O corpo do modelo dos técnicos continua a pedir uma resposta que sabemos ler?
+ *
+ * Este texto é metade de um acordo: a outra metade é `interpretarResposta`.
+ * Trocar "responda SIM" por "responda ACEITO" não parte nada de visível -- os
+ * pedidos continuam a sair --, mas as aceitações deixam de ser reconhecidas e
+ * ninguém dá por isso até um cliente ficar sem técnico.
+ *
+ * Por isso a validação usa as MESMAS listas que a leitura das respostas: se o
+ * que está escrito no modelo não é reconhecível, não se guarda.
+ *
+ * Devolve o motivo, ou null quando está bom.
+ */
+export function validarCorpoTecnico(corpo: string): string | null {
+  const t = (corpo || "").trim();
+  if (!t) return "O texto não pode ficar vazio.";
+  if (t.length > 1024) return "A Meta não aceita corpos com mais de 1024 caracteres.";
+  if (!t.includes("{{1}}")) return "Falta {{1}} — é onde entra o serviço e a localidade.";
+  if (!t.includes("{{2}}")) return "Falta {{2}} — é onde entra a urgência.";
+
+  /*
+    Os parâmetros saem primeiro. A normalização transforma "{{1}}" em "1" e
+    "{{2}}" em "2" -- que são respostas válidas ("1" para sim, "2" para não) --
+    e por isso qualquer texto passava esta verificação só por ter os
+    parâmetros lá dentro. A validação parecia estar a proteger e não protegia.
+  */
+  const palavras = normalizar(t.replace(/\{\{\s*\d+\s*\}\}/g, " ")).split(/\s+/);
+  const temSim = SIM.some((s) => !s.includes(" ") && palavras.includes(s));
+  const temNao = NAO.some((n) => !n.includes(" ") && palavras.includes(n));
+  if (!temSim || !temNao) {
+    return "O texto tem de pedir uma resposta que o backoffice saiba ler — SIM/NÃO, ou equivalentes como \"aceito\"/\"recuso\".";
+  }
+  return null;
+}

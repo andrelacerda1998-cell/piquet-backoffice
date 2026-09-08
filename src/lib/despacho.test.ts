@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { interpretarResposta, fone9, resumirDifusoes, fazCategoria, type Difusao } from "./despacho";
+import { interpretarResposta, fone9, resumirDifusoes, fazCategoria, validarCorpoTecnico, type Difusao } from "./despacho";
 
 describe("interpretarResposta", () => {
   it("lê as formas de aceitar que um técnico escreve mesmo", () => {
@@ -93,5 +93,36 @@ describe("fazCategoria", () => {
   it("sem categoria no pedido não afirma nada", () => {
     expect(fazCategoria(["Canalização"], "")).toBe(false);
     expect(fazCategoria([], "Canalização")).toBe(false);
+  });
+});
+
+describe("validarCorpoTecnico", () => {
+  const bom = "Novo pedido na Piquet: {{1}}.\nUrgencia: {{2}}.\nResponda SIM ou NAO.";
+
+  it("aceita um texto que pede a resposta que sabemos ler", () => {
+    expect(validarCorpoTecnico(bom)).toBeNull();
+  });
+
+  /*
+    O caso que justifica esta validação existir: trocar as palavras não parte
+    nada de visível — os pedidos continuam a sair — mas as aceitações deixam
+    de ser reconhecidas, e só se descobre com um cliente sem técnico.
+  */
+  it("aceita sinónimos que a leitura das respostas também reconhece", () => {
+    expect(validarCorpoTecnico("Pedido {{1}} ({{2}}). Responda ACEITO ou RECUSO.")).toBeNull();
+  });
+
+  it("recusa um texto que pede palavras que não sabemos ler", () => {
+    const mau = "Pedido {{1}} ({{2}}). Responda com o polegar para cima ou para baixo.";
+    expect(validarCorpoTecnico(mau)).toMatch(/saiba ler/);
+  });
+
+  it("exige os dois parâmetros", () => {
+    expect(validarCorpoTecnico("Pedido {{1}}. Responda SIM ou NAO.")).toMatch(/\{\{2\}\}/);
+    expect(validarCorpoTecnico("Urgencia {{2}}. Responda SIM ou NAO.")).toMatch(/\{\{1\}\}/);
+  });
+
+  it("recusa texto vazio", () => {
+    expect(validarCorpoTecnico("   ")).toMatch(/vazio/);
   });
 });

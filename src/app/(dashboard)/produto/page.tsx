@@ -13,7 +13,7 @@ import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/c
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, criarModeloTecnico, getAppFunnel,
+  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, criarModeloTecnico, editarModeloWhatsapp, getAppFunnel,
   type Bug, type SystemLog, type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -91,6 +91,9 @@ export default function ProdutoPage() {
   const { data: logs } = useAsyncData(() => getSystemLogs(), []);
   const { data: health, refetch: refetchHealth } = useAsyncData(() => getIntegrationsStatus(), []);
   const [aCriarModelo, setACriarModelo] = useState(false);
+  const [modeloEmEdicao, setModeloEmEdicao] = useState<string | null>(null);
+  const [corpoModelo, setCorpoModelo] = useState("");
+  const [aGuardarModelo, setAGuardarModelo] = useState(false);
   const { data: errors } = useAsyncData(() => getAppErrors(1, 10), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
@@ -438,16 +441,82 @@ export default function ProdutoPage() {
                       : st === "REJECTED" ? "Recusado"
                       : st === "PAUSED" ? "Pausado"
                       : st || "—";
+                    const aEditar = modeloEmEdicao === t.name;
                     return (
-                      <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate font-mono">{t.name}</p>
-                          <p className="text-xs text-text-muted">
-                            {[t.category, t.language].filter(Boolean).join(" · ") || "—"}
-                            {t.rejectedReason && <span className="text-danger"> · {t.rejectedReason}</span>}
-                          </p>
+                      <div key={t.id} className="px-4 py-2.5 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate font-mono">{t.name}</p>
+                            <p className="text-xs text-text-muted">
+                              {[t.category, t.language].filter(Boolean).join(" · ") || "—"}
+                              {t.rejectedReason && <span className="text-danger"> · {t.rejectedReason}</span>}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Em revisão não há nada a editar: está a ser lido do lado da Meta. */}
+                            {t.editavel && !aEditar && (
+                              <button
+                                onClick={() => { setModeloEmEdicao(t.name); setCorpoModelo(t.corpo); }}
+                                className="btn-secondary text-xs py-1"
+                              >
+                                Editar texto
+                              </button>
+                            )}
+                            <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium", tom)}>{rotulo}</span>
+                          </div>
                         </div>
-                        <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium shrink-0", tom)}>{rotulo}</span>
+
+                        {!aEditar && t.corpo && (
+                          <p className="whitespace-pre-wrap text-xs text-text-secondary">{t.corpo}</p>
+                        )}
+
+                        {aEditar && (
+                          <div className="space-y-2">
+                            <textarea
+                              value={corpoModelo}
+                              onChange={(e) => setCorpoModelo(e.target.value)}
+                              rows={7}
+                              className="input-field resize-y text-sm w-full font-mono"
+                            />
+                            {/*
+                              O aviso não é decorativo: guardar volta a pôr o
+                              modelo em revisão e, até ser reaprovado, deixa de
+                              poder ser enviado. Quem edita tem de saber que
+                              está a parar o canal, não a mexer num campo.
+                            */}
+                            <p className="text-[11px] text-warning">
+                              Guardar submete o modelo outra vez à Meta. Até ser reaprovado não pode ser enviado.
+                              {t.name === "pedido_tecnico_piquet" && (
+                                <> O texto tem de continuar a pedir SIM ou NÃO — são as palavras que o backoffice
+                                lê nas respostas dos técnicos; sem elas as aceitações deixam de ser reconhecidas.</>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  setAGuardarModelo(true);
+                                  try {
+                                    await editarModeloWhatsapp(t.name, corpoModelo);
+                                    toast(`${t.name} submetido à Meta. Fica em revisão até ser aprovado.`);
+                                    setModeloEmEdicao(null);
+                                    refetchHealth();
+                                  } catch (e) {
+                                    toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
+                                  } finally {
+                                    setAGuardarModelo(false);
+                                  }
+                                }}
+                                disabled={aGuardarModelo || !corpoModelo.trim() || corpoModelo.trim() === t.corpo.trim()}
+                                className="btn-primary text-xs py-1.5 disabled:opacity-50"
+                              >
+                                {aGuardarModelo ? "A submeter…" : "Guardar e submeter"}
+                              </button>
+                              <button onClick={() => setModeloEmEdicao(null)} className="btn-secondary text-xs py-1.5">
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

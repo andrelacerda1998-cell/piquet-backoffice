@@ -1,4 +1,4 @@
-import { apiGet, apiPost, USE_REAL_API } from "./api";
+import { apiGet, apiPost, apiPut, USE_REAL_API } from "./api";
 import { monthlySeries } from "@/lib/trends";
 import { TODAY } from "@/lib/today";
 
@@ -140,6 +140,10 @@ export interface WhatsappTemplate {
   category: string | null;
   language: string | null;
   rejectedReason: string | null;
+  /** Texto do corpo, com os `{{n}}` por substituir. */
+  corpo: string;
+  /** A Meta só deixa editar modelos aprovados, recusados ou pausados. */
+  editavel: boolean;
 }
 
 export interface IntegrationsStatus {
@@ -160,6 +164,18 @@ export interface IntegrationsStatus {
 export async function criarModeloTecnico(): Promise<{ id: string; status: string; nome: string }> {
   return apiPost<{ id: string; status: string; nome: string }>(
     "/product/whatsapp-templates", {}, () => {
+      throw new Error("O WhatsApp ainda não está ligado.");
+    },
+  ).then((r) => r.data);
+}
+
+/**
+ * Reescreve o corpo de um modelo. A Meta volta a pô-lo em revisão -- até ser
+ * reaprovado, o modelo não pode ser enviado.
+ */
+export async function editarModeloWhatsapp(nome: string, corpo: string): Promise<{ nome: string; status: string }> {
+  return apiPut<{ nome: string; status: string }>(
+    "/product/whatsapp-templates", { nome, corpo }, () => {
       throw new Error("O WhatsApp ainda não está ligado.");
     },
   ).then((r) => r.data);

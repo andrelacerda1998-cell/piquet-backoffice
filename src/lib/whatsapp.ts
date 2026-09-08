@@ -135,6 +135,16 @@ export interface ModeloWhatsapp {
   language: string | null;
   /** Porque foi recusado (a Meta manda "NONE" quando não há recusa). */
   rejectedReason: string | null;
+  /** Texto do corpo, com os `{{n}}` por substituir. "" quando não vier. */
+  corpo: string;
+  /**
+   * Dá para editar agora?
+   *
+   * A Meta só deixa editar modelos aprovados, recusados ou pausados -- um
+   * modelo em revisão está a ser lido por alguém do lado deles. Vem calculado
+   * daqui para o ecrã não ter de conhecer a regra.
+   */
+  editavel: boolean;
 }
 
 /**
@@ -148,11 +158,14 @@ export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
 
   const res = await fetch(
     `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_WABA_ID}/message_templates` +
-      `?fields=name,status,category,language,rejected_reason&limit=50&access_token=${encodeURIComponent(token)}`,
+      `?fields=name,status,category,language,rejected_reason,components&limit=50&access_token=${encodeURIComponent(token)}`,
     { cache: "no-store" },
   );
   const json = (await res.json()) as {
-    data?: { id: string; name: string; status: string; category?: string; language?: string; rejected_reason?: string }[];
+    data?: {
+      id: string; name: string; status: string; category?: string; language?: string;
+      rejected_reason?: string; components?: { type: string; text?: string }[];
+    }[];
     error?: { message?: string };
   };
   if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
@@ -166,6 +179,8 @@ export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
     // "NONE" é a forma da Meta dizer "não foi recusado" — vira null para não
     // aparecer um motivo de recusa em modelos que estão bem.
     rejectedReason: t.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : null,
+    corpo: t.components?.find((c) => c.type === "BODY")?.text ?? "",
+    editavel: ["APPROVED", "REJECTED", "PAUSED"].includes((t.status || "").toUpperCase()),
   }));
 }
 
@@ -365,4 +380,37 @@ export async function enviarModeloLead(
   // nada do que aconteceu ao cliente.
   const texto = await corpoModeloLead(primeiroNome, pedido);
   return { waMessageId: json.messages?.[0]?.id ?? "", texto };
+}
+
+/**
+ * Reescreve o corpo de um modelo já submetido.
+ *
+ * A Meta volta a pôr o modelo em revisão -- até ser reaprovado deixa de poder
+ * ser enviado. Isto não é um campo que se experimente: é uma submissão, com o
+ * custo de o canal ficar parado entretanto. O ecrã tem de o dizer.
+ *
+ * O `example` acompanha o texto porque a Meta rejeita corpos com parâmetros
+ * sem exemplo; conta-se quantos `{{n}}` existem e manda-se um exemplo com esse
+ * tamanho, senão uma edição que acrescente um parâmetro é recusada.
+ */
+export async function editarCorpoModelo(id: string, corpo: string): Promise<void> {
+  const token = process.env.WHATSAPP_TOKEN;
+  if (!token) throw new Error("WhatsApp não configurado.");
+
+  const nParams = new Set((corpo.match(/\{\{\s*(\d+)\s*\}\}/g) ?? [])).size;
+  const exemplo = Array.from({ length: nParams }, (_, i) => `exemplo ${i + 1}`);
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${id}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      components: [{
+        type: "BODY",
+        text: corpo,
+        ...(nParams > 0 ? { example: { body_text: [exemplo] } } : {}),
+      }],
+    }),
+  });
+  const json = (await res.json()) as { success?: boolean; error?: { message?: string } };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
 }
