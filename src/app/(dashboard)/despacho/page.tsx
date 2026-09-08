@@ -1,23 +1,103 @@
 "use client";
 
+import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { LoadingState, ErrorState } from "@/components/ui/States";
+import { LoadingState, ErrorState, EmptyState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getDispatchBoard } from "@/services/extrasService";
+import { getDispatchBoard, type DispatchPedido } from "@/services/extrasService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDuration } from "@/lib/formatters";
+import { formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MapPin, Star, Radio, Zap, Radius } from "lucide-react";
+import { MapPin, Radio, Clock, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DemoBadge } from "@/components/ui/DemoBadge";
+import { DespachoLead } from "@/components/ui/DespachoLead";
+
+/**
+ * Despacho — quem está à espera de técnico, e em que ponto.
+ *
+ * A fila são leads: um serviço só existe depois de haver técnico e preço, e
+ * quem está à espera está antes disso. Cada linha abre no mesmo painel que
+ * existe no detalhe da lead — o despacho faz-se aqui, não noutro sítio com
+ * outras regras.
+ */
+
+/** Há quantas horas entrou. É a única medida que interessa numa fila. */
+function espera(recebidoEm: string, agora = Date.now()): { texto: string; tarde: boolean } {
+  const horas = Math.floor((agora - new Date(recebidoEm).getTime()) / 3_600_000);
+  if (horas < 1) return { texto: "há menos de 1h", tarde: false };
+  if (horas < 24) return { texto: `há ${horas}h`, tarde: horas >= 4 };
+  const dias = Math.floor(horas / 24);
+  return { texto: `há ${dias} ${dias === 1 ? "dia" : "dias"}`, tarde: true };
+}
+
+function Linha({ p, aberta, onAbrir }: { p: DispatchPedido; aberta: boolean; onAbrir: () => void }) {
+  const e = espera(p.recebidoEm);
+  return (
+    <div className="rounded-xl border border-surface-border overflow-hidden">
+      <button
+        onClick={onAbrir}
+        className="w-full flex flex-wrap items-center gap-3 px-4 py-3 text-left hover:bg-surface-muted/40"
+      >
+        {aberta ? <ChevronDown className="h-4 w-4 text-text-muted shrink-0" />
+          : <ChevronRight className="h-4 w-4 text-text-muted shrink-0" />}
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-text-primary">
+            {p.servico}
+            {p.urgente && <span className="ml-2 text-xs font-medium text-danger">Urgente</span>}
+          </span>
+          <span className="block truncate text-xs text-text-secondary">
+            {p.nome}
+            {p.cidade && (
+              <span className="inline-flex items-center gap-1 ml-2">
+                <MapPin className="h-3 w-3" />{p.cidade}
+              </span>
+            )}
+          </span>
+        </span>
+
+        <span className={cn("text-xs inline-flex items-center gap-1 shrink-0",
+          e.tarde ? "text-warning font-medium" : "text-text-muted")}>
+          <Clock className="h-3.5 w-3.5" />{e.texto}
+        </span>
+
+        {/* O estado do despacho em três palavras: é o que decide a acção. */}
+        <span className="text-xs shrink-0 min-w-[9rem] text-right">
+          {p.aceites > 0 ? (
+            <span className="text-success font-medium inline-flex items-center gap-1 justify-end">
+              <Check className="h-3.5 w-3.5" />
+              {p.aceites} {p.aceites === 1 ? "aceitou" : "aceitaram"}
+            </span>
+          ) : p.perguntados === 0 ? (
+            <span className="text-text-muted">Ninguém perguntado</span>
+          ) : (
+            <span className="text-text-muted">{p.porResponder} por responder</span>
+          )}
+        </span>
+      </button>
+
+      {aberta && (
+        <div className="border-t border-surface-border p-3 bg-surface-muted/20">
+          <p className="text-[11px] text-text-muted mb-2">
+            Recebido a {formatDate(p.recebidoEm)}
+            {p.urgencia && ` · ${p.urgencia}`}
+          </p>
+          <DespachoLead leadId={p.leadId} cidade={p.cidade} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DispatchPage() {
   const { data, loading, error, refetch } = useAsyncData(() => getDispatchBoard(), []);
+  const [aberta, setAberta] = useState<string | null>(null);
 
   if (loading && !data) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  const k = data?.kpis;
 
   return (
     <RouteGuard route="/despacho">
@@ -25,90 +105,53 @@ export default function DispatchPage() {
         <PageHeader
           icon={Radio}
           eyebrow="Operação"
-          title={<>Despacho <DemoBadge endpoint="/dispatch" /></>}
-          subtitle="Pedidos por atribuir e técnicos disponíveis em tempo real"
-          actions={
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-              </span>
-              Ao vivo
-            </span>
-          }
+          title="Despacho"
+          subtitle="Pedidos à espera de técnico, e em que ponto está cada um"
         />
 
-        {data && (
+        {k && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <MetricCard title="Pedidos em espera" metric={buildMetricValue(data.kpis.waiting, data.kpis.waiting)} hideDelta />
-            <MetricCard title="Técnicos disponíveis" metric={buildMetricValue(data.kpis.available, data.kpis.available)} hideDelta />
-            <MetricCard title="Tempo médio atribuição" metric={buildMetricValue(data.kpis.avgAssignMin, data.kpis.avgAssignMin)} hideDelta />
-            <MetricCard title="Auto-despacho" metric={buildMetricValue(data.kpis.autoDispatchRate, data.kpis.autoDispatchRate)} hideDelta format="percent" />
+            <MetricCard title="À espera de técnico" metric={buildMetricValue(k.espera, k.espera)} hideDelta />
+            <MetricCard title="Ninguém perguntado" metric={buildMetricValue(k.porDifundir, k.porDifundir)} hideDelta />
+            <MetricCard title="À espera da tua decisão" metric={buildMetricValue(k.porDecidir, k.porDecidir)} hideDelta />
+            {/*
+              Sem histórico mostra-se um traço, não um zero: "0 min" diria que
+              os técnicos respondem de imediato, que é o contrário de não se
+              saber ainda.
+            */}
+            {k.minutosAteAceitar === null ? (
+              <div className="card p-4">
+                <p className="text-sm text-text-secondary">Minutos até alguém aceitar</p>
+                <p className="mt-1 text-2xl font-bold text-text-muted">—</p>
+                <p className="text-xs text-text-muted">ainda sem respostas</p>
+              </div>
+            ) : (
+              <MetricCard
+                title="Minutos até alguém aceitar"
+                metric={buildMetricValue(k.minutosAteAceitar, k.minutosAteAceitar)}
+                hideDelta
+              />
+            )}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Fila de pedidos */}
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Radio className="h-4 w-4 text-piquet-600" />
-              <h3 className="font-semibold">Fila de pedidos</h3>
-              <span className="ml-auto text-xs text-text-muted">{data?.requests.length ?? 0} ativos</span>
-            </div>
-            <div className="space-y-2">
-              {data?.requests.map((r) => (
-                <div key={r.id} className="rounded-lg border border-surface-border p-3 hover:bg-surface-muted transition-colors">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-text-primary truncate">{r.serviceName}</p>
-                      <p className="text-xs text-text-secondary truncate">{r.customerName} · {r.categoryName}</p>
-                    </div>
-                    <StatusBadge status={r.status} />
-                  </div>
-                  <div className="mt-2 flex items-center gap-4 text-xs text-text-secondary">
-                    <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{r.city}</span>
-                    <span className="inline-flex items-center gap-1"><Radius className="h-3.5 w-3.5" />{r.radiusKm} km</span>
-                    <span className={cn("inline-flex items-center gap-1", r.waitingMinutes > 20 ? "text-warning font-medium" : "")}>
-                      ⏱ {formatDuration(r.waitingMinutes)}
-                    </span>
-                    <span className="ml-auto font-medium text-text-primary">{formatCurrency(r.value)}</span>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <button className="btn-primary text-xs py-1"><Zap className="h-3.5 w-3.5" /> Auto-despacho</button>
-                    <button className="btn-secondary text-xs py-1">Alargar raio</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {data && data.pedidos.length === 0 ? (
+          <EmptyState
+            title="Ninguém à espera"
+            description="Todos os pedidos abertos já têm técnico atribuído."
+          />
+        ) : (
+          <div className="space-y-2">
+            {data?.pedidos.map((p) => (
+              <Linha
+                key={p.leadId}
+                p={p}
+                aberta={aberta === p.leadId}
+                onAbrir={() => setAberta(aberta === p.leadId ? null : p.leadId)}
+              />
+            ))}
           </div>
-
-          {/* Técnicos disponíveis */}
-          <div className="card p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="h-2 w-2 rounded-full bg-success" />
-              <h3 className="font-semibold">Técnicos disponíveis</h3>
-              <span className="ml-auto text-xs text-text-muted">{data?.technicians.length ?? 0} online</span>
-            </div>
-            <div className="space-y-2">
-              {data?.technicians.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 rounded-lg border border-surface-border p-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-sm font-bold">
-                    {t.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-text-primary truncate">{t.name}</p>
-                    <p className="text-xs text-text-secondary truncate">{t.categories.join(", ")}</p>
-                  </div>
-                  <div className="text-right text-xs text-text-secondary">
-                    <p className="inline-flex items-center gap-1 text-text-primary font-medium"><Star className="h-3.5 w-3.5 text-piquet" />{t.rating.toFixed(1)}</p>
-                    <p>{t.distanceKm.toFixed(1)} km · {t.acceptanceRate}%</p>
-                  </div>
-                  <button className="btn-secondary text-xs py-1">Atribuir</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </RouteGuard>
   );

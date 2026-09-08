@@ -6,73 +6,45 @@ import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
 /* ============================ DESPACHO AO VIVO ============================ */
 
-export interface DispatchRequest {
-  id: string;
-  customerName: string;
-  categoryName: string;
-  serviceName: string;
-  city: string;
-  status: string;
-  waitingMinutes: number;
-  value: number;
-  radiusKm: number;
-}
-
-export interface AvailableTechnician {
-  id: string;
-  name: string;
-  city: string;
-  categories: string[];
-  rating: number;
-  distanceKm: number;
-  acceptanceRate: number;
+export interface DispatchPedido {
+  leadId: string;
+  nome: string;
+  servico: string;
+  cidade: string;
+  urgencia: string;
+  urgente: boolean;
+  recebidoEm: string;
+  perguntados: number;
+  aceites: number;
+  porResponder: number;
 }
 
 export interface DispatchBoard {
-  kpis: { waiting: number; available: number; avgAssignMin: number; autoDispatchRate: number };
-  requests: DispatchRequest[];
-  technicians: AvailableTechnician[];
+  pedidos: DispatchPedido[];
+  kpis: {
+    espera: number;
+    porDifundir: number;
+    porDecidir: number;
+    minutosAteAceitar: number | null;
+  };
+  migrated: boolean;
 }
 
+/**
+ * A fila de quem está à espera de técnico.
+ *
+ * São leads, não serviços: um serviço só existe depois de haver técnico e
+ * preço, e quem está à espera está antes disso. A versão anterior mostrava
+ * serviços mock a fingir de fila, com minutos de espera calculados a partir do
+ * índice do array -- nunca podia mostrar o problema real, que é um pedido de
+ * ontem sem ninguém contactado.
+ */
 export async function getDispatchBoard(): Promise<DispatchBoard> {
-  return apiGet("/dispatch", () => {
-    const active = mockData.services.filter((s) =>
-      ["a_procurar_tecnico", "tecnico_encontrado", "a_aguardar_orcamento", "agendado", "em_execucao"].includes(s.status)
-    );
-    const requests: DispatchRequest[] = active.slice(0, 8).map((s, i) => ({
-      id: s.id,
-      customerName: s.customerName,
-      categoryName: s.categoryName,
-      serviceName: s.serviceName,
-      city: s.city,
-      status: s.status,
-      waitingMinutes: 3 + ((i * 7) % 41),
-      value: s.totalCustomerValue,
-      radiusKm: 5 + ((i * 3) % 12),
-    }));
-    const technicians: AvailableTechnician[] = mockData.technicians
-      .filter((t) => t.status === "ativo")
-      .slice(0, 7)
-      .map((t, i) => ({
-        id: t.id,
-        name: t.name,
-        city: t.city,
-        categories: t.categories.slice(0, 2),
-        rating: t.averageRating,
-        distanceKm: 1 + ((i * 2.4) % 9),
-        acceptanceRate: t.acceptanceRate,
-      }));
-    return {
-      kpis: {
-        waiting: active.length,
-        available: technicians.length,
-        avgAssignMin: 12,
-        autoDispatchRate: 74,
-      },
-      requests,
-      technicians,
-    };
-  }).then((r) => r.data);
+  return apiGet<DispatchBoard>("/dispatch", () => ({
+    pedidos: [],
+    kpis: { espera: 0, porDifundir: 0, porDecidir: 0, minutosAteAceitar: null },
+    migrated: false,
+  })).then((r) => r.data);
 }
 
 /* ============================ CATÁLOGO ============================ */
