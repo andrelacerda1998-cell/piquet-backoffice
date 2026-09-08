@@ -117,6 +117,7 @@ const LIVE_EXACT = new Set<string>([
   "/product/growth",
   "/product/ratings",
   "/product/integrations-status",
+  "/product/whatsapp-templates",
   "/product/funnel",
   // Fase 2 — Clientes
   "/customers",
@@ -339,7 +340,8 @@ const REAL_DATA = new Set<string>([
   "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
-  "/product/integrations-status", // Saúde real das pipelines (cron_runs).
+  "/product/integrations-status",
+  "/product/whatsapp-templates", // Saúde real das pipelines (cron_runs).
   "/product/funnel", // Funil da app (Mixpanel); vazio/configured:false sem creds.
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
@@ -427,6 +429,8 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
   // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
+  // Difusão do pedido aos técnicos e atribuição — reais (lead_dispatches).
+  if (/^\/marketing\/leads\/[^/]+\/(dispatch|assign)$/.test(path)) return false;
   return true;
 }
 
@@ -471,6 +475,8 @@ export function isLiveEndpoint(endpoint: string): boolean {
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
+  if (/^\/marketing\/leads\/[^/]+\/dispatch$/.test(path)) return true; // difundir o pedido aos técnicos
+  if (/^\/marketing\/leads\/[^/]+\/assign$/.test(path)) return true; // atribuir o pedido a quem aceitou
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex

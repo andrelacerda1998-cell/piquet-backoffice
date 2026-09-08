@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
 import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "@/lib/leadReply";
+import { interpretarResposta, fone9 } from "@/lib/despacho";
 
 /**
  * Webhook do WhatsApp Business (Meta Cloud API). Cada mensagem recebida no
@@ -95,6 +96,19 @@ export async function POST(req: Request) {
           const nome = (nameByPhone.get(phone) ?? "").slice(0, 200);
           const texto = messageText(m).slice(0, 2000);
 
+          /*
+            É um técnico a responder a um pedido que lhe difundimos?
+
+            Tem de ser decidido ANTES de se mexer nas leads. Sem isto, o "sim"
+            de um técnico criava-lhe uma lead no CRM -- a rede de quem executa
+            os serviços entrava na lista de quem os pede.
+
+            Casa-se pelos últimos 9 dígitos: o Laravel guarda "912345678" e a
+            Meta manda "351912345678".
+          */
+          const respostaTecnico = await tratarRespostaTecnico(db, phone, texto);
+          if (respostaTecnico) continue;
+
           // A lead: reutiliza a mais recente deste telefone, ou cria uma nova.
           // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens
           // do mesmo cliente enchiam o CRM com dez pedidos iguais.
@@ -164,4 +178,55 @@ export async function POST(req: Request) {
     // não propaga — o webhook responde sempre 200
   }
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Marca a difusão como aceite ou recusada quando quem escreve é um técnico a
+ * quem perguntámos. Devolve true quando a mensagem foi tratada como resposta —
+ * e aí não vira lead nenhuma.
+ *
+ * Uma mensagem que não se percebe ("a que horas?") devolve false de propósito:
+ * segue o caminho normal e fica visível para alguém responder. Adivinhar aí
+ * seria arriscar dar como recusado um técnico que só queria uma informação.
+ */
+async function tratarRespostaTecnico(
+  db: ReturnType<typeof supabaseAdmin>,
+  phone: string,
+  texto: string,
+): Promise<boolean> {
+  const decisao = interpretarResposta(texto);
+  if (!decisao) return false;
+
+  try {
+    // Só difusões ainda sem resposta, da mais recente para trás: um técnico
+    // que responde "sim" está a responder ao último pedido que recebeu.
+    const { data } = await db
+      .from("lead_dispatches")
+      .select("id, phone, lead_id")
+      .eq("status", "enviado")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const alvo = ((data ?? []) as { id: string; phone: string; lead_id: string }[])
+      .find((d) => fone9(d.phone) === fone9(phone));
+    if (!alvo) return false;
+
+    await db.from("lead_dispatches")
+      .update({ status: decisao, responded_at: new Date().toISOString() })
+      .eq("id", alvo.id);
+
+    // A resposta fica na conversa da lead: quem despacha precisa de ver o que
+    // o técnico escreveu, não só o estado.
+    try {
+      await db.from("whatsapp_messages").insert({
+        lead_id: alvo.lead_id, phone, direction: "in",
+        body: texto, status: "received",
+      });
+    } catch { /* tabela não migrada — o estado já ficou */ }
+
+    return true;
+  } catch {
+    // Sem a tabela das difusões (migração por correr) segue o caminho normal.
+    return false;
+  }
 }

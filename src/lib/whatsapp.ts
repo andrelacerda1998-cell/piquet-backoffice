@@ -182,6 +182,105 @@ export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
 export const MODELO_LEAD = { nome: "pedido_recebido_piquet", idioma: "pt_PT" } as const;
 
 /**
+ * Modelo que leva um pedido à comunidade de técnicos.
+ *
+ * Também tem de ser modelo, e pela mesma razão do outro: o técnico não escreveu
+ * primeiro, por isso a janela das 24h está fechada. A diferença é o destinatário
+ * -- este vai para dentro da rede, não para o cliente.
+ *
+ * `{{1}}` = pedido (serviço + localização) · `{{2}}` = urgência.
+ *
+ * O corpo pede uma resposta em palavra, não um botão: botões obrigam a modelo
+ * com componentes interactivos e a app do WhatsApp de negócio de cada técnico,
+ * e um técnico a conduzir responde "sim" mais depressa do que encontra um botão.
+ */
+export const MODELO_TECNICO = { nome: "pedido_tecnico_piquet", idioma: "pt_PT" } as const;
+
+export const CORPO_MODELO_TECNICO =
+  "Novo pedido na Piquet: {{1}}.\n" +
+  "Urgencia: {{2}}.\n\n" +
+  "Se puder aceitar, responda SIM a esta mensagem. Se nao puder, responda NAO.\n" +
+  "O primeiro a responder nao fica automaticamente com o servico -- a Piquet " +
+  "confirma consigo antes de o atribuir.";
+
+/**
+ * Cria o modelo dos técnicos na conta da Meta e deixa-o em aprovação.
+ *
+ * Está no código, e não num passo-a-passo na consola, porque o texto tem de
+ * bater certo com o que o webhook sabe interpretar: quem lê "responda SIM" é o
+ * `interpretarResposta`. Separar as duas coisas era garantir que um dia alguém
+ * mudava o texto e as respostas deixavam de ser lidas, sem nada a avisar.
+ */
+export async function criarModeloTecnico(): Promise<{ id: string; status: string }> {
+  const token = process.env.WHATSAPP_TOKEN;
+  if (!token) throw new Error("WhatsApp não configurado.");
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_WABA_ID}/message_templates`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: MODELO_TECNICO.nome,
+        language: MODELO_TECNICO.idioma,
+        // UTILITY e não MARKETING: é um aviso operacional a quem já trabalha
+        // com a Piquet, não angariação. A Meta cobra menos e aprova mais.
+        category: "UTILITY",
+        components: [
+          {
+            type: "BODY",
+            text: CORPO_MODELO_TECNICO,
+            example: { body_text: [["Canalizacao em Lisboa", "Normal (proximos dias)"]] },
+          },
+        ],
+      }),
+    },
+  );
+  const json = (await res.json()) as { id?: string; status?: string; error?: { message?: string } };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
+  return { id: json.id ?? "", status: json.status ?? "PENDING" };
+}
+
+/**
+ * Envia o pedido a um técnico. Devolve o id da Meta para se poder casar
+ * depois o estado (entregue/lida) com esta difusão.
+ */
+export async function enviarModeloTecnico(
+  to: string,
+  pedido: string,
+  urgencia: string,
+): Promise<{ waMessageId: string }> {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) throw new Error("WhatsApp não configurado.");
+  if (!pedido.trim() || !urgencia.trim()) throw new Error("Modelo exige pedido e urgência.");
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: normalizarTelefone(to),
+      type: "template",
+      template: {
+        name: MODELO_TECNICO.nome,
+        language: { code: MODELO_TECNICO.idioma },
+        components: [{
+          type: "body",
+          parameters: [
+            { type: "text", text: pedido.trim() },
+            { type: "text", text: urgencia.trim() },
+          ],
+        }],
+      },
+    }),
+  });
+  const json = (await res.json()) as { messages?: { id: string }[]; error?: { message?: string } };
+  if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
+  return { waMessageId: json.messages?.[0]?.id ?? "" };
+}
+
+/**
  * Corpo aprovado do modelo, com os parâmetros já substituídos.
  *
  * Serve para guardar no histórico o que o cliente leu, e não uma etiqueta

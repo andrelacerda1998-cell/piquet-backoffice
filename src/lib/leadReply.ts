@@ -10,6 +10,8 @@ export interface DadosLead {
   nome?: string;
   servico?: string;
   localizacao?: string;
+  /** "Urgente (hoje ou amanhã)" / "Normal (próximos dias)" — como o cliente escolheu. */
+  urgencia?: string;
 }
 
 /**
@@ -25,7 +27,13 @@ export function extrairDadosLead(message: string, fallbackNome = ""): Required<D
   const nome = pick(/\*?\s*nome\s*:\*?\s*([^\n*]+)/i) || fallbackNome;
   const servico = pick(/\*?\s*servi[çc]o\s*:\*?\s*([^\n*·]+)/i);
   const localizacao = pick(/\*?\s*(?:localiza[çc][ãa]o|cidade|localidade)\s*:\*?\s*([^\n*]+)/i);
-  return { nome: nome.trim(), servico: servico.trim(), localizacao: localizacao.trim() };
+  // A urgência decide quem vale a pena incomodar e com que pressa; ia perdida
+  // porque só o ecrã a lia, e quem a precisa é quem despacha.
+  const urgencia = pick(/\*?\s*urg[êe]ncia\s*:\*?\s*([^\n*·]+)/i);
+  return {
+    nome: nome.trim(), servico: servico.trim(),
+    localizacao: localizacao.trim(), urgencia: urgencia.trim(),
+  };
 }
 
 /** Primeiro nome, para o tratamento pessoal. */

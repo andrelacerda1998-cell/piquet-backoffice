@@ -1,4 +1,4 @@
-import { apiGet, USE_REAL_API } from "./api";
+import { apiGet, apiPost, USE_REAL_API } from "./api";
 import { monthlySeries } from "@/lib/trends";
 import { TODAY } from "@/lib/today";
 
@@ -149,6 +149,20 @@ export interface IntegrationsStatus {
   whatsappNumber?: WhatsappNumberStatus | null;
   whatsappNumberError?: string | null;
   whatsappTemplates?: WhatsappTemplate[] | null;
+}
+
+/**
+ * Cria na Meta o modelo que leva os pedidos aos técnicos.
+ *
+ * O texto vem do servidor porque tem de bater certo com o que o webhook
+ * interpreta ao ler as respostas — não é escolha de quem carrega no botão.
+ */
+export async function criarModeloTecnico(): Promise<{ id: string; status: string; nome: string }> {
+  return apiPost<{ id: string; status: string; nome: string }>(
+    "/product/whatsapp-templates", {}, () => {
+      throw new Error("O WhatsApp ainda não está ligado.");
+    },
+  ).then((r) => r.data);
 }
 
 export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {

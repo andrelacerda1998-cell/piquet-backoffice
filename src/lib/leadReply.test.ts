@@ -40,12 +40,16 @@ describe("extrairDadosLead", () => {
       nome: "André Lacerda",
       servico: "Canalização",
       localizacao: "Cascais",
+      urgencia: "Urgente (hoje ou amanhã)",
     });
   });
 
   it("lê o formato 'Serviço: X · Urgência: Y'", () => {
     const dados = extrairDadosLead("Serviço: Eletricidade · Urgência: normal\nQuadro a disparar");
     expect(dados.servico).toBe("Eletricidade");
+    // A urgência decide com que pressa se procura técnico — é ela que vai no
+    // pedido difundido à comunidade.
+    expect(dados.urgencia).toBe("normal");
   });
 
   it("cai para o nome do perfil quando a mensagem não o traz", () => {
@@ -53,7 +57,7 @@ describe("extrairDadosLead", () => {
   });
 
   it("devolve campos vazios quando não há nada a extrair", () => {
-    expect(extrairDadosLead("")).toEqual({ nome: "", servico: "", localizacao: "" });
+    expect(extrairDadosLead("")).toEqual({ nome: "", servico: "", localizacao: "", urgencia: "" });
   });
 });
 
