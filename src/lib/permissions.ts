@@ -77,7 +77,6 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/produto": ["view_dashboard"],
   "/servicos-personalizados": ["view_services"],
   "/recrutamento": ["view_employees", "view_technicians"],
-  "/despacho": ["view_services"],
   "/qualidade": ["view_support"],
   "/relatorios": ["export_data"],
   "/marketing": ["view_marketing"],

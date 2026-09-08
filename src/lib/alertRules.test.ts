@@ -5,8 +5,7 @@ const AGORA = Date.parse("2026-08-20T12:00:00Z");
 const haDias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString();
 
 const vazio: SinaisDoNegocio = {
-  leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [],
-  orcamentosSemResposta: [], faturasVencidas: [], impostosVencidos: [],
+  leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [], faturasVencidas: [], impostosVencidos: [],
   documentosPendentes: 0, diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
   despachosPorDecidir: [],
 };
@@ -65,32 +64,21 @@ describe("gerarAlertas", () => {
     expect(gerarAlertas({ ...vazio, documentosPendentes: 10 }, AGORA)[0].priority).toBe("alta");
   });
 
-  it("à espera do cliente: só a partir de 3 dias, e nunca acima de média", () => {
-    // A bola está do lado do cliente. Um orçamento à espera não é falha nossa
-    // — marcá-lo a vermelho ensinaria a ignorar o vermelho.
-    const o = (dias: number) => gerarAlertas({ ...vazio,
-      orcamentosSemResposta: [{ id: "1", nome: "Ana", enviadoDesde: haDias(dias), valor: 120 }] }, AGORA);
-    expect(o(0)).toHaveLength(0);
-    expect(o(2)).toHaveLength(0);
-    expect(o(3)[0].priority).toBe("media");
-    expect(o(3)[0].description).toContain("120,00 €");
-    // Por muito tempo que passe, continua média.
-    expect(o(30)[0].priority).toBe("media");
-    expect(o(365)[0].priority).toBe("media");
-  });
-
-  it("só sobe a alta/crítica o que se resolve do NOSSO lado", () => {
+  /*
+    O alerta "à espera do cliente" desapareceu com o estado que o gerava:
+    "Aguarda resposta" era o funil de orçamentos, e este negócio não tem esse
+    passo. O que resta são todos alertas do nosso lado.
+  */
+  it("os alertas que restam resolvem-se todos deste lado", () => {
     const r = gerarAlertas({
-      leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(5) }],           // nosso
-      orcamentosSemResposta: [{ id: "2", nome: "Rui", enviadoDesde: haDias(60), valor: 900 }], // do cliente
+      leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(5) }],
+      despachosPorDecidir: [{ leadId: "2", nome: "Rui", aceites: 1, desde: haDias(0) }],
       cronsFalhados: [], ticketsAbertos: [], documentosPendentes: 0,
       diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
-      faturasVencidas: [], impostosVencidos: [], despachosPorDecidir: [],
+      faturasVencidas: [], impostosVencidos: [],
     }, AGORA);
-    const lead = r.find((a) => a.entityId === "1")!;
-    const espera = r.find((a) => a.entityId === "2")!;
-    expect(lead.priority).toBe("critica");   // ninguém respondeu a quem pediu
-    expect(espera.priority).toBe("media");   // o cliente é que não decidiu
+    expect(r.find((a) => a.entityId === "1")!.priority).toBe("critica");
+    expect(r.find((a) => a.entityId === "2")!.priority).toBe("alta");
   });
 
   it("fatura vencida é alta; aos 15 dias passa a crítica", () => {
@@ -132,13 +120,12 @@ describe("gerarAlertas", () => {
       leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(2) }],
       cronsFalhados: [{ job: "x", falhasSeguidas: 5, ultimoErro: "e", ultimaTentativa: haDias(0) }],
       ticketsAbertos: [{ id: "TK-1", assunto: "A", canal: "App · Cliente", desde: haDias(2) }],
-      orcamentosSemResposta: [{ id: "2", nome: "Rui", enviadoDesde: haDias(4), valor: null }],
       faturasVencidas: [{ fornecedor: "X", valorEmDivida: 10, venceuEm: haDias(1) }],
       impostosVencidos: [{ nome: "IVA", valor: 5, venceuEm: haDias(1), estimado: false }],
       documentosPendentes: 40, diasSemDadosDeAnuncios: 10, pagamentosRecusados: 6,
       despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 2, desde: haDias(1) }],
     }, AGORA);
-    expect(r.length).toBe(10);
+    expect(r.length).toBe(9);
     for (const a of r) {
       expect(a.recommendedAction.length, a.title).toBeGreaterThan(10);
       expect(a.status).toBe("novo");

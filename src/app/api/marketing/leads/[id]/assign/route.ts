@@ -38,7 +38,9 @@ export const POST = withStaff(async (req, { params, staff }) => {
 
   // O técnico fica escrito na lead — é o campo que a conversão em serviço usa.
   const { error: upErr } = await db.from("leads")
-    .update({ technician_name: escolhido.technician_name, stage: "orcamento_aceite" })
+    // O estado avança sozinho. Um funil mantido à mão só está certo enquanto
+    // alguém se lembrar de o manter.
+    .update({ technician_name: escolhido.technician_name, stage: "com_tecnico" })
     .eq("id", params.id);
   if (upErr) throw new Error(upErr.message);
 

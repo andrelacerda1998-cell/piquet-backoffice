@@ -138,6 +138,16 @@ export const POST = withStaff(async (req, { params }) => {
     resultados.push(toDTO(guardada as DispatchRow));
   }
 
+  /*
+    O pedido passa a "À procura de técnico" assim que sai a primeira pergunta.
+    Se ninguém foi contactado com sucesso, o estado não muda -- dizer que se
+    está à procura quando nenhuma mensagem saiu seria mentira.
+  */
+  if (resultados.some((d) => d.status === "enviado")) {
+    await db.from("leads").update({ stage: "a_procurar" })
+      .eq("id", params.id).eq("stage", "novo");
+  }
+
   return apiOk({
     dispatches: resultados,
     enviadas: resultados.filter((d) => d.status === "enviado").length,

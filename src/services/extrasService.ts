@@ -6,48 +6,6 @@ import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
 /* ============================ DESPACHO AO VIVO ============================ */
 
-export interface DispatchPedido {
-  leadId: string;
-  nome: string;
-  servico: string;
-  categoria: string;
-  cidade: string;
-  urgencia: string;
-  urgente: boolean;
-  recebidoEm: string;
-  perguntados: number;
-  aceites: number;
-  porResponder: number;
-}
-
-export interface DispatchBoard {
-  pedidos: DispatchPedido[];
-  kpis: {
-    espera: number;
-    porDifundir: number;
-    porDecidir: number;
-    minutosAteAceitar: number | null;
-  };
-  migrated: boolean;
-}
-
-/**
- * A fila de quem está à espera de técnico.
- *
- * São leads, não serviços: um serviço só existe depois de haver técnico e
- * preço, e quem está à espera está antes disso. A versão anterior mostrava
- * serviços mock a fingir de fila, com minutos de espera calculados a partir do
- * índice do array -- nunca podia mostrar o problema real, que é um pedido de
- * ontem sem ninguém contactado.
- */
-export async function getDispatchBoard(): Promise<DispatchBoard> {
-  return apiGet<DispatchBoard>("/dispatch", () => ({
-    pedidos: [],
-    kpis: { espera: 0, porDifundir: 0, porDecidir: 0, minutosAteAceitar: null },
-    migrated: false,
-  })).then((r) => r.data);
-}
-
 /* ============================ CATÁLOGO ============================ */
 
 export interface CatalogCategory {
@@ -557,25 +515,22 @@ export async function getComplaints(): Promise<Complaint[]> {
 
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
 
-// Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
-/** Estados do funil — definidos em src/lib/leadStages.ts (fonte única). */
+/** Estados de um pedido — definidos em src/lib/leadStages.ts (fonte única). */
 export type LeadStage = LeadStageId;
 
-// Rótulos pedidos pelo André: Novo / Orçamento enviado / Aceite / Executado /
-// Recusado. Os `id` mantêm-se (a BD e a lógica de criar serviço no "concluido"
-// dependem deles); muda só o texto.
+/*
+  Os rótulos dizem o que se passa, não em que casa do funil se está.
+
+  "Aguardar resposta" e "Aceite" descreviam um negócio de orçamentos. Aqui, um
+  pedido está à procura de técnico ou já tem um -- e é isso que quem olha para
+  a lista precisa de saber para decidir o que fazer a seguir.
+*/
 export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
-  { id: "nao_iniciado", label: "Novo" },
-  // Já se contactou o cliente e espera-se que ele diga alguma coisa — antes
-  // disto, um pedido contactado sem resposta ficava indistinguível de um novo.
-  { id: "aguarda_resposta", label: "Aguardar resposta" },
-  { id: "orcamento_aceite", label: "Aceite" },
-  { id: "concluido", label: "Executado" },
-  { id: "recusado", label: "Recusado" },
-  // Serviço que chegou a ser executado e pago, e cujo dinheiro foi depois
-  // devolvido ao cliente. É diferente de "Recusado" (nunca houve trabalho nem
-  // dinheiro) e não pode continuar a contar como ganho.
-  { id: "reembolsado", label: "Reembolsado" },
+  { id: "novo", label: "Novo" },
+  { id: "a_procurar", label: "À procura de técnico" },
+  { id: "com_tecnico", label: "Com técnico" },
+  { id: "concluido", label: "Concluído" },
+  { id: "perdido", label: "Perdido" },
 ];
 
 export { LEAD_STAGES_SEM_RECEITA } from "@/lib/leadStages";
@@ -769,7 +724,7 @@ export async function createLead(input: NewLead): Promise<Lead> {
   const now = new Date().toISOString();
   return apiPost<Lead>("/marketing/leads", input, () => ({
     id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
-    stage: "nao_iniciado", value: 0, createdAt: now, notes: "", lossReason: "", lossNote: "",
+    stage: "novo", value: 0, createdAt: now, notes: "", lossReason: "", lossNote: "",
     quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
     executionDate: "", rating: null, serviceId: null,
   })).then((r) => r.data);

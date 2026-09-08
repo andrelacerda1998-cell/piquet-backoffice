@@ -121,11 +121,13 @@ const STATUS_TONE: Record<string, StatusTone> = {
   pago: "success", agendado: "info", em_execucao: "active", concluido: "success",
   cancelado_cliente: "danger", cancelado_tecnico: "danger", sem_tecnico_disponivel: "warning",
   reembolsado: "warning", em_reclamacao: "warning",
-  // Leads / CRM (os `id` mantêm-se; rótulos são Novo/…/Executado/Cancelado)
-  nao_iniciado: "info", orcamento_aceite: "success", recusado: "danger",
-  // À espera do cliente: amarelo, como tudo o que está parado à espera de
-  // terceiros (não é problema nosso, mas também não está fechado).
-  aguarda_resposta: "warning",
+  /*
+    Pedidos. "À procura de técnico" é amarelo porque está parado à espera de
+    alguém responder; "Com técnico" é azul (a andar, ainda não fechado) e só
+    "Concluído" fica verde -- verde antes de o serviço estar feito era dar por
+    ganho o que ainda podia correr mal.
+  */
+  a_procurar: "warning", com_tecnico: "active", perdido: "danger",
   // Faturas de custos
   pendente: "warning", parcial: "info",
   // Pagamentos
@@ -139,7 +141,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
   vencido: "danger", estimado: "warning", emitida: "success", nao_emitida: "neutral",
   // Prioridades
   critica: "danger", alta: "warning", media: "info", baixa: "neutral",
-  // Genéricos
+  // Genéricos ("novo" serve o estado do pedido e o genérico — é o mesmo tom)
   novo: "info", ativa: "success", pausada: "neutral", concluida: "success",
 };
 

@@ -83,7 +83,6 @@ export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
-  { href: "/despacho", label: "Despacho", icon: "Radio" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
@@ -91,7 +90,7 @@ export const NAV_ITEMS = [
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
-  { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
+  { href: "/leads", label: "Pedidos", icon: "Inbox" },
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
@@ -116,17 +115,6 @@ export const NAV_ITEMS = [
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
   "/", "/alertas",
-  /*
-    O Despacho estava fora do menu, de quando era uma maqueta a mostrar zeros
-    -- chegava-se lá por ⌘K ou pelo endereço. Agora é onde se decide quem vai a
-    cada serviço e onde acende a bolinha quando um técnico aceita, e uma
-    bolinha num ecrã que não está no menu não avisa ninguém.
-
-    Fica antes de Serviços porque é o único ecrã com gente à espera de uma
-    decisão: um técnico que aceitou está a segurar a agenda até alguém aqui
-    responder.
-  */
-  "/despacho",
   "/servicos",
   // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
   // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas

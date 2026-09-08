@@ -116,7 +116,6 @@ const LIVE_EXACT = new Set<string>([
   // Produto — evolução de downloads (lojas) e registos reais
   "/product/growth",
   "/product/ratings",
-  "/dispatch",
   "/product/integrations-status",
   "/product/whatsapp-templates",
   "/product/funnel",
@@ -341,7 +340,6 @@ const REAL_DATA = new Set<string>([
   "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
-  "/dispatch", // fila real de leads à espera de técnico (lead_dispatches)
   "/product/integrations-status",
   "/product/whatsapp-templates", // Saúde real das pipelines (cron_runs).
   "/product/funnel", // Funil da app (Mixpanel); vazio/configured:false sem creds.

@@ -273,7 +273,7 @@ export default function FinancePage() {
   const { data: leadsData } = useAsyncData(() => getLeads(), []);
   const planLeadInflows = useMemo<PlanItem[]>(
     () => (leadsData ?? [])
-      .filter((l) => l.stage === "orcamento_aceite" && (l.quoteValue ?? 0) > 0)
+      .filter((l) => l.stage === "com_tecnico" && (l.quoteValue ?? 0) > 0)
       .map((l) => {
         const commission = l.technicianValue != null
           ? Math.max(0, (l.quoteValue ?? 0) - l.technicianValue)

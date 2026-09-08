@@ -8,7 +8,7 @@ import { tecnicoPorTelefone } from "@/lib/tecnicoContactos";
 
 /**
  * Webhook do WhatsApp Business (Meta Cloud API). Cada mensagem recebida no
- * número da Piquet entra como lead em **Marketing → CRM & Leads** com o estado
+ * número da Piquet entra como pedido em **Pedidos** com o estado
  * "Não iniciado" (`source: "whatsapp"`).
  *
  * GET  — verificação do webhook (Meta chama com hub.challenge na configuração).

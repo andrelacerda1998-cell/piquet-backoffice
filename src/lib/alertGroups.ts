@@ -36,7 +36,7 @@ const FAMILIAS: Familia[] = [
     prefixo: "lead-sem-resposta-",
     id: "grupo-leads-sem-resposta",
     titulo: (n) => `${n} pedidos sem resposta`,
-    accao: "Abrir CRM & Leads e responder aos mais antigos primeiro.",
+    accao: "Abrir os Pedidos e responder aos mais antigos primeiro.",
     entityType: "leads",
   },
   {

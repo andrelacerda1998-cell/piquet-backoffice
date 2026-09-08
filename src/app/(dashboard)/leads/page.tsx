@@ -97,12 +97,12 @@ function LeadsPageInner() {
   };
   /**
    * Por omissão a lista mostra só o que está NA MÃO DA EQUIPA: pedidos novos e
-   * orçamentos enviados à espera de resposta. Aceites, executados, recusados e
-   * reembolsados são consulta, não trabalho — aparecem pelo filtro de estado
+   * pedidos à procura de técnico. Com técnico, concluídos e perdidos são
+   * consulta, não trabalho — aparecem pelo filtro de estado
    * ou pelos cartões. O que fica oculto é dito por baixo da lista, para não
    * parecer que desapareceu.
    */
-  const ESTADOS_ATIVOS: LeadStage[] = ["nao_iniciado", "aguarda_resposta"];
+  const ESTADOS_ATIVOS: LeadStage[] = ["novo", "a_procurar"];
   const byStage = leadStage === ""
     ? baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage))
     : leadStage === "todos"
@@ -133,13 +133,14 @@ function LeadsPageInner() {
   const crm = (() => {
     const total = baseFiltered.length;
     const executadas = baseFiltered.filter((l) => l.stage === "concluido");
-    const porResponder = baseFiltered.filter((l) => l.stage === "nao_iniciado").length;
-    // Reembolsados: o serviço chegou a fechar e o dinheiro foi devolvido. Não
-    // entram no pipeline (já não podem fechar), não contam como executados, e
-    // o que se devolveu aparece à parte para não desaparecer da conta.
-    const reembolsadas = baseFiltered.filter((l) => l.stage === "reembolsado");
-    const valorReembolsado = reembolsadas.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
-    // Pipeline = só o que ainda pode fechar (recusados e reembolsados não).
+    const porResponder = baseFiltered.filter((l) => l.stage === "novo").length;
+    /*
+      O reembolso deixou de ser um estado do pedido: é um acontecimento
+      financeiro e vive no Financeiro, onde estão os botões que devolvem o
+      dinheiro. Aqui um pedido reembolsado é simplesmente "perdido" -- não deu
+      receita -- e o valor devolvido conta-se lá, sobre os pagamentos reais.
+    */
+    // Pipeline = só o que ainda pode fechar (os perdidos não).
     const emAberto = baseFiltered.filter((l) => !LEAD_STAGES_SEM_RECEITA.includes(l.stage));
     const pipeline = emAberto.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
     const comissao = emAberto.reduce(
@@ -148,8 +149,6 @@ function LeadsPageInner() {
     return {
       total, porResponder, pipeline, comissao, ganho,
       executadas: executadas.length,
-      reembolsadas: reembolsadas.length,
-      valorReembolsado,
       conversao: total ? (executadas.length / total) * 100 : 0,
     };
   })();
@@ -275,7 +274,7 @@ function LeadsPageInner() {
   /**
    * Perder um pedido sem dizer porquê é como não o registar: 88% das leads
    * acabam assim e não havia como saber se o problema é o preço, a demora ou
-   * a falta de técnico. Ao marcar recusado/reembolsado pergunta-se o motivo
+   * a falta de técnico. Ao marcar perdido pergunta-se o motivo
    * antes de gravar.
    */
   const [motivoPara, setMotivoPara] = useState<{ lead: Lead; stage: LeadStage } | null>(null);
@@ -448,9 +447,9 @@ function LeadsPageInner() {
       <div className="space-y-6">
         <PageHeader
           icon={Headphones}
-          eyebrow="Crescimento"
-          title="CRM & Leads"
-          subtitle="Pedidos recebidos da landing e do WhatsApp — do primeiro contacto ao serviço executado."
+          eyebrow="Operação"
+          title="Pedidos"
+          subtitle="Tudo o que entrou, e em que ponto está: à procura de técnico, com técnico, ou fechado."
         />
 
           <div className="space-y-4">
@@ -512,9 +511,9 @@ function LeadsPageInner() {
                   {motivosPerda.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setLeadStage(leadStage === "recusado" ? "" : "recusado")}
+                      onClick={() => setLeadStage(leadStage === "perdido" ? "" : "perdido")}
                       className="w-full flex items-center gap-3 group"
-                      title="Ver os pedidos recusados"
+                      title="Ver os pedidos perdidos"
                     >
                       <span className={cn("text-xs w-44 shrink-0 text-left truncate",
                         m.id === "sem_motivo" ? "text-text-muted italic" : "text-text-secondary")}>
@@ -782,7 +781,7 @@ function LeadsPageInner() {
         open={showLead}
         onClose={() => setShowLead(false)}
         title="Registar pedido"
-        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra no CRM como “Não iniciado”."
+        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra como “Novo”."
         footer={
           <>
             <button onClick={() => setShowLead(false)} className="btn-secondary text-sm">Cancelar</button>
@@ -815,10 +814,8 @@ function LeadsPageInner() {
         title="Editar pedido"
         subtitle={
           editForm.stage === "concluido"
-            ? "Ao guardar como “Executado”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
-            : editForm.stage === "reembolsado"
-              ? "Ao guardar como “Reembolsado”, o serviço correspondente em Operações deixa de contar como receita."
-              : "Atualiza os dados e o estado do pedido."
+            ? "Ao guardar como “Concluído”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
+            : "Atualiza os dados e o estado do pedido."
         }
         size="lg"
         footer={

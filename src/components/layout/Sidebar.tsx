@@ -15,7 +15,7 @@ import {
   MapPin, Megaphone, Headphones, Bell, Settings, ChevronLeft, X,
   Radio, BookOpen, Tag, Map, ShieldCheck, FileText,
   MessageSquare, Target, ListChecks, Wand2, UserPlus, SlidersHorizontal,
-  MoreHorizontal, ChevronDown, MonitorSmartphone, Code2,
+  MoreHorizontal, ChevronDown, MonitorSmartphone, Code2, Inbox,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -23,7 +23,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   MapPin, Megaphone, Headphones, Bell, Settings,
   Radio, BookOpen, Tag, Map, ShieldCheck, FileText,
   MessageSquare, Target, ListChecks, Wand2, UserPlus, SlidersHorizontal,
-  MonitorSmartphone, Code2,
+  MonitorSmartphone, Code2, Inbox,
 };
 
 const NAV_BY_HREF = Object.fromEntries(NAV_ITEMS.map((i) => [i.href, i]));

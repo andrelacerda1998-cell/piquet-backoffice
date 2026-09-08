@@ -183,7 +183,7 @@ export default function OverviewPage() {
 
   // O que está à espera de alguém: leads por responder (e quantas urgentes) e
   // documentos KYC por validar. É o primeiro que se quer ver ao abrir o dia.
-  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "nao_iniciado");
+  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "novo");
   const leadsUrgentes = leadsPorResponder.filter((l) => /urg[êe]ncia:\s*(urgente|hoje|emerg|imediat|agora)/i.test(l.message || "")).length;
   const kycPendentes = pendingDocs?.meta.total ?? 0;
 
