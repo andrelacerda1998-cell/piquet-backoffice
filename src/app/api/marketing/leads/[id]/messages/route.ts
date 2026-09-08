@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isMissingTable } from "@/lib/missingColumn";
 import { WHATSAPP_ENABLED, dentroDaJanela, enviarTextoWhatsapp, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
+import { fone9 } from "@/lib/despacho";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
 import { apiOk, apiErr, withStaff } from "../../../../_lib/handler";
 
@@ -38,8 +39,11 @@ export const GET = withStaff(async (_req, { params }) => {
   // Mensagens ligadas pela lead OU pelo telefone (mensagens antigas do mesmo
   // número que ainda não estavam associadas a esta lead).
   const phone = (lead as { phone: string }).phone || "";
+  // Pelos últimos 9 dígitos: o mesmo número aparece com e sem indicativo,
+  // conforme tenha entrado pela landing ou pela Meta.
+  const p9 = fone9(phone);
   let query = db.from("whatsapp_messages").select("*").order("created_at", { ascending: true });
-  query = phone ? query.or(`lead_id.eq.${params.id},phone.eq.${phone}`) : query.eq("lead_id", params.id);
+  query = p9 ? query.or(`lead_id.eq.${params.id},phone9.eq.${p9}`) : query.eq("lead_id", params.id);
 
   const { data, error } = await query;
   if (error) {
@@ -90,7 +94,7 @@ export const POST = withStaff(async (req, { params, staff }) => {
 
   // Janela de 24h: lê-se a última entrada do próprio histórico.
   const { data: hist } = await db.from("whatsapp_messages")
-    .select("direction, created_at").or(`lead_id.eq.${params.id},phone.eq.${phone}`)
+    .select("direction, created_at").or(`lead_id.eq.${params.id},phone9.eq.${fone9(phone)}`)
     .order("created_at", { ascending: true });
   const aberta = dentroDaJanela(ultimaEntrada((hist ?? []) as MsgRow[]), Date.now());
   /*

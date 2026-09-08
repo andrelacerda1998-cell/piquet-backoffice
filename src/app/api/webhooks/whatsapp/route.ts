@@ -142,8 +142,17 @@ export async function POST(req: Request) {
           // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens
           // do mesmo cliente enchiam o CRM com dez pedidos iguais.
           let leadId: string | null = null;
+          /*
+            Procura pelos últimos 9 dígitos, não pelo texto do telefone.
+
+            A landing grava "934670597" e a Meta manda "351934670597": pela
+            comparação literal nunca casavam, e a resposta de um cliente ao
+            nosso "recebemos o seu pedido" criava uma lead NOVA -- um "Ok"
+            solto, separado do pedido a que respondia. Foi o que aconteceu a
+            07/09.
+          */
           const { data: existente } = await db
-            .from("leads").select("id").eq("phone", phone)
+            .from("leads").select("id").eq("phone9", fone9(phone))
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           if (existente?.id) {
             leadId = existente.id as string;

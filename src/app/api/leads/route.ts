@@ -4,6 +4,7 @@ import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 import { eDuplicado, JANELA_MESMA_MENSAGEM_MIN } from "@/lib/leadDedupe";
 import { WHATSAPP_ENABLED, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
+import { fone9 } from "@/lib/despacho";
 
 /**
  * POST /api/leads — receção PÚBLICA de leads do formulário da landing page
@@ -114,7 +115,9 @@ export async function POST(req: Request) {
   // "Servico: Selecionar…".
   const since = new Date(Date.now() - JANELA_MESMA_MENSAGEM_MIN * 60 * 1000).toISOString();
   let dupQ = supabaseAdmin().from("leads").select("created_at, message").gte("created_at", since);
-  dupQ = lead.phone ? dupQ.eq("phone", lead.phone)
+  // Pelos últimos 9 dígitos: o mesmo número entra com indicativo pela Meta e
+  // sem ele pela landing, e pela comparação literal os dois nunca casavam.
+  dupQ = lead.phone ? dupQ.eq("phone9", fone9(lead.phone))
     : lead.email ? dupQ.eq("email", lead.email)
     : dupQ.eq("name", lead.name);
   const { data: recentes } = await dupQ;
