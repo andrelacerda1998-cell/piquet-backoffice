@@ -4,6 +4,7 @@ import { WHATSAPP_ENABLED, enviarModeloTecnico } from "@/lib/whatsapp";
 import { extrairDadosLead } from "@/lib/leadReply";
 import { fone9, type Difusao, type EstadoDifusao } from "@/lib/despacho";
 import { laravelAdminRequest } from "@/lib/laravelAdmin";
+import { guardarTelefonesTecnicos } from "@/lib/tecnicoContactos";
 import { apiOk, apiErr, withStaff } from "../../../../_lib/handler";
 import type { AdminVendorsData } from "@/app/api/technicians/route";
 
@@ -90,6 +91,13 @@ export const POST = withStaff(async (req, { params }) => {
   } catch {
     return apiErr("Não foi possível ler a lista de técnicos para obter os contactos.", 502);
   }
+
+  /*
+    Aproveita a lista para actualizar a cópia local dos números. Este é o
+    momento em que ela está mais fresca, e é dela que o webhook depende para
+    não transformar a resposta de um técnico numa lead.
+  */
+  try { await guardarTelefonesTecnicos(vendors); } catch { /* não trava o envio */ }
 
   const escolhidos = vendors.filter((v) => ids.includes(String(v.id)));
   if (escolhidos.length === 0) return apiErr("Nenhum dos técnicos escolhidos foi encontrado.", 404);

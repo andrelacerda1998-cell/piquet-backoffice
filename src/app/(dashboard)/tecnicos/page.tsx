@@ -29,6 +29,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
+import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
@@ -1046,6 +1047,22 @@ export default function TechniciansPage() {
                       Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
                     </p>
                   )}
+
+                  {/*
+                    O que este técnico escreveu. Vive aqui porque é aqui que
+                    pertence: antes, uma mensagem dele só podia existir agarrada
+                    a uma lead, e por isso aparecia no CRM como um pedido de
+                    serviço vindo de quem os executa.
+                  */}
+                  <div className="pt-1">
+                    <WhatsappConversa
+                      tecnicoId={String(v.id)}
+                      temTelefone={Boolean(v.phone_number)}
+                      waNumero={(v.phone_number || "").replace(/\D/g, "").length === 9
+                        ? `351${(v.phone_number || "").replace(/\D/g, "")}`
+                        : (v.phone_number || "").replace(/\D/g, "")}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

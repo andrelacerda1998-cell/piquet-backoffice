@@ -358,7 +358,24 @@ function LeadsPageInner() {
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Contacto", sortable: true, render: (r) => (
       <div className="min-w-0">
-        <p className="font-medium text-text-primary truncate">{r.name}</p>
+        <p className="font-medium text-text-primary truncate">
+          {r.name}
+          {/*
+            Este contacto é da rede, não um cliente. As mensagens de técnicos
+            já não criam leads; as que entraram antes dessa separação ficaram
+            cá e continuam a contar para a conversão e para os alertas. Ficam
+            marcadas em vez de apagadas — apagar dados reais não é decisão de
+            um filtro.
+          */}
+          {r.technicianContact && (
+            <span
+              title={`É um técnico (${r.technicianContact}), não um cliente. A conversa dele está no perfil, em Técnicos.`}
+              className="ml-2 inline-flex items-center rounded-full bg-surface-subtle px-1.5 py-0.5 text-[11px] font-semibold text-text-secondary align-middle"
+            >
+              técnico
+            </span>
+          )}
+        </p>
         {r.phone && (
           <div className="mt-0.5 flex items-center gap-1.5">
             <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-piquet-700 hover:underline">{r.phone}</a>

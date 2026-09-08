@@ -606,6 +606,15 @@ export interface Lead {
   executionDate: string;          // data de execução (ISO ou "")
   rating: number | null;          // classificação do serviço
   serviceId: string | null;       // serviço criado em Operações quando concluído
+  /**
+   * Nome do técnico, quando este contacto é da rede e não um cliente.
+   *
+   * Vazio para clientes. As mensagens de técnicos já não criam leads, mas as
+   * que entraram antes dessa separação ficaram cá -- e marcá-las é melhor do
+   * que apagá-las: apagar dados reais não é decisão de um filtro, e escondê-las
+   * faria desaparecer sem aviso o pedido de um técnico que também é cliente.
+   */
+  technicianContact?: string;
 }
 
 /** Campos editáveis de um pedido no CRM. */
@@ -692,6 +701,25 @@ export async function sendLeadMessage(id: string, body: string): Promise<WaMensa
  */
 export async function sendLeadTemplate(id: string): Promise<WaMensagem> {
   return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { modelo: true }, () => {
+    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
+  }).then((r) => r.data);
+}
+
+/**
+ * Conversa de WhatsApp com um técnico.
+ *
+ * Separada da do cliente: uma mensagem de um técnico deixou de precisar de uma
+ * lead para existir, e por isso deixou de aparecer no CRM como um pedido.
+ */
+export async function getTechnicianMessages(id: string): Promise<Conversa> {
+  return apiGet<Conversa>(
+    `/technicians/${id}/messages`,
+    () => ({ messages: [], configured: false, windowOpen: false, migrated: false }),
+  ).then((r) => r.data);
+}
+
+export async function sendTechnicianMessage(id: string, body: string): Promise<WaMensagem> {
+  return apiPost<WaMensagem>(`/technicians/${id}/messages`, { body }, () => {
     throw new Error("O envio pelo WhatsApp ainda não está ligado.");
   }).then((r) => r.data);
 }

@@ -4,6 +4,7 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
 import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "@/lib/leadReply";
 import { interpretarResposta, fone9 } from "@/lib/despacho";
+import { tecnicoPorTelefone } from "@/lib/tecnicoContactos";
 
 /**
  * Webhook do WhatsApp Business (Meta Cloud API). Cada mensagem recebida no
@@ -108,6 +109,34 @@ export async function POST(req: Request) {
           */
           const respostaTecnico = await tratarRespostaTecnico(db, phone, texto);
           if (respostaTecnico) continue;
+
+          /*
+            Não é resposta a um pedido, mas é da rede?
+
+            Um técnico também escreve fora do despacho -- uma dúvida, uma foto,
+            "cheguei". Isso não é um pedido de serviço, e entrar no CRM como
+            lead punha quem executa os serviços na lista de quem os pede. A
+            mensagem fica guardada com o técnico, e aparece no perfil dele.
+
+            Se a cópia local dos números falhar, `tecnicoPorTelefone` devolve
+            null e a mensagem segue como cliente -- é a falha certa: uma
+            mensagem a mais no CRM corrige-se à mão, uma de cliente que não
+            entra perde-se.
+          */
+          const tecnico = await tecnicoPorTelefone(phone);
+          if (tecnico) {
+            try {
+              await db.from("whatsapp_messages").upsert({
+                technician_id: tecnico.id,
+                phone,
+                direction: "in",
+                body: texto,
+                wa_message_id: m.id ?? null,
+                status: "received",
+              }, { onConflict: "wa_message_id", ignoreDuplicates: true });
+            } catch { /* tabela não migrada — a mensagem não se perde no log */ }
+            continue;
+          }
 
           // A lead: reutiliza a mais recente deste telefone, ou cria uma nova.
           // Antes criava-se SEMPRE uma lead nova por mensagem — dez mensagens

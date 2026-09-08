@@ -3,6 +3,7 @@ import { isMissingColumn } from "@/lib/missingColumn";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
+import { fone9 } from "@/lib/despacho";
 
 /**
  * GET /api/marketing/leads — leads reais recebidas do formulário da landing
@@ -31,7 +32,7 @@ const SELECT = `${COLUNAS_BASE}, notes, loss_reason, loss_note`;
 // "reembolsado" voltar a aparecer como "Novo").
 
 /** Linha da BD → forma `Lead` que a página de Marketing consome. */
-function toLead(r: Row) {
+function toLead(r: Row, tecnicos?: Map<string, string>) {
   return {
     id: r.id,
     // Nome pode vir vazio do formulário — cai para o contacto que existir.
@@ -54,6 +55,18 @@ function toLead(r: Row) {
     serviceId: r.service_id || null,
     value: 0, // Sem valor estimado real — 0 em vez de inventado.
     createdAt: r.created_at,
+    /*
+      Esta lead é, afinal, um técnico?
+
+      Antes de os técnicos passarem a ter conversa própria, qualquer mensagem
+      da rede entrava aqui como pedido de serviço. Essas leads ficaram no CRM
+      e continuam a contar para tudo -- conversão, funil, alertas.
+
+      Fica marcada em vez de apagada ou escondida: apagar dados reais não é
+      decisão de um filtro, e esconder faria desaparecer, sem aviso, o pedido
+      de um técnico que também é cliente.
+    */
+    technicianContact: tecnicos?.get(fone9(r.phone || "")) || "",
   };
 }
 
@@ -74,7 +87,23 @@ export const GET = withStaff(async () => {
     ({ data, error } = await ler(COLUNAS_BASE));
   }
   if (error) throw new Error(error.message);
-  return apiOk(((data ?? []) as unknown as Row[]).map(toLead));
+
+  const linhas = (data ?? []) as unknown as Row[];
+
+  /*
+    Que destes contactos são técnicos. Uma leitura só, à cópia local -- não é
+    por lead, e uma falha aqui deixa apenas as marcas por fazer.
+  */
+  const tecnicos = new Map<string, string>();
+  try {
+    const { data: tp } = await supabaseAdmin()
+      .from("technician_phones").select("phone9, name");
+    for (const t of (tp ?? []) as { phone9: string; name: string }[]) {
+      tecnicos.set(t.phone9, t.name || "Técnico");
+    }
+  } catch { /* sem a tabela, ninguém fica marcado */ }
+
+  return apiOk(linhas.map((r) => toLead(r, tecnicos)));
 });
 
 /**

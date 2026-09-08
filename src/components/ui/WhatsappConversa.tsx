@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getLeadMessages, sendLeadMessage, sendLeadTemplate, type WaMensagem, type Conversa } from "@/services/extrasService";
+import {
+  getLeadMessages, sendLeadMessage, sendLeadTemplate,
+  getTechnicianMessages, sendTechnicianMessage,
+  type WaMensagem, type Conversa,
+} from "@/services/extrasService";
 import { formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -24,8 +28,15 @@ function EstadoMsg({ status }: { status: string }) {
   return <Check className="h-3 w-3 text-text-muted" aria-label="Enviada" />;
 }
 
-export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntradas }: {
-  leadId: string;
+export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNumero, onEntradas }: {
+  /** Conversa com o cliente desta lead. Exclusivo com `tecnicoId`. */
+  leadId?: string;
+  /**
+   * Conversa com um técnico. Existe porque as mensagens da rede deixaram de
+   * ter de se agarrar a uma lead para existir -- era isso que as punha no CRM
+   * como se fossem pedidos de serviço.
+   */
+  tecnicoId?: string;
   temTelefone: boolean;
   /*
     Quantas mensagens o cliente escreveu. Quem abre a lead precisa de saber
@@ -46,15 +57,18 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
   const [aConfirmar, setAConfirmar] = useState(false);
   const fimRef = useRef<HTMLDivElement>(null);
 
+  const alvo = leadId ?? tecnicoId ?? "";
+  const eTecnico = !leadId && Boolean(tecnicoId);
+
   useEffect(() => {
     let vivo = true;
     setCarregando(true);
-    getLeadMessages(leadId)
+    (eTecnico ? getTechnicianMessages(alvo) : getLeadMessages(alvo))
       .then((c) => { if (vivo) setConversa(c); })
       .catch(() => { if (vivo) setConversa({ messages: [], configured: false, windowOpen: false, migrated: false }); })
       .finally(() => { if (vivo) setCarregando(false); });
     return () => { vivo = false; };
-  }, [leadId]);
+  }, [alvo, eTecnico]);
 
   const reportar = useRef(onEntradas);
   reportar.current = onEntradas;
@@ -71,7 +85,9 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
     if (!corpo || aEnviar) return;
     setAEnviar(true);
     try {
-      const nova: WaMensagem = await sendLeadMessage(leadId, corpo);
+      const nova: WaMensagem = eTecnico
+        ? await sendTechnicianMessage(alvo, corpo)
+        : await sendLeadMessage(alvo, corpo);
       setConversa((c) => c ? { ...c, messages: [...c.messages, nova] } : c);
       setTexto("");
     } catch (e) {
@@ -90,7 +106,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
   const enviarConfirmacao = async () => {
     setAConfirmar(true);
     try {
-      const nova = await sendLeadTemplate(leadId);
+      const nova = await sendLeadTemplate(alvo);
       setConversa((c) => c ? { ...c, messages: [...c.messages, nova], windowOpen: true } : c);
       toast("Confirmação enviada. A conversa fica aberta 24h para responderes em texto livre.");
     } catch (e) {
@@ -115,8 +131,12 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
       : conversa?.windowOpen
         ? ""
         : temEntrada
-          ? "Passaram mais de 24h desde a última mensagem do cliente. Manda a confirmação para reabrir a conversa."
-          : "Este contacto ainda não escreveu pelo WhatsApp. Manda a confirmação para abrir a conversa — depois disso podes responder por aqui.";
+          ? eTecnico
+            ? "Passaram mais de 24h desde a última mensagem deste técnico. Só um pedido difundido reabre a conversa."
+            : "Passaram mais de 24h desde a última mensagem do cliente. Manda a confirmação para reabrir a conversa."
+          : eTecnico
+            ? "Este técnico ainda não escreveu. A conversa abre quando ele responder a um pedido difundido."
+            : "Este contacto ainda não escreveu pelo WhatsApp. Manda a confirmação para abrir a conversa — depois disso podes responder por aqui.";
 
   return (
     <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
@@ -177,7 +197,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
           {modelo && (
             <button onClick={() => setTexto(modelo)} className="btn-secondary text-xs py-1.5">Inserir modelo</button>
           )}
-          {!podeEnviar && conversa?.configured && (
+          {!podeEnviar && conversa?.configured && !eTecnico && (
             <button
               onClick={enviarConfirmacao}
               disabled={aConfirmar}

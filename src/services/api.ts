@@ -433,6 +433,8 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
   // Difusão do pedido aos técnicos e atribuição — reais (lead_dispatches).
   if (/^\/marketing\/leads\/[^/]+\/(dispatch|assign)$/.test(path)) return false;
+  // Conversa com o técnico — real (whatsapp_messages.technician_id).
+  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return false;
   return true;
 }
 
@@ -491,6 +493,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
   if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
   if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
+  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return true; // conversa de WhatsApp do técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
   if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
