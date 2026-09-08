@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getLeadMessages, sendLeadMessage, type WaMensagem, type Conversa } from "@/services/extrasService";
+import { getLeadMessages, sendLeadMessage, sendLeadTemplate, type WaMensagem, type Conversa } from "@/services/extrasService";
 import { formatDateTime } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
   const [carregando, setCarregando] = useState(true);
   const [texto, setTexto] = useState("");
   const [aEnviar, setAEnviar] = useState(false);
+  const [aConfirmar, setAConfirmar] = useState(false);
   const fimRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,6 +81,25 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
     }
   };
 
+  /*
+    A confirmação por modelo -- o único envio que a Meta deixa passar fora das
+    24h, e o que reabre a conversa. Existe aqui para o caso em que o envio
+    automático não chegou ao cliente: sem isto, a única saída era escrever do
+    telemóvel pessoal e o backoffice ficava sem registo nenhum disso.
+  */
+  const enviarConfirmacao = async () => {
+    setAConfirmar(true);
+    try {
+      const nova = await sendLeadTemplate(leadId);
+      setConversa((c) => c ? { ...c, messages: [...c.messages, nova], windowOpen: true } : c);
+      toast("Confirmação enviada. A conversa fica aberta 24h para responderes em texto livre.");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível enviar a confirmação.", "error");
+    } finally {
+      setAConfirmar(false);
+    }
+  };
+
   if (!temTelefone) return null;
 
   const msgs = conversa?.messages ?? [];
@@ -95,8 +115,8 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
       : conversa?.windowOpen
         ? ""
         : temEntrada
-          ? "Passaram mais de 24h desde a última mensagem do cliente. Para lhe escrever livremente, usa o “Abrir no WhatsApp”."
-          : "Este contacto ainda não escreveu pelo WhatsApp, por isso não dá para enviar pela app. Usa o “Abrir no WhatsApp” para lhe escrever a partir do teu.";
+          ? "Passaram mais de 24h desde a última mensagem do cliente. Manda a confirmação para reabrir a conversa."
+          : "Este contacto ainda não escreveu pelo WhatsApp. Manda a confirmação para abrir a conversa — depois disso podes responder por aqui.";
 
   return (
     <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
@@ -157,6 +177,16 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
           {modelo && (
             <button onClick={() => setTexto(modelo)} className="btn-secondary text-xs py-1.5">Inserir modelo</button>
           )}
+          {!podeEnviar && conversa?.configured && (
+            <button
+              onClick={enviarConfirmacao}
+              disabled={aConfirmar}
+              className="btn-primary text-xs py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50"
+              title="Envia o modelo aprovado pela Meta — reabre a conversa por 24h"
+            >
+              <Send className="h-3.5 w-3.5" /> {aConfirmar ? "A enviar…" : "Enviar confirmação"}
+            </button>
+          )}
           {podeEnviar && (
             <button
               onClick={enviar}
@@ -171,7 +201,7 @@ export function WhatsappConversa({ leadId, temTelefone, modelo, waNumero, onEntr
             <a
               href={`https://wa.me/${waNumero}${texto.trim() ? `?text=${encodeURIComponent(texto)}` : ""}`}
               target="_blank" rel="noopener noreferrer"
-              className={cn("text-xs py-1.5 inline-flex items-center gap-1.5", podeEnviar ? "btn-secondary" : "btn-primary")}
+              className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5"
             >
               <MessageCircle className="h-3.5 w-3.5" /> Abrir no WhatsApp
             </a>

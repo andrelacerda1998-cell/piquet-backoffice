@@ -709,6 +709,20 @@ export async function sendLeadMessage(id: string, body: string): Promise<WaMensa
   }).then((r) => r.data);
 }
 
+/**
+ * Envia a confirmação por mensagem-modelo aprovada.
+ *
+ * É o único envio permitido fora das 24h -- e é o que reabre a janela para se
+ * poder falar em texto livre a seguir. O corpo é montado no servidor a partir
+ * do pedido (nome, serviço, localização): os parâmetros do modelo têm de bater
+ * certo com o que a Meta aprovou, não é texto a escolher aqui.
+ */
+export async function sendLeadTemplate(id: string): Promise<WaMensagem> {
+  return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { modelo: true }, () => {
+    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
+  }).then((r) => r.data);
+}
+
 /** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
 export async function deleteLead(id: string): Promise<void> {
   await apiDelete(`/marketing/leads/${id}`, () => null);
