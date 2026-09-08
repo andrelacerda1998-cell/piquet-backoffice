@@ -193,7 +193,7 @@ function LeadsPageInner() {
   // Editar pedido (dados + orçamento + valor do técnico + data + classificação + estado).
   // Modelo: escreve-se o orçamento e o valor do técnico; a margem é sempre orçamento − técnico.
 
-  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
+  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "novo" as LeadStage };
   const [editing, setEditing] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   // Ver o pedido SEM entrar em modo de edição: a mensagem que o cliente

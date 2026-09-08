@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
-import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "@/lib/leadReply";
+import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding, contactoNoFormulario } from "@/lib/leadReply";
 import { interpretarResposta, fone9 } from "@/lib/despacho";
 import { tecnicoPorTelefone } from "@/lib/tecnicoContactos";
 
@@ -151,14 +151,35 @@ export async function POST(req: Request) {
             solto, separado do pedido a que respondia. Foi o que aconteceu a
             07/09.
           */
+          /*
+            E o número a procurar não é necessariamente o de quem envia.
+
+            A mensagem que a landing prepara traz "*Contacto:* 912345678", que é
+            o que a pessoa escreveu no formulário. Quem carrega em enviar pode
+            estar noutro telemóvel -- preencheu no computador e enviou do
+            telefone de outra pessoa. A 08/09 aconteceu: o formulário levava
+            932429907, a mensagem veio de 919820416, e o mesmo pedido entrou
+            duas vezes.
+
+            O contacto escrito ganha, quando existe: é o número por onde se vai
+            responder ao cliente.
+          */
+          const contacto = fone9(contactoNoFormulario(texto)) || fone9(phone);
+
           const { data: existente } = await db
-            .from("leads").select("id").eq("phone9", fone9(phone))
+            .from("leads").select("id").eq("phone9", contacto)
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           if (existente?.id) {
             leadId = existente.id as string;
           } else {
             const { data: nova } = await db.from("leads").insert({
-              name: nome, phone, message: texto, source: "whatsapp", stage: "nao_iniciado",
+              name: nome,
+              // O contacto do formulário quando existe: é por aí que se
+              // responde ao cliente, não pelo telemóvel de quem carregou em
+              // enviar. "novo" e não "nao_iniciado" -- o estado mudou de nome
+              // a 08/09 e isto ficou para trás, a gravar o antigo.
+              phone: contacto || phone,
+              message: texto, source: "whatsapp", stage: "novo",
             }).select("id").single();
             leadId = (nova?.id as string) ?? null;
           }

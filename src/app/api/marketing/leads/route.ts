@@ -120,7 +120,7 @@ export const POST = withStaff(async (req) => {
     city: clip(b.city, 100),
     message: clip(b.message, 2000),
     source: clip(b.source, 100) || "whatsapp",
-    stage: "nao_iniciado",
+    stage: "novo",
   };
   if (categoryId) row.category_id = categoryId;
   if (!row.name && !row.phone) return apiErr("Indica pelo menos o nome ou o telefone.", 400);

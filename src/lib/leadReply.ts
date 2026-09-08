@@ -83,3 +83,19 @@ export function mensagemBoasVindas({ nome, servico, localizacao }: DadosLead): s
     "Equipa Piquet",
   ].join("\n");
 }
+
+/**
+ * O contacto ESCRITO no formulário, que pode não ser o de quem envia.
+ *
+ * A mensagem que a landing prepara traz "*Contacto:* 912345678". Quem carrega
+ * em enviar pode estar noutro telemóvel -- preencheu no computador e enviou do
+ * telefone de outra pessoa, ou pôs o contacto de um familiar. Sem ler este
+ * campo, o mesmo pedido entrava duas vezes: uma pelo formulário, outra pela
+ * mensagem, com números diferentes e sem forma de as juntar.
+ *
+ * Devolve "" quando a mensagem não traz o campo.
+ */
+export function contactoNoFormulario(message: string): string {
+  const m = (message || "").match(/\*?\s*contacto\s*:\*?\s*([+0-9 ()-]{9,})/i)?.[1] ?? "";
+  return m.replace(/[^0-9]/g, "");
+}

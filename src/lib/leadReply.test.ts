@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding } from "./leadReply";
+import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding, contactoNoFormulario } from "./leadReply";
 
 const MSG_LANDING = [
   "*Novo pedido de serviço — Site Piquet*",
@@ -79,5 +79,32 @@ describe("mensagemBoasVindas", () => {
   it("inclui a localização mesmo sem serviço", () => {
     const t = mensagemBoasVindas({ nome: "Rui", localizacao: "Sintra" });
     expect(t).toContain("o seu pedido em Sintra");
+  });
+});
+
+describe("contactoNoFormulario", () => {
+  const msg = [
+    "*Novo pedido de serviço — Site Piquet*",
+    "",
+    "*Nome:* André Lacerda",
+    "*Contacto:* 932 429 907",
+    "*Serviço:* Canalização",
+  ].join("\n");
+
+  /*
+    O caso real de 08/09: o formulário levava 932429907 e a mensagem foi
+    enviada de 919820416. Sem ler este campo, o mesmo pedido entrou duas vezes.
+  */
+  it("lê o contacto escrito, que pode não ser o de quem envia", () => {
+    expect(contactoNoFormulario(msg)).toBe("932429907");
+  });
+
+  it("aguenta indicativo e pontuação", () => {
+    expect(contactoNoFormulario("*Contacto:* +351 912-345-678")).toBe("351912345678");
+  });
+
+  it("sem o campo, não inventa nada", () => {
+    expect(contactoNoFormulario("olá, preciso de ajuda")).toBe("");
+    expect(contactoNoFormulario("")).toBe("");
   });
 });
