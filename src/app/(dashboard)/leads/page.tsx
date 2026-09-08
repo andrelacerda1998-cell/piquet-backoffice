@@ -637,7 +637,12 @@ function LeadsPageInner() {
         subtitle={viewing
           ? `Recebido a ${formatDate(viewing.createdAt)} · via ${viewing.source === "whatsapp" ? "WhatsApp" : viewing.source === "landing" || viewing.source === "website" ? "landing page" : viewing.source}`
           : undefined}
-        size="full"
+        /*
+          "xl" e não "full": um pedido do WhatsApp cujo texto é "Ok" não tem
+          conteúdo para 92% do ecrã, e o que sobrava era meio ecrã de vazio ao
+          lado de um telefone. A altura passa a acompanhar o que há para ler.
+        */
+        size="xl"
         footer={
           <>
             <button onClick={() => setViewing(null)} className="btn-secondary text-sm">Fechar</button>
@@ -689,18 +694,40 @@ function LeadsPageInner() {
           const digitos = (viewing.phone || "").replace(/\D/g, "");
           const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
           return (
-            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-6 space-y-4 lg:space-y-0 lg:h-full">
+            <div className="lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-6 space-y-4 lg:space-y-0">
               {/* Coluna esquerda: os detalhes do pedido. */}
               <div className="space-y-4">
               {/* Os factos do pedido, um golpe de vista. A mensagem completa
                   está na conversa ao lado — aqui só o essencial, sem repetir. */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {(catName || service) && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                {/*
+                  O estado existe sempre e é o que diz o que falta fazer.
+                  Faltava aqui: um pedido do WhatsApp sem serviço nem cidade
+                  mostrava um telefone e mais nada, e nem o estado se via.
+                */}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Estado</p>
+                  <p className="mt-0.5">
+                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                      getStatusColor(viewing.stage))}>
+                      {LEAD_STAGE_LABEL[viewing.stage] ?? viewing.stage}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                  {catName || service ? (
                     <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
-                  </div>
-                )}
+                  ) : (
+                    /*
+                      Dizer que falta, em vez de esconder a linha. Sem serviço
+                      não há como filtrar os técnicos por categoria -- quem
+                      abre isto precisa de saber que o passo seguinte é
+                      perguntar ao cliente ou preencher no Editar.
+                    */
+                    <p className="text-sm text-text-muted mt-0.5 italic">Por identificar</p>
+                  )}
+                </div>
                 {urgency && (
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Urgência</p>
