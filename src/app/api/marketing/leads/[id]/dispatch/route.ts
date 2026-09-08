@@ -63,10 +63,26 @@ export const POST = withStaff(async (req, { params }) => {
 
   const db = supabaseAdmin();
   const { data: lead, error: leadErr } = await db
-    .from("leads").select("id, name, city, message").eq("id", params.id).maybeSingle();
+    .from("leads").select("id, name, city, message, laravel_service_id").eq("id", params.id).maybeSingle();
   if (leadErr) throw new Error(leadErr.message);
   if (!lead) return apiErr("Pedido não encontrado.", 404);
-  const l = lead as { name: string; city: string; message: string };
+  const l = lead as { name: string; city: string; message: string; laravel_service_id: string | null };
+
+  /*
+    Um pedido da app já foi difundido pela app.
+
+    O Laravel tem o seu próprio sistema de matching (ServiceCandidate: notified,
+    accepted, declined, expired, selected) e é ele que pergunta aos técnicos.
+    Difundir daqui por WhatsApp perguntaria a mesma coisa duas vezes às mesmas
+    pessoas, por dois canais -- e um técnico que aceita nos dois sítios não sabe
+    qual conta.
+  */
+  if (l.laravel_service_id) {
+    return apiErr(
+      "Este pedido veio da app e já está a ser distribuído por ela. Perguntar outra vez por WhatsApp duplicaria o pedido aos mesmos técnicos.",
+      409,
+    );
+  }
 
   /*
     O texto do pedido sai da própria lead, não de campos escritos à mão: é o
