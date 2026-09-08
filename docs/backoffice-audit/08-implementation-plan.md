@@ -7,8 +7,9 @@ obra com o produto partido pelo meio. Nenhuma foi executada: isto é a proposta.
 
 Antes de mexer em estrutura, corrigir o que faz duvidar do que se lê.
 
-1. Rever `REAL_DATA` em `src/services/api.ts`: os 13 endpoints reais marcados
-   como demonstração.
+1. Rever `REAL_DATA` em `src/services/api.ts`: os 7 gráficos derivados de
+   `services` marcados como demonstração. (Os `/tax/*` e o `/finance/summary`
+   ficam como estão — somam `tax_obligations`, que é seed.)
 2. Remover o separador **Push** do Marketing (métricas com `Math.random()`).
 3. Marcar claramente o que fica mock: Qualidade e Pedidos personalizados.
 4. Apagar as tabelas `_seed_backup_*`.

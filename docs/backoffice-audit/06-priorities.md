@@ -6,7 +6,7 @@
 |---|---|---|
 | 1 | **Continuidade do serviço**: agendamento, preço e execução no pedido; estados Agendado e Em execução | Sem isto o backoffice não sabe o que está a acontecer hoje |
 | 2 | **Hoje**: fundir Visão Geral e Alertas, com "Requer atenção" no topo | Abrir e perceber em 30 segundos |
-| 3 | **Corrigir o selo de demonstração**: 13 endpoints reais marcados como demo | Um selo que erra destrói a confiança em todos os números |
+| 3 | **Corrigir o selo de demonstração**: 7 gráficos derivados de `services` marcados como demo | A mesma tabela não pode ter selos diferentes conforme o ecrã |
 | 4 | **Pesquisa global sobre dados reais** (Laravel + pedidos, por telefone e NIF) | Suporte ao telefone |
 | 5 | **Ligar pagamentos a clientes e serviços** | Saber quem pagou sem abrir o Payshop |
 | 6 | **Tirar os dados de exemplo dos ecrãs de produção** (Push, Qualidade, Pedidos personalizados) | Números inventados ao lado de números reais |

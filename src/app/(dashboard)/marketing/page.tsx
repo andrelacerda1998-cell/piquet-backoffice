@@ -9,13 +9,13 @@ import { ChartCard, FunnelChartComponent, BarChartComponent } from "@/components
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
-import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
+import { SEED_CODES, type DiscountCode } from "@/services/backofficeService";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
+import { MessageSquare, TicketPercent, Plus, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
@@ -591,15 +591,20 @@ export default function MarketingPage() {
           </div>
         )}
 
+        {/*
+          O separador "Push" saiu a 08/09/2026. Guardava as campanhas em
+          localStorage e gerava entregas, aberturas e conversões com
+          Math.random() -- reportava resultados de campanhas que nunca saíram da
+          máquina, ao lado de números reais. Quando houver envio de push a
+          sério, volta com os números do fornecedor.
+        */}
         {tab === "comunicacao" && (
           <SubTabs tabs={[
-            { id: "push", label: "Push" },
             { id: "codigos", label: "Códigos de desconto" },
             { id: "guioes", label: "Guiões e mensagens" },
           ]}>
             {(sub) => (
               <>
-                {sub === "push" && <PushTab />}
                 {sub === "codigos" && <CodigosTab />}
                 {sub === "guioes" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -630,80 +635,7 @@ export default function MarketingPage() {
   );
 }
 
-/* ------------------------------ Push notifications ------------------------------ */
 
-function PushTab() {
-  const [campaigns, setCampaigns] = usePersistentList<PushCampaign>("push-campaigns", SEED_PUSH);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", message: "", segment: PUSH_SEGMENTS[0] as string, when: "agora" as "agora" | "agendar", scheduledFor: "2026-07-10T10:00" });
-
-  const create = () => {
-    if (!form.title.trim() || !form.message.trim()) { toast("Indica o título e a mensagem.", "error"); return; }
-    const now = form.when === "agora";
-    const c: PushCampaign = {
-      id: `push_${Date.now()}`, title: form.title.trim(), message: form.message.trim(), segment: form.segment,
-      status: now ? "enviada" : "agendada",
-      sentAt: now ? new Date().toISOString() : undefined,
-      scheduledFor: now ? undefined : form.scheduledFor,
-      delivered: now ? Math.round(300 + Math.random() * 200) : 0,
-      deliveryRate: now ? Math.round((92 + Math.random() * 6) * 10) / 10 : 0,
-      openRate: now ? Math.round((25 + Math.random() * 20) * 10) / 10 : 0,
-      conversions: now ? Math.round(5 + Math.random() * 30) : 0,
-    };
-    setCampaigns((prev) => [c, ...prev]);
-    setOpen(false);
-    setForm({ title: "", message: "", segment: PUSH_SEGMENTS[0], when: "agora", scheduledFor: "2026-07-10T10:00" });
-    toast(now ? `Push "${c.title}" enviada ao segmento "${c.segment}".` : `Push "${c.title}" agendada.`);
-  };
-
-  const pushColumns: Column<PushCampaign>[] = [
-    { key: "title", label: "Campanha", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-text-muted truncate max-w-[280px]">{r.message}</p></div> },
-    { key: "segment", label: "Segmento" },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "enviada" ? "bg-success-light text-success" : r.status === "agendada" ? "bg-info-light text-info" : "bg-surface-subtle text-text-secondary")}>
-        {r.status === "enviada" ? "Enviada" : r.status === "agendada" ? "Agendada" : "Rascunho"}
-      </span>
-    ) },
-    { key: "delivered", label: "Entregues", render: (r) => r.status === "enviada" ? `${r.delivered} (${r.deliveryRate}%)` : "—" },
-    { key: "openRate", label: "Abertura", render: (r) => r.status === "enviada" ? formatPercent(r.openRate) : "—" },
-    { key: "conversions", label: "Conversões", render: (r) => r.status === "enviada" ? `${r.conversions}` : "—" },
-    { key: "when", label: "Quando", render: (r) => r.sentAt ? formatDate(r.sentAt) : r.scheduledFor ? `Agendada ${formatDate(r.scheduledFor)}` : "—" },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary inline-flex items-center gap-2"><BellRing className="h-4 w-4 text-piquet-600" /> Campanhas push para clientes e técnicos, por segmento.</p>
-        <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova campanha</button>
-      </div>
-      <DataTable columns={pushColumns} data={campaigns} keyField="id" emptyMessage="Sem campanhas push" />
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Nova campanha push" subtitle="Notificação para um segmento"
-        footer={<>
-          <button onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={create} className="btn-primary text-sm"><Send className="h-4 w-4" /> {form.when === "agora" ? "Enviar agora" : "Agendar"}</button>
-        </>}>
-        <div className="space-y-3">
-          <Field label="Título"><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Ex.: ☀️ Verão sem avarias" /></Field>
-          <Field label="Mensagem"><textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="input-field resize-none" rows={3} placeholder="Texto da notificação (máx. ~140 caracteres)" /></Field>
-          <Field label="Segmento"><select value={form.segment} onChange={(e) => setForm({ ...form, segment: e.target.value })} className="input-field">
-            {PUSH_SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Envio"><select value={form.when} onChange={(e) => setForm({ ...form, when: e.target.value as "agora" | "agendar" })} className="input-field">
-              <option value="agora">Enviar imediatamente</option>
-              <option value="agendar">Agendar</option>
-            </select></Field>
-            {form.when === "agendar" && (
-              <Field label="Data e hora"><input type="datetime-local" value={form.scheduledFor} onChange={(e) => setForm({ ...form, scheduledFor: e.target.value })} className="input-field" /></Field>
-            )}
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
-}
 
 /* ------------------------------ Códigos de desconto ------------------------------ */
 

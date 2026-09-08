@@ -39,11 +39,16 @@ tabelas com **1 linha cada**. Os dados reais estão no Laravel. Quem usa a
 pesquisa para resolver um caso de suporte não encontra o cliente que tem ao
 telefone.
 
-### 4. O selo de demonstração mente nos dois sentidos
-13 endpoints chamam o servidor e continuam marcados como demonstração — entre
-eles `/finance/summary`, `/finance/daily-revenue` e os três de impostos. O
-Financeiro mostra "Demo" por cima de números verdadeiros. Um selo que erra
-ensina a ignorá-lo, e a partir daí nenhum número é de confiança.
+### 4. A mesma tabela com dois selos diferentes
+Sete gráficos do Financeiro e da Visão Geral derivam de `services`, que está
+marcado como real desde que o seed foi apagado — e mostravam "Demo". A lista
+era real e o gráfico feito a partir dela dizia que era ficção.
+
+**Correcção da primeira versão desta auditoria:** aqui dizia-se que eram 13
+endpoints e que o selo mentia. Estava errado por má leitura do que o selo
+significa — não é "chama o servidor", é "não é ficção". `/finance/summary` e os
+três de impostos somam `tax_obligations`, que tem 27 linhas escritas todas no
+mesmo dia por um seed: nesses, o selo está certo e fica.
 
 ### 5. Dados de exemplo em ecrãs de produção
 Qualidade, Pedidos personalizados, partes de Técnicos e Clientes e o separador
