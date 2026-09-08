@@ -762,19 +762,30 @@ function LeadsPageInner() {
                 )}
               </div>
 
-              {/* Descrição livre do cliente — ou, na falta dela, a mensagem
-                  tal como chegou. Nunca nada. */}
-              {(descricao || mostrarCrua) && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
-                    {descricao ? "Descrição" : "Mensagem recebida"}
+              {/*
+                O que o cliente escreveu — e, quando não escreveu nada, dizê-lo.
+
+                O campo de descrição é opcional no formulário e muita gente
+                deixa-o em branco. Enquanto o bloco desaparecia nesses casos,
+                quem abria o pedido não conseguia distinguir "o cliente não
+                escreveu" de "isto está avariado" -- e a diferença importa: no
+                primeiro caso o passo seguinte é ligar-lhe a perguntar o que
+                precisa.
+              */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
+                  {descricao || !mostrarCrua ? "Descrição" : "Mensagem recebida"}
+                </p>
+                {descricao ? (
+                  <p className="whitespace-pre-wrap text-sm text-text-primary">{descricao}</p>
+                ) : mostrarCrua ? (
+                  <p className="whitespace-pre-wrap text-sm text-text-secondary">{mensagemCrua}</p>
+                ) : (
+                  <p className="text-sm text-text-muted italic">
+                    O cliente não escreveu nada — o campo é opcional no formulário.
                   </p>
-                  <p className={cn("whitespace-pre-wrap text-sm",
-                    descricao ? "text-text-primary" : "text-text-secondary")}>
-                    {descricao || mensagemCrua}
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Despacho: quem foi perguntado e quem aceitou. Vive ao lado do
                   pedido porque é a decisão que se segue a lê-lo. */}
