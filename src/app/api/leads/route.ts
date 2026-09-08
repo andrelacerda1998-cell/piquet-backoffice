@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 import { eDuplicado, JANELA_MESMA_MENSAGEM_MIN } from "@/lib/leadDedupe";
-import { WHATSAPP_ENABLED, enviarModeloLead } from "@/lib/whatsapp";
+import { WHATSAPP_ENABLED, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
 
 /**
@@ -172,13 +172,15 @@ async function enviarConfirmacao(
     const servico = dados.servico.trim() || "assistência";
     const pedido = local ? `${servico} em ${local}` : servico;
 
-    const { waMessageId } = await enviarModeloLead(phone, primeiro, pedido);
+    const { waMessageId, texto } = await enviarModeloLead(phone, primeiro, pedido);
 
     await supabaseAdmin().from("whatsapp_messages").insert({
       lead_id: leadId,
       phone,
       direction: "out",
-      body: `[modelo pedido_recebido_piquet] ${primeiro} · ${pedido}`,
+      // O texto que o cliente leu; a etiqueta só quando não se consegue ler o
+      // modelo aprovado na Meta.
+      body: texto || `[modelo ${MODELO_LEAD.nome}] ${primeiro} · ${pedido}`,
       wa_message_id: waMessageId || null,
       status: "sent",
       sent_by: "automático",
@@ -204,7 +206,7 @@ async function enviarConfirmacao(
         lead_id: leadId,
         phone,
         direction: "out",
-        body: "[modelo pedido_recebido_piquet] não chegou a ser entregue",
+        body: `[modelo ${MODELO_LEAD.nome}] não chegou a ser entregue`,
         status: "failed",
         error: motivo.slice(0, 500),
         sent_by: "automático",

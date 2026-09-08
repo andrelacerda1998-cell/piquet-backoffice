@@ -182,14 +182,57 @@ export async function modelosWhatsapp(): Promise<ModeloWhatsapp[]> {
 export const MODELO_LEAD = { nome: "pedido_recebido_piquet", idioma: "pt_PT" } as const;
 
 /**
+ * Corpo aprovado do modelo, com os parâmetros já substituídos.
+ *
+ * Serve para guardar no histórico o que o cliente leu, e não uma etiqueta
+ * interna: quem abre a lead precisa de saber o que já lhe foi dito antes de
+ * escrever a seguir. O texto vive na Meta (é lá que é aprovado e editado),
+ * por isso lê-se de lá em vez de o duplicar aqui e arriscar que divirja.
+ *
+ * Uma falha nisto não pode travar o envio -- devolve null e o chamador guarda
+ * o que souber. A mensagem já saiu; o que está em causa é só como se mostra.
+ */
+let corpoModeloCache: string | null = null;
+
+async function corpoModeloLead(primeiroNome: string, pedido: string): Promise<string | null> {
+  const token = process.env.WHATSAPP_TOKEN;
+  if (!token) return null;
+  try {
+    if (corpoModeloCache === null) {
+      const res = await fetch(
+        `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_WABA_ID}/message_templates` +
+          `?fields=name,components&name=${MODELO_LEAD.nome}&limit=5&access_token=${encodeURIComponent(token)}`,
+        { cache: "no-store" },
+      );
+      const json = (await res.json()) as {
+        data?: { name: string; components?: { type: string; text?: string }[] }[];
+      };
+      if (!res.ok) return null;
+      const modelo = (json.data ?? []).find((t) => t.name === MODELO_LEAD.nome);
+      const corpo = modelo?.components?.find((c) => c.type === "BODY")?.text;
+      if (!corpo) return null;
+      corpoModeloCache = corpo;
+    }
+    return corpoModeloCache
+      .replace(/\{\{\s*1\s*\}\}/g, primeiroNome.trim())
+      .replace(/\{\{\s*2\s*\}\}/g, pedido.trim());
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Envia o modelo. Os parâmetros NUNCA podem ir vazios — a Meta rejeita o
  * pedido —, por isso é o chamador que garante que ambos têm conteúdo.
+ *
+ * Devolve também o texto que o cliente recebeu, quando se consegue ler o
+ * modelo aprovado, para o histórico mostrar a mensagem e não uma referência.
  */
 export async function enviarModeloLead(
   to: string,
   primeiroNome: string,
   pedido: string,
-): Promise<{ waMessageId: string }> {
+): Promise<{ waMessageId: string; texto: string | null }> {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!token || !phoneNumberId) throw new Error("WhatsApp não configurado.");
@@ -219,5 +262,8 @@ export async function enviarModeloLead(
   });
   const json = (await res.json()) as { messages?: { id: string }[]; error?: { message?: string } };
   if (!res.ok) throw new Error(json.error?.message || `Meta devolveu ${res.status}`);
-  return { waMessageId: json.messages?.[0]?.id ?? "" };
+  // Só depois de a mensagem sair: se a leitura do modelo falhar, já não muda
+  // nada do que aconteceu ao cliente.
+  const texto = await corpoModeloLead(primeiroNome, pedido);
+  return { waMessageId: json.messages?.[0]?.id ?? "", texto };
 }

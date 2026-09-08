@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isMissingTable } from "@/lib/missingColumn";
-import { WHATSAPP_ENABLED, dentroDaJanela, enviarTextoWhatsapp, enviarModeloLead } from "@/lib/whatsapp";
+import { WHATSAPP_ENABLED, dentroDaJanela, enviarTextoWhatsapp, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
 import { apiOk, apiErr, withStaff } from "../../../../_lib/handler";
 
@@ -123,8 +123,11 @@ export const POST = withStaff(async (req, { params, staff }) => {
       const local = dados.localizacao.trim();
       const servico = dados.servico.trim() || "assistência";
       const pedido = local ? `${servico} em ${local}` : servico;
-      ({ waMessageId } = await enviarModeloLead(phone, primeiro, pedido));
-      corpo = `[modelo pedido_recebido_piquet] ${primeiro} · ${pedido}`;
+      const env = await enviarModeloLead(phone, primeiro, pedido);
+      waMessageId = env.waMessageId;
+      // O que o cliente leu. Só se cai na etiqueta quando não se consegue ler
+      // o modelo aprovado na Meta.
+      corpo = env.texto || `[modelo ${MODELO_LEAD.nome}] ${primeiro} · ${pedido}`;
     } else {
       ({ waMessageId } = await enviarTextoWhatsapp(phone, body));
     }
