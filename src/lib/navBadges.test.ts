@@ -100,3 +100,17 @@ describe("as rotas do menu batem certo com os destinos dos alertas", () => {
     }
   });
 });
+
+describe("despacho", () => {
+  /*
+    A bolinha tem de acender onde se resolve. Um técnico que aceitou resolve-se
+    no Despacho, não no CRM — contá-lo em /leads mandava a pessoa ao ecrã
+    errado, e lá não havia nada a fazer.
+  */
+  it("um técnico à espera de decisão acende o Despacho", () => {
+    const r = contarPorRota([a("despacho-por-decidir-1", "alta", "despacho")]);
+    expect(r["/despacho"]).toBe(1);
+    expect(r["/leads"]).toBeUndefined();
+    expect(r["/alertas"]).toBe(1);
+  });
+});

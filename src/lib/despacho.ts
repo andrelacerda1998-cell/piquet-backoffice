@@ -97,3 +97,27 @@ export function resumirDifusoes(difusoes: Difusao[]): {
     porResponder: conta("enviado"),
   };
 }
+
+/**
+ * Este técnico faz esta categoria?
+ *
+ * As categorias do técnico vêm do Laravel em `operation_areas` -- o nome engana
+ * (parece geografia) mas são ofícios: "Canalização", "Eletricista". A geografia
+ * real vive noutro sítio (AllowedZone) e a API de admin ainda não a expõe, por
+ * isso proximidade não é coisa que se possa decidir aqui.
+ *
+ * A comparação é tolerante de propósito: o catálogo da Piquet diz
+ * "Canalização" e o Laravel pode ter "Canalizador" ou "Canalização e água".
+ * Exigir igualdade exacta deixava de fora técnicos qualificados -- e um
+ * técnico a mais na lista custa a quem escolhe um segundo de leitura, um
+ * técnico a menos custa o serviço.
+ */
+export function fazCategoria(categoriasTecnico: string[], categoria: string): boolean {
+  const alvo = normalizar(categoria);
+  if (!alvo) return false;
+  const raiz = alvo.slice(0, Math.max(5, Math.floor(alvo.length * 0.7)));
+  return categoriasTecnico.some((c) => {
+    const t = normalizar(c);
+    return t === alvo || t.includes(alvo) || alvo.includes(t) || (raiz.length >= 5 && t.startsWith(raiz));
+  });
+}

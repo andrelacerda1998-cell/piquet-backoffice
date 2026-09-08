@@ -8,6 +8,7 @@ const vazio: SinaisDoNegocio = {
   leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [],
   orcamentosSemResposta: [], faturasVencidas: [], impostosVencidos: [],
   documentosPendentes: 0, diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
+  despachosPorDecidir: [],
 };
 
 describe("gerarAlertas", () => {
@@ -84,7 +85,7 @@ describe("gerarAlertas", () => {
       orcamentosSemResposta: [{ id: "2", nome: "Rui", enviadoDesde: haDias(60), valor: 900 }], // do cliente
       cronsFalhados: [], ticketsAbertos: [], documentosPendentes: 0,
       diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
-      faturasVencidas: [], impostosVencidos: [],
+      faturasVencidas: [], impostosVencidos: [], despachosPorDecidir: [],
     }, AGORA);
     const lead = r.find((a) => a.entityId === "1")!;
     const espera = r.find((a) => a.entityId === "2")!;
@@ -135,8 +136,9 @@ describe("gerarAlertas", () => {
       faturasVencidas: [{ fornecedor: "X", valorEmDivida: 10, venceuEm: haDias(1) }],
       impostosVencidos: [{ nome: "IVA", valor: 5, venceuEm: haDias(1), estimado: false }],
       documentosPendentes: 40, diasSemDadosDeAnuncios: 10, pagamentosRecusados: 6,
+      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 2, desde: haDias(1) }],
     }, AGORA);
-    expect(r.length).toBe(9);
+    expect(r.length).toBe(10);
     for (const a of r) {
       expect(a.recommendedAction.length, a.title).toBeGreaterThan(10);
       expect(a.status).toBe("novo");
@@ -148,5 +150,27 @@ describe("gerarAlertas", () => {
     const a = gerarAlertas(sinais, AGORA);
     const b = gerarAlertas(sinais, AGORA + 3_600_000);
     expect(a[0].id).toBe(b[0].id);
+  });
+});
+
+describe("técnicos à espera de decisão", () => {
+  /*
+    Alta desde o primeiro minuto, ao contrário do orçamento por responder:
+    aqui a bola é nossa e há um técnico a segurar a agenda. É o alerta que
+    protege a relação com a rede.
+  */
+  it("um técnico que aceitou hoje já é alerta alto", () => {
+    const r = gerarAlertas({ ...vazio,
+      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 1, desde: haDias(0) }] }, AGORA);
+    expect(r).toHaveLength(1);
+    expect(r[0].priority).toBe("alta");
+    expect(r[0].title).toBe("Um técnico aceitou um pedido");
+  });
+
+  it("ao fim de um dia passa a crítico", () => {
+    const r = gerarAlertas({ ...vazio,
+      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 3, desde: haDias(1) }] }, AGORA);
+    expect(r[0].priority).toBe("critica");
+    expect(r[0].title).toBe("3 técnicos aceitaram um pedido");
   });
 });

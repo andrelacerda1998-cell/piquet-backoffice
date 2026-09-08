@@ -752,7 +752,7 @@ function LeadsPageInner() {
 
               {/* Despacho: quem foi perguntado e quem aceitou. Vive ao lado do
                   pedido porque é a decisão que se segue a lê-lo. */}
-              <DespachoLead leadId={viewing.id} cidade={viewing.city} />
+              <DespachoLead leadId={viewing.id} categoria={catName || service} />
 
               {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (

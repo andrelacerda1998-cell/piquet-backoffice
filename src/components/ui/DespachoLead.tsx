@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getVendors, type RealVendor } from "@/services/vendorsService";
 import { getLeadDispatches, dispatchLead, assignLead } from "@/services/extrasService";
-import { resumirDifusoes, type Difusao } from "@/lib/despacho";
+import { resumirDifusoes, fazCategoria, type Difusao } from "@/lib/despacho";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Radio, Check, X, AlertCircle, Clock, UserCheck } from "lucide-react";
@@ -24,13 +24,18 @@ const ESTADOS: Record<Difusao["status"], { rotulo: string; classe: string; Icone
   falhou: { rotulo: "Não chegou", classe: "text-danger", Icone: AlertCircle },
 };
 
-export function DespachoLead({ leadId, cidade }: { leadId: string; cidade?: string }) {
+export function DespachoLead({ leadId, categoria }: {
+  leadId: string;
+  /** Categoria do pedido ("Canalização"). Define a quem faz sentido perguntar. */
+  categoria?: string;
+}) {
   const [difusoes, setDifusoes] = useState<Difusao[]>([]);
   const [tecnicos, setTecnicos] = useState<RealVendor[]>([]);
   const [escolhidos, setEscolhidos] = useState<Set<string>>(new Set());
   const [aEnviar, setAEnviar] = useState(false);
   const [aAtribuir, setAAtribuir] = useState("");
   const [aAbrir, setAAbrir] = useState(false);
+  const [todos, setTodos] = useState(false);
 
   const carregar = () => { getLeadDispatches(leadId).then((r) => setDifusoes(r.dispatches)).catch(() => {}); };
   useEffect(carregar, [leadId]);
@@ -60,16 +65,32 @@ export function DespachoLead({ leadId, cidade }: { leadId: string; cidade?: stri
     serviço. Perguntar a quem não pode aceitar gasta a paciência do técnico e
     uma mensagem paga.
   */
-  const candidatos = tecnicos
+  const disponiveis = tecnicos
     .filter((t) => t.can_accept_service && !t.suspended_at && (t.phone_number || "").trim())
-    .filter((t) => !jaPerguntados.has(String(t.id)))
+    .filter((t) => !jaPerguntados.has(String(t.id)));
+
+  /*
+    Quem faz esta categoria.
+
+    `operation_areas` tem nome de geografia mas são ofícios -- "Canalização",
+    "Eletricista". É a qualificação registada de cada técnico, e é o critério
+    que decide a quem faz sentido perguntar: mandar um pedido de canalização a
+    um eletricista gasta a paciência dele e uma mensagem paga.
+
+    Quem não faz a categoria continua acessível em "mostrar todos", porque o
+    catálogo do Laravel está incompleto para alguns técnicos e o julgamento de
+    quem despacha vale mais do que uma lista.
+  */
+  const daCategoria = categoria
+    ? disponiveis.filter((t) => fazCategoria(t.operation_areas, categoria))
+    : disponiveis;
+
+  const candidatos = (todos || daCategoria.length === 0 ? disponiveis : daCategoria)
     .sort((a, b) => {
-      // Os da cidade do pedido primeiro — é o sinal de proximidade que a lista
-      // do Laravel dá hoje (as zonas de operação são texto livre).
-      const c = (cidade || "").toLowerCase().trim();
-      const perto = (t: RealVendor) =>
-        c && t.operation_areas.some((z) => z.toLowerCase().includes(c)) ? 0 : 1;
-      return perto(a) - perto(b) || (a.name || "").localeCompare(b.name || "");
+      // Os da categoria à frente quando se está a ver a lista toda.
+      const faz = (t: RealVendor) =>
+        categoria && fazCategoria(t.operation_areas, categoria) ? 0 : 1;
+      return faz(a) - faz(b) || (a.name || "").localeCompare(b.name || "");
     });
 
   const alternar = (id: string) => {
@@ -173,6 +194,22 @@ export function DespachoLead({ leadId, cidade }: { leadId: string; cidade?: stri
           </button>
         ) : (
           <div className="space-y-2">
+            {categoria && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-text-muted">
+                  {todos
+                    ? `Todos os técnicos disponíveis (${disponiveis.length})`
+                    : daCategoria.length > 0
+                      ? `${daCategoria.length} técnico(s) registados em ${categoria}`
+                      : `Nenhum técnico registado em ${categoria} — a mostrar todos`}
+                </p>
+                {daCategoria.length > 0 && daCategoria.length !== disponiveis.length && (
+                  <button onClick={() => setTodos(!todos)} className="text-[11px] text-piquet-700 hover:underline">
+                    {todos ? `Só os de ${categoria}` : "Mostrar todos"}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="max-h-48 overflow-y-auto rounded-lg border border-surface-border divide-y divide-surface-border/60">
               {candidatos.length === 0 ? (
                 <p className="text-sm text-text-muted p-3">
@@ -190,7 +227,9 @@ export function DespachoLead({ leadId, cidade }: { leadId: string; cidade?: stri
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-text-primary">{t.name || `#${t.id}`}</span>
                     {t.operation_areas.length > 0 && (
-                      <span className="block truncate text-[11px] text-text-muted">
+                      <span className={cn("block truncate text-[11px]",
+                        categoria && fazCategoria(t.operation_areas, categoria)
+                          ? "text-success" : "text-text-muted")}>
                         {t.operation_areas.join(" · ")}
                       </span>
                     )}

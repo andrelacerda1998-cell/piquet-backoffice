@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isMissingTable } from "@/lib/missingColumn";
 import { extrairDadosLead } from "@/lib/leadReply";
+import { categoryName, categoryFromMessage } from "@/lib/categories";
 import { apiOk, withStaff } from "../_lib/handler";
 
 /**
@@ -19,6 +20,7 @@ import { apiOk, withStaff } from "../_lib/handler";
 interface LeadRow {
   id: string; name: string; phone: string; city: string;
   message: string; stage: string; created_at: string; technician_name: string | null;
+  category_id: string | null;
 }
 
 interface DispatchRow {
@@ -29,6 +31,8 @@ export interface DispatchPedido {
   leadId: string;
   nome: string;
   servico: string;
+  /** Categoria canónica do catálogo — é ela que decide a quem perguntar. */
+  categoria: string;
   cidade: string;
   urgencia: string;
   urgente: boolean;
@@ -61,7 +65,7 @@ export const GET = withStaff(async () => {
 
   const { data: leadsData, error } = await db
     .from("leads")
-    .select("id, name, phone, city, message, stage, created_at, technician_name")
+    .select("id, name, phone, city, message, stage, created_at, technician_name, category_id")
     .not("stage", "in", `(${FECHADOS.join(",")})`)
     .order("created_at", { ascending: true })
     .limit(200);
@@ -101,6 +105,7 @@ export const GET = withStaff(async () => {
       leadId: l.id,
       nome: l.name || l.phone || "Sem nome",
       servico: dados.servico || "Por identificar",
+      categoria: categoryName(l.category_id || categoryFromMessage(l.message || "")),
       cidade: dados.localizacao || l.city || "",
       urgencia,
       urgente: /urgente/i.test(urgencia),

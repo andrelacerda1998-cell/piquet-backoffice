@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { interpretarResposta, fone9, resumirDifusoes, type Difusao } from "./despacho";
+import { interpretarResposta, fone9, resumirDifusoes, fazCategoria, type Difusao } from "./despacho";
 
 describe("interpretarResposta", () => {
   it("lê as formas de aceitar que um técnico escreve mesmo", () => {
@@ -70,5 +70,28 @@ describe("resumirDifusoes", () => {
     expect(resumirDifusoes([])).toEqual({
       enviadas: 0, aceites: 0, recusadas: 0, falhadas: 0, porResponder: 0,
     });
+  });
+});
+
+describe("fazCategoria", () => {
+  it("aceita a mesma categoria escrita de outra maneira", () => {
+    expect(fazCategoria(["Canalização"], "Canalização")).toBe(true);
+    expect(fazCategoria(["Canalizador"], "Canalização")).toBe(true);
+    expect(fazCategoria(["Canalização e água"], "Canalização")).toBe(true);
+    expect(fazCategoria(["canalizacao"], "Canalização")).toBe(true);
+  });
+
+  it("não mistura ofícios diferentes", () => {
+    expect(fazCategoria(["Eletricidade"], "Canalização")).toBe(false);
+    expect(fazCategoria(["Limpeza Doméstica"], "Fechaduras e Portas")).toBe(false);
+  });
+
+  it("um técnico com vários ofícios entra por qualquer um deles", () => {
+    expect(fazCategoria(["Eletricidade", "Canalização"], "Canalização")).toBe(true);
+  });
+
+  it("sem categoria no pedido não afirma nada", () => {
+    expect(fazCategoria(["Canalização"], "")).toBe(false);
+    expect(fazCategoria([], "Canalização")).toBe(false);
   });
 });

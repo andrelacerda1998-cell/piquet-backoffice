@@ -83,7 +83,7 @@ function Linha({ p, aberta, onAbrir }: { p: DispatchPedido; aberta: boolean; onA
             Recebido a {formatDate(p.recebidoEm)}
             {p.urgencia && ` · ${p.urgencia}`}
           </p>
-          <DespachoLead leadId={p.leadId} cidade={p.cidade} />
+          <DespachoLead leadId={p.leadId} categoria={p.categoria} />
         </div>
       )}
     </div>

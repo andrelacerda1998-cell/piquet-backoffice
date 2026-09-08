@@ -17,6 +17,7 @@ import type { DashboardAlert } from "@/types";
 /** entityType do alerta → ecrã do menu onde se resolve. */
 const ROTA_POR_ENTIDADE: Record<string, string> = {
   lead: "/leads",
+  despacho: "/despacho",
   leads: "/leads",
   ticket: "/suporte",
   tickets: "/suporte",

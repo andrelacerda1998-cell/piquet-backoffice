@@ -10,6 +10,7 @@ export interface DispatchPedido {
   leadId: string;
   nome: string;
   servico: string;
+  categoria: string;
   cidade: string;
   urgencia: string;
   urgente: boolean;
