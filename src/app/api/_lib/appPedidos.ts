@@ -71,6 +71,43 @@ function montarMensagem(r: LaravelServiceRow): string {
   return notas ? `${linhas[0]}\n${notas}` : linhas[0];
 }
 
+/**
+ * Sincroniza, mas só se a última já tiver algum tempo.
+ *
+ * A conta da Vercel é Hobby e os crons são limitados a uma vez por dia -- um
+ * pedido de canalização feito às 9h não pode esperar até à manhã seguinte para
+ * alguém saber que existe. Por isso a sincronização também acontece quando
+ * alguém abre a lista de Pedidos: quem está a olhar para o backoffice vê os
+ * pedidos de agora, e o cron diário fica como rede de segurança para quando
+ * ninguém abre.
+ *
+ * O intervalo evita que cada carregamento da página chame o Laravel. Usa-se o
+ * registo dos crons, que já existe, em vez de mais uma tabela de estado.
+ */
+export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | null> {
+  if (!servicesFromLaravel()) return null;
+  try {
+    const { data } = await supabaseAdmin()
+      .from("cron_runs").select("created_at")
+      .eq("job", "app-requests")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const ultima = (data as { created_at: string } | null)?.created_at;
+    if (ultima && Date.now() - Date.parse(ultima) < minutos * 60_000) return null;
+  } catch {
+    // Sem registo não se sabe quando foi a última: sincroniza.
+  }
+
+  const r = await sincronizarPedidosDaApp();
+  try {
+    await supabaseAdmin().from("cron_runs").insert({
+      job: "app-requests", ok: !r.erro,
+      detail: (r.erro ?? `${r.criados} novos · ${r.atualizados} actualizados`).slice(0, 900),
+      upserted: r.criados + r.atualizados,
+    });
+  } catch { /* o registo é conveniência, não pode travar a listagem */ }
+  return r;
+}
+
 export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSync> {
   const vazio: ResultadoSync = { lidos: 0, criados: 0, atualizados: 0, ignorados: 0 };
   if (!servicesFromLaravel()) {

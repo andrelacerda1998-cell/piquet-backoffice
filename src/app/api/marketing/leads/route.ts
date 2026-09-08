@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { sincronizarSeVelho } from "../../_lib/appPedidos";
 import { isMissingColumn } from "@/lib/missingColumn";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
@@ -73,6 +74,17 @@ function toLead(r: Row, tecnicos?: Map<string, string>) {
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v : "").trim().slice(0, max);
 
 export const GET = withStaff(async () => {
+  /*
+    Antes de listar, traz os pedidos feitos na app.
+
+    A conta da Vercel é Hobby e os crons só correm uma vez por dia; um pedido
+    feito às 9h não pode esperar pela manhã seguinte para aparecer. Quando
+    alguém abre esta lista está a olhar para o backoffice, e é aí que a
+    frescura importa. Vem com intervalo próprio, por isso não é uma chamada ao
+    Laravel por cada carregamento, e uma falha nunca trava a listagem.
+  */
+  try { await sincronizarSeVelho(); } catch { /* a lista é mais importante */ }
+
   const ler = (colunas: string) =>
     supabaseAdmin()
       .from("leads")
