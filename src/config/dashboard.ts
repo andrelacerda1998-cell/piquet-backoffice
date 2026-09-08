@@ -83,6 +83,7 @@ export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
+  { href: "/despacho", label: "Despacho", icon: "Radio" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
@@ -104,8 +105,6 @@ export const NAV_ITEMS = [
   { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
-  // Operacional próprio, ainda fora do menu.
-  { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
 ] as const;
 
 // Consolidação 2026-07-20: o menu passa a 9 grupos; cada um agrega os ecrãs
@@ -116,7 +115,19 @@ export const NAV_ITEMS = [
 // destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
-  "/", "/alertas", "/servicos",
+  "/", "/alertas",
+  /*
+    O Despacho estava fora do menu, de quando era uma maqueta a mostrar zeros
+    -- chegava-se lá por ⌘K ou pelo endereço. Agora é onde se decide quem vai a
+    cada serviço e onde acende a bolinha quando um técnico aceita, e uma
+    bolinha num ecrã que não está no menu não avisa ninguém.
+
+    Fica antes de Serviços porque é o único ecrã com gente à espera de uma
+    decisão: um técnico que aceitou está a segurar a agenda até alguém aqui
+    responder.
+  */
+  "/despacho",
+  "/servicos",
   // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
   // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
   // coisas era o mesmo conteúdo em dois sítios.
@@ -135,7 +146,6 @@ export const NAV_DEEPLINKS: string[] = [
   "/servicos?tab=personalizados",
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
-  "/despacho",
 ];
 
 export const MARKETING_CHANNELS = [
