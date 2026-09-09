@@ -127,9 +127,12 @@ export const NAV_ITEMS = [
                  vista sobre os técnicos.
   - Produto    → as Integrações consultam-se de vez em quando; o funil e os
                  downloads pertencem ao Marketing.
-  - Suporte    → zero tickets desde que existe.
-  - Equipa, Desenvolvimento → ferramentas de gestão de uma empresa com equipa,
-                 num backoffice que uma pessoa usa para operar.
+  - Equipa     → ferramenta de gestão de uma empresa com equipa, num backoffice
+                 que uma pessoa usa para operar.
+
+  Suporte e Desenvolvimento voltaram ao menu a 09/09/2026, por decisão do
+  André: eu tinha-os tirado pelos números (zero tickets, tarefas internas), e
+  os números não sabem o que ele usa todos os dias.
 
   Ficaram oito e não seis. As duas que a auditoria queria fundir -- Serviços em
   Pedidos -- dependem da ponte com a app estar ligada: enquanto os serviços do
@@ -138,7 +141,7 @@ export const NAV_ITEMS = [
 */
 export const NAV_PRIMARY: string[] = [
   "/", "/leads", "/servicos", "/tecnicos", "/clientes",
-  "/financeiro", "/marketing", "/configuracao",
+  "/financeiro", "/marketing", "/suporte", "/desenvolvimento", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -152,7 +155,7 @@ export const NAV_DEEPLINKS: string[] = [
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
   // Saíram do menu a 09/09/2026 (ver NAV_PRIMARY). Continuam inteiros.
-  "/qualidade", "/produto", "/suporte", "/chat", "/desenvolvimento",
+  "/qualidade", "/produto", "/chat",
   /*
     Os Alertas saíram do menu a 09/09/2026: passaram a ser o bloco "Requer
     atenção" no topo do ecrã inicial. A lista completa continua a existir --
