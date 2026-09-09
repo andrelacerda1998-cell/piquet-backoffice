@@ -88,10 +88,13 @@ export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | n
   if (!servicesFromLaravel()) return null;
   try {
     const { data } = await supabaseAdmin()
-      .from("cron_runs").select("created_at")
+      // A coluna chama-se `ran_at`, não `created_at`. Com o nome errado a
+      // leitura falhava, o catch engolia o erro e o intervalo nunca travava
+      // nada: chamava-se o Laravel a CADA carregamento da lista de pedidos.
+      .from("cron_runs").select("ran_at")
       .eq("job", "app-requests")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const ultima = (data as { created_at: string } | null)?.created_at;
+      .order("ran_at", { ascending: false }).limit(1).maybeSingle();
+    const ultima = (data as { ran_at: string } | null)?.ran_at;
     if (ultima && Date.now() - Date.parse(ultima) < minutos * 60_000) return null;
   } catch {
     // Sem registo não se sabe quando foi a última: sincroniza.
