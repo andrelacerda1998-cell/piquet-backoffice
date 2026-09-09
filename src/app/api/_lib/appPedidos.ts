@@ -54,6 +54,15 @@ export interface ResultadoSync {
   criados: number;
   atualizados: number;
   ignorados: number;
+  /*
+    Porque foram ignorados. Sem isto, "0 novos" tanto pode querer dizer que
+    não há nada de novo como que se descartou tudo em silêncio -- e foi
+    exactamente essa dúvida que apareceu na primeira leitura real.
+  */
+  semEstado: number;
+  semContacto: number;
+  /** Quantos serviços o Laravel diz ter no total, além da página lida. */
+  total?: number;
   erro?: string;
 }
 
@@ -84,6 +93,18 @@ function montarMensagem(r: LaravelServiceRow): string {
  * O intervalo evita que cada carregamento da página chame o Laravel. Usa-se o
  * registo dos crons, que já existe, em vez de mais uma tabela de estado.
  */
+/** Uma linha que diz o que aconteceu a TODOS os serviços lidos, não só aos guardados. */
+export function resumo(r: ResultadoSync): string {
+  const partes = [
+    `${r.lidos} lidos${r.total != null && r.total !== r.lidos ? ` de ${r.total}` : ""}`,
+    `${r.criados} novos`,
+    `${r.atualizados} actualizados`,
+  ];
+  if (r.semEstado) partes.push(`${r.semEstado} com estado desconhecido`);
+  if (r.semContacto) partes.push(`${r.semContacto} sem nome nem telefone`);
+  return partes.join(" · ");
+}
+
 export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | null> {
   if (!servicesFromLaravel()) return null;
   try {
@@ -104,7 +125,7 @@ export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | n
   try {
     await supabaseAdmin().from("cron_runs").insert({
       job: "app-requests", ok: !r.erro,
-      detail: (r.erro ?? `${r.criados} novos · ${r.atualizados} actualizados`).slice(0, 900),
+      detail: (r.erro ?? resumo(r)).slice(0, 900),
       upserted: r.criados + r.atualizados,
     });
   } catch { /* o registo é conveniência, não pode travar a listagem */ }
@@ -112,17 +133,18 @@ export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | n
 }
 
 export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSync> {
-  const vazio: ResultadoSync = { lidos: 0, criados: 0, atualizados: 0, ignorados: 0 };
+  const vazio: ResultadoSync = { lidos: 0, criados: 0, atualizados: 0, ignorados: 0, semEstado: 0, semContacto: 0 };
   if (!servicesFromLaravel()) {
     return { ...vazio, erro: "LARAVEL_SERVICES_ENABLED não está ligado." };
   }
 
   let itens: LaravelServiceRow[] = [];
   try {
-    const r = await laravelAdminRequest<{ items: LaravelServiceRow[] }>(
+    const r = await laravelAdminRequest<{ items: LaravelServiceRow[]; meta?: { total?: number } }>(
       `/v1/admin/services?per_page=${limite}`,
     );
     itens = r.items ?? [];
+    vazio.total = r.meta?.total;
   } catch (e) {
     return { ...vazio, erro: e instanceof Error ? e.message : "Falha ao ler os serviços." };
   }
@@ -142,11 +164,11 @@ export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSy
   for (const r of itens) {
     const estadoLaravel = String(r.status ?? "");
     const stage = ESTADO[estadoLaravel];
-    if (!stage) { res.ignorados++; continue; }
+    if (!stage) { res.ignorados++; res.semEstado++; continue; }
 
     const nome = (r.customer_name ?? "").trim();
     const telefone = ((r as { customer_phone?: string | null }).customer_phone ?? "").trim();
-    if (!nome && !telefone) { res.ignorados++; continue; }
+    if (!nome && !telefone) { res.ignorados++; res.semContacto++; continue; }
 
     const linha: Record<string, unknown> = {
       laravel_service_id: String(r.id),
