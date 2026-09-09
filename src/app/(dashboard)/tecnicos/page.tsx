@@ -14,6 +14,7 @@ import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import QualidadePage from "../qualidade/page";
+import { FilaAprovacao } from "@/components/ui/FilaAprovacao";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
@@ -675,6 +676,18 @@ export default function TechniciansPage() {
                 ))}
               </div>
             </div>
+            {/*
+              Pendentes: uma fila por pessoa, com os dados dela ao lado dos
+              documentos dela. A tabela continua a servir o histórico (aprovados
+              e recusados), onde o que interessa é procurar, não decidir.
+            */}
+            {docStatus === "pending" ? (
+              <FilaAprovacao
+                onPreview={setPreviewDoc}
+                onAprovar={openApprove}
+                onRecusar={openDecline}
+              />
+            ) : (
             <DataTable
               columns={[
                 { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
@@ -695,8 +708,9 @@ export default function TechniciansPage() {
               data={docsData.data?.items ?? []}
               keyField="id"
               loading={docsData.loading}
-              emptyMessage={docStatus === "pending" ? "Sem documentos pendentes 🎉" : "Sem documentos neste estado"}
+              emptyMessage="Sem documentos neste estado"
             />
+            )}
           </div>
         )}
 

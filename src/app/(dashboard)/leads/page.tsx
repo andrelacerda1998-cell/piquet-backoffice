@@ -220,6 +220,14 @@ function LeadsPageInner() {
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
    * é o trabalho todo. Corre uma vez, quando os dados já cá estão.
    */
+  /*
+    `?lead=<id>` abre o pedido — a ver, não a editar.
+
+    Abria o formulário de edição, que é o que se faz a seguir e não o que se
+    quer primeiro: quem vem de um alerta ou da pesquisa quer LER o pedido, e a
+    primeira coisa que via era uma dúzia de campos preenchidos com o risco de
+    lhes mexer. Editar continua a um clique, no rodapé do detalhe.
+  */
   const leadParam = useSearchParams().get("lead");
   const abriuDoUrl = useRef(false);
   useEffect(() => {
@@ -227,7 +235,8 @@ function LeadsPageInner() {
     const alvo = leadRows.find((l) => l.id === leadParam);
     if (!alvo) return;
     abriuDoUrl.current = true;
-    openEdit(alvo);
+    setEntradasWa(null);
+    setViewing(alvo);
   }, [leadParam, leadRows]);
 
   const openEdit = (lead: Lead, presetStage?: LeadStage) => {
