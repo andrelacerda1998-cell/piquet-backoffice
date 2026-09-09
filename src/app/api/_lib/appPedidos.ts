@@ -84,6 +84,20 @@ function montarMensagem(r: LaravelServiceRow): string {
  * O intervalo evita que cada carregamento da página chame o Laravel. Usa-se o
  * registo dos crons, que já existe, em vez de mais uma tabela de estado.
  */
+/**
+ * O dia e a hora marcados, num só instante.
+ *
+ * O Laravel devolve-os separados, como estão gravados. Sem hora fica só o
+ * dia -- é menos preciso, mas é o que está escrito, e inventar meio-dia seria
+ * fazer o técnico parecer atrasado.
+ */
+function montarMarcacao(r: LaravelServiceRow): string | null {
+  const dia = (r as { scheduled_day?: string | null }).scheduled_day;
+  if (!dia) return null;
+  const hora = (r as { scheduled_time?: string | null }).scheduled_time;
+  return hora ? `${dia}T${hora}` : dia;
+}
+
 export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | null> {
   if (!servicesFromLaravel()) return null;
   try {
@@ -138,8 +152,20 @@ export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSy
 
   for (const r of itens) {
     const estadoLaravel = String(r.status ?? "");
-    const stage = ESTADO[estadoLaravel];
+    let stage = ESTADO[estadoLaravel];
     if (!stage) { res.ignorados++; continue; }
+
+    /*
+      Entre "o técnico aceitou" e "está pago" há duas coisas que o Laravel
+      sabe e o estado dele não distingue: se já está marcado e se o técnico já
+      chegou. Sem isto, um serviço a decorrer aparecia igual a um que ainda
+      não tinha data.
+    */
+    if (stage === "com_tecnico") {
+      const agendado = (r as { scheduled_day?: string | null }).scheduled_day;
+      if (r.started_at) stage = "em_execucao";
+      else if (agendado) stage = "agendado";
+    }
 
     const nome = (r.customer_name ?? "").trim();
     const telefone = ((r as { customer_phone?: string | null }).customer_phone ?? "").trim();
@@ -154,6 +180,7 @@ export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSy
       source: "app",
       stage,
       technician_name: (r.technician_name ?? "").trim(),
+      execution_date: montarMarcacao(r),
       quote_value: r.total_customer_value ?? null,
       technician_value: r.technician_value ?? null,
     };

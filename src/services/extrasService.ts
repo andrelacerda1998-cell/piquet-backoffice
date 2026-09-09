@@ -529,6 +529,8 @@ export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
   { id: "novo", label: "Novo" },
   { id: "a_procurar", label: "À procura de técnico" },
   { id: "com_tecnico", label: "Com técnico" },
+  { id: "agendado", label: "Agendado" },
+  { id: "em_execucao", label: "Em execução" },
   { id: "concluido", label: "Concluído" },
   { id: "perdido", label: "Perdido" },
 ];

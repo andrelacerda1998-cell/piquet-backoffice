@@ -11,10 +11,11 @@ import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import { categoryName } from "@/lib/categories";
 import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
-import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
+import { formatCurrency, formatPercent, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { CronologiaPedido } from "@/components/ui/CronologiaPedido";
 import { DespachoLead } from "@/components/ui/DespachoLead";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { mensagemBoasVindas } from "@/lib/leadReply";
@@ -102,7 +103,13 @@ function LeadsPageInner() {
    * ou pelos cartões. O que fica oculto é dito por baixo da lista, para não
    * parecer que desapareceu.
    */
-  const ESTADOS_ATIVOS: LeadStage[] = ["novo", "a_procurar"];
+  /*
+    Tudo o que ainda dá trabalho. Passou a incluir "com técnico", "agendado" e
+    "em execução" a 09/09/2026: antes um pedido desaparecia da lista assim que
+    tinha técnico, e a maior parte do trabalho -- combinar, executar, fechar --
+    acontece depois disso.
+  */
+  const ESTADOS_ATIVOS: LeadStage[] = ["novo", "a_procurar", "com_tecnico", "agendado", "em_execucao"];
   const byStage = leadStage === ""
     ? baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage))
     : leadStage === "todos"
@@ -237,7 +244,8 @@ function LeadsPageInner() {
       categoryId: lead.categoryId || "",
       quoteValue: q != null ? String(q) : "",
       technicianValue: techDefault != null ? String(techDefault) : "",
-      executionDate: lead.executionDate ? lead.executionDate.slice(0, 10) : "",
+      // "YYYY-MM-DDTHH:mm" é o formato que o datetime-local aceita.
+      executionDate: lead.executionDate ? lead.executionDate.slice(0, 16) : "",
       rating: lead.rating != null ? String(lead.rating) : "",
       stage: presetStage ?? lead.stage,
     });
@@ -787,6 +795,28 @@ function LeadsPageInner() {
                 )}
               </div>
 
+              {viewing.executionDate && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Marcado para</p>
+                  <p className="text-sm text-text-primary">{formatDateTime(viewing.executionDate)}</p>
+                </div>
+              )}
+
+              {/*
+                Onde o pedido está e onde parou. Um estado diz o ponto; não diz
+                há quanto tempo lá está nem o que já aconteceu — que é o que se
+                precisa de saber quando alguém liga a perguntar.
+              */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-2">Cronologia</p>
+                <CronologiaPedido
+                  estado={viewing.stage}
+                  recebidoEm={viewing.createdAt}
+                  marcadoPara={viewing.executionDate}
+                  tecnico={viewing.technicianName}
+                />
+              </div>
+
               {/* Despacho: quem foi perguntado e quem aceitou. Vive ao lado do
                   pedido porque é a decisão que se segue a lê-lo. */}
               <DespachoLead leadId={viewing.id} categoria={catName || service} />
@@ -929,8 +959,15 @@ function LeadsPageInner() {
             <input type="number" step="0.01" min="0" value={editForm.technicianValue}
               onChange={(e) => setEditForm({ ...editForm, technicianValue: e.target.value })} placeholder="0,00" className="input-field" />
           </Field>
-          <Field label="Data de execução">
-            <input type="date" value={editForm.executionDate} onChange={(e) => setEditForm({ ...editForm, executionDate: e.target.value })} className="input-field" />
+          {/*
+            Data E hora. A coluna sempre foi timestamptz e o ecrã só deixava
+            escrever o dia -- combinava-se "quinta às 15h" por telefone e
+            ficava gravado "quinta", que não chega para saber se o técnico está
+            atrasado.
+          */}
+          <Field label="Marcado para">
+            <input type="datetime-local" value={editForm.executionDate}
+              onChange={(e) => setEditForm({ ...editForm, executionDate: e.target.value })} className="input-field" />
           </Field>
           <Field label="Classificação (1–5)">
             <select value={editForm.rating} onChange={(e) => setEditForm({ ...editForm, rating: e.target.value })} className="input-field">

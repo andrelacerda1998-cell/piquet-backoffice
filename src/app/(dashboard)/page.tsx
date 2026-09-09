@@ -184,6 +184,20 @@ export default function OverviewPage() {
   const hoje = new Date().toISOString().slice(0, 10);
   const pedidosHoje = (leads ?? []).filter((l) => (l.createdAt || "").slice(0, 10) === hoje).length;
   const semTecnico = (leads ?? []).filter((l) => l.stage === "novo" || l.stage === "a_procurar").length;
+  const aDecorrer = (leads ?? []).filter(
+    (l) => l.stage === "com_tecnico" || l.stage === "agendado" || l.stage === "em_execucao").length;
+
+  /*
+    Taxa de preenchimento: dos pedidos que já se resolveram de alguma maneira,
+    quantos arranjaram técnico. É a pergunta central de um mercado -- se a rede
+    chega para a procura.
+
+    O denominador exclui os que ainda estão a decorrer: contá-los faria a taxa
+    parecer pior de manhã e melhor à noite, sem nada ter mudado.
+  */
+  const fechados = (leads ?? []).filter((l) => l.stage === "concluido" || l.stage === "perdido");
+  const preenchidos = fechados.filter((l) => l.stage === "concluido").length;
+  const taxaPreenchimento = fechados.length ? Math.round((preenchidos / fechados.length) * 100) : null;
 
   const goals = goalsData?.goals ?? [];
   const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
@@ -268,15 +282,30 @@ export default function OverviewPage() {
             estava a competir com os números de hoje. Eram oito cartões para
             duas perguntas.
           */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
             <MetricCard compact title="Pedidos hoje" hideDelta
               metric={buildMetricValue(pedidosHoje, pedidosHoje, false, undefined, "Pedidos que entraram desde a meia-noite, por qualquer via.")} />
             <MetricCard compact title="Sem técnico" hideDelta
               metric={buildMetricValue(semTecnico, semTecnico, false, undefined, "Pedidos abertos que ainda não têm técnico atribuído.")} />
+            <MetricCard compact title="A decorrer" hideDelta
+              metric={buildMetricValue(aDecorrer, aDecorrer, false, undefined, "Pedidos com técnico atribuído, agendados ou em execução.")} />
             <MetricCard compact title="Executados no mês" hideDelta
               metric={buildMetricValue(svcCounts?.mes.executados ?? 0, svcCounts?.mes.executados ?? 0, false, undefined, "Serviços concluídos com data de conclusão dentro do mês corrente.")} />
-            <MetricCard compact title="Agendados no mês" hideDelta
-              metric={buildMetricValue(svcCounts?.mes.agendados ?? 0, svcCounts?.mes.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do mês corrente e ainda por concluir.")} />
+            {/*
+              Preenchimento em vez de "agendados no mês": os agendados passaram
+              a estar em "A decorrer", e esta é a pergunta que faltava — se a
+              rede de técnicos chega para a procura.
+            */}
+            {taxaPreenchimento === null ? (
+              <div className="card p-3">
+                <p className="text-xs text-text-secondary">Preenchidos</p>
+                <p className="mt-1 text-xl font-bold text-text-muted">—</p>
+                <p className="text-[11px] text-text-muted">ainda sem pedidos fechados</p>
+              </div>
+            ) : (
+              <MetricCard compact title="Preenchidos" format="percent" hideDelta
+                metric={buildMetricValue(taxaPreenchimento, taxaPreenchimento, false, undefined, "Dos pedidos já fechados, os que arranjaram técnico e foram concluídos. Os que ainda estão a decorrer não contam para o cálculo.")} />
+            )}
           </div>
 
           {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}

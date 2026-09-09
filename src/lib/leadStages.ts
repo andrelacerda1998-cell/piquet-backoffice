@@ -23,11 +23,21 @@
  * Estes avançam sozinhos: difundir põe em "À procura de técnico", atribuir põe
  * em "Com técnico". Um funil mantido à mão só está certo enquanto alguém se
  * lembrar de o manter.
+ *
+ * ---
+ *
+ * "Agendado" e "Em execução" entraram a 09/09/2026. Entre "o técnico aceitou" e
+ * "está pago" acontece o serviço, e o backoffice não sabia nada disso: não
+ * havia forma de responder a "o que está a acontecer agora na Piquet?".
+ * Marcar como concluído exigia já ter os valores, o que fazia do estado final
+ * um acto de contabilidade e não o fim de um trabalho.
  */
 export const LEAD_STAGE_IDS = [
   "novo",
   "a_procurar",
   "com_tecnico",
+  "agendado",
+  "em_execucao",
   "concluido",
   "perdido",
 ] as const;
