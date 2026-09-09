@@ -19,6 +19,7 @@ import { Megaphone, MessageSquare, Plus, RefreshCw, TicketPercent } from "lucide
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
+import { PushCampanhas } from "./PushCampanhas";
 import { RoasReal } from "./RoasReal";
 import { costPerDownload } from "@/lib/adAttribution";
 import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
@@ -592,19 +593,22 @@ export default function MarketingPage() {
         )}
 
         {/*
-          O separador "Push" saiu a 08/09/2026. Guardava as campanhas em
-          localStorage e gerava entregas, aberturas e conversões com
-          Math.random() -- reportava resultados de campanhas que nunca saíram da
-          máquina, ao lado de números reais. Quando houver envio de push a
-          sério, volta com os números do fornecedor.
+          O separador "Push" voltou a 09/09/2026, com os números reais.
+
+          Saiu na véspera porque guardava as campanhas em localStorage e gerava
+          entregas, aberturas e conversões com Math.random(). As campanhas
+          sempre existiram -- no Laravel, enviadas pelo canal Expo -- e só se
+          viam no Filament. Agora lê-se de lá.
         */}
         {tab === "comunicacao" && (
           <SubTabs tabs={[
+            { id: "push", label: "Push" },
             { id: "codigos", label: "Códigos de desconto" },
             { id: "guioes", label: "Guiões e mensagens" },
           ]}>
             {(sub) => (
               <>
+                {sub === "push" && <PushCampanhas />}
                 {sub === "codigos" && <CodigosTab />}
                 {sub === "guioes" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

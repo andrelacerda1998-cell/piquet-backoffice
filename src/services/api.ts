@@ -110,6 +110,7 @@ interface RequestOptions<T> {
  * À medida que se migram endpoints, acrescenta-se aqui.
  */
 const LIVE_EXACT = new Set<string>([
+  "/marketing/push-campaigns", // campanhas de push reais (Laravel)
   // Fase 1 — Serviços/Reservas
   "/services",
   "/dashboard/recent-services",
@@ -288,6 +289,7 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  "/marketing/push-campaigns", // campanhas de push reais (Laravel)
   /*
     Gráficos derivados dos serviços (08/09/2026).
 
@@ -496,6 +498,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/budget\/[^/]+$/.test(path)) return true; // editar/apagar linha do orçamento
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
+  if (/^\/marketing\/push-campaigns\/[^/]+\/active$/.test(path)) return true; // ligar/desligar campanha
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
   if (/^\/marketing\/leads\/[^/]+\/dispatch$/.test(path)) return true; // difundir o pedido aos técnicos
   if (/^\/marketing\/leads\/[^/]+\/assign$/.test(path)) return true; // atribuir o pedido a quem aceitou

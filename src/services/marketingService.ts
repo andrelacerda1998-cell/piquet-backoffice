@@ -408,3 +408,30 @@ export async function definirModeloAcompanhamento(modelo?: string) {
     () => { throw new Error("Definir o modelo precisa do Google Ads configurado."); },
   ).then((r) => r.data);
 }
+
+/* --- Campanhas de push (Laravel: NotificationCampaign) ------------------- */
+
+import type { PushCampaign as PushCampaignDTO } from "@/app/api/marketing/push-campaigns/route";
+export type { PushCampaign, PushCampaignStats } from "@/app/api/marketing/push-campaigns/route";
+
+/**
+ * As campanhas de push, com os números reais de entrega e abertura.
+ *
+ * Substituiu o separador que guardava campanhas em localStorage e gerava as
+ * métricas com Math.random(). Sem o Laravel ligado devolve vazio -- e vazio é
+ * verdade, ao contrário do que lá estava.
+ */
+export async function getPushCampaigns(): Promise<{ items: PushCampaignDTO[]; total: number }> {
+  return apiGet<{ items: PushCampaignDTO[]; meta?: { total: number } }>(
+    "/marketing/push-campaigns",
+    () => ({ items: [], meta: { total: 0 } }),
+    { per_page: 50 },
+  ).then((r) => ({ items: r.data.items ?? [], total: r.data.meta?.total ?? 0 }));
+}
+
+/** Liga ou desliga uma campanha. Criar continua no Filament. */
+export async function setPushCampaignActive(id: number, active: boolean): Promise<void> {
+  await apiPut(`/marketing/push-campaigns/${id}/active`, { active }, () => {
+    throw new Error("As campanhas de push ainda não estão ligadas.");
+  });
+}
