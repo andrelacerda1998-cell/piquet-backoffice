@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
-import { RequerAtencao } from "@/components/ui/RequerAtencao";
 import { MetricCard, TrendIndicator } from "@/components/ui/MetricCard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { LoadingState, ErrorState } from "@/components/ui/States";
@@ -12,6 +11,7 @@ import { getFinanceGmv, getUnitEconomics, getFinanceSummary } from "@/services/f
 import { getGoals, getLeads } from "@/services/extrasService";
 import { getServiceCounts } from "@/services/dashboardService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
+import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
 import type { MetricValue } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -22,7 +22,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Scale, FileText } from "lucide-react";
+import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale, FileText } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -150,6 +150,7 @@ export default function OverviewPage() {
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
   const { data: leads } = useAsyncData(() => getLeads(), []);
+  const { data: pendingDocs } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
   const [tab, setTab] = useTabParam("resumo");
 
   if (loading && !gmvData) return <LoadingState />;
@@ -160,6 +161,12 @@ export default function OverviewPage() {
   const gmvPrevMonth = gmvData?.prevMonth.gmv ?? 0;
   const commissionMonth = gmvData?.month.commission ?? 0;
   const commissionPrevMonth = gmvData?.prevMonth.commission ?? 0;
+  const gmvYear = gmvData?.year.gmv ?? 0;
+  const gmvPrevYear = gmvData?.prevYearSame.gmv ?? 0;
+  // A comissão do ano vinha da API desde sempre e nunca chegou ao ecrã: via-se
+  // o GMV acumulado sem se ver quanto disso é receita da Piquet.
+  const commissionYear = gmvData?.year.commission ?? 0;
+  const commissionPrevYear = gmvData?.prevYearSame.commission ?? 0;
 
   // Downloads da App Cliente (acumulados das lojas): total e crescimento do mês.
   const dl = growth?.downloads ?? [];
@@ -176,28 +183,9 @@ export default function OverviewPage() {
 
   // O que está à espera de alguém: leads por responder (e quantas urgentes) e
   // documentos KYC por validar. É o primeiro que se quer ver ao abrir o dia.
-  /*
-    O dia, em dois números que não existem em mais lado nenhum: quantos
-    pedidos entraram hoje e quantos continuam sem técnico. O resto do que
-    está à espera de alguém está no bloco "Requer atenção", acima.
-  */
-  const hoje = new Date().toISOString().slice(0, 10);
-  const pedidosHoje = (leads ?? []).filter((l) => (l.createdAt || "").slice(0, 10) === hoje).length;
-  const semTecnico = (leads ?? []).filter((l) => l.stage === "novo" || l.stage === "a_procurar").length;
-  const aDecorrer = (leads ?? []).filter(
-    (l) => l.stage === "com_tecnico" || l.stage === "agendado" || l.stage === "em_execucao").length;
-
-  /*
-    Taxa de preenchimento: dos pedidos que já se resolveram de alguma maneira,
-    quantos arranjaram técnico. É a pergunta central de um mercado -- se a rede
-    chega para a procura.
-
-    O denominador exclui os que ainda estão a decorrer: contá-los faria a taxa
-    parecer pior de manhã e melhor à noite, sem nada ter mudado.
-  */
-  const fechados = (leads ?? []).filter((l) => l.stage === "concluido" || l.stage === "perdido");
-  const preenchidos = fechados.filter((l) => l.stage === "concluido").length;
-  const taxaPreenchimento = fechados.length ? Math.round((preenchidos / fechados.length) * 100) : null;
+  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "novo");
+  const leadsUrgentes = leadsPorResponder.filter((l) => /urg[êe]ncia:\s*(urgente|hoje|emerg|imediat|agora)/i.test(l.message || "")).length;
+  const kycPendentes = pendingDocs?.meta.total ?? 0;
 
   const goals = goalsData?.goals ?? [];
   const goalsOnTrack = goals.filter((g) => g.projection >= g.target).length;
@@ -248,13 +236,44 @@ export default function OverviewPage() {
 
         {tab === "resumo" && (
         <div className="space-y-8">
-        {/*
-          O que está à espera de alguém, vindo da mesma fonte das bolinhas do
-          menu. Antes eram contas próprias sobre leads e documentos: dois dos
-          sete tipos de problema, e com o risco de discordar do número que o
-          menu mostrava ao lado.
-        */}
-        <RequerAtencao />
+        {/* ---------- À espera de resposta ---------- */}
+        {(leadsPorResponder.length > 0 || kycPendentes > 0) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {leadsPorResponder.length > 0 && (
+              <Link href="/leads"
+                className="card border-l-[3px] border-l-warning p-4 flex items-center gap-3 hover:shadow-elevated transition-shadow group">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-light text-warning">
+                  <Headphones className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary">
+                    {leadsPorResponder.length} lead{leadsPorResponder.length === 1 ? "" : "s"} por responder
+                    {leadsUrgentes > 0 && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger align-middle">
+                        {leadsUrgentes} urgente{leadsUrgentes === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-text-secondary">Pedidos recebidos que ainda ninguém contactou.</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0 group-hover:text-piquet-700 transition-colors" />
+              </Link>
+            )}
+            {kycPendentes > 0 && (
+              <Link href="/tecnicos?tab=aprovacoes"
+                className="card border-l-[3px] border-l-piquet p-4 flex items-center gap-3 hover:shadow-elevated transition-shadow group">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700">
+                  <FileCheck2 className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary">{kycPendentes} documento{kycPendentes === 1 ? "" : "s"} por validar</p>
+                  <p className="text-sm text-text-secondary">Técnicos à espera de aprovação para poderem trabalhar.</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0 group-hover:text-piquet-700 transition-colors" />
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* ---------- Indicadores-chave (reais) ---------- */}
         <div>
@@ -270,42 +289,40 @@ export default function OverviewPage() {
             />
           </div>
           {/*
+            O ano em par com o mês: antes só cá estava o GMV acumulado, perdido
+            entre os downloads e a avaliação das lojas, e a comissão do ano não
+            aparecia em lado nenhum — via-se quanto passou pela plataforma sem
+            se ver quanto disso ficou para a Piquet.
+          */}
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">
+            Acumulado do ano
+            <span className="ml-2 font-normal normal-case tracking-normal text-[11px]">
+              1 de janeiro até hoje · comparado com o mesmo período do ano passado
+            </span>
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <MetricCard title="GMV do ano" format="currency" deltaLabel="vs ano ant."
+              metric={buildMetricValue(gmvYear, gmvPrevYear, false, undefined, "Tudo o que passou pela plataforma desde 1 de janeiro (Payshop cobrado + serviços concluídos).")} />
+            <MetricCard title="Comissão Piquet (ano)" format="currency" deltaLabel="vs ano ant."
+              metric={buildMetricValue(commissionYear, commissionPrevYear, false, undefined, "A parte do GMV que é receita da Piquet (25%), acumulada desde 1 de janeiro.")} />
+          </div>
+
+          {/*
             Volume de trabalho, ao lado do dinheiro. Executados contam-se pela
             data de conclusão e agendados pela data marcada -- um serviço
             agendado para dezembro é volume de dezembro, não deste mês. Por
             isso o "agendados no ano" olha para o ano inteiro, futuro incluído.
           */}
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">Serviços</p>
-          {/*
-            Só o mês. O acumulado do ano — GMV, comissão e serviços — passou
-            para o Financeiro a 09/09/2026: é leitura de fim de mês, e aqui
-            estava a competir com os números de hoje. Eram oito cartões para
-            duas perguntas.
-          */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
-            <MetricCard compact title="Pedidos hoje" hideDelta
-              metric={buildMetricValue(pedidosHoje, pedidosHoje, false, undefined, "Pedidos que entraram desde a meia-noite, por qualquer via.")} />
-            <MetricCard compact title="Sem técnico" hideDelta
-              metric={buildMetricValue(semTecnico, semTecnico, false, undefined, "Pedidos abertos que ainda não têm técnico atribuído.")} />
-            <MetricCard compact title="A decorrer" hideDelta
-              metric={buildMetricValue(aDecorrer, aDecorrer, false, undefined, "Pedidos com técnico atribuído, agendados ou em execução.")} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
             <MetricCard compact title="Executados no mês" hideDelta
               metric={buildMetricValue(svcCounts?.mes.executados ?? 0, svcCounts?.mes.executados ?? 0, false, undefined, "Serviços concluídos com data de conclusão dentro do mês corrente.")} />
-            {/*
-              Preenchimento em vez de "agendados no mês": os agendados passaram
-              a estar em "A decorrer", e esta é a pergunta que faltava — se a
-              rede de técnicos chega para a procura.
-            */}
-            {taxaPreenchimento === null ? (
-              <div className="card p-3">
-                <p className="text-xs text-text-secondary">Preenchidos</p>
-                <p className="mt-1 text-xl font-bold text-text-muted">—</p>
-                <p className="text-[11px] text-text-muted">ainda sem pedidos fechados</p>
-              </div>
-            ) : (
-              <MetricCard compact title="Preenchidos" format="percent" hideDelta
-                metric={buildMetricValue(taxaPreenchimento, taxaPreenchimento, false, undefined, "Dos pedidos já fechados, os que arranjaram técnico e foram concluídos. Os que ainda estão a decorrer não contam para o cálculo.")} />
-            )}
+            <MetricCard compact title="Agendados no mês" hideDelta
+              metric={buildMetricValue(svcCounts?.mes.agendados ?? 0, svcCounts?.mes.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do mês corrente e ainda por concluir.")} />
+            <MetricCard compact title="Executados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.executados ?? 0, svcCounts?.ano.executados ?? 0, false, undefined, "Serviços concluídos desde 1 de janeiro.")} />
+            <MetricCard compact title="Agendados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.agendados ?? 0, svcCounts?.ano.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do ano corrente e ainda por concluir — inclui os que estão no futuro.")} />
           </div>
 
           {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}

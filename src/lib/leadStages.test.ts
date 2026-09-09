@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  LEAD_STAGE_IDS, normalizeLeadStage, isLeadStage, LEAD_STAGES_SEM_RECEITA, LEAD_STAGE_LEGACY,
+  LEAD_STAGE_IDS, normalizeLeadStage, isLeadStage, LEAD_STAGES_SEM_RECEITA,
 } from "./leadStages";
 
 describe("normalizeLeadStage", () => {
@@ -69,32 +69,5 @@ describe("a interface cobre todos os estados", () => {
     const { LEAD_STAGES } = await import("@/services/extrasService");
     const comRotulo = LEAD_STAGES.map((s) => s.id).sort();
     expect(comRotulo).toEqual([...LEAD_STAGE_IDS].sort());
-  });
-});
-
-describe("os estados do serviço a decorrer", () => {
-  /*
-    Entrámos aqui a 09/09/2026. Entre "o técnico aceitou" e "está pago"
-    acontece o serviço, e o backoffice não sabia nada disso — não havia como
-    responder a "o que está a acontecer agora na Piquet?".
-  */
-  it("agendado e em execução ficam entre com_tecnico e concluído", () => {
-    const i = (s: string) => (LEAD_STAGE_IDS as readonly string[]).indexOf(s);
-    expect(i("agendado")).toBeGreaterThan(i("com_tecnico"));
-    expect(i("em_execucao")).toBeGreaterThan(i("agendado"));
-    expect(i("concluido")).toBeGreaterThan(i("em_execucao"));
-  });
-
-  it("são estados graváveis, não traduções", () => {
-    expect(isLeadStage("agendado")).toBe(true);
-    expect(isLeadStage("em_execucao")).toBe(true);
-    expect(normalizeLeadStage("agendado")).toBe("agendado");
-  });
-
-  // Nenhum estado antigo aponta para os novos: são passos que não existiam.
-  it("nenhum estado antigo se traduz para eles", () => {
-    const traduzidos = Object.values(LEAD_STAGE_LEGACY);
-    expect(traduzidos).not.toContain("agendado");
-    expect(traduzidos).not.toContain("em_execucao");
   });
 });

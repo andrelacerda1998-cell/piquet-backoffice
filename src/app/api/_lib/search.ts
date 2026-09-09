@@ -1,21 +1,11 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
-import { fone9 } from "@/lib/despacho";
 
 /**
- * Pesquisa global de ENTIDADES (não navegação): pedidos, clientes, técnicos,
- * pagamentos, faturas e tickets. Cada fonte é consultada em paralelo e
- * defensiva -- uma fonte indisponível não parte a pesquisa.
- *
- * Clientes e técnicos vêm do LARAVEL (09/09/2026). Antes procuravam-se nas
- * tabelas `customers` e `technicians` de Supabase, que têm uma linha cada: a
- * operação real vive no Laravel, e quem usava a pesquisa para resolver um caso
- * ao telefone não encontrava a pessoa que tinha do outro lado.
- *
- * O telefone procura-se pelos últimos 9 dígitos, porque o mesmo número aparece
- * com e sem indicativo conforme tenha entrado pela app, pela landing ou pela
- * Meta.
+ * Pesquisa global de ENTIDADES (não navegação): serviços, clientes, técnicos,
+ * faturas, leads e tickets. Cada fonte é consultada em paralelo e defensiva
+ * (uma tabela em falta não parte a pesquisa). À medida que os dados reais
+ * ligam (Laravel), passa a encontrar mais — a infraestrutura fica igual.
  */
 export type SearchType = "service" | "customer" | "technician" | "invoice" | "lead" | "ticket";
 
@@ -52,21 +42,19 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       });
     }),
     safe(async () => {
-      if (!LARAVEL_ADMIN_ENABLED) return;
-      const r = await laravelAdminRequest<{ items?: { id: number | string; name?: string | null; email?: string | null; phone_number?: string | null; nif?: string | null }[] }>(
-        `/v1/admin/customers?per_page=6&search=${encodeURIComponent(q)}`);
-      for (const c of r.items ?? []) out.push({
+      const { data } = await admin.from("customers").select("id, name, email, phone")
+        .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
+      for (const c of data ?? []) out.push({
         type: "customer", typeLabel: "Cliente", id: String(c.id),
-        title: c.name || "(sem nome)", subtitle: join([c.phone_number, c.email]), href: "/clientes",
+        title: c.name || "(sem nome)", subtitle: join([c.phone, c.email]), href: "/clientes",
       });
     }),
     safe(async () => {
-      if (!LARAVEL_ADMIN_ENABLED) return;
-      const r = await laravelAdminRequest<{ items?: { id: number | string; name?: string | null; phone_number?: string | null; nif?: string | null }[] }>(
-        `/v1/admin/vendors?per_page=6&search=${encodeURIComponent(q)}`);
-      for (const t of r.items ?? []) out.push({
+      const { data } = await admin.from("technicians").select("id, name, email, phone")
+        .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
+      for (const t of data ?? []) out.push({
         type: "technician", typeLabel: "Técnico", id: String(t.id),
-        title: t.name || "(sem nome)", subtitle: join([t.phone_number, t.nif]), href: "/tecnicos",
+        title: t.name || "(sem nome)", subtitle: join([t.phone, t.email]), href: "/tecnicos",
       });
     }),
     safe(async () => {
@@ -78,37 +66,12 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       });
     }),
     safe(async () => {
-      /*
-        Os últimos 9 dígitos quando o termo é um telefone: "934670597" e
-        "351934670597" são a mesma pessoa, e escrever o indicativo ou não devia
-        ser indiferente para quem procura.
-      */
-      const p9 = fone9(q);
-      const filtro = p9.length === 9
-        ? `name.ilike.${like},phone9.eq.${p9}`
-        : `name.ilike.${like},phone.ilike.${like},city.ilike.${like}`;
-      const { data } = await admin.from("leads").select("id, name, phone, city").or(filtro).limit(6);
+      const { data } = await admin.from("leads").select("id, name, phone, city")
+        .or(`name.ilike.${like},phone.ilike.${like},city.ilike.${like}`).limit(6);
       for (const l of data ?? []) out.push({
-        type: "lead", typeLabel: "Pedido", id: String(l.id),
-        title: l.name || "(sem nome)", subtitle: join([l.phone, l.city]), href: `/leads?lead=${l.id}`,
+        type: "lead", typeLabel: "Lead", id: String(l.id),
+        title: l.name || "(sem nome)", subtitle: join([l.phone, l.city]), href: "/marketing?tab=crm",
       });
-    }),
-    safe(async () => {
-      /*
-        Pagamentos pela referência. É o que se tem na mão quando um cliente
-        liga a dizer que pagou -- e era a única coisa que a pesquisa não sabia
-        procurar de todo.
-      */
-      const { data } = await admin.from("pop_transactions")
-        .select("uuid, customer_ext_id, amount_cents, operative, created_at")
-        .or(`uuid.ilike.${like},customer_ext_id.ilike.${like}`).limit(6);
-      for (const t of (data ?? []) as { uuid: string; customer_ext_id: string | null; amount_cents: number | null }[]) {
-        out.push({
-          type: "invoice", typeLabel: "Pagamento", id: String(t.uuid),
-          title: t.amount_cents != null ? `${(t.amount_cents / 100).toFixed(2).replace(".", ",")} €` : t.uuid,
-          subtitle: join([t.customer_ext_id, t.uuid.slice(0, 8)]), href: "/financeiro?tab=pagamentos",
-        });
-      }
     }),
     safe(async () => {
       const { data } = await admin.from("support_tickets").select("id, subject, requester_name, requester_email")

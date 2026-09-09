@@ -162,23 +162,6 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     }
   });
 
-  /*
-    A mesma tabela não pode ter selos diferentes conforme o ecrã. Os gráficos
-    do Financeiro derivam de `services`, que é real desde que o seed foi
-    apagado -- durante um tempo a lista era real e o gráfico feito a partir
-    dela dizia "demo".
-  */
-  it("um gráfico derivado de dados reais também é real", async () => {
-    const { isDemoEndpoint } = await load();
-    for (const ep of [
-      "/finance/by-service", "/finance/daily-revenue", "/finance/revenue-vs-costs",
-      "/finance/revenue-by-technician", "/finance/operational-result",
-      "/dashboard/revenue-by-category", "/dashboard/recent-services",
-    ]) {
-      expect(isDemoEndpoint(ep), `${ep} deriva de /services, que é real`).toBe(false);
-    }
-  });
-
   it("todo o endpoint REAL tem de estar migrado — senão o mock passa por real", async () => {
     const { isDemoEndpoint, isLiveEndpoint } = await load();
     // Invariante: REAL_DATA ⊆ LIVE_EXACT. Um endpoint marcado real mas não

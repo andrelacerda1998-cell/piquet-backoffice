@@ -128,8 +128,6 @@ const STATUS_TONE: Record<string, StatusTone> = {
     ganho o que ainda podia correr mal.
   */
   a_procurar: "warning", com_tecnico: "active", perdido: "danger",
-  // "agendado" e "em_execucao" já existem acima, com os mesmos tons, para os
-  // estados de serviço — o pedido e o serviço passam a falar a mesma língua.
   // Faturas de custos
   pendente: "warning", parcial: "info",
   // Pagamentos
