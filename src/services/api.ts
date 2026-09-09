@@ -451,8 +451,6 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
   // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
-  // Difusão do pedido aos técnicos e atribuição — reais (lead_dispatches).
-  if (/^\/marketing\/leads\/[^/]+\/(dispatch|assign)$/.test(path)) return false;
   // Conversa com o técnico — real (whatsapp_messages.technician_id).
   if (/^\/technicians\/[^/]+\/messages$/.test(path)) return false;
   return true;
@@ -500,8 +498,6 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
   if (/^\/marketing\/push-campaigns\/[^/]+\/active$/.test(path)) return true; // ligar/desligar campanha
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
-  if (/^\/marketing\/leads\/[^/]+\/dispatch$/.test(path)) return true; // difundir o pedido aos técnicos
-  if (/^\/marketing\/leads\/[^/]+\/assign$/.test(path)) return true; // atribuir o pedido a quem aceitou
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex

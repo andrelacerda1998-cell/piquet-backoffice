@@ -13,7 +13,7 @@ import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/c
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, criarModeloTecnico, editarModeloWhatsapp, getAppFunnel,
+  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, editarModeloWhatsapp, getAppFunnel,
   type Bug, type SystemLog, type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -90,7 +90,6 @@ export default function ProdutoPage() {
   const { data: bugs } = useAsyncData(() => getBugs(), []);
   const { data: logs } = useAsyncData(() => getSystemLogs(), []);
   const { data: health, refetch: refetchHealth } = useAsyncData(() => getIntegrationsStatus(), []);
-  const [aCriarModelo, setACriarModelo] = useState(false);
   const [modeloEmEdicao, setModeloEmEdicao] = useState<string | null>(null);
   const [corpoModelo, setCorpoModelo] = useState("");
   const [aGuardarModelo, setAGuardarModelo] = useState(false);
@@ -486,10 +485,6 @@ export default function ProdutoPage() {
                             */}
                             <p className="text-[11px] text-warning">
                               Guardar submete o modelo outra vez à Meta. Até ser reaprovado não pode ser enviado.
-                              {t.name === "pedido_tecnico_piquet" && (
-                                <> O texto tem de continuar a pedir SIM ou NÃO — são as palavras que o backoffice
-                                lê nas respostas dos técnicos; sem elas as aceitações deixam de ser reconhecidas.</>
-                              )}
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               <button
@@ -524,40 +519,6 @@ export default function ProdutoPage() {
                 <p className="text-[11px] text-text-muted mt-2">
                   Um modelo aprovado é o que permite iniciar conversa com quem nunca escreveu — o caso das leads da landing.
                 </p>
-                {/*
-                  O modelo dos técnicos é a condição do despacho: sem ele, um
-                  pedido não chega a quem o pode executar. Falta enquanto não
-                  aparecer na lista acima, por isso o botão só se mostra aí.
-                */}
-                {!health!.whatsappTemplates!.some((t) => t.name === "pedido_tecnico_piquet") && (
-                  <div className="mt-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/25 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary">Falta o modelo que leva os pedidos aos técnicos</p>
-                      <p className="text-xs text-text-secondary mt-0.5">
-                        Sem ele não dá para difundir um pedido à comunidade — o técnico nunca escreveu primeiro,
-                        por isso só um modelo aprovado lhe chega.
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        setACriarModelo(true);
-                        try {
-                          const r = await criarModeloTecnico();
-                          toast(`Modelo ${r.nome} submetido à Meta. Fica em revisão até ser aprovado.`);
-                          refetchHealth();
-                        } catch (e) {
-                          toast(e instanceof Error ? e.message : "Não foi possível criar o modelo.", "error");
-                        } finally {
-                          setACriarModelo(false);
-                        }
-                      }}
-                      disabled={aCriarModelo}
-                      className="btn-primary text-sm shrink-0 disabled:opacity-50"
-                    >
-                      {aCriarModelo ? "A submeter…" : "Criar modelo"}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 

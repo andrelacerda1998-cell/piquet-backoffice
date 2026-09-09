@@ -4,7 +4,7 @@ import { isMissingColumn } from "@/lib/missingColumn";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
-import { fone9 } from "@/lib/despacho";
+import { fone9 } from "@/lib/telefone";
 
 /**
  * GET /api/marketing/leads — leads reais recebidas do formulário da landing

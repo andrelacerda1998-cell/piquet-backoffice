@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { laravelAdminRequest } from "@/lib/laravelAdmin";
-import { fone9 } from "@/lib/despacho";
+import { fone9 } from "@/lib/telefone";
 
 /**
  * Saber, do lado de cá, que números de telefone são de técnicos.

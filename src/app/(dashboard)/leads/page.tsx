@@ -15,7 +15,6 @@ import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib
 import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DespachoLead } from "@/components/ui/DespachoLead";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { mensagemBoasVindas } from "@/lib/leadReply";
 
@@ -787,9 +786,6 @@ function LeadsPageInner() {
                 )}
               </div>
 
-              {/* Despacho: quem foi perguntado e quem aceitou. Vive ao lado do
-                  pedido porque é a decisão que se segue a lê-lo. */}
-              <DespachoLead leadId={viewing.id} categoria={catName || service} />
 
               {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (

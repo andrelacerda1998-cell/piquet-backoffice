@@ -4,7 +4,7 @@ import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
 import { eDuplicado, JANELA_MESMA_MENSAGEM_MIN } from "@/lib/leadDedupe";
 import { WHATSAPP_ENABLED, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
-import { fone9 } from "@/lib/despacho";
+import { fone9 } from "@/lib/telefone";
 
 /**
  * POST /api/leads — receção PÚBLICA de leads do formulário da landing page

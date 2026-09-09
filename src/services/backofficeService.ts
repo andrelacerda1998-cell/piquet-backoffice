@@ -155,19 +155,6 @@ export interface IntegrationsStatus {
   whatsappTemplates?: WhatsappTemplate[] | null;
 }
 
-/**
- * Cria na Meta o modelo que leva os pedidos aos técnicos.
- *
- * O texto vem do servidor porque tem de bater certo com o que o webhook
- * interpreta ao ler as respostas — não é escolha de quem carrega no botão.
- */
-export async function criarModeloTecnico(): Promise<{ id: string; status: string; nome: string }> {
-  return apiPost<{ id: string; status: string; nome: string }>(
-    "/product/whatsapp-templates", {}, () => {
-      throw new Error("O WhatsApp ainda não está ligado.");
-    },
-  ).then((r) => r.data);
-}
 
 /**
  * Reescreve o corpo de um modelo. A Meta volta a pô-lo em revisão -- até ser

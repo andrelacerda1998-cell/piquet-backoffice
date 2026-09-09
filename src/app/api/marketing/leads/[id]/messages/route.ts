@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isMissingTable } from "@/lib/missingColumn";
 import { WHATSAPP_ENABLED, dentroDaJanela, enviarTextoWhatsapp, enviarModeloLead, MODELO_LEAD } from "@/lib/whatsapp";
-import { fone9 } from "@/lib/despacho";
+import { fone9 } from "@/lib/telefone";
 import { extrairDadosLead, primeiroNome } from "@/lib/leadReply";
 import { apiOk, apiErr, withStaff } from "../../../../_lib/handler";
 

@@ -1,4 +1,3 @@
-import type { Difusao } from "@/lib/despacho";
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import type { LeadStageId } from "@/lib/leadStages";
 import { mockData } from "@/mocks/data";
@@ -678,40 +677,6 @@ export async function sendTechnicianMessage(id: string, body: string): Promise<W
   return apiPost<WaMensagem>(`/technicians/${id}/messages`, { body }, () => {
     throw new Error("O envio pelo WhatsApp ainda não está ligado.");
   }).then((r) => r.data);
-}
-
-/* --- Despacho: levar o pedido à comunidade de técnicos ------------------ */
-
-export interface RespostaDifusao {
-  dispatches: Difusao[];
-  enviadas: number;
-  falhadas: number;
-  /** Técnicos escolhidos que não têm telefone registado, por isso não foram contactados. */
-  semTelefone: string[];
-}
-
-/** Quem já foi perguntado sobre este pedido, e o que respondeu. */
-export async function getLeadDispatches(id: string): Promise<{ dispatches: Difusao[]; migrated: boolean }> {
-  return apiGet<{ dispatches: Difusao[]; migrated: boolean }>(
-    `/marketing/leads/${id}/dispatch`,
-    () => ({ dispatches: [], migrated: false }),
-  ).then((r) => r.data);
-}
-
-/** Pergunta o pedido a vários técnicos ao mesmo tempo, pelo WhatsApp. */
-export async function dispatchLead(id: string, technicianIds: string[]): Promise<RespostaDifusao> {
-  return apiPost<RespostaDifusao>(`/marketing/leads/${id}/dispatch`, { technicianIds }, () => {
-    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
-  }).then((r) => r.data);
-}
-
-/** Atribui o pedido a um dos técnicos que aceitaram e avisa toda a gente. */
-export async function assignLead(id: string, technicianId: string): Promise<{ technicianName: string; avisos: string[] }> {
-  return apiPost<{ technicianName: string; avisos: string[] }>(
-    `/marketing/leads/${id}/assign`, { technicianId }, () => {
-      throw new Error("A atribuição ainda não está ligada.");
-    },
-  ).then((r) => r.data);
 }
 
 /** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
