@@ -74,3 +74,12 @@ export function quantosRepresenta(a: DashboardAlert): number {
 export function rotuloBadge(n: number): string {
   return n > 99 ? "99+" : String(n);
 }
+
+/**
+ * O ecrã onde se resolve um alerta. `null` quando não se sabe — nesse caso o
+ * chamador manda para a lista de alertas, que é sempre melhor do que um link
+ * que não leva a lado nenhum.
+ */
+export function rotaDoAlerta(a: DashboardAlert): string | null {
+  return ROTA_POR_ENTIDADE[a.entityType ?? ""] ?? null;
+}

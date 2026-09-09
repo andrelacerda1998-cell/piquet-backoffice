@@ -114,7 +114,7 @@ export const NAV_ITEMS = [
 // destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
-  "/", "/alertas",
+  "/",
   "/servicos",
   // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
   // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
@@ -134,6 +134,14 @@ export const NAV_DEEPLINKS: string[] = [
   "/servicos?tab=personalizados",
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
+  /*
+    Os Alertas saíram do menu a 09/09/2026: passaram a ser o bloco "Requer
+    atenção" no topo do ecrã inicial. A lista completa continua a existir --
+    é onde se adiam alertas e se vêem os que não cabem no bloco -- mas deixou
+    de fazer sentido como destino próprio: um ecrã de alertas é um sítio onde
+    se vai, e o objectivo é que se veja sem ir a lado nenhum.
+  */
+  "/alertas",
 ];
 
 export const MARKETING_CHANNELS = [
