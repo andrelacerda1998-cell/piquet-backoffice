@@ -288,6 +288,26 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  /*
+    Gráficos derivados dos serviços (08/09/2026).
+
+    Estavam marcados como demonstração enquanto o próprio `/services` já estava
+    marcado como real -- a mesma tabela dava um selo diferente conforme se
+    olhasse para a lista ou para o gráfico feito a partir dela. Derivam de
+    `services`, `employees` e `company_invoices`, e as três já são reais desde
+    que os seeds foram apagados.
+
+    O selo fica onde é verdade: `/finance/summary` e os `/tax/*` continuam
+    demonstração, porque somam `tax_obligations` -- 27 linhas escritas todas no
+    mesmo dia por um seed.
+  */
+  "/dashboard/recent-services",
+  "/dashboard/revenue-by-category",
+  "/finance/by-service",
+  "/finance/daily-revenue",
+  "/finance/operational-result",
+  "/finance/revenue-by-technician",
+  "/finance/revenue-vs-costs",
   // Tickets de suporte: chegam das apps por POST /api/tickets e ficam na tabela
   // support_tickets. São mensagens de pessoas reais — nunca foram semeados.
   // Sem isto, `deepZero` transformava a lista em [] e a caixa aparecia sempre
