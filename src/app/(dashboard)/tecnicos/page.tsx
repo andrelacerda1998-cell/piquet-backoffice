@@ -13,6 +13,7 @@ import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
+import QualidadePage from "../qualidade/page";
 import {
   getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
@@ -334,6 +335,12 @@ export default function TechniciansPage() {
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
     { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
+    /*
+      A Qualidade era um ecrã próprio no menu, mas não é um domínio -- é uma
+      vista sobre os técnicos: avaliações, faltas, cancelamentos. Passou a
+      separador a 09/09/2026, e o ecrã saiu do menu.
+    */
+    { id: "desempenho", label: "Desempenho" },
   ];
 
   const topColumns: Column<TopVendor>[] = [
@@ -430,6 +437,8 @@ export default function TechniciansPage() {
         )}
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+        {tab === "desempenho" && <QualidadePage />}
 
         {tab === "visao" && (
           <SubTabs tabs={[

@@ -80,10 +80,10 @@ export const SERVICE_STATUS_LABELS: Record<string, string> = {
 };
 
 export const NAV_ITEMS = [
-  { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
+  { href: "/", label: "Hoje", icon: "LayoutDashboard" },
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
-  { href: "/servicos", label: "Operações", icon: "Wrench" },
+  { href: "/servicos", label: "Serviços", icon: "Wrench" },
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
@@ -102,6 +102,9 @@ export const NAV_ITEMS = [
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
   { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
+  // O ecrã /impostos-rh é o conteúdo deste separador. O ⌘K aponta para o
+  // separador, não para o ecrã solto: dois endereços para o mesmo conteúdo é
+  // como se descobre, a meio de uma conversa, que se está no sítio errado.
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
 ] as const;
@@ -113,15 +116,29 @@ export const NAV_ITEMS = [
 // Menu enxuto: Clientes é o hub de pessoas (absorve o CRM & Leads como
 // destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
 // tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
+/*
+  O menu, por ordem do dia de trabalho: o que precisa de mim → quem pediu →
+  o que está a ser feito → com quem → para quem → quanto → de onde vêm.
+
+  Passou de treze entradas para oito a 09/09/2026. Saíram do menu, e ficam a um
+  ⌘K de distância:
+
+  - Qualidade  → separador "Desempenho" em Técnicos: não é um domínio, é uma
+                 vista sobre os técnicos.
+  - Produto    → as Integrações consultam-se de vez em quando; o funil e os
+                 downloads pertencem ao Marketing.
+  - Suporte    → zero tickets desde que existe.
+  - Equipa, Desenvolvimento → ferramentas de gestão de uma empresa com equipa,
+                 num backoffice que uma pessoa usa para operar.
+
+  Ficaram oito e não seis. As duas que a auditoria queria fundir -- Serviços em
+  Pedidos -- dependem da ponte com a app estar ligada: enquanto os serviços do
+  Laravel não entrarem nos Pedidos, tirar o ecrã de Serviços deixava-os sem
+  sítio nenhum.
+*/
 export const NAV_PRIMARY: string[] = [
-  "/",
-  "/servicos",
-  // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
-  // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
-  // coisas era o mesmo conteúdo em dois sítios.
-  "/qualidade",
-  "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento", "/configuracao",
+  "/", "/leads", "/servicos", "/tecnicos", "/clientes",
+  "/financeiro", "/marketing", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -134,6 +151,8 @@ export const NAV_DEEPLINKS: string[] = [
   "/servicos?tab=personalizados",
   "/tecnicos?tab=recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
+  // Saíram do menu a 09/09/2026 (ver NAV_PRIMARY). Continuam inteiros.
+  "/qualidade", "/produto", "/suporte", "/chat", "/desenvolvimento",
   /*
     Os Alertas saíram do menu a 09/09/2026: passaram a ser o bloco "Requer
     atenção" no topo do ecrã inicial. A lista completa continua a existir --
