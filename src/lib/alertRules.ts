@@ -30,13 +30,6 @@ export interface SinaisDoNegocio {
   diasSemDadosDeAnuncios: number | null;
   /** Pagamentos recusados nos últimos 7 dias. */
   pagamentosRecusados: number;
-  /**
-   * Pedidos com técnicos que já aceitaram e continuam sem ninguém escolhido.
-   *
-   * A bola é nossa e o técnico está à espera: prometeu-se disponibilidade e
-   * não se respondeu. É isto que faz alguém deixar de responder à terceira vez.
-   */
-  despachosPorDecidir: Array<{ leadId: string; nome: string; aceites: number; desde: string }>;
 }
 
 /**
@@ -111,26 +104,6 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `${l.nome} pediu contacto e continua no estado "Novo".`,
       "Abrir o pedido e responder, ou perguntar a técnicos.",
       l.recebidaEm, "lead", l.id,
-    ));
-  }
-
-  /*
-    --- Técnicos à espera de resposta nossa ---------------------------------
-
-    Alta desde o primeiro minuto, e não ao fim de um dia como as leads: aqui
-    há gente que já disse que pode ir e está a segurar a agenda à espera. O
-    custo de demorar não é só o cliente -- é a rede deixar de responder.
-  */
-  for (const d of s.despachosPorDecidir) {
-    const dias = diasEntre(d.desde, agoraMs);
-    alertas.push(novo(
-      `despacho-por-decidir-${d.leadId}`,
-      "operacional",
-      dias >= 1 ? "critica" : "alta",
-      d.aceites === 1 ? "Um técnico aceitou um pedido" : `${d.aceites} técnicos aceitaram um pedido`,
-      `${d.nome} tem quem o faça e continua sem técnico atribuído.`,
-      "Abrir o pedido e escolher o técnico — quem aceitou está à espera.",
-      d.desde, "lead", d.leadId,
     ));
   }
 

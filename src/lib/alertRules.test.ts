@@ -7,7 +7,6 @@ const haDias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString();
 const vazio: SinaisDoNegocio = {
   leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [], faturasVencidas: [], impostosVencidos: [],
   documentosPendentes: 0, diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
-  despachosPorDecidir: [],
 };
 
 describe("gerarAlertas", () => {
@@ -72,13 +71,11 @@ describe("gerarAlertas", () => {
   it("os alertas que restam resolvem-se todos deste lado", () => {
     const r = gerarAlertas({
       leadsPorResponder: [{ id: "1", nome: "Ana", recebidaEm: haDias(5) }],
-      despachosPorDecidir: [{ leadId: "2", nome: "Rui", aceites: 1, desde: haDias(0) }],
       cronsFalhados: [], ticketsAbertos: [], documentosPendentes: 0,
       diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
       faturasVencidas: [], impostosVencidos: [],
     }, AGORA);
     expect(r.find((a) => a.entityId === "1")!.priority).toBe("critica");
-    expect(r.find((a) => a.entityId === "2")!.priority).toBe("alta");
   });
 
   it("fatura vencida é alta; aos 15 dias passa a crítica", () => {
@@ -123,9 +120,8 @@ describe("gerarAlertas", () => {
       faturasVencidas: [{ fornecedor: "X", valorEmDivida: 10, venceuEm: haDias(1) }],
       impostosVencidos: [{ nome: "IVA", valor: 5, venceuEm: haDias(1), estimado: false }],
       documentosPendentes: 40, diasSemDadosDeAnuncios: 10, pagamentosRecusados: 6,
-      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 2, desde: haDias(1) }],
     }, AGORA);
-    expect(r.length).toBe(9);
+    expect(r.length).toBe(8);
     for (const a of r) {
       expect(a.recommendedAction.length, a.title).toBeGreaterThan(10);
       expect(a.status).toBe("novo");
@@ -140,24 +136,3 @@ describe("gerarAlertas", () => {
   });
 });
 
-describe("técnicos à espera de decisão", () => {
-  /*
-    Alta desde o primeiro minuto, ao contrário do orçamento por responder:
-    aqui a bola é nossa e há um técnico a segurar a agenda. É o alerta que
-    protege a relação com a rede.
-  */
-  it("um técnico que aceitou hoje já é alerta alto", () => {
-    const r = gerarAlertas({ ...vazio,
-      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 1, desde: haDias(0) }] }, AGORA);
-    expect(r).toHaveLength(1);
-    expect(r[0].priority).toBe("alta");
-    expect(r[0].title).toBe("Um técnico aceitou um pedido");
-  });
-
-  it("ao fim de um dia passa a crítico", () => {
-    const r = gerarAlertas({ ...vazio,
-      despachosPorDecidir: [{ leadId: "l1", nome: "Diogo", aceites: 3, desde: haDias(1) }] }, AGORA);
-    expect(r[0].priority).toBe("critica");
-    expect(r[0].title).toBe("3 técnicos aceitaram um pedido");
-  });
-});

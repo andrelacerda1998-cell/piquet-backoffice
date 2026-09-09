@@ -37,46 +37,6 @@ export const GET = withStaff(async () => {
         .map((l) => ({ id: l.id, nome: l.name || l.phone || "Contacto sem nome", recebidaEm: l.created_at }));
     }, []),
 
-    /*
-      Pedidos com técnicos que já aceitaram e continuam sem ninguém escolhido.
-      Duas leituras pequenas: as difusões aceites e o nome da lead. Sem a
-      tabela (migração por correr) fica vazio e nada rebenta.
-    */
-    despachosPorDecidir: await tenta("despachos", async () => {
-      const { data } = await db
-        .from("lead_dispatches")
-        .select("lead_id, responded_at")
-        .eq("status", "aceite")
-        .limit(500);
-      const linhas = (data ?? []) as Array<{ lead_id: string; responded_at: string | null }>;
-      if (linhas.length === 0) return [];
-
-      const ids = [...new Set(linhas.map((l) => l.lead_id))];
-      const { data: ls } = await db
-        .from("leads").select("id, name, phone, technician_name").in("id", ids);
-      const leads = new Map(
-        ((ls ?? []) as Array<{ id: string; name: string; phone: string; technician_name: string | null }>)
-          .map((l) => [l.id, l]),
-      );
-
-      return ids.flatMap((id) => {
-        const lead = leads.get(id);
-        // Já tem técnico escrito: a decisão foi tomada, não há nada a avisar.
-        if (!lead || (lead.technician_name || "").trim()) return [];
-        const aceites = linhas.filter((l) => l.lead_id === id);
-        const desde = aceites
-          .map((a) => a.responded_at)
-          .filter(Boolean)
-          .sort()[0] as string | undefined;
-        return [{
-          leadId: id,
-          nome: lead.name || lead.phone || "Pedido sem nome",
-          aceites: aceites.length,
-          desde: desde || new Date().toISOString(),
-        }];
-      });
-    }, []),
-
     faturasVencidas: await tenta("company_invoices", async () => {
       const hoje = new Date(agora).toISOString().slice(0, 10);
       const { data } = await db.from("company_invoices")
