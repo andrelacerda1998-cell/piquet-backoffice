@@ -153,6 +153,8 @@ export interface IntegrationsStatus {
   whatsappNumber?: WhatsappNumberStatus | null;
   whatsappNumberError?: string | null;
   whatsappTemplates?: WhatsappTemplate[] | null;
+  /** O `WHATSAPP_APP_SECRET` está definido? Sem ele o webhook recusa tudo. */
+  whatsappWebhookSigned?: boolean;
 }
 
 

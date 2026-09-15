@@ -382,6 +382,16 @@ export default function ProdutoPage() {
               return (
                 <div className="mb-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Número de WhatsApp</p>
+                  {health.whatsappWebhookSigned === false && (
+                    <div className="card p-4 border-l-[3px] border-l-danger mb-3">
+                      <p className="text-sm font-medium text-text-primary">Mensagens recebidas estão a ser recusadas</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        Falta o <code>WHATSAPP_APP_SECRET</code> na Vercel. Sem ele não há como distinguir a Meta de
+                        quem descubra o endereço do webhook, por isso o backoffice recusa tudo — nenhuma mensagem de
+                        cliente entra em Pedidos. A Meta reenvia o que foi recusado assim que o segredo for ligado.
+                      </p>
+                    </div>
+                  )}
                   {health.whatsappNumberError ? (
                     <div className="card p-4 border-l-[3px] border-l-danger">
                       <p className="text-sm font-medium text-text-primary">Não foi possível ler o número na Meta</p>

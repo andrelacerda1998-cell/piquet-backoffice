@@ -89,5 +89,10 @@ export const GET = withStaff(async () => {
       Paylands: paylandsConfigured(),
       WhatsApp: WHATSAPP_ENABLED,
     },
+    /*
+      O webhook recusa tudo sem o App Secret. Sem isto à vista, a única pista
+      seria os pedidos deixarem de entrar -- e ninguém liga uma coisa à outra.
+    */
+    whatsappWebhookSigned: Boolean(process.env.WHATSAPP_APP_SECRET),
   });
 });

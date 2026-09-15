@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { WHATSAPP_ENABLED, enviarTextoWhatsapp } from "@/lib/whatsapp";
 import { extrairDadosLead, mensagemBoasVindas, eFormularioLanding, contactoNoFormulario } from "@/lib/leadReply";
 import { fone9 } from "@/lib/telefone";
+import { verificarAssinaturaMeta } from "../../_lib/webhookAuth";
 import { tecnicoPorTelefone } from "@/lib/tecnicoContactos";
 
 /**
@@ -12,13 +12,15 @@ import { tecnicoPorTelefone } from "@/lib/tecnicoContactos";
  * "Não iniciado" (`source: "whatsapp"`).
  *
  * GET  — verificação do webhook (Meta chama com hub.challenge na configuração).
- * POST — mensagens recebidas. Se `WHATSAPP_APP_SECRET` estiver definido, valida
- *        a assinatura `X-Hub-Signature-256`.
+ * POST — mensagens recebidas. Exige a assinatura `X-Hub-Signature-256`, que a
+ *        Meta calcula com o App Secret: sem `WHATSAPP_APP_SECRET` definido o
+ *        webhook recusa tudo (401) em vez de aceitar tudo.
  *
  * Configuração (App > WhatsApp > Configuration na Meta):
  *   Callback URL:  https://piquet-dashboard.vercel.app/api/webhooks/whatsapp
  *   Verify token:  = env WHATSAPP_VERIFY_TOKEN
  *   Subscrever ao campo "messages".
+ *   WHATSAPP_APP_SECRET = App Secret da app (Definições > Básico).
  */
 
 export const dynamic = "force-dynamic";
@@ -56,14 +58,23 @@ function messageText(m: WaMessage): string {
 export async function POST(req: Request) {
   const raw = await req.text();
 
-  // Validação da assinatura (opcional — só se o segredo estiver configurado).
-  const secret = process.env.WHATSAPP_APP_SECRET;
-  if (secret) {
-    const sig = req.headers.get("x-hub-signature-256") ?? "";
-    const expected = "sha256=" + crypto.createHmac("sha256", secret).update(raw).digest("hex");
-    const ok = sig.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-    if (!ok) return new NextResponse("bad signature", { status: 401 });
+  /*
+    Assinatura da Meta — obrigatória.
+
+    Era opcional: sem `WHATSAPP_APP_SECRET` definido, qualquer POST anónimo que
+    descobrisse este URL criava um pedido no backoffice com nome, telefone e
+    texto à escolha de quem o enviasse. Passa a valer a mesma regra do webhook
+    do Outlook (`verificarChave`): env em falta é porta fechada, não porta
+    aberta.
+
+    A Meta reenvia o que for recusado, por isso ligar o segredo depois de um
+    deploy não perde mensagens — só as atrasa.
+  */
+  const auth = verificarAssinaturaMeta(raw, req.headers.get("x-hub-signature-256"), process.env.WHATSAPP_APP_SECRET);
+  if (!auth.ok) {
+    // O motivo fica no servidor; a Meta só vê 401.
+    console.warn(`[whatsapp] webhook recusado: ${auth.motivo}`);
+    return new NextResponse("unauthorized", { status: 401 });
   }
 
   let payload: unknown;
