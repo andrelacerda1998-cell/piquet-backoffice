@@ -13,7 +13,7 @@ import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/c
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, editarModeloWhatsapp, getAppFunnel,
+  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel,
   type Bug, type SystemLog, type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -90,9 +90,6 @@ export default function ProdutoPage() {
   const { data: bugs } = useAsyncData(() => getBugs(), []);
   const { data: logs } = useAsyncData(() => getSystemLogs(), []);
   const { data: health, refetch: refetchHealth } = useAsyncData(() => getIntegrationsStatus(), []);
-  const [modeloEmEdicao, setModeloEmEdicao] = useState<string | null>(null);
-  const [corpoModelo, setCorpoModelo] = useState("");
-  const [aGuardarModelo, setAGuardarModelo] = useState(false);
   const { data: errors } = useAsyncData(() => getAppErrors(1, 10), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
@@ -352,185 +349,6 @@ export default function ProdutoPage() {
                 </div>
               </div>
             ))}
-
-            {/*
-              Número de WhatsApp, lido ao vivo da Meta.
-              Existe porque a pergunta "o nome já foi aprovado?" só tinha
-              resposta na consola do Facebook -- e é a diferença entre o
-              cliente ver "Piquet" ou ver um número desconhecido a ligar-lhe.
-            */}
-            {(health?.whatsappNumber || health?.whatsappNumberError) && (() => {
-              const n = health.whatsappNumber;
-              const st = (n?.nameStatus ?? "").toUpperCase();
-              const aprovado = st === "APPROVED";
-              const tom = aprovado
-                ? "bg-success-light text-success"
-                : st === "DECLINED"
-                  ? "bg-danger-light text-danger"
-                  : "bg-warning-light text-warning";
-              const rotulo = aprovado ? "Nome aprovado"
-                : st === "PENDING_REVIEW" ? "Nome em revisão"
-                : st === "DECLINED" ? "Nome recusado"
-                : st === "EXPIRED" ? "Aprovação expirada"
-                : st || "Sem estado";
-              const linha = (r: string, v: string | null | undefined) => (
-                <div key={r} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
-                  <span className="text-xs text-text-muted shrink-0">{r}</span>
-                  <span className="text-sm text-text-primary text-right truncate">{v || "—"}</span>
-                </div>
-              );
-              return (
-                <div className="mb-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Número de WhatsApp</p>
-                  {health.whatsappWebhookSigned === false && (
-                    <div className="card p-4 border-l-[3px] border-l-danger mb-3">
-                      <p className="text-sm font-medium text-text-primary">Mensagens recebidas estão a ser recusadas</p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        Falta o <code>WHATSAPP_APP_SECRET</code> na Vercel. Sem ele não há como distinguir a Meta de
-                        quem descubra o endereço do webhook, por isso o backoffice recusa tudo — nenhuma mensagem de
-                        cliente entra em Pedidos. A Meta reenvia o que foi recusado assim que o segredo for ligado.
-                      </p>
-                    </div>
-                  )}
-                  {health.whatsappNumberError ? (
-                    <div className="card p-4 border-l-[3px] border-l-danger">
-                      <p className="text-sm font-medium text-text-primary">Não foi possível ler o número na Meta</p>
-                      <p className="text-xs text-text-secondary mt-1">{health.whatsappNumberError}</p>
-                    </div>
-                  ) : n && (
-                    <div className="card p-4 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-success-light text-success shrink-0">
-                            <MessageCircle className="h-4 w-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-text-primary truncate">{n.verifiedName || "Sem nome definido"}</p>
-                            <p className="text-xs text-text-muted">{n.displayPhoneNumber || "—"}</p>
-                          </div>
-                        </div>
-                        <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium", tom)}>{rotulo}</span>
-                      </div>
-                      {!aprovado && (
-                        <p className="text-xs text-text-secondary">
-                          Enquanto o nome não estiver aprovado, os clientes veem o número em vez de
-                          &ldquo;{n.verifiedName || "Piquet"}&rdquo;. O envio e a receção de mensagens funcionam na mesma.
-                        </p>
-                      )}
-                      <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
-                        {linha("Qualidade", n.qualityRating)}
-                        {linha("Limite de conversas novas", n.messagingLimit)}
-                        {linha("Verificação do número", n.verificationStatus)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/*
-              Modelos de mensagem. Estão aqui, colados ao número, porque são a
-              outra metade da mesma pergunta: o número diz se os clientes veem
-              "Piquet", e os modelos dizem se lhes conseguimos ESCREVER
-              PRIMEIRO -- sem um modelo aprovado, as leads da landing (que
-              nunca escrevem) ficam sem resposta automática.
-            */}
-            {(health?.whatsappTemplates?.length ?? 0) > 0 && (
-              <div className="mb-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Modelos de mensagem</p>
-                <div className="card divide-y divide-surface-border">
-                  {health!.whatsappTemplates!.map((t) => {
-                    const st = (t.status || "").toUpperCase();
-                    const tom = st === "APPROVED" ? "bg-success-light text-success"
-                      : st === "REJECTED" ? "bg-danger-light text-danger"
-                      : st === "PENDING" ? "bg-warning-light text-warning"
-                      : "bg-surface-subtle text-text-secondary";
-                    const rotulo = st === "APPROVED" ? "Aprovado"
-                      : st === "PENDING" ? "Em revisão"
-                      : st === "REJECTED" ? "Recusado"
-                      : st === "PAUSED" ? "Pausado"
-                      : st || "—";
-                    const aEditar = modeloEmEdicao === t.name;
-                    return (
-                      <div key={t.id} className="px-4 py-2.5 space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-text-primary truncate font-mono">{t.name}</p>
-                            <p className="text-xs text-text-muted">
-                              {[t.category, t.language].filter(Boolean).join(" · ") || "—"}
-                              {t.rejectedReason && <span className="text-danger"> · {t.rejectedReason}</span>}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Em revisão não há nada a editar: está a ser lido do lado da Meta. */}
-                            {t.editavel && !aEditar && (
-                              <button
-                                onClick={() => { setModeloEmEdicao(t.name); setCorpoModelo(t.corpo); }}
-                                className="btn-secondary text-xs py-1"
-                              >
-                                Editar texto
-                              </button>
-                            )}
-                            <span className={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium", tom)}>{rotulo}</span>
-                          </div>
-                        </div>
-
-                        {!aEditar && t.corpo && (
-                          <p className="whitespace-pre-wrap text-xs text-text-secondary">{t.corpo}</p>
-                        )}
-
-                        {aEditar && (
-                          <div className="space-y-2">
-                            <textarea
-                              value={corpoModelo}
-                              onChange={(e) => setCorpoModelo(e.target.value)}
-                              rows={7}
-                              className="input-field resize-y text-sm w-full font-mono"
-                            />
-                            {/*
-                              O aviso não é decorativo: guardar volta a pôr o
-                              modelo em revisão e, até ser reaprovado, deixa de
-                              poder ser enviado. Quem edita tem de saber que
-                              está a parar o canal, não a mexer num campo.
-                            */}
-                            <p className="text-[11px] text-warning">
-                              Guardar submete o modelo outra vez à Meta. Até ser reaprovado não pode ser enviado.
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                onClick={async () => {
-                                  setAGuardarModelo(true);
-                                  try {
-                                    await editarModeloWhatsapp(t.name, corpoModelo);
-                                    toast(`${t.name} submetido à Meta. Fica em revisão até ser aprovado.`);
-                                    setModeloEmEdicao(null);
-                                    refetchHealth();
-                                  } catch (e) {
-                                    toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
-                                  } finally {
-                                    setAGuardarModelo(false);
-                                  }
-                                }}
-                                disabled={aGuardarModelo || !corpoModelo.trim() || corpoModelo.trim() === t.corpo.trim()}
-                                className="btn-primary text-xs py-1.5 disabled:opacity-50"
-                              >
-                                {aGuardarModelo ? "A submeter…" : "Guardar e submeter"}
-                              </button>
-                              <button onClick={() => setModeloEmEdicao(null)} className="btn-secondary text-xs py-1.5">
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-[11px] text-text-muted mt-2">
-                  Um modelo aprovado é o que permite iniciar conversa com quem nunca escreveu — o caso das leads da landing.
-                </p>
-              </div>
-            )}
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Pipelines de dados</p>

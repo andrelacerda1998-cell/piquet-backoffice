@@ -122,52 +122,9 @@ export interface IntegrationJob {
   lastOkAt: string | null;
   consecutiveFailures: number;
 }
-/** Estado do número na Meta — ver `estadoNumeroWhatsapp` em lib/whatsapp.ts. */
-export interface WhatsappNumberStatus {
-  displayPhoneNumber: string | null;
-  verifiedName: string | null;
-  nameStatus: string | null;
-  qualityRating: string | null;
-  messagingLimit: string | null;
-  verificationStatus: string | null;
-}
-
-/** Modelo de mensagem — ver `modelosWhatsapp` em lib/whatsapp.ts. */
-export interface WhatsappTemplate {
-  id: string;
-  name: string;
-  status: string;
-  category: string | null;
-  language: string | null;
-  rejectedReason: string | null;
-  /** Texto do corpo, com os `{{n}}` por substituir. */
-  corpo: string;
-  /** A Meta só deixa editar modelos aprovados, recusados ou pausados. */
-  editavel: boolean;
-}
-
 export interface IntegrationsStatus {
   jobs: IntegrationJob[];
   configured: Record<string, boolean>;
-  /** `null` quando o WhatsApp não está configurado ou a leitura falhou. */
-  whatsappNumber?: WhatsappNumberStatus | null;
-  whatsappNumberError?: string | null;
-  whatsappTemplates?: WhatsappTemplate[] | null;
-  /** O `WHATSAPP_APP_SECRET` está definido? Sem ele o webhook recusa tudo. */
-  whatsappWebhookSigned?: boolean;
-}
-
-
-/**
- * Reescreve o corpo de um modelo. A Meta volta a pô-lo em revisão -- até ser
- * reaprovado, o modelo não pode ser enviado.
- */
-export async function editarModeloWhatsapp(nome: string, corpo: string): Promise<{ nome: string; status: string }> {
-  return apiPut<{ nome: string; status: string }>(
-    "/product/whatsapp-templates", { nome, corpo }, () => {
-      throw new Error("O WhatsApp ainda não está ligado.");
-    },
-  ).then((r) => r.data);
 }
 
 export async function getIntegrationsStatus(): Promise<IntegrationsStatus> {

@@ -616,52 +616,23 @@ export interface WaMensagem {
   createdAt: string;
 }
 
-/** A conversa de WhatsApp de uma lead, mais o estado do canal. */
+/** O histórico de WhatsApp de um pedido. Só leitura — não se envia do backoffice. */
 export interface Conversa {
   messages: WaMensagem[];
-  /** Há chaves da Meta na Vercel para poder enviar? */
-  configured: boolean;
-  /** Ainda se pode responder em texto livre (< 24h da última entrada)? */
-  windowOpen: boolean;
   /** A migração da tabela já correu? */
   migrated: boolean;
 }
 
-/** Lê a conversa de WhatsApp de uma lead. Sem backend, devolve vazio. */
+/** Lê o histórico de WhatsApp de uma lead. Sem backend, devolve vazio. */
 export async function getLeadMessages(id: string): Promise<Conversa> {
   return apiGet<Conversa>(
     `/marketing/leads/${id}/messages`,
-    () => ({ messages: [], configured: false, windowOpen: false, migrated: false }),
+    () => ({ messages: [], migrated: false }),
   ).then((r) => r.data);
 }
 
 /**
- * Envia uma resposta pelo WhatsApp. Lança com a mensagem do servidor quando não
- * dá (canal por ligar, janela de 24h fechada, ou a Meta recusou) — o ecrã
- * mostra esse motivo em vez de fingir que enviou.
- */
-export async function sendLeadMessage(id: string, body: string): Promise<WaMensagem> {
-  return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { body }, () => {
-    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
-  }).then((r) => r.data);
-}
-
-/**
- * Envia a confirmação por mensagem-modelo aprovada.
- *
- * É o único envio permitido fora das 24h -- e é o que reabre a janela para se
- * poder falar em texto livre a seguir. O corpo é montado no servidor a partir
- * do pedido (nome, serviço, localização): os parâmetros do modelo têm de bater
- * certo com o que a Meta aprovou, não é texto a escolher aqui.
- */
-export async function sendLeadTemplate(id: string): Promise<WaMensagem> {
-  return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { modelo: true }, () => {
-    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
-  }).then((r) => r.data);
-}
-
-/**
- * Conversa de WhatsApp com um técnico.
+ * Histórico de WhatsApp de um técnico.
  *
  * Separada da do cliente: uma mensagem de um técnico deixou de precisar de uma
  * lead para existir, e por isso deixou de aparecer no CRM como um pedido.
@@ -669,14 +640,8 @@ export async function sendLeadTemplate(id: string): Promise<WaMensagem> {
 export async function getTechnicianMessages(id: string): Promise<Conversa> {
   return apiGet<Conversa>(
     `/technicians/${id}/messages`,
-    () => ({ messages: [], configured: false, windowOpen: false, migrated: false }),
+    () => ({ messages: [], migrated: false }),
   ).then((r) => r.data);
-}
-
-export async function sendTechnicianMessage(id: string, body: string): Promise<WaMensagem> {
-  return apiPost<WaMensagem>(`/technicians/${id}/messages`, { body }, () => {
-    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
-  }).then((r) => r.data);
 }
 
 /** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
