@@ -46,6 +46,47 @@ function oficios(v: VendorMinimo): string[] {
   return doMatching.length > 0 ? doMatching : limpar(v.operation_areas);
 }
 
+interface ServicoDoCatalogo {
+  name: string | null;
+  /** A categoria a que o serviço pertence ("CANALIZAÇÃO", "LIMPEZAS", ...). */
+  operation_area_name?: string | null;
+}
+
+/**
+ * O catálogo: que categoria tem cada serviço.
+ *
+ * Existe porque `services_types` são SERVIÇOS ("Montar Cama de Solteiro"), e
+ * são mais de 150. Para falar com a rede o nível útil é a categoria, e a
+ * ligação entre os dois só existe do lado do Laravel.
+ *
+ * Devolve um mapa vazio se a leitura falhar: perde-se a categoria, não a
+ * sincronização -- os telefones e os serviços continuam a ser guardados.
+ */
+async function catalogoPorServico(): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  try {
+    let pagina = 1;
+    let ultima = 1;
+    do {
+      const r = await laravelAdminRequest<{
+        items: ServicoDoCatalogo[];
+        meta?: { last_page?: number };
+      }>(`/v1/admin/services-types?per_page=100&page=${pagina}`);
+      const itens = r.items ?? [];
+      for (const t of itens) {
+        const servico = (t.name ?? "").trim();
+        const categoria = (t.operation_area_name ?? "").trim();
+        if (servico && categoria) mapa.set(servico.toLowerCase(), categoria);
+      }
+      ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
+      pagina++;
+    } while (pagina <= ultima && pagina <= 50);
+  } catch {
+    /* sem catálogo não há categoria -- mas o resto da sincronização vale. */
+  }
+  return mapa;
+}
+
 interface PaginaVendors {
   items: VendorMinimo[];
   meta?: { current_page?: number; last_page?: number; total?: number };
@@ -83,21 +124,34 @@ export async function sincronizarTelefonesTecnicos(): Promise<{ guardados: numbe
     pagina++;
   } while (pagina <= ultima && pagina <= 50); // trava de segurança: 5000 técnicos
 
-  return guardarTelefonesTecnicos(todos);
+  return guardarTelefonesTecnicos(todos, await catalogoPorServico());
 }
 
 /** Guarda uma lista de técnicos já lida. */
 export async function guardarTelefonesTecnicos(
   vendors: VendorMinimo[],
+  catalogo: Map<string, string> = new Map(),
 ): Promise<{ guardados: number; semTelefone: number }> {
   const linhas = vendors
-    .map((v) => ({
-      phone9: fone9(v.phone_number || ""),
-      technician_id: String(v.id),
-      name: v.name || "",
-      trades: oficios(v),
-      updated_at: new Date().toISOString(),
-    }))
+    .map((v) => {
+      const trades = oficios(v);
+      /*
+        A categoria de cada serviço, sem repetir. Um serviço que não esteja no
+        catálogo simplesmente não contribui -- é melhor do que inventar uma
+        categoria a partir do nome.
+      */
+      const categorias = [...new Set(
+        trades.map((t) => catalogo.get(t.toLowerCase())).filter((c): c is string => Boolean(c)),
+      )].sort();
+      return {
+        phone9: fone9(v.phone_number || ""),
+        technician_id: String(v.id),
+        name: v.name || "",
+        trades,
+        categories: categorias,
+        updated_at: new Date().toISOString(),
+      };
+    })
     .filter((l) => l.phone9.length === 9);
 
   if (linhas.length === 0) {
