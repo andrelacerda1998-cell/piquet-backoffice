@@ -510,6 +510,15 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
   if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
   if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
+  /*
+    Validar o subutilizador da AT e criar o workspace de faturação.
+
+    As duas rotas existem e chamam o Laravel, mas faltavam aqui -- e sem
+    estarem nesta lista o pedido nunca sai do browser: cai no ramo de
+    demonstração, que lança "precisa da API de admin do Laravel configurada".
+    A mensagem culpava a configuração do servidor, que estava certa.
+  */
+  if (/^\/technicians\/[^/]+\/(at-validation|invoice-workspace)$/.test(path)) return true;
   if (/^\/technicians\/[^/]+\/messages$/.test(path)) return true; // conversa de WhatsApp do técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria

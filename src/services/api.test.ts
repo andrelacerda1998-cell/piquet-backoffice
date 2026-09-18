@@ -24,6 +24,21 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/technicians/live-locations")).toBe(true);
   });
 
+  /*
+    Os dois botões da ficha do técnico. Estavam fora da allowlist e por isso o
+    pedido nunca saía do browser: caía no ramo de demonstração, que lança
+    "precisa da API de admin do Laravel configurada" -- uma mensagem que
+    culpava a configuração do servidor, estando ela certa.
+  */
+  it("marca como reais as ações da ficha do técnico (AT e faturação)", () => {
+    expect(isLiveEndpoint("/technicians/123/at-validation")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/invoice-workspace")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/suspend")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/restore")).toBe(true);
+    // Um subcaminho inventado continua fora: a regra é estreita de propósito.
+    expect(isLiveEndpoint("/technicians/123/qualquer-coisa")).toBe(false);
+  });
+
   it("marca como migrados os endpoints da Fase 3a (Financeiro derivável)", () => {
     expect(isLiveEndpoint("/finance/by-service?page=1")).toBe(true);
     expect(isLiveEndpoint("/finance/daily-revenue")).toBe(true);
