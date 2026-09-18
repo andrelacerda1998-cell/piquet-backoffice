@@ -5,15 +5,15 @@ import { sincronizarTelefonesTecnicos } from "@/lib/tecnicoContactos";
 import { logCronRun } from "../../_lib/cronlog";
 
 /**
- * Cron diário: copia do Laravel os números de telefone dos técnicos.
+ * Cron diário: copia do Laravel o nome, o telefone e o ofício dos técnicos.
  *
- * É desta cópia que o webhook do WhatsApp depende para saber se quem escreve é
- * cliente ou alguém da rede. Sem ela actualizada, um técnico novo escreve e
- * entra no CRM como se fosse um pedido de serviço -- e um técnico que mudou de
- * número deixa de ser reconhecido.
+ * Servia o webhook do WhatsApp, que saiu com a Cloud API. O que continua a
+ * valer é a cópia em si: o token do Laravel só existe no servidor, e sem ela
+ * não há forma de responder a "quem faz canalização" -- que é o que permite
+ * falar com um grupo de técnicos de uma vez.
  *
- * A difusão de pedidos também a actualiza, porque já lê a lista toda. Este
- * cron existe para os dias em que ninguém despacha nada.
+ * Um técnico novo, ou um que mudou de número ou de ofício, entra aqui no dia
+ * seguinte.
  */
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
   try {
     const r = await sincronizarTelefonesTecnicos();
-    await logCronRun("technician-phones", true, `${r.guardados} números`, r.guardados);
+    await logCronRun("technician-phones", true, `${r.guardados} técnicos com ofício`, r.guardados);
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     const motivo = e instanceof Error ? e.message : String(e);

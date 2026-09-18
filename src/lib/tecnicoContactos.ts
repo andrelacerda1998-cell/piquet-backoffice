@@ -3,19 +3,30 @@ import { laravelAdminRequest } from "@/lib/laravelAdmin";
 import { fone9 } from "@/lib/telefone";
 
 /**
- * Saber, do lado de cá, que números de telefone são de técnicos.
+ * Uma cópia local de quem são os técnicos: nome, telefone e ofício.
  *
- * Os técnicos vivem no Laravel. Mas quem precisa desta resposta é o webhook do
- * WhatsApp, a cada mensagem que entra: sem ela, a mensagem de um técnico vira
- * uma lead e a rede de quem executa os serviços entra na lista de quem os pede.
+ * Os técnicos vivem no Laravel, e o token para lá chegar só existe no
+ * servidor. Esta cópia é o que permite responder a perguntas sobre a rede sem
+ * uma chamada externa no caminho -- por exemplo "quem faz canalização", para
+ * falar com um grupo de técnicos de uma vez.
  *
- * Ir ao Laravel a cada mensagem seria pôr um serviço externo no caminho de
- * todas as mensagens, incluindo quando ele está em baixo -- e uma falha
- * escreveria a resposta errada, não nenhuma. Por isso a lista é copiada para
- * `technician_phones` e lida daí.
+ * Nasceu para o webhook do WhatsApp distinguir técnicos de clientes. Esse
+ * webhook saiu com a Cloud API (18/09/2026); o que ficou foi a cópia, que é
+ * útil por si.
  */
 
-interface VendorMinimo { id: number; name: string | null; phone_number: string | null }
+interface VendorMinimo {
+  id: number;
+  name: string | null;
+  phone_number: string | null;
+  /*
+    No Laravel chamam-se `operation_areas`, mas são CATEGORIAS de serviço
+    ("Canalização", "Eletricidade"), não zonas geográficas. O nome engana e já
+    levou a ordenar técnicos por cidade contra este campo -- uma ordenação que
+    não fazia nada.
+  */
+  operation_areas?: string[] | null;
+}
 
 /**
  * Actualiza a cópia local a partir do Laravel. Devolve quantos números ficaram
@@ -28,13 +39,7 @@ export async function sincronizarTelefonesTecnicos(): Promise<{ guardados: numbe
   return guardarTelefonesTecnicos(r.items ?? []);
 }
 
-/**
- * Guarda uma lista de técnicos já lida.
- *
- * Existe separada da função acima para o despacho poder reaproveitar a lista
- * que acabou de ler -- despachar um pedido é o momento em que a lista está
- * mais fresca, e seria absurdo ir buscá-la outra vez a seguir.
- */
+/** Guarda uma lista de técnicos já lida. */
 export async function guardarTelefonesTecnicos(
   vendors: VendorMinimo[],
 ): Promise<{ guardados: number; semTelefone: number }> {
@@ -43,6 +48,7 @@ export async function guardarTelefonesTecnicos(
       phone9: fone9(v.phone_number || ""),
       technician_id: String(v.id),
       name: v.name || "",
+      trades: (v.operation_areas ?? []).filter((t): t is string => Boolean(t && t.trim())),
       updated_at: new Date().toISOString(),
     }))
     .filter((l) => l.phone9.length === 9);
@@ -57,31 +63,4 @@ export async function guardarTelefonesTecnicos(
   if (error) throw new Error(error.message);
 
   return { guardados: linhas.length, semTelefone: vendors.length - linhas.length };
-}
-
-/**
- * O técnico deste número, ou null se for um cliente.
- *
- * Falhar aqui devolve null -- por omissão trata-se como cliente, que é o que
- * acontecia antes desta separação existir. É a falha certa: uma mensagem a
- * mais no CRM corrige-se, uma mensagem de cliente que não entra no CRM
- * perde-se.
- */
-export async function tecnicoPorTelefone(
-  phone: string,
-): Promise<{ id: string; nome: string } | null> {
-  const p9 = fone9(phone);
-  if (p9.length !== 9) return null;
-  try {
-    const { data } = await supabaseAdmin()
-      .from("technician_phones")
-      .select("technician_id, name")
-      .eq("phone9", p9)
-      .maybeSingle();
-    if (!data) return null;
-    const r = data as { technician_id: string; name: string };
-    return { id: r.technician_id, nome: r.name };
-  } catch {
-    return null;
-  }
 }
