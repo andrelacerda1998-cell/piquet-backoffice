@@ -83,7 +83,9 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
     <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-border bg-surface-muted/50 shrink-0">
         <MessageCircle className="h-4 w-4 text-success" />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Conversa de WhatsApp</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+          {eTecnico ? "Mensagens recebidas" : "Conversa de WhatsApp"}
+        </span>
       </div>
 
       {/* Histórico — cresce para ocupar a altura disponível. */}
@@ -119,8 +121,15 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
         <div ref={fimRef} />
       </div>
 
-      {/* Compor a resposta. Não se envia daqui: o botão leva o texto para o
-          WhatsApp do telemóvel, que é de onde a Piquet responde. */}
+      {/*
+        Compor a resposta -- só para clientes.
+
+        Na ficha de um técnico este bloco não aparece: o backoffice não é sítio
+        para escrever a quem executa os serviços (decisão do André, 21/09/2026).
+        O histórico do que ELE escreveu fica, porque é o que diz que houve uma
+        pergunta por responder.
+      */}
+      {!eTecnico && (
       <div className="border-t border-surface-border p-2 bg-surface-muted/30 space-y-2 shrink-0">
         <textarea
           value={texto}
@@ -143,8 +152,9 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
             </a>
           )}
         </div>
-        <p className="text-[11px] text-text-muted">Responde pelo WhatsApp do telemóvel — o texto vai já escrito.</p>
+        <p className="text-xs text-text-muted">Responde pelo WhatsApp do telemóvel — o texto vai já escrito.</p>
       </div>
+      )}
     </div>
   );
 }
