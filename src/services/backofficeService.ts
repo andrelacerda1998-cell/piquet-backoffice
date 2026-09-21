@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, USE_REAL_API } from "./api";
+import { apiGet, USE_REAL_API } from "./api";
 import { monthlySeries } from "@/lib/trends";
 import { TODAY } from "@/lib/today";
 

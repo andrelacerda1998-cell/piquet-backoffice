@@ -1,7 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { isMissingTable } from "@/lib/missingColumn";
-import { fone9 } from "@/lib/telefone";
-import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
+import { apiOk, withStaff } from "../../../_lib/handler";
 
 /**
  * Histórico de WhatsApp de um técnico -- só leitura.

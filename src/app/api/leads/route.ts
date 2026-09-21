@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, duplicate: true }, { status: 200, headers: CORS });
   }
 
-  const { data: criada, error } = await supabaseAdmin().from("leads").insert(lead).select("id").single();
+  const { error } = await supabaseAdmin().from("leads").insert(lead);
   if (error) {
     return NextResponse.json({ ok: false, error: "erro ao guardar" }, { status: 500, headers: CORS });
   }
