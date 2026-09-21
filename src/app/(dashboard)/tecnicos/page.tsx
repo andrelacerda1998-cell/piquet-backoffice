@@ -417,8 +417,21 @@ export default function TechniciansPage() {
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
     { key: "suspended_at", label: "Suspenso em", render: (r) => r.suspended_at ? formatDate(r.suspended_at) : "—" },
+    /*
+      Reativar e apagar lado a lado, mas não com o mesmo peso.
+
+      Um técnico suspenso está à espera de uma de duas decisões: volta, ou vai
+      de vez. Fazer a segunda obrigava a abrir a ficha -- e é aqui que se olha
+      para a lista de quem está parado.
+
+      "Apagar" fica em cinzento e só fica vermelho ao passar o rato: a ação sem
+      retorno não deve ter o mesmo destaque da que se desfaz num clique.
+    */
     { key: "acao", label: "", render: (r) => (
-      <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+      <div className="flex items-center justify-end gap-3">
+        <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-sm text-success hover:underline disabled:opacity-50">Reativar</button>
+        <button onClick={() => setVendorParaApagar(r)} className="text-sm text-text-muted hover:text-danger transition-colors">Apagar</button>
+      </div>
     ) },
   ];
 
