@@ -103,7 +103,7 @@ interface PaginaVendors {
  * resultado como se fosse a rede toda. Quem estivesse na página 2 não existia
  * para o backoffice.
  */
-export async function sincronizarTelefonesTecnicos(): Promise<{ guardados: number; semTelefone: number }> {
+export async function sincronizarTelefonesTecnicos(): Promise<{ guardados: number; semTelefone: number; removidos: number }> {
   const todos: VendorMinimo[] = [];
   let pagina = 1;
   let ultima = 1;
@@ -131,7 +131,17 @@ export async function sincronizarTelefonesTecnicos(): Promise<{ guardados: numbe
 export async function guardarTelefonesTecnicos(
   vendors: VendorMinimo[],
   catalogo: Map<string, string> = new Map(),
-): Promise<{ guardados: number; semTelefone: number }> {
+): Promise<{ guardados: number; semTelefone: number; removidos: number }> {
+  /*
+    Uma marca de tempo só, igual em todas as linhas desta corrida.
+
+    É ela que separa "visto agora" de "já não existe lá": as linhas que ficarem
+    com um `updated_at` anterior a esta são de técnicos que desapareceram do
+    Laravel. Gerar a data linha a linha dava valores ligeiramente diferentes e
+    tornava essa comparação instável.
+  */
+  const agora = new Date().toISOString();
+
   const linhas = vendors
     .map((v) => {
       const trades = oficios(v);
@@ -149,13 +159,21 @@ export async function guardarTelefonesTecnicos(
         name: v.name || "",
         trades,
         categories: categorias,
-        updated_at: new Date().toISOString(),
+        updated_at: agora,
       };
     })
     .filter((l) => l.phone9.length === 9);
 
+  /*
+    Lista vazia NÃO é motivo para limpar nada.
+
+    Se o Laravel devolver zero -- por um erro que não lançou, por um filtro que
+    mudou, por uma migração a meio -- apagar aqui deitava fora a rede inteira a
+    partir de uma resposta que provavelmente está errada. Não guardar nada é
+    recuperável na corrida seguinte; apagar tudo não é.
+  */
   if (linhas.length === 0) {
-    return { guardados: 0, semTelefone: vendors.length };
+    return { guardados: 0, semTelefone: vendors.length, removidos: 0 };
   }
 
   const { error } = await supabaseAdmin()
@@ -163,5 +181,29 @@ export async function guardarTelefonesTecnicos(
     .upsert(linhas, { onConflict: "phone9" });
   if (error) throw new Error(error.message);
 
-  return { guardados: linhas.length, semTelefone: vendors.length - linhas.length };
+  /*
+    Quem já não está lá, sai daqui.
+
+    Era um upsert puro: actualizava quem existe, acrescentava quem é novo, e
+    nunca esquecia ninguém. Um técnico apagado em definitivo no Laravel ficava
+    nesta cópia para sempre -- e daqui saem os contactos, as contagens por
+    ofício e os ficheiros que se exportam. Contactar alguém que já não pertence
+    à rede é pior do que não o ter na lista.
+
+    Só se chega aqui depois de uma leitura completa: se qualquer página falhar,
+    `sincronizarTelefonesTecnicos` lança e nunca se apaga nada.
+  */
+  const { data: apagados, error: erroApagar } = await supabaseAdmin()
+    .from("technician_phones")
+    .delete()
+    .lt("updated_at", agora)
+    .select("phone9");
+  if (erroApagar) throw new Error(erroApagar.message);
+
+  return {
+    guardados: linhas.length,
+    semTelefone: vendors.length - linhas.length,
+    removidos: (apagados ?? []).length,
+  };
+
 }

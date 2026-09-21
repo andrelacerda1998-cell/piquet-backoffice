@@ -34,7 +34,16 @@ export async function GET(req: Request) {
 
   try {
     const r = await sincronizarTelefonesTecnicos();
-    await logCronRun("technician-phones", true, `${r.guardados} técnicos com ofício`, r.guardados);
+    await logCronRun(
+      "technician-phones",
+      true,
+      // O que saiu conta tanto como o que entrou: é a única pista de que um
+      // técnico foi apagado no Laravel.
+      r.removidos > 0
+        ? `${r.guardados} técnicos com ofício · ${r.removidos} removidos`
+        : `${r.guardados} técnicos com ofício`,
+      r.guardados,
+    );
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     const motivo = e instanceof Error ? e.message : String(e);
