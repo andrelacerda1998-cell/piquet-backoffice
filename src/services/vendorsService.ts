@@ -20,6 +20,13 @@ export interface RealVendor {
   phone_number: string | null;
   price_rate: number | null;
   operation_areas: string[];
+  /*
+    Os serviços do catálogo que o técnico escolheu fazer. É por aqui que o
+    matching (VendorRankingService) decide se ele serve para um pedido --
+    `operation_areas` guarda categorias, mas está preenchido em pouquíssimos.
+    Opcional: só existe desde o PR #70 do backend (18/09/2026).
+  */
+  services_types?: string[];
   can_accept_service: boolean;
   at_valid: boolean;
   at_validated_at: string | null;

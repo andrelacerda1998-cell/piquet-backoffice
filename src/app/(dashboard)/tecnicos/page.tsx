@@ -1016,6 +1016,46 @@ export default function TechniciansPage() {
                   </div>
 
                   {/*
+                    Os serviços que o técnico escolheu fazer.
+
+                    Lista própria e não mais uma linha na tabela acima: são
+                    serviços do catálogo, não categorias, e um técnico costuma
+                    ter dezenas -- juntá-los por vírgulas numa linha truncada
+                    dava uma frase cortada que não responde a nada.
+
+                    Fechado por omissão, com a contagem à vista: quem abre a
+                    ficha quer saber QUANTOS e, às vezes, SE faz um em
+                    concreto. Aberto de origem, empurrava o resto do perfil
+                    para fora do ecrã.
+                  */}
+                  {(() => {
+                    const servicos = v.services_types ?? [];
+                    if (servicos.length === 0) {
+                      return (
+                        <p className="text-[11px] text-text-muted">
+                          Sem serviços escolhidos — este técnico não entra no matching de nenhum pedido.
+                        </p>
+                      );
+                    }
+                    return (
+                      <details>
+                        <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-primary">
+                          Serviços que faz ({servicos.length})
+                        </summary>
+                        <div className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {[...servicos].sort((a, b) => a.localeCompare(b, "pt")).map((nome) => (
+                              <span key={nome} className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-text-secondary">
+                                {nome}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </details>
+                    );
+                  })()}
+
+                  {/*
                     Aviso preciso, e só quando se aplica. As colunas existem
                     todas na BD (company_name, at_user, iban, invoice_workspace
                     e a morada FISCAL_ADDRESS): o que falta é o
