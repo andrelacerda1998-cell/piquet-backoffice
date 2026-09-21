@@ -679,7 +679,7 @@ export default function TechniciansPage() {
                 { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
                   <div className="flex items-center gap-3 justify-end">
                     <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
-                    <button onClick={() => openDecline(r)} className="text-xs text-danger hover:underline">Recusar</button>
+                    <button onClick={() => openDecline(r)} className="text-sm text-danger hover:underline">Recusar</button>
                   </div>
                 ) : null },
               ]}
@@ -890,7 +890,7 @@ export default function TechniciansPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* ------------------------- Documentos ------------------------- */}
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Documentos obrigatórios</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Documentos obrigatórios</p>
                   {REQUIRED_DOCS.map((req) => {
                     const st = states?.[req.key] ?? "em_falta";
                     const ui = DOC_STATE_UI[st];
@@ -899,7 +899,7 @@ export default function TechniciansPage() {
                       <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-text-primary">{req.label}</p>
-                          <p className={cn("text-xs", ui.tone)}>
+                          <p className={cn("text-sm", ui.tone)}>
                             {ui.symbol} {ui.label}
                             {doc?.created_at && st !== "em_falta" && ` · ${formatDate(doc.created_at)}`}
                             {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
@@ -916,7 +916,7 @@ export default function TechniciansPage() {
                           {doc && doc.status === "pending" && (
                             <>
                               <button onClick={() => { setProfileVendor(null); openApprove(doc); }}
-                                className="text-xs font-medium text-success hover:underline">Aprovar</button>
+                                className="text-sm font-medium text-success hover:underline">Aprovar</button>
                               <button onClick={() => { setProfileVendor(null); openDecline(doc); }}
                                 className="text-xs text-danger hover:underline">Recusar</button>
                             </>
@@ -955,15 +955,15 @@ export default function TechniciansPage() {
                 */}
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Faturação e dados</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Faturação e dados</p>
                     <div className="flex items-center gap-2">
                       {at === "validado" ? (
                         <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
-                          className="text-xs text-warning hover:underline disabled:opacity-50">Retirar AT</button>
+                          className="text-sm text-warning hover:underline disabled:opacity-50">Retirar AT</button>
                       ) : (
                         <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
                           title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
-                          className="btn-secondary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                          className="btn-secondary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
                           {atSaving ? "A gravar…" : "Validar AT"}
                         </button>
                       )}
@@ -972,7 +972,7 @@ export default function TechniciansPage() {
                           disabled={wsSaving || !podeCriarWs}
                           onClick={() => criarWorkspace(v)}
                           title={wsMotivo ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
-                          className="btn-primary text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="btn-primary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {wsSaving ? "A criar…" : "Criar workspace"}
                         </button>
@@ -984,7 +984,7 @@ export default function TechniciansPage() {
                       é aviso a sério, e diz a razão que o backend dá. */}
                   {!temWorkspace && (
                     <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
-                      <p className="text-xs text-text-secondary">
+                      <p className="text-sm text-text-secondary">
                         <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
                         {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
                       </p>
@@ -1004,12 +1004,12 @@ export default function TechniciansPage() {
                         {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
                       ["NIF", v.nif || "—"],
                       ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
-                      ["IBAN", v.iban ? <span key="iban" className="font-mono text-xs">{v.iban}</span> : "—"],
+                      ["IBAN", v.iban ? <span key="iban" className="font-mono text-sm">{v.iban}</span> : "—"],
                       ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
                       ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
                     ] as [string, React.ReactNode][]).map(([rotulo, valor]) => (
                       <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
-                        <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
+                        <span className="text-sm text-text-muted shrink-0">{rotulo}</span>
                         <span className="text-sm text-text-primary text-right truncate">{valor}</span>
                       </div>
                     ))}
@@ -1032,25 +1032,36 @@ export default function TechniciansPage() {
                     const servicos = v.services_types ?? [];
                     if (servicos.length === 0) {
                       return (
-                        <p className="text-[11px] text-text-muted">
+                        <p className="text-sm text-text-muted">
                           Sem serviços escolhidos — este técnico não entra no matching de nenhum pedido.
                         </p>
                       );
                     }
                     return (
-                      <details>
-                        <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-primary">
+                      <details open>
+                        <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
                           Serviços que faz ({servicos.length})
                         </summary>
-                        <div className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2">
-                          <div className="flex flex-wrap gap-1.5">
-                            {[...servicos].sort((a, b) => a.localeCompare(b, "pt")).map((nome) => (
-                              <span key={nome} className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-text-secondary">
-                                {nome}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                        {/*
+                          Lista e não etiquetas: os nomes são frases ("Limpeza de
+                          Colchão de Casal"), e em etiquetas o olho tem de saltar
+                          entre linhas de larguras diferentes para ler cada uma.
+                          Em coluna, lê-se de cima a baixo.
+
+                          Duas colunas em ecrãs largos porque a maioria dos nomes
+                          é curta e uma coluna só desperdiçava metade da largura
+                          com dezenas de linhas.
+                        */}
+                        <ul className="mt-2 max-h-64 overflow-auto rounded-lg bg-surface-subtle p-3
+                                       columns-1 sm:columns-2 gap-x-6">
+                          {[...servicos].sort((a, b) => a.localeCompare(b, "pt")).map((nome) => (
+                            <li key={nome} className="break-inside-avoid py-1 pl-3 text-sm text-text-secondary
+                                                      relative before:absolute before:left-0 before:top-[0.6em]
+                                                      before:h-1 before:w-1 before:rounded-full before:bg-text-muted">
+                              {nome}
+                            </li>
+                          ))}
+                        </ul>
                       </details>
                     );
                   })()}
@@ -1073,7 +1084,7 @@ export default function TechniciansPage() {
                     nenhum. Aqui vê-se a resposta crua, sem sair do ecrã.
                   */}
                   <details>
-                    <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-primary">
+                    <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
                       Dados brutos da API ({Object.keys(v).length} campos)
                     </summary>
                     <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2 text-[11px] leading-snug text-text-secondary">
@@ -1082,7 +1093,7 @@ export default function TechniciansPage() {
                   </details>
 
                   {!temFaturacao && !v.company_name && (
-                    <p className="text-[11px] text-text-muted cursor-help"
+                    <p className="text-xs text-text-muted cursor-help"
                       title="Os dados existem na base de dados do Laravel; o VendorController ainda não os devolve na API de admin. Já implementado na branch feat/admin-payment-refund-cancel, por publicar.">
                       Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
                     </p>
