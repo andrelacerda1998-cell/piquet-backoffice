@@ -1,4 +1,4 @@
-import { apiGet, apiPut, apiPost } from "./api";
+import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -141,6 +141,21 @@ export async function setVendorAtValidation(id: number, valid: boolean): Promise
   await apiPut(`/technicians/${id}/at-validation`, { valid }, () => {
     throw new Error("Validar o subutilizador AT precisa da API de admin do Laravel configurada.");
   });
+}
+
+/**
+ * Apaga um técnico DE VEZ. Não tem volta.
+ *
+ * O `suspendVendor` faz soft delete e reverte-se com `restoreVendor`. Isto
+ * remove o utilizador e tudo o que pende dele. Devolve `orphan_services`: os
+ * serviços que a pessoa executou sobrevivem sem dono, e esse número é o custo
+ * real da operação -- quem chama tem de o mostrar, não de o esconder.
+ */
+export async function deleteVendorPermanently(id: number): Promise<{ id: number; orphan_services: number }> {
+  return apiDelete<{ id: number; deleted: boolean; orphan_services: number }>(
+    `/technicians/${id}/permanent`,
+    () => { throw new Error("Apagar técnicos precisa da API de admin do Laravel configurada."); },
+  ).then((r) => r.data);
 }
 
 /**

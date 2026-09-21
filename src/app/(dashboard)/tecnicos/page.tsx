@@ -14,7 +14,7 @@ import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
-  getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
+  getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
@@ -29,6 +29,7 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
@@ -327,6 +328,38 @@ export default function TechniciansPage() {
       toast(e instanceof Error ? e.message : "Não foi possível reativar o técnico.", "error");
     } finally {
       setActingId(null);
+    }
+  };
+
+  /*
+    Apagar de vez. Duas coisas diferentes do suspender:
+
+    1. Confirmação explícita, porque não há volta -- o `suspend` reverte-se
+       num clique, isto não se reverte de todo.
+    2. O resultado diz quantos serviços ficaram sem dono. É o custo real da
+       operação e o Laravel devolve-o de propósito; escondê-lo aqui seria
+       deixar a pessoa sem saber o que acabou de acontecer ao histórico.
+  */
+  const [vendorParaApagar, setVendorParaApagar] = useState<RealVendor | null>(null);
+  const [aApagar, setAApagar] = useState(false);
+  const apagarDeVez = async (v: RealVendor) => {
+    setAApagar(true);
+    try {
+      const r = await deleteVendorPermanently(v.id);
+      toast(
+        r.orphan_services > 0
+          ? `${v.name ?? v.id} apagado. ${r.orphan_services} ${r.orphan_services === 1 ? "serviço ficou" : "serviços ficaram"} sem técnico associado.`
+          : `${v.name ?? v.id} apagado.`,
+        "error",
+      );
+      setVendorParaApagar(null);
+      setProfileVendor(null);
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível apagar o técnico.", "error");
+    } finally {
+      setAApagar(false);
     }
   };
 
@@ -1100,6 +1133,23 @@ export default function TechniciansPage() {
                   )}
 
                   {/*
+                    Apagar de vez.
+
+                    Ao fundo, isolado por uma linha e em texto discreto: é a
+                    única ação da ficha que não tem volta, e não devia estar ao
+                    lado das que se carregam por engano. Quem o procura,
+                    encontra; quem não o procura, não lhe tropeça.
+                  */}
+                  <div className="border-t border-surface-border pt-3">
+                    <button
+                      onClick={() => setVendorParaApagar(v)}
+                      className="text-sm text-text-muted hover:text-danger transition-colors"
+                    >
+                      Apagar este técnico em definitivo
+                    </button>
+                  </div>
+
+                  {/*
                     O que este técnico escreveu. Vive aqui porque é aqui que
                     pertence: antes, uma mensagem dele só podia existir agarrada
                     a uma lead, e por isso aparecia no CRM como um pedido de
@@ -1239,6 +1289,42 @@ export default function TechniciansPage() {
           </div>
         )}
       </Modal>
+
+      {/*
+        A confirmação diz o que vai acontecer, com nomes e números, em vez de
+        "tem a certeza?". O que se perde aqui não se recupera, e a pessoa que
+        carrega merece ver a lista antes, não um aviso genérico.
+      */}
+      <ConfirmDialog
+        open={vendorParaApagar !== null}
+        onClose={() => setVendorParaApagar(null)}
+        onConfirm={async () => { if (vendorParaApagar) await apagarDeVez(vendorParaApagar); }}
+        title="Apagar o técnico em definitivo"
+        tone="danger"
+        confirmLabel="Apagar para sempre"
+        loading={aApagar}
+        description={
+          <div className="space-y-2 text-sm">
+            <p>
+              <b className="text-text-primary">{vendorParaApagar?.name ?? "Este técnico"}</b> e a conta dele
+              desaparecem. <b className="text-text-primary">Não há como desfazer.</b>
+            </p>
+            <p className="text-text-secondary">
+              Vão com ele: avaliações, documentos, candidaturas a pedidos, zonas, cidades,
+              tickets de suporte e agenda.
+            </p>
+            <p className="text-text-secondary">
+              <b className="text-text-primary">Os serviços que ele executou ficam</b>, mas sem técnico
+              associado. O total faturado não muda; o que ele faturou deixa de lhe ser atribuído, e
+              as faturas já emitidas passam a apontar para alguém que não existe.
+            </p>
+            <p className="text-text-muted">
+              Se a pessoa só saiu, <b className="text-text-primary">Suspender</b> faz o mesmo efeito na
+              prática e tem volta.
+            </p>
+          </div>
+        }
+      />
     </RouteGuard>
   );
 }

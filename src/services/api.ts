@@ -518,7 +518,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
     demonstração, que lança "precisa da API de admin do Laravel configurada".
     A mensagem culpava a configuração do servidor, que estava certa.
   */
-  if (/^\/technicians\/[^/]+\/(at-validation|invoice-workspace)$/.test(path)) return true;
+  if (/^\/technicians\/[^/]+\/(at-validation|invoice-workspace|permanent)$/.test(path)) return true;
   if (/^\/technicians\/[^/]+\/messages$/.test(path)) return true; // conversa de WhatsApp do técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria

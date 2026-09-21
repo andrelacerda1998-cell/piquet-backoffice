@@ -33,6 +33,7 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
   it("marca como reais as ações da ficha do técnico (AT e faturação)", () => {
     expect(isLiveEndpoint("/technicians/123/at-validation")).toBe(true);
     expect(isLiveEndpoint("/technicians/123/invoice-workspace")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/permanent")).toBe(true);
     expect(isLiveEndpoint("/technicians/123/suspend")).toBe(true);
     expect(isLiveEndpoint("/technicians/123/restore")).toBe(true);
     // Um subcaminho inventado continua fora: a regra é estreita de propósito.
