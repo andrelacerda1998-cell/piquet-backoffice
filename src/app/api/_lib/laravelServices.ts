@@ -173,6 +173,36 @@ export interface ServicesQuery {
 
 /** Busca a lista paginada ao Laravel e devolve no MESMO envelope que a rota
  *  Supabase (`{ data, total, page, pageSize, totalPages }`). */
+/**
+ * TODOS os serviços do Laravel, percorrendo as páginas.
+ *
+ * O `fetchLaravelServices` devolve uma página, que é o que uma lista precisa.
+ * Quem agrega -- o Financeiro, as unit economics, o resultado operacional --
+ * precisa do conjunto inteiro: somar a primeira página e chamar-lhe receita
+ * seria pior do que não somar nada.
+ *
+ * O controlador do Laravel limita `per_page` a 100 (`min($perPage, 100)`), por
+ * isso pedir 1000 devolve 100 e cala-se. Foi assim que a cópia dos técnicos
+ * andou meses a ver 100 de 438.
+ */
+export async function fetchAllLaravelServices(): Promise<ServiceRequest[]> {
+  const todos: ServiceRequest[] = [];
+  let pagina = 1;
+  let ultima = 1;
+
+  do {
+    const res = await laravelAdminRequest<LaravelServicesResponse>(
+      `/v1/admin/services?per_page=100&page=${pagina}`,
+    );
+    const itens = res.items ?? [];
+    todos.push(...itens.map(mapLaravelService));
+    ultima = res.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
+    pagina++;
+  } while (pagina <= ultima && pagina <= 100); // trava: 10 000 serviços
+
+  return todos;
+}
+
 export async function fetchLaravelServices(query: ServicesQuery) {
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));

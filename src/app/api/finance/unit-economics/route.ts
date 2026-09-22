@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, withStaff } from "../../_lib/handler";
+import { servicosConcluidos } from "../../_lib/finance";
 
 /**
  * GET /api/finance/unit-economics — LTV, CAC e serviços/cliente das fontes REAIS.
@@ -16,21 +17,20 @@ import { apiOk, withStaff } from "../../_lib/handler";
  * mês (aproximação até haver histórico de registo por cliente).
  */
 
-interface SvcRow { id: string; customer_name: string | null; piquet_revenue: number; completed_at: string | null }
+import type { ServicoConcluido } from "../../_lib/finance";
 
 /** Identidade do cliente: o nome, ou o id do serviço se for anónimo. */
-const identity = (r: SvcRow) => (r.customer_name?.trim() || r.id);
+const identity = (r: ServicoConcluido) => (r.customer_name?.trim() || r.id);
 
 export const GET = withStaff(async () => {
   const admin = supabaseAdmin();
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 
-  const [svcRes, adRes] = await Promise.all([
-    admin.from("services").select("id, customer_name, piquet_revenue, completed_at").eq("status", "concluido"),
+  const [services, adRes] = await Promise.all([
+    servicosConcluidos({ period: null }),
     admin.from("ad_metrics").select("spend").gte("date", monthStart.slice(0, 10)),
   ]);
-  const services = (svcRes.data ?? []) as SvcRow[];
   const adSpendMonth = (adRes.data ?? []).reduce((s, r) => s + (Number((r as { spend: number }).spend) || 0), 0);
 
   // Todo o histórico → LTV (comissão média por cliente).

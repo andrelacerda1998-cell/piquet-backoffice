@@ -8,17 +8,15 @@ import { computeEmployeeCost } from "@/services/employeesService";
 import { calculateBurnRate, calculateRunway, calculatePiquetRevenueWithoutVat } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { apiOk, withStaff } from "../../_lib/handler";
-import { completedQuery, parseFinanceFilters } from "../../_lib/finance";
-
-interface Completed { piquet_revenue: number; total_customer_value: number; technician_value: number; invoice_status: string }
+import { servicosConcluidos, parseFinanceFilters } from "../../_lib/finance";
 
 /** GET /api/finance/summary — resumo financeiro (serviços + opex de equipa + impostos). */
 export const GET = withStaff(async (req) => {
   const f = parseFinanceFilters(new URL(req.url));
   const admin = supabaseAdmin();
 
-  const [completedRes, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes, saldoRes] = await Promise.all([
-    completedQuery("piquet_revenue, total_customer_value, technician_value, invoice_status", f),
+  const [completed, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes, saldoRes] = await Promise.all([
+    servicosConcluidos(f),
     admin.from("employees").select("*"),
     admin.from("tax_obligations").select("amount_estimated, status"),
     admin.from("services").select("id", { count: "exact", head: true }).or("status.eq.cancelado_cliente,status.eq.cancelado_tecnico"),
@@ -30,10 +28,8 @@ export const GET = withStaff(async (req) => {
     // Saldo de tesouraria registado à mão — o mais recente é o que vale.
     admin.from("treasury_balances").select("amount, balance_date").order("balance_date", { ascending: false }).limit(1),
   ]);
-  if (completedRes.error) throw new Error(completedRes.error.message);
   if (empRes.error) throw new Error(empRes.error.message);
 
-  const completed = (completedRes.data ?? []) as Completed[];
   const piquetRevenue = completed.reduce((s, r) => s + Number(r.piquet_revenue), 0);
   const totalServiceValue = completed.reduce((s, r) => s + Number(r.total_customer_value), 0);
   const technicianOwed = completed.reduce((s, r) => s + Number(r.technician_value), 0);
