@@ -560,7 +560,9 @@ export interface Lead {
   categoryId: string;
   executionDate: string;          // data de execução (ISO ou "")
   rating: number | null;          // classificação do serviço
-  serviceId: string | null;       // serviço criado em Operações quando concluído
+  serviceId: string | null;
+  /** Serviço correspondente na app, quando o pedido veio de lá. */
+  laravelServiceId?: string | null;       // serviço criado em Operações quando concluído
   /**
    * Nome do técnico, quando este contacto é da rede e não um cliente.
    *
@@ -817,4 +819,26 @@ export async function getRecruitmentAgenda(): Promise<AgendaEvent[]> {
     ];
     return data;
   }).then((r) => r.data);
+}
+
+
+/** Um acontecimento na vida de um pedido — só com data real. */
+export interface EventoPedido {
+  em: string;
+  titulo: string;
+  detalhe?: string;
+}
+
+/**
+ * A cronologia de um pedido.
+ *
+ * `completo: false` quer dizer que só sabemos quando entrou -- ou porque veio
+ * do site (e aí não há passos automáticos), ou porque o serviço da app não
+ * está ao alcance agora. Não é erro; é o que há.
+ */
+export async function getLeadTimeline(id: string): Promise<{ eventos: EventoPedido[]; completo: boolean }> {
+  return apiGet<{ eventos: EventoPedido[]; completo: boolean }>(
+    `/marketing/leads/${id}/timeline`,
+    () => ({ eventos: [], completo: false }),
+  ).then((r) => r.data);
 }

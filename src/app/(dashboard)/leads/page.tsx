@@ -16,6 +16,7 @@ import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
+import { CronologiaPedido } from "@/components/ui/CronologiaPedido";
 import { mensagemBoasVindas } from "@/lib/leadReply";
 
 /**
@@ -794,6 +795,13 @@ function LeadsPageInner() {
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}
+              </div>
+
+              {/* A cronologia acrescenta, não substitui: o estado, as notas e a
+                  conversa continuam onde estavam. Fecha a pergunta que não
+                  tinha resposta -- "o que é que já aconteceu a este pedido?" */}
+              <div className="pt-1">
+                <CronologiaPedido leadId={viewing.id} />
               </div>
 
               {/* Coluna direita: a conversa de WhatsApp com o campo de resposta

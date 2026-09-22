@@ -17,6 +17,7 @@ interface Row {
   message: string; source: string; stage: string; created_at: string;
   quote_value: number | null; technician_value: number | null; technician_name: string | null;
   category_id: string | null; execution_date: string | null; rating: number | null; service_id: string | null;
+  laravel_service_id: string | null;
   /** Opcionais: podem não vir se as migrações ainda não correram. */
   notes?: string | null;
   loss_reason?: string | null;
@@ -25,7 +26,9 @@ interface Row {
 
 // `notes` é opcional no SELECT: se a migração ainda não foi aplicada, a
 // leitura recorre à lista sem essa coluna em vez de devolver 500.
-const COLUNAS_BASE = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id";
+// `laravel_service_id` liga o pedido ao serviço na app -- é o que permite
+// mostrar a cronologia real (quando se procurou técnico, quem recusou).
+const COLUNAS_BASE = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id, laravel_service_id";
 const SELECT = `${COLUNAS_BASE}, notes, loss_reason, loss_note`;
 
 // Estados do funil: fonte única em src/lib/leadStages.ts (leitura, escrita e
@@ -54,6 +57,8 @@ function toLead(r: Row, tecnicos?: Map<string, string>) {
     executionDate: r.execution_date || "",
     rating: r.rating != null ? Number(r.rating) : null,
     serviceId: r.service_id || null,
+    /* Serviço correspondente na app, quando o pedido veio de lá. É a chave da cronologia. */
+    laravelServiceId: r.laravel_service_id || null,
     value: 0, // Sem valor estimado real — 0 em vez de inventado.
     createdAt: r.created_at,
     /*

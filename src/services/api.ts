@@ -510,6 +510,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
   if (/^\/marketing\/push-campaigns\/[^/]+\/active$/.test(path)) return true; // ligar/desligar campanha
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
+  if (/^\/marketing\/leads\/[^/]+\/timeline$/.test(path)) return true; // cronologia do pedido
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex
