@@ -69,7 +69,7 @@ export function PushCampanhas() {
         <div>
           <h3 className="font-semibold">Campanhas de push</h3>
           <p className="text-xs text-text-secondary">
-            Enviadas pela app (canal Expo). Criam-se no Filament — aqui vê-se o resultado e pára-se se for preciso.
+            Enviadas pela app. Criam-se no painel de administração — aqui vê-se o resultado e pára-se se for preciso.
           </p>
         </div>
         <button onClick={refetch} className="btn-secondary text-sm">
@@ -80,7 +80,7 @@ export function PushCampanhas() {
       {campanhas.length === 0 && !loading && (
         <div className="card p-5 text-center">
           <p className="text-sm font-medium text-text-primary">Nenhuma campanha de push criada.</p>
-          <p className="text-sm text-text-secondary">Criam-se no Filament; aparecem aqui com os números reais.</p>
+          <p className="text-sm text-text-secondary">Criam-se no painel de administração da app; aparecem aqui com os números reais.</p>
         </div>
       )}
 

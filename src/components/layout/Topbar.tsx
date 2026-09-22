@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useFilterStore, useAuthStore, useUiStore } from "@/stores";
 import { getActiveFilterCount } from "@/lib/filters";
 import { getPeriodLabel } from "@/lib/formatters";
@@ -10,11 +11,24 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import {
-  Menu, Search, Filter, Download,
+  Menu, Search, Filter,
   ChevronDown, X, Bookmark, Command,
 } from "lucide-react";
 import type { PeriodPreset, ServiceStatus } from "@/types";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
+
+/*
+  Os ecrãs que aplicam MESMO os filtros globais.
+
+  A barra de período e o botão "Filtros" apareciam em todos os 20 ecrãs, mas só
+  estes dois os usam -- nos outros dezoito escolher um período não mudava nada,
+  e o contador continuava a dizer que havia um filtro ativo. Um controlo que não
+  controla nada é pior do que não existir: quem filtra e vê o mesmo conclui que
+  os dados estão errados.
+
+  Quando outro ecrã passar a ler os filtros, acrescenta-se aqui.
+*/
+const ECRAS_COM_FILTROS = ["/servicos", "/financeiro"];
 
 const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
   { value: "hoje", label: "Hoje" },
@@ -38,9 +52,8 @@ export function Topbar() {
   const [viewName, setViewName] = useState("");
   const activeCount = getActiveFilterCount(filters);
 
-  const handleExport = () => {
-    alert("Exportação iniciada — funcionalidade preparada para integração com API.");
-  };
+  const pathname = usePathname();
+  const filtrosValem = ECRAS_COM_FILTROS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 
   return (
     <header className="sticky top-0 z-20 bg-surface border-b border-surface-border">
@@ -77,7 +90,8 @@ export function Topbar() {
             <kbd className="font-sans">K</kbd>
           </button>
 
-          {/* Period filter */}
+          {/* Período e filtros — só nos ecrãs que os aplicam (ver ECRAS_COM_FILTROS). */}
+          {filtrosValem && (<>
           <select
             value={filters.period}
             onChange={(e) => setFilter("period", e.target.value as PeriodPreset)}
@@ -105,11 +119,14 @@ export function Topbar() {
               </span>
             )}
           </button>
+          </>)}
 
-          <button onClick={handleExport} className="btn-secondary text-sm py-1.5 hidden sm:flex">
-            <Download className="h-4 w-4" />
-            Exportar
-          </button>
+          {/*
+            O botão "Exportar" que aqui estava mostrava um alert a dizer que a
+            funcionalidade não estava feita -- em todos os ecrãs, desde sempre.
+            Exportar bem depende do que está no ecrã, por isso vive em cada
+            lista: ver "Exportar CSV" em Pedidos, que usa downloadCsv().
+          */}
 
           <ThemeToggle />
 
@@ -143,8 +160,8 @@ export function Topbar() {
         </div>
       </div>
 
-      {/* Expanded filters panel */}
-      {showFilters && (
+      {/* Painel de filtros — fechado, e só existe onde os filtros valem. */}
+      {showFilters && filtrosValem && (
         <div className="border-t border-surface-border px-4 py-3 bg-surface-muted/30">
           <div className="flex flex-wrap gap-3 items-end">
             <FilterSelect

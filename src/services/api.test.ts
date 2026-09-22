@@ -172,7 +172,11 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // 2026-07-22: o seed foi apagado e passam a ser dados reais ou vazios.)
     // (/finance/payouts foi retirado a 2026-08-11: a página Relatórios passou
     // a usar o saldo real do /vendor-payments, ledger Laravel.)
-    for (const ep of ["/finance/summary", "/tax/obligations"]) {
+    // (/tax/obligations e /finance/summary saíram a 2026-09-22, pela MESMA
+    // regra das anteriores: as 27 obrigações semeadas foram apagadas e o
+    // resumo passou a somar os serviços do Laravel. Ficar na lista fazia o
+    // selo dizer "dados fictícios" por cima de números verdadeiros.)
+    for (const ep of ["/tax/summary", "/tax/vat"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
     }
@@ -184,6 +188,12 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     apagado -- durante um tempo a lista era real e o gráfico feito a partir
     dela dizia "demo".
   */
+  it("o que deixou de vir do seed deixa de ter selo de demonstração", async () => {
+    const { isDemoEndpoint } = await load();
+    expect(isDemoEndpoint("/tax/obligations")).toBe(false);
+    expect(isDemoEndpoint("/finance/summary")).toBe(false);
+  });
+
   it("um gráfico derivado de dados reais também é real", async () => {
     const { isDemoEndpoint } = await load();
     for (const ep of [

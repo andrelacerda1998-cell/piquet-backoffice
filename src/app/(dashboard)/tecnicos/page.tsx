@@ -1140,7 +1140,7 @@ export default function TechniciansPage() {
 
                   {!temFaturacao && !v.company_name && (
                     <p className="text-xs text-text-muted cursor-help"
-                      title="Os dados existem na base de dados do Laravel; o VendorController ainda não os devolve na API de admin. Já implementado na branch feat/admin-payment-refund-cancel, por publicar.">
+                      title="Estes dados existem no sistema, mas ainda não chegam a este ecrã. Está a ser tratado.">
                       Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
                     </p>
                   )}

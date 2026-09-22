@@ -404,7 +404,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
                 <span className="ml-auto text-xs text-text-muted font-normal">{evs.length} {evs.length === 1 ? "evento" : "eventos"}</span>
               </div>
               <div className="space-y-2">
-                {evs.length === 0 && <p className="text-xs text-text-muted py-3 text-center">Sem eventos</p>}
+                {evs.length === 0 && <p className="text-xs text-text-muted py-3 text-center">Nada marcado neste dia</p>}
                 {evs.map((e) => (
                   <div key={e.id} className={cn("rounded-lg border px-2.5 py-2 text-xs", EVENT_TONE[e.type])}>
                     <div className="flex items-center justify-between gap-2">

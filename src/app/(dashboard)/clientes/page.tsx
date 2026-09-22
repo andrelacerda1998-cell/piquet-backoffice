@@ -384,7 +384,7 @@ export default function CustomersPage() {
         {tab === "reclamacoes" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-secondary">Notas manuais da equipa — sem sistema de reclamações no Laravel, guardado só neste browser.</p>
+              <p className="text-sm text-text-secondary">Notas escritas à mão pela equipa. Ficam guardadas apenas neste computador — não são partilhadas nem sincronizadas.</p>
               <button onClick={() => setNewComplaintOpen(true)} className="btn-primary text-sm py-2">Nova reclamação</button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

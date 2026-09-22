@@ -291,6 +291,18 @@ const LIVE_DENY = new Set<string>([
 const REAL_DATA = new Set<string>([
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
   /*
+    Deixaram de ser ficção a 21/09/2026 e o selo ficou a mentir ao contrário:
+    dizia "sem integração de dados reais" por cima de números verdadeiros.
+
+    `/finance/summary` passou a somar os serviços do Laravel, como o resto do
+    Financeiro. `/tax/obligations` tinha 27 obrigações semeadas com valores
+    impossíveis (11 mil euros de Segurança Social numa empresa sem
+    colaboradores registados); foram apagadas, e o que lá está agora -- nada --
+    é verdade.
+  */
+  "/finance/summary",
+  "/tax/obligations",
+  /*
     Gráficos derivados dos serviços (08/09/2026).
 
     Estavam marcados como demonstração enquanto o próprio `/services` já estava

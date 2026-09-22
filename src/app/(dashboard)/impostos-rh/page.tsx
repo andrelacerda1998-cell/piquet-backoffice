@@ -348,7 +348,8 @@ export default function TaxHRPage() {
               </PermissionGate>
             </div>
 
-            <DataTable columns={empColumns} data={employees?.data ?? []} keyField="id" onRowClick={setSelectedEmployee} loading={loading} />
+            <DataTable columns={empColumns} data={employees?.data ?? []} keyField="id" onRowClick={setSelectedEmployee} loading={loading}
+              emptyMessage="Ainda não há colaboradores registados. Adiciona-os aqui para o custo mensal da equipa entrar no Planeamento e no resultado operacional." />
             {employees && <Pagination page={page} totalPages={employees.totalPages} total={employees.total} pageSize={pageSize} onPageChange={setPage} />}
           </>
         )}
