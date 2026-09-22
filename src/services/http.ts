@@ -3,7 +3,7 @@
  *
  * Uma única implementação de fetch (com timeout, headers, params e erros
  * normalizados) usada por AMBOS os clientes: `api.ts` (backoffice) e
- * `piquetClient.ts` (backend da app Flutter). Evita duplicar lógica de rede
+ * os serviços do backoffice. Evita duplicar lógica de rede
  * e garante mensagens de erro/estados consistentes em toda a app.
  */
 

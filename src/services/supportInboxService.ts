@@ -5,9 +5,9 @@ import { apiGet, apiPost, apiPut, apiDelete } from "./api";
  *
  * Base de implementação: os dados são mock. As costuras para as fontes reais
  * estão marcadas — em produção, `getInboxTickets` agrega:
- *   - Técnicos: piquetClient.getProSupportTickets() (backend Express /admin/*)
- *   - Clientes: novo endpoint /admin/customer-support-tickets (a acordar com o
- *     André — mesmo padrão dos técnicos)
+ *   - Técnicos e clientes: endpoints de suporte no Laravel, a acordar. O
+ *     cliente do protótipo Flutter (piquetClient) foi removido a 22/09/2026:
+ *     apontava para localhost:3100 e nunca funcionou em produção.
  *   - Email (fase 2): fornecedor de email transacional
  * O resto do backoffice (esta UI) não muda quando se ligam as fontes reais.
  * ========================================================================== */

@@ -12,7 +12,6 @@ import ServicosPersonalizadosPage from "../servicos-personalizados/page";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ChartCard, DonutChartComponent, FunnelChartComponent } from "@/components/charts/Charts";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
-import { AppBookingsPanel } from "@/components/ui/AppBookingsPanel";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getServices, getStatusDistribution, getMainFunnel, createCompletedService, updateCompletedService } from "@/services/dashboardService";
@@ -92,7 +91,19 @@ export default function ServicesPage() {
 
   const TABS: TabDef[] = [
     { id: "pedidos", label: "Serviços" },
-    { id: "app", label: "Reservas da app" },
+    /*
+      "Reservas da app" saiu a 22/09/2026.
+
+      Falava com um backend Express em localhost:3100 -- o do protótipo
+      Flutter em ~/dev/piquet, não o Laravel que serve as apps das lojas. Em
+      produção a variável NEXT_PUBLIC_PIQUET_API nunca foi definida, por isso
+      o separador tentava chamar o localhost DO BROWSER de quem abria o
+      backoffice: falhava sempre, e desde sempre.
+
+      Os pedidos feitos na app verdadeira já estão no separador "Serviços" --
+      entram pela ponte com o Laravel (ver _lib/appPedidos.ts). Não se perde
+      nada; deixa de haver um separador que nunca mostrou nada.
+    */
     { id: "incidentes", label: "Incidentes", count: (incidents ?? []).filter((i) => i.status !== "resolvido").length },
     { id: "desempenho", label: "Desempenho (SLA)" },
     { id: "personalizados", label: "Pedidos personalizados" },
@@ -250,8 +261,6 @@ export default function ServicesPage() {
             )}
           </div>
         )}
-
-        {tab === "app" && <AppBookingsPanel />}
 
         {tab === "incidentes" && (
           <div className="space-y-4">
