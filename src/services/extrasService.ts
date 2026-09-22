@@ -339,7 +339,12 @@ export interface CustomServiceRequest {
   phone: string;
   description: string;
   city: string;
-  urgency: "baixa" | "media" | "alta";
+  /*
+    O Laravel não guarda urgência num pedido personalizado. Fica `null` em vez
+    de "média" por omissão: um pedido urgente tratado como normal por causa de
+    um valor inventado é pior do que não se saber.
+  */
+  urgency: "baixa" | "media" | "alta" | null;
   status: "novo" | "em_analise" | "orcamento_enviado" | "aprovado" | "recusado";
   createdAt: string;
   estimate?: number;
@@ -706,59 +711,34 @@ export interface CustomRequest {
   city: string;
   category: string;
   description: string;
-  urgency: "baixa" | "media" | "alta";
+  /*
+    O Laravel não guarda urgência num pedido personalizado. Fica `null` em vez
+    de "média" por omissão: um pedido urgente tratado como normal por causa de
+    um valor inventado é pior do que não se saber.
+  */
+  urgency: "baixa" | "media" | "alta" | null;
   status: CustomRequestStatus;
   createdAt: string;
   estimatedHours: number | null;   // definido pela Piquet
+  /** Quantas fotografias o cliente anexou na app (URLs só no detalhe). */
+  photosCount?: number;
   proposals: TechProposal[];       // 3 opções (vazio até estimar)
 }
 
-const SAMPLE_REVIEWS = [
-  "Trabalho impecável e muito profissional.",
-  "Rápido, limpo e explicou tudo.",
-  "Chegou à hora e resolveu logo.",
-  "Excelente relação qualidade/preço.",
-  "Muito cuidadoso e simpático.",
-  "Recomendo, voltarei a contratar.",
-];
-
-function makeProposals(seed: number, hours: number, category: string): TechProposal[] {
-  const techs = mockData.technicians.filter((t) => t.averageRating >= 4 && t.servicesCompleted > 5);
-  return Array.from({ length: 3 }).map((_, i) => {
-    const t = techs[(seed * 3 + i) % techs.length];
-    const hourly = 22 + ((seed + i) % 4) * 6; // 22–40€/h
-    return {
-      id: `prop_${seed}_${i}`,
-      technicianId: t?.id,
-      technicianName: t?.name ?? `Técnico ${i + 1}`,
-      rating: t?.averageRating ?? 4.6,
-      reviewsCount: (t?.servicesCompleted ?? 40) % 120 + 12,
-      specialization: category,
-      distanceKm: 1 + ((seed + i * 2) % 9),
-      fixedPrice: Math.round(hours * hourly + 15),
-      topReviews: [SAMPLE_REVIEWS[(seed + i) % SAMPLE_REVIEWS.length], SAMPLE_REVIEWS[(seed + i + 2) % SAMPLE_REVIEWS.length]],
-    };
-  });
-}
-
 export async function getCustomRequests(): Promise<CustomRequest[]> {
-  return apiGet("/custom-requests", () => {
-    const base: Omit<CustomRequest, "proposals">[] = [
-      { id: "cr_1", customerName: "Helena Marques", phone: "+351 912 345 678", city: "Cascais", category: "Instalações domésticas", description: "Instalação de painéis solares numa moradia T4, incluindo ligação ao quadro elétrico.", urgency: "media", status: "opcoes_enviadas", createdAt: "2026-06-28", estimatedHours: 8 },
-      { id: "cr_2", customerName: "Bruno Tavares", phone: "+351 934 111 222", city: "Lisboa", category: "Canalização", description: "Remodelação completa de casa de banho — substituir loiças, torneiras e canalização.", urgency: "baixa", status: "em_analise", createdAt: "2026-06-25", estimatedHours: 14 },
-      { id: "cr_3", customerName: "Condomínio Estrela", phone: "+351 210 998 877", city: "Lisboa", category: "AVAC", description: "Manutenção anual do sistema AVAC e limpeza das zonas comuns do edifício.", urgency: "alta", status: "novo", createdAt: "2026-07-01", estimatedHours: null },
-      { id: "cr_4", customerName: "Rita Nunes", phone: "+351 961 555 444", city: "Sintra", category: "Eletricidade", description: "Domótica — automação de estores, luzes e termostato em apartamento T3.", urgency: "media", status: "agendado", createdAt: "2026-06-20", estimatedHours: 6 },
-      { id: "cr_5", customerName: "Miguel Antunes", phone: "+351 926 777 000", city: "Loures", category: "Instalações domésticas", description: "Reparação de telhado após tempestade — substituir telhas e impermeabilizar.", urgency: "alta", status: "novo", createdAt: "2026-06-30", estimatedHours: null },
-      { id: "cr_6", customerName: "Sofia Melo", phone: "+351 915 222 333", city: "Amadora", category: "Montagem de mobiliário", description: "Montagem de cozinha completa em kit, com fixação de móveis suspensos.", urgency: "media", status: "opcoes_enviadas", createdAt: "2026-06-29", estimatedHours: 10 },
-    ];
-    return base.map((b, i) => ({
-      ...b,
-      // Só os já enviados/agendados trazem propostas; novos e em análise começam
-      // vazios, para a equipa escolher os 3 técnicos à mão.
-      proposals: (b.status === "opcoes_enviadas" || b.status === "agendado") && b.estimatedHours
-        ? makeProposals(i + 1, b.estimatedHours, b.category) : [],
-    }));
-  }).then((r) => r.data);
+  /*
+    Sem recurso a dados de exemplo.
+
+    Até 22/09/2026 este fallback devolvia SEIS pedidos escritos à mão -- Helena
+    Marques com painéis solares em Cascais, o Condomínio Estrela com AVAC --
+    que apareciam no ecrã como se fossem clientes. Os verdadeiros existiam na
+    base de dados das apps e nunca chegavam cá.
+
+    Agora vêm do Laravel (PR #83). Sem ligação, a lista vem vazia e o ecrã
+    di-lo -- que é a verdade, e não seis pessoas que não existem.
+  */
+  return apiGet<CustomRequest[]>("/custom-requests", () => []).then((r) => r.data);
+
 }
 
 /* ==================== RECRUTAMENTO — TAREFAS & AGENDA ==================== */

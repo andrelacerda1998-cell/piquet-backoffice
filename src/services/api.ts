@@ -111,6 +111,8 @@ interface RequestOptions<T> {
  */
 const LIVE_EXACT = new Set<string>([
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  // Pedidos personalizados reais (serviços com is_custom no Laravel, PR #83).
+  "/custom-requests",
   // Fase 1 — Serviços/Reservas
   "/services",
   "/dashboard/recent-services",
@@ -290,6 +292,9 @@ const LIVE_DENY = new Set<string>([
  */
 const REAL_DATA = new Set<string>([
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  // Pedidos personalizados: serviços com is_custom no Laravel (PR #83).
+  // Antes disto o ecrã caía num fallback com seis pedidos escritos à mão.
+  "/custom-requests",
   /*
     Deixaram de ser ficção a 21/09/2026 e o selo ficou a mentir ao contrário:
     dizia "sem integração de dados reais" por cima de números verdadeiros.

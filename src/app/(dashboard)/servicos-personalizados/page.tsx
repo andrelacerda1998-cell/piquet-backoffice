@@ -26,7 +26,7 @@ const STATUS: Record<CustomRequestStatus, { label: string; tone: string }> = {
   recusado: { label: "Recusado", tone: "bg-danger-light text-danger" },
 };
 
-const URGENCY: Record<CustomRequest["urgency"], string> = {
+const URGENCY: Record<string, string> = {
   baixa: "text-text-secondary", media: "text-warning", alta: "text-danger font-semibold",
 };
 
@@ -131,7 +131,9 @@ export default function CustomRequestsPage() {
               </div>
               <p className="mt-2 text-sm text-text-secondary line-clamp-2">{r.description}</p>
               <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
-                <span className={cn("capitalize", URGENCY[r.urgency])}>Urgência {r.urgency}</span>
+                {r.urgency
+                  ? <span className={cn("capitalize", URGENCY[r.urgency])}>Urgência {r.urgency}</span>
+                  : <span className="text-text-muted">{r.photosCount ? `${r.photosCount} ${r.photosCount === 1 ? "foto" : "fotos"}` : "Sem fotos"}</span>}
                 <span>{r.estimatedHours ? `${r.estimatedHours}h · ${r.proposals.length}/3 técnicos` : "Por estimar"}</span>
               </div>
             </button>
@@ -203,7 +205,7 @@ function RequestDrawer({ req, technicians, onClose, onSetHours, onToggleTech, on
             <div className="card p-4">
               <p className="text-sm text-text-primary">{req.description}</p>
               <div className="mt-2 flex items-center gap-3 text-xs text-text-secondary">
-                <span>Urgência <b className={cn("capitalize", URGENCY[req.urgency])}>{req.urgency}</b></span>
+                {req.urgency && <span>Urgência <b className={cn("capitalize", URGENCY[req.urgency])}>{req.urgency}</b></span>}
                 <span>· Recebido {formatDate(req.createdAt)}</span>
               </div>
             </div>
