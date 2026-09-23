@@ -29,6 +29,16 @@ interface ServicoCru {
 
 /** Estado do serviço → estado do pedido personalizado, como o ecrã os conhece. */
 const ESTADO: Record<string, string> = {
+  /*
+    `PendingReview` é o estado em que um pedido personalizado NASCE: o cliente
+    descreveu, e está à espera que a Piquet analise e defina o preço. É o que
+    precisa de ação, por isso é o que aparece como "novo".
+
+    Faltava aqui -- e sem ele todo o pedido acabado de chegar caía no ramo de
+    omissão. Apanhado a 23/09/2026 ao preparar um teste de ponta a ponta,
+    antes de o pedido existir.
+  */
+  PendingReview: "novo",
   Pending: "novo",
   Matching: "em_analise",
   Accepted: "opcoes_enviadas",
