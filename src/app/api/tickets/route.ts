@@ -5,10 +5,11 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
  * POST /api/tickets — receção PÚBLICA de tickets de suporte da app cliente
  * (e, no futuro, da app dos técnicos via channel/requester_type).
  *
- * Mesmo racional do /api/leads: o pedido vem de utilizadores da app sem token
- * do backoffice, por isso é o segundo endpoint /api sem autenticação. Defesas
- * idênticas: honeypot `website`, validação/truncagem, CORS só POST/OPTIONS.
- * Ler e responder a tickets continua a exigir staff (/api/support/inbox).
+ * O pedido vem de utilizadores da app sem token do backoffice, por isso é o
+ * único endpoint /api sem autenticação -- o /api/leads, que era o outro, foi
+ * fechado a 24/09/2026 quando o formulário saiu da landing. Defesas: honeypot
+ * `website`, validação/truncagem, CORS só POST/OPTIONS. Ler e responder a
+ * tickets continua a exigir staff (/api/support/inbox).
  */
 
 export const dynamic = "force-dynamic";
