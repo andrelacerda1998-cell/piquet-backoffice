@@ -104,30 +104,6 @@ export async function getOverviewMetrics(filters: DashboardFilter): Promise<Over
   }).then((r) => r.data);
 }
 
-export async function getMainFunnel(filters: DashboardFilter): Promise<FunnelStep[]> {
-  return apiGet("/dashboard/funnel", () => {
-    const services = getFilteredServices(filters);
-    const total = services.length || 1;
-    const steps = [
-      { name: "Pedido recebido", filter: () => services },
-      { name: "Técnico encontrado", filter: () => services.filter((s) => s.technicianId) },
-      { name: "Orçamento enviado", filter: () => services.filter((s) => ["orcamento_enviado", "a_aguardar_pagamento", "pago", "agendado", "em_execucao", "concluido"].includes(s.status)) },
-      { name: "Pagamento realizado", filter: () => services.filter((s) => ["pago", "agendado", "em_execucao", "concluido"].includes(s.status)) },
-      { name: "Serviço iniciado", filter: () => services.filter((s) => ["em_execucao", "concluido"].includes(s.status)) },
-      { name: "Serviço concluído", filter: () => services.filter((s) => s.status === "concluido") },
-    ];
-    let prevCount = total;
-    return steps.map((step) => {
-      const count = step.filter().length;
-      const conversionRate = (count / total) * 100;
-      const dropoffRate = prevCount > 0 ? ((prevCount - count) / prevCount) * 100 : 0;
-      const result: FunnelStep = { name: step.name, count, conversionRate, dropoffRate, previousCount: prevCount };
-      prevCount = count;
-      return result;
-    });
-  }).then((r) => r.data);
-}
-
 export async function getRevenueTimeSeries(filters: DashboardFilter): Promise<TimeSeriesPoint[]> {
   return apiGet("/dashboard/revenue-series", () => {
     const services = getFilteredServices(filters).filter((s) => s.status === "concluido");
@@ -167,17 +143,6 @@ export async function getOrdersByLocation(filters: DashboardFilter): Promise<Cha
       byCity[s.city] = (byCity[s.city] ?? 0) + 1;
     });
     return Object.entries(byCity).map(([name, value]) => ({ name, value }));
-  }).then((r) => r.data);
-}
-
-export async function getStatusDistribution(filters: DashboardFilter): Promise<ChartDataPoint[]> {
-  return apiGet("/dashboard/status-distribution", () => {
-    const services = getFilteredServices(filters);
-    const byStatus: Record<string, number> = {};
-    services.forEach((s) => {
-      byStatus[s.status] = (byStatus[s.status] ?? 0) + 1;
-    });
-    return Object.entries(byStatus).map(([name, value]) => ({ name, value }));
   }).then((r) => r.data);
 }
 
@@ -400,4 +365,26 @@ export async function getServiceCounts(): Promise<ServiceCounts> {
     mes: { executados: 0, agendados: 0 },
     ano: { executados: 0, agendados: 0 },
   })).then((r) => r.data);
+}
+
+/* --------------------- Operação: funil, estados e tempos --------------------- */
+
+/**
+ * Funil, distribuição de estados e tempos, dos serviços REAIS (ver
+ * /api/services/operacao).
+ *
+ * Substitui getMainFunnel, getStatusDistribution e getOperationalMetrics: a
+ * conta do funil e dos estados já estava certa, mas corria sobre
+ * `mockData.services`; os tempos eram constantes escritas no código.
+ *
+ * Numa só leitura porque as três saem da MESMA lista, e a lista custa uma
+ * travessia paginada ao Laravel.
+ */
+export type { Operacao } from "@/lib/operacao";
+import type { Operacao as OperacaoDTO } from "@/lib/operacao";
+
+export async function getOperacao(): Promise<OperacaoDTO> {
+  return apiGet<OperacaoDTO>("/services/operacao", () => {
+    throw new Error("O desempenho da operação precisa da ligação aos serviços do Laravel.");
+  }).then((r) => r.data);
 }

@@ -137,6 +137,8 @@ const LIVE_EXACT = new Set<string>([
   "/technicians/top",
   // Funil de quem se inscreveu e ficou a meio (Laravel: account_blocker).
   // Avaliacoes reais dos clientes (services.rating_by_customer).
+  // Funil, estados e tempos, dos servicos reais do Laravel.
+  "/services/operacao",
   "/quality",
   "/technicians/onboarding",
   "/technicians/coverage",
@@ -353,6 +355,8 @@ const REAL_DATA = new Set<string>([
   "/technicians/top",
   // Funil de quem se inscreveu e ficou a meio (Laravel: account_blocker).
   // Avaliacoes reais dos clientes (services.rating_by_customer).
+  // Funil, estados e tempos, dos servicos reais do Laravel.
+  "/services/operacao",
   "/quality",
   "/technicians/onboarding",
   "/technicians/coverage",

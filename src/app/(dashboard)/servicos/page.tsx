@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -10,24 +9,18 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
 import ServicosPersonalizadosPage from "../servicos-personalizados/page";
 import { Modal, Field } from "@/components/ui/Modal";
-import { ChartCard, DonutChartComponent, FunnelChartComponent } from "@/components/charts/Charts";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { getServices, getStatusDistribution, getMainFunnel, createCompletedService, updateCompletedService } from "@/services/dashboardService";
-import { getOperationalMetrics } from "@/services/supportService";
-import { getIncidents, incidentTypeLabel, type Incident } from "@/services/backofficeService";
-import { buildMetricValue } from "@/lib/calculations";
+import { getServices, createCompletedService, updateCompletedService } from "@/services/dashboardService";
+import { getOperacao } from "@/services/dashboardService";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS, DEFAULT_SETTINGS } from "@/config/dashboard";
 import { downloadCsv, cn } from "@/lib/utils";
 import { toast } from "@/stores";
 import { Plus, ClipboardList } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { PriorityBadge } from "@/components/ui/StatusBadge";
-import { formatDateTime } from "@/lib/formatters";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import type { ServiceRequest, ServiceStatus } from "@/types";
-import { DemoBadge } from "@/components/ui/DemoBadge";
 
 // Grupos de estado do fluxo operacional (mapeados nos ServiceStatus existentes).
 const STATUS_GROUPS: { id: string; label: string; statuses?: ServiceStatus[] }[] = [
@@ -87,7 +80,6 @@ export default function ServicesPage() {
 
   const [statusGroup, setStatusGroup] = useState("todos");
   const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
-  const { data: incidents } = useAsyncData(() => getIncidents(), []);
 
   const TABS: TabDef[] = [
     { id: "pedidos", label: "Serviços" },
@@ -104,7 +96,6 @@ export default function ServicesPage() {
       entram pela ponte com o Laravel (ver _lib/appPedidos.ts). Não se perde
       nada; deixa de haver um separador que nunca mostrou nada.
     */
-    { id: "incidentes", label: "Incidentes", count: (incidents ?? []).filter((i) => i.status !== "resolvido").length },
     { id: "desempenho", label: "Desempenho (SLA)" },
     { id: "personalizados", label: "Pedidos personalizados" },
   ];
@@ -171,9 +162,11 @@ export default function ServicesPage() {
     [filters, page, pageSize, sortField, sortDirection, debouncedSearch, statusGroup]
   );
 
-  const { data: opMetrics } = useAsyncData(() => getOperationalMetrics(filters), [filters]);
-  const { data: statusDist } = useAsyncData(() => getStatusDistribution(filters), [filters]);
-  const { data: funnel } = useAsyncData(() => getMainFunnel(filters), [filters]);
+  /*
+    Funil, estados e tempos numa só leitura: as três saem da MESMA lista de
+    serviços, e a lista custa uma travessia paginada ao Laravel.
+  */
+  const { data: op, error: opErro } = useAsyncData(() => getOperacao(), []);
 
   // Sem ID; sem Agendado, Valor técnico, Origem, Tempo técnico e Reclamação
   // (pedido do André 2026-07-22). Avaliação visível junto ao estado.
@@ -207,7 +200,7 @@ export default function ServicesPage() {
           icon={ClipboardList}
           eyebrow="Operação"
           title="Operações"
-          subtitle="Serviços, agendamentos, estados e incidentes"
+          subtitle="Serviços, agendamentos e desempenho da operação"
           actions={
             <>
               <button onClick={openNewService} className="btn-primary text-sm">
@@ -262,56 +255,118 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {tab === "incidentes" && (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">Ocorrências operacionais que precisam de intervenção (técnico não compareceu, atrasos, danos, falhas de pagamento).</p>
-            <DataTable
-              columns={[
-                { key: "serviceId", label: "Serviço", render: (r: Incident) => <span className="font-mono text-xs">{r.serviceId}</span> },
-                { key: "type", label: "Tipo", render: (r: Incident) => <span className="font-medium">{incidentTypeLabel(r.type)}</span> },
-                { key: "description", label: "Descrição" },
-                { key: "severity", label: "Gravidade", render: (r: Incident) => <PriorityBadge priority={r.severity} /> },
-                { key: "assignee", label: "Responsável" },
-                { key: "openedAt", label: "Abertura", render: (r: Incident) => formatDateTime(r.openedAt) },
-                { key: "status", label: "Estado", render: (r: Incident) => (
-                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                    r.status === "resolvido" ? "bg-success-light text-success" : r.status === "em_resolucao" ? "bg-warning-light text-warning" : "bg-danger-light text-danger")}>
-                    {r.status === "resolvido" ? "Resolvido" : r.status === "em_resolucao" ? "Em resolução" : "Aberto"}
-                  </span>
-                ) },
-              ]}
-              data={incidents ?? []}
-              keyField="id"
-              emptyMessage="Sem incidentes 🎉"
-            />
-          </div>
-        )}
-
-        {tab === "desempenho" && opMetrics && (
+        {tab === "desempenho" && (
           <div className="space-y-6">
-            <DemoBadge endpoint="/services/operational-metrics" />
-            {/* Uma linha só: as taxas de conclusão, cancelamento e sem técnico
-                somam ~100% -- vê-las juntas é a leitura, separá-las não é. */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              <MetricCard compact title="Tempo resposta" metric={buildMetricValue(opMetrics.avgResponseTime, opMetrics.avgResponseTime)} hideDelta />
-              <MetricCard compact title="Tempo encontrar téc." metric={buildMetricValue(opMetrics.avgTechnicianFindTime, opMetrics.avgTechnicianFindTime)} hideDelta />
-              <MetricCard compact title="Taxa conclusão" metric={buildMetricValue(opMetrics.completionRate, opMetrics.completionRate)} hideDelta format="percent" />
-              <MetricCard compact title="Taxa cancelamento" metric={buildMetricValue(opMetrics.cancellationRate, opMetrics.cancellationRate)} hideDelta format="percent" />
-              <MetricCard compact title="Sem técnico" metric={buildMetricValue(opMetrics.noTechnicianRate, opMetrics.noTechnicianRate)} hideDelta format="percent" />
-              <MetricCard compact title="Em atraso" metric={buildMetricValue(opMetrics.overdueServices, opMetrics.overdueServices)} hideDelta />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Estados dos serviços">
-                <DonutChartComponent data={(statusDist ?? []).map((d) => ({ name: SERVICE_STATUS_LABELS[d.name] ?? d.name, value: d.value }))} centerLabel="Serviços" />
-              </ChartCard>
-              <ChartCard title="Funil de conversão">
-                <FunnelChartComponent data={(funnel ?? []).map((s) => ({ name: s.name, count: s.count, conversionRate: s.conversionRate }))} />
-              </ChartCard>
-            </div>
-            <div className="card p-4 text-sm text-text-secondary">
-              Indicadores de nível de serviço (SLA): tempos de resposta e de atribuição de técnico, taxas de conclusão e
-              cancelamento, e serviços em atraso. Usa o <span className="font-medium text-text-primary">Despacho ao vivo</span> para agir sobre os pedidos por atribuir.
-            </div>
+            {opErro && (
+              <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-4 py-3">
+                <p className="text-sm font-semibold text-danger">Não foi possível medir a operação</p>
+                <p className="text-xs text-text-secondary mt-0.5">{opErro}</p>
+              </div>
+            )}
+
+            {op && (
+              <>
+                {/*
+                  Só os tempos que se conseguem MEDIR. O ecrã mostrava antes
+                  28, 95, 180, 1440 e 120 minutos, mais "sem técnico 2,1%" e
+                  "em atraso 12" — todos constantes escritas no código.
+
+                  Medianas e não médias: um serviço esquecido em aberto durante
+                  três semanas desloca uma média e não desloca a mediana.
+                */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="card p-3">
+                    <p className="text-xs text-text-secondary">Pedidos</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">{op.total}</p>
+                    <p className="text-[11px] text-text-muted">no histórico todo</p>
+                  </div>
+                  <div className="card p-3">
+                    <p className="text-xs text-text-secondary">Taxa de conclusão</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">
+                      {op.taxaConclusao.toFixed(1).replace(".", ",")}%
+                    </p>
+                  </div>
+                  <div className="card p-3">
+                    <p className="text-xs text-text-secondary">Taxa de cancelamento</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">
+                      {op.taxaCancelamento.toFixed(1).replace(".", ",")}%
+                    </p>
+                  </div>
+                  <div className="card p-3">
+                    <p className="text-xs text-text-secondary">Até encontrar técnico</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">
+                      {op.tempoAteEncontrarTecnico == null ? "—" : `${op.tempoAteEncontrarTecnico} min`}
+                    </p>
+                    <p className="text-[11px] text-text-muted">
+                      {op.amostras.encontrar > 0 ? `mediana de ${op.amostras.encontrar} serviços` : "sem dados"}
+                    </p>
+                  </div>
+                  <div className="card p-3">
+                    <p className="text-xs text-text-secondary">Duração do serviço</p>
+                    <p className="text-xl font-bold text-text-primary tabular-nums">
+                      {op.duracaoDoServico == null ? "—" : `${op.duracaoDoServico} min`}
+                    </p>
+                    <p className="text-[11px] text-text-muted">
+                      {op.amostras.duracao > 0 ? `mediana de ${op.amostras.duracao} serviços` : "sem dados"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="card p-4 space-y-3">
+                    <SectionHeader title="Onde se perdem os pedidos" />
+                    {op.funil.map((p, i) => (
+                      <div key={p.nome}>
+                        <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                          <span className="font-medium text-text-primary">{p.nome}</span>
+                          <span className="tabular-nums text-text-secondary">
+                            {p.quantos}
+                            {i > 0 && p.perdaNoPasso > 0 && (
+                              <span className="ml-2 text-danger">−{p.perdaNoPasso.toFixed(1).replace(".", ",")}%</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                          <div className="h-full rounded-full bg-piquet" style={{ width: `${p.percentagem}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="card p-4 space-y-3">
+                    <SectionHeader title="Em que estado estão" />
+                    {op.porEstado.length === 0 ? (
+                      <p className="py-4 text-center text-sm text-text-muted">Sem serviços registados.</p>
+                    ) : (
+                      op.porEstado.map((e) => (
+                        <div key={e.estado}>
+                          <div className="flex items-baseline justify-between text-sm">
+                            <span className="font-medium text-text-primary">
+                              {SERVICE_STATUS_LABELS[e.estado] ?? e.estado}
+                            </span>
+                            <span className="tabular-nums text-text-secondary">
+                              {e.quantos} ({op.total > 0 ? Math.round((e.quantos / op.total) * 100) : 0}%)
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-piquet/70"
+                              style={{ width: `${op.total > 0 ? (e.quantos / op.total) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <p className="card p-4 text-sm text-text-secondary">
+                  Tudo aqui sai dos serviços reais. Onde não há como medir — o tempo até responder, por exemplo, se o
+                  Laravel não o registar — aparece um traço em vez de um número. Usa o{" "}
+                  <span className="font-medium text-text-primary">Despacho ao vivo</span> para agir sobre os pedidos por atribuir.
+                </p>
+              </>
+            )}
           </div>
         )}
 

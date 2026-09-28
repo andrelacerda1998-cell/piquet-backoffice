@@ -11,13 +11,11 @@ import { LoadingState } from "@/components/ui/States";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getQuality, type Qualidade } from "@/services/extrasService";
-import { getTechnicians } from "@/services/techniciansService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatDateTime, formatPercent, formatCurrency } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatCurrency } from "@/lib/formatters";
 import { getVendorNoShows, declareVendorNoShow, type NoShowService } from "@/services/noShowsService";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
-import type { Technician } from "@/types";
 
 /*
   ——— O que saiu deste ecrã ———
@@ -41,7 +39,6 @@ import type { Technician } from "@/types";
 export default function QualityPage() {
   const [tab, setTab] = useState("visao");
   const { data: q, loading, error } = useAsyncData(() => getQuality(), []);
-  const { data: techs } = useAsyncData(() => getTechnicians(1, 100), []);
 
   // Faltas de técnicos — endpoint real do Laravel, sem mock: isto tira
   // dinheiro a pessoas, e uma lista inventada seria um botão que "funciona"
@@ -63,10 +60,13 @@ export default function QualityPage() {
     }
   };
 
-  const lowRated = (techs?.data ?? [])
-    .filter((t) => t.averageRating > 0 && t.averageRating < 4)
-    .sort((a, b) => a.averageRating - b.averageRating);
-  const below3 = lowRated.filter((t) => t.averageRating < 3).length;
+  /*
+    Vinha de getTechnicians(), que lê `/technicians/legacy-mock`: a lista de
+    "técnicos abaixo de 4 estrelas" nomeava pessoas que não existem, com
+    médias inventadas. Agora sai das notas reais dos serviços deles.
+  */
+  const lowRated = (q?.porTecnico ?? []).filter((t) => t.media < 4);
+  const below3 = lowRated.filter((t) => t.media < 3).length;
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Avaliações" },
@@ -113,15 +113,18 @@ export default function QualityPage() {
     { key: "penalty", label: "Cobrado", render: (r) => <span className="whitespace-nowrap font-semibold text-danger">{formatCurrency((r.vendor_no_show_penalty ?? 0) / 100)}</span> },
   ];
 
-  const lowRatedColumns: Column<Technician>[] = [
-    { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "city", label: "Zona" },
-    { key: "categories", label: "Categorias", render: (r) => r.categories.slice(0, 2).join(", ") },
-    { key: "servicesCompleted", label: "Serviços" },
-    { key: "averageRating", label: "Avaliação", render: (r) => (
-      <span className={cn("font-semibold", r.averageRating < 3 ? "text-danger" : "text-warning")}>{r.averageRating}★</span>
+  const lowRatedColumns: Column<Qualidade["porTecnico"][number]>[] = [
+    { key: "nome", label: "Técnico", render: (r) => <span className="font-medium">{r.nome}</span> },
+    { key: "media", label: "Média", render: (r) => (
+      <span className={cn("font-semibold", r.media < 3 ? "text-danger" : "text-warning")}>
+        {r.media.toFixed(2).replace(".", ",")}★
+      </span>
     ) },
-    { key: "cancellationRate", label: "Cancelamento", render: (r) => formatPercent(r.cancellationRate) },
+    { key: "avaliacoes", label: "Avaliações", render: (r) => (
+      // Sem isto, "2,0★" de uma avaliação lia-se igual a "2,0★" de trinta.
+      <span className="tabular-nums" title="Quantos clientes o avaliaram">{r.avaliacoes}</span>
+    ) },
+    { key: "fracas", label: "1 ou 2★", render: (r) => <span className="tabular-nums">{r.fracas}</span> },
   ];
 
   const insatisfeitosColumns: Column<Qualidade["insatisfeitos"][number]>[] = [
@@ -260,10 +263,11 @@ export default function QualityPage() {
               <MetricCard title="Serviços com 1 ou 2★" metric={buildMetricValue(q?.insatisfeitos.length ?? 0, q?.insatisfeitos.length ?? 0)} hideDelta />
             </div>
             <p className="text-sm text-text-secondary">
-              Técnicos com avaliação abaixo de 4 estrelas — candidatos a formação, acompanhamento ou suspensão.
-              A média de cada um vem do Laravel, calculada sobre as notas reais dos clientes.
+              Técnicos com média abaixo de 4 estrelas — candidatos a formação, acompanhamento ou suspensão.
+              A média sai das notas reais dos serviços de cada um. Repara sempre no número de avaliações antes de
+              agir: duas estrelas de um cliente só não é o mesmo que duas estrelas de trinta.
             </p>
-            <DataTable columns={lowRatedColumns} data={lowRated} keyField="id" emptyMessage="Nenhum técnico abaixo de 4★ 🎉" />
+            <DataTable columns={lowRatedColumns} data={lowRated} keyField="nome" emptyMessage="Nenhum técnico abaixo de 4★ 🎉" />
           </div>
         )}
 

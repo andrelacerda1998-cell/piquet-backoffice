@@ -33,6 +33,14 @@ export interface ServicoMalAvaliado {
   categoria: string | null;
 }
 
+export interface TecnicoAvaliado {
+  nome: string;
+  media: number;
+  avaliacoes: number;
+  /** Quantas dessas foram 1 ou 2 estrelas. */
+  fracas: number;
+}
+
 export interface Qualidade {
   /** Serviços concluídos no período coberto. */
   concluidos: number;
@@ -46,6 +54,15 @@ export interface Qualidade {
   porMes: { mes: string; media: number; avaliados: number }[];
   /** Notas de 1 ou 2 estrelas, da mais recente para a mais antiga. */
   insatisfeitos: ServicoMalAvaliado[];
+  /**
+   * Média por técnico, calculada das notas REAIS dos serviços dele.
+   *
+   * O ecrã tirava isto de `mockData.technicians`, com médias inventadas: a
+   * lista de "técnicos abaixo de 4 estrelas" nomeava pessoas que não existem.
+   * Só entram os que têm avaliações — com zero notas não há média, e mostrar
+   * 0,0 marcava como péssimo quem ainda ninguém avaliou.
+   */
+  porTecnico: TecnicoAvaliado[];
 }
 
 /** Estados que contam como serviço feito — os únicos que podiam ter nota. */
@@ -104,7 +121,30 @@ export function construirQualidade(servicos: ServicoAvaliavel[]): Qualidade {
     }))
     .sort((a, b) => (b.quando ?? "").localeCompare(a.quando ?? ""));
 
+  // Média por técnico, das notas reais. Sem nome do técnico não se agrupa:
+  // juntar tudo num "sem técnico" daria uma linha que não se pode acionar.
+  const porTecnicoMapa = new Map<string, { soma: number; n: number; fracas: number }>();
+  for (const { s: serv, n } of comNota) {
+    const nome = (serv.technicianName ?? "").trim();
+    if (!nome) continue;
+    const cur = porTecnicoMapa.get(nome) ?? { soma: 0, n: 0, fracas: 0 };
+    cur.soma += n;
+    cur.n++;
+    if (n <= 2) cur.fracas++;
+    porTecnicoMapa.set(nome, cur);
+  }
+  const porTecnico = [...porTecnicoMapa.entries()]
+    .map(([nome, v]) => ({
+      nome,
+      media: Math.round((v.soma / v.n) * 100) / 100,
+      avaliacoes: v.n,
+      fracas: v.fracas,
+    }))
+    // Do pior para o melhor: é essa a ponta que precisa de alguém.
+    .sort((a, b) => a.media - b.media || b.avaliacoes - a.avaliacoes);
+
   return {
+    porTecnico,
     concluidos: concluidosLista.length,
     avaliados: comNota.length,
     media,

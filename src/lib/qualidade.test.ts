@@ -114,3 +114,54 @@ describe("construirQualidade", () => {
     expect(q.insatisfeitos[0].cliente).toBeNull();
   });
 });
+
+describe("porTecnico", () => {
+  const s = (over: Partial<ServicoAvaliavel> = {}): ServicoAvaliavel => ({
+    id: "x", status: "concluido", completedAt: "2026-09-10T00:00:00Z", ...over,
+  });
+
+  it("calcula a média de cada técnico das notas reais", () => {
+    const q = construirQualidade([
+      s({ id: "1", rating: 5, technicianName: "Ana" }),
+      s({ id: "2", rating: 3, technicianName: "Ana" }),
+      s({ id: "3", rating: 4, technicianName: "Rui" }),
+    ]);
+    const ana = q.porTecnico.find((t) => t.nome === "Ana");
+    expect(ana).toEqual({ nome: "Ana", media: 4, avaliacoes: 2, fracas: 0 });
+  });
+
+  it("põe o pior em primeiro", () => {
+    const q = construirQualidade([
+      s({ id: "1", rating: 5, technicianName: "Boa" }),
+      s({ id: "2", rating: 2, technicianName: "Fraca" }),
+      s({ id: "3", rating: 4, technicianName: "Media" }),
+    ]);
+    expect(q.porTecnico.map((t) => t.nome)).toEqual(["Fraca", "Media", "Boa"]);
+  });
+
+  it("conta quantas foram fracas", () => {
+    const q = construirQualidade([
+      s({ id: "1", rating: 1, technicianName: "Rui" }),
+      s({ id: "2", rating: 2, technicianName: "Rui" }),
+      s({ id: "3", rating: 5, technicianName: "Rui" }),
+    ]);
+    expect(q.porTecnico[0].fracas).toBe(2);
+  });
+
+  it("um técnico sem avaliações não aparece com zero", () => {
+    // Mostrar 0,0 marcava como péssimo quem ainda ninguém avaliou.
+    const q = construirQualidade([
+      s({ id: "1", technicianName: "Sem notas" }),
+      s({ id: "2", rating: 4, technicianName: "Com notas" }),
+    ]);
+    expect(q.porTecnico.map((t) => t.nome)).toEqual(["Com notas"]);
+  });
+
+  it("serviços sem técnico não viram uma linha 'sem técnico'", () => {
+    const q = construirQualidade([s({ id: "1", rating: 2, technicianName: "  " })]);
+    expect(q.porTecnico).toEqual([]);
+    // Mas a nota continua a contar para a média geral e para os insatisfeitos.
+    expect(q.media).toBe(2);
+    expect(q.insatisfeitos).toHaveLength(1);
+  });
+});
