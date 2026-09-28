@@ -289,27 +289,6 @@ export const SEED_PUSH: PushCampaign[] = demoList([
   { id: "push_3", title: "Fim de semana em Cascais", message: "Técnicos disponíveis no teu bairro este fim de semana. Marca já!", segment: "Clientes de Cascais", status: "agendada", scheduledFor: "2026-07-11T09:00:00", delivered: 0, deliveryRate: 0, openRate: 0, conversions: 0 },
 ]);
 
-export interface DiscountCode {
-  id: string;
-  code: string;
-  kind: "percentagem" | "valor_fixo";
-  value: number;
-  usageLimit: number;
-  used: number;
-  validUntil: string;
-  categories: string;
-  cities: string;
-  active: boolean;
-  revenue: number;
-}
-
-export const SEED_CODES: DiscountCode[] = demoList([
-  { id: "dc_1", code: "VERAO25", kind: "percentagem", value: 15, usageLimit: 500, used: 212, validUntil: "2026-08-31", categories: "AVAC, Limpeza", cities: "Todas", active: true, revenue: 9840 },
-  { id: "dc_2", code: "VOLTEI10", kind: "valor_fixo", value: 10, usageLimit: 300, used: 64, validUntil: "2026-07-31", categories: "Todas", cities: "Todas", active: true, revenue: 3120 },
-  { id: "dc_3", code: "BEMVINDO5", kind: "valor_fixo", value: 5, usageLimit: 1000, used: 431, validUntil: "2026-12-31", categories: "Todas", cities: "Todas", active: true, revenue: 15680 },
-  { id: "dc_4", code: "PRIMAVERA", kind: "percentagem", value: 20, usageLimit: 200, used: 200, validUntil: "2026-05-31", categories: "Limpeza", cities: "Lisboa", active: false, revenue: 6212 },
-]);
-
 /* ----------------------------- Financeiro ------------------------------ */
 
 export interface Refund {

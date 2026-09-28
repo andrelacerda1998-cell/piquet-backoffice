@@ -1,93 +1,10 @@
 import { apiGet, apiPost, apiPut } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices } from "@/lib/filters";
-import { calculateCPL, calculateCAC, calculateROAS } from "@/lib/calculations";
 import type { DashboardFilter } from "@/types";
-
-export async function getMarketingMetrics(_filters: DashboardFilter) {
-  return apiGet("/marketing/metrics", () => {
-    const campaigns = mockData.campaigns;
-    const totalInvestment = campaigns.reduce((s, c) => s + c.investment, 0);
-    const totalLeads = campaigns.reduce((s, c) => s + c.leads, 0);
-    const totalCustomers = campaigns.reduce((s, c) => s + c.customers, 0);
-    const totalRevenue = campaigns.reduce((s, c) => s + c.piquetRevenue, 0);
-
-    return {
-      totalInvestment,
-      leads: totalLeads,
-      payingCustomers: totalCustomers,
-      cpl: calculateCPL(totalInvestment, totalLeads),
-      cac: calculateCAC(totalInvestment, totalCustomers),
-      piquetRevenue: totalRevenue,
-      roas: calculateROAS(totalRevenue, totalInvestment),
-      conversionRate: totalLeads ? (totalCustomers / totalLeads) * 100 : 0,
-      activeCampaigns: campaigns.filter((c) => c.status === "ativa").length,
-    };
-  }).then((r) => r.data);
-}
 
 export async function getCampaigns() {
   return apiGet("/marketing/campaigns", () => mockData.campaigns).then((r) => r.data);
-}
-
-export async function getMarketingFunnel() {
-  return apiGet("/marketing/funnel", () => {
-    const total = 500000;
-    const steps = [
-      { name: "Impressões", count: total },
-      { name: "Cliques", count: Math.round(total * 0.025) },
-      { name: "Visitas", count: Math.round(total * 0.018) },
-      { name: "Leads", count: Math.round(total * 0.003) },
-      { name: "Orçamentos", count: Math.round(total * 0.0015) },
-      { name: "Pagamentos", count: Math.round(total * 0.0008) },
-      { name: "Serviços concluídos", count: Math.round(total * 0.0006) },
-    ];
-    return steps.map((step, i) => ({
-      ...step,
-      conversionRate: i > 0 ? (step.count / steps[i - 1].count) * 100 : 100,
-    }));
-  }).then((r) => r.data);
-}
-
-export async function getCreativesPerformance() {
-  return apiGet("/marketing/creatives", () => {
-    return mockData.campaigns.map((c) => ({
-      id: c.id,
-      name: c.creative ?? c.campaignName,
-      format: "Imagem",
-      theme: c.campaignName,
-      investment: c.investment,
-      ctr: c.ctr,
-      cpl: c.cpl,
-      cac: c.cac,
-      revenue: c.piquetRevenue,
-      roas: c.roas,
-      recommendation: c.roas > 3 ? "Escalar" : c.roas > 1.5 ? "Manter" : c.roas > 0.8 ? "Testar novamente" : "Desativar",
-    }));
-  }).then((r) => r.data);
-}
-
-export async function getChannelBreakdown() {
-  return apiGet("/marketing/channels", () => {
-    const byPlatform: Record<string, { investment: number; revenue: number; leads: number; customers: number }> = {};
-    mockData.campaigns.forEach((c) => {
-      if (!byPlatform[c.platform]) byPlatform[c.platform] = { investment: 0, revenue: 0, leads: 0, customers: 0 };
-      byPlatform[c.platform].investment += c.investment;
-      byPlatform[c.platform].revenue += c.piquetRevenue;
-      byPlatform[c.platform].leads += c.leads;
-      byPlatform[c.platform].customers += c.customers;
-    });
-    return Object.entries(byPlatform).map(([name, d]) => ({
-      name,
-      investment: Math.round(d.investment),
-      revenue: Math.round(d.revenue),
-      leads: d.leads,
-      customers: d.customers,
-      // CAC do canal = investimento / clientes adquiridos por esse canal.
-      cac: d.customers ? Math.round((d.investment / d.customers) * 100) / 100 : 0,
-      roas: d.investment ? d.revenue / d.investment : 0,
-    }));
-  }).then((r) => r.data);
 }
 
 export async function getCategoryZoneMetrics(filters: DashboardFilter) {
@@ -349,64 +266,6 @@ export async function criarAnuncioDisplayUI(input: {
 
 export async function mudarEstadoGoogleUI(resourceName: string, estado: "ENABLED" | "PAUSED") {
   return apiPut<{ resourceName: string; estado: string }>("/marketing/google-ads/status", { resourceName, estado }, semMockGoogle("Mudar o estado")).then((r) => r.data);
-}
-
-/* ==================== ROAS REAL (atribuicao de leads) ==================== */
-
-export interface RoasLinha {
-  nome: string;
-  leads: number;
-  clientes: number;
-  gmv: number;
-  receita: number;
-  investimento?: number;
-  /** `null` quando nao se conhece o investimento daquela campanha. */
-  roas?: number | null;
-  cpl?: number | null;
-  cac?: number | null;
-}
-
-export interface RoasReal {
-  porCampanha: RoasLinha[];
-  porCanal: RoasLinha[];
-  totais: { leads: number; clientes: number; receita: number };
-}
-
-/**
- * ROAS calculado a partir do que os clientes pagaram, nao do que a plataforma
- * diz ter convertido. Ver /api/marketing/roas.
- */
-export async function getRoasReal(): Promise<RoasReal> {
-  return apiGet<RoasReal>("/marketing/roas", () => ({
-    porCampanha: [], porCanal: [], totais: { leads: 0, clientes: 0, receita: 0 },
-  })).then((r) => r.data);
-}
-
-export async function casarLeadsComClientes() {
-  return apiPost<{ clientes: number; leadsPorCasar: number; casadas: number; ambiguas: number; semTelefoneUtil: number }>(
-    "/marketing/attribution/match", {},
-    () => { throw new Error("Casar leads precisa da API de admin do Laravel configurada."); },
-  ).then((r) => r.data);
-}
-
-export interface ModeloAcompanhamento {
-  configured: boolean;
-  atual: string | null;
-  recomendado: string;
-  error: string | null;
-}
-
-/** Modelo de acompanhamento do Google Ads — carimba os UTM em cada clique. */
-export async function getModeloAcompanhamento(): Promise<ModeloAcompanhamento> {
-  return apiGet<ModeloAcompanhamento>("/marketing/google-ads/tracking", () => ({
-    configured: false, atual: null, recomendado: "", error: null,
-  })).then((r) => r.data);
-}
-
-export async function definirModeloAcompanhamento(modelo?: string) {
-  return apiPut<{ modelo: string }>("/marketing/google-ads/tracking", modelo ? { modelo } : {},
-    () => { throw new Error("Definir o modelo precisa do Google Ads configurado."); },
-  ).then((r) => r.data);
 }
 
 /* --- Campanhas de push (Laravel: NotificationCampaign) ------------------- */
