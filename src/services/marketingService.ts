@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices } from "@/lib/filters";
 import type { DashboardFilter } from "@/types";
@@ -293,4 +293,37 @@ export async function setPushCampaignActive(id: number, active: boolean): Promis
   await apiPut(`/marketing/push-campaigns/${id}/active`, { active }, () => {
     throw new Error("As campanhas de push ainda não estão ligadas.");
   });
+}
+
+/* ------------------------------- Vouchers -------------------------------- */
+
+/**
+ * Vouchers REAIS, do Laravel, via /api/vouchers.
+ *
+ * Não têm mock de propósito. Um mock que devolvesse "criado" fazia acreditar
+ * que o código existia — e o cliente que o escrevesse na app ouvia que era
+ * inválido. Foi exatamente isso que a lista antiga de "códigos de desconto",
+ * guardada no localStorage, fazia.
+ */
+export type { Voucher, NovoVoucher } from "@/lib/vouchers";
+import type { Voucher as VoucherDTO, NovoVoucher as NovoVoucherDTO } from "@/lib/vouchers";
+
+const semVouchers = (o: string) => () => {
+  throw new Error(`${o} precisa da API de admin do Laravel configurada — os vouchers vivem lá.`);
+};
+
+export async function getVouchers(): Promise<VoucherDTO[]> {
+  return apiGet<VoucherDTO[]>("/vouchers", semVouchers("Ver os vouchers")).then((r) => r.data);
+}
+
+export async function criarVoucher(input: NovoVoucherDTO): Promise<VoucherDTO> {
+  return apiPost<VoucherDTO>("/vouchers", input, semVouchers("Criar vouchers")).then((r) => r.data);
+}
+
+export async function alterarVoucher(id: string, input: Partial<NovoVoucherDTO>): Promise<VoucherDTO> {
+  return apiPut<VoucherDTO>(`/vouchers/${id}`, input, semVouchers("Alterar vouchers")).then((r) => r.data);
+}
+
+export async function apagarVoucher(id: string): Promise<{ id: string }> {
+  return apiDelete<{ id: string }>(`/vouchers/${id}`, semVouchers("Apagar vouchers")).then((r) => r.data);
 }

@@ -15,6 +15,7 @@ import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
 import { PushCampanhas } from "./PushCampanhas";
+import { Vouchers } from "./Vouchers";
 import { costPerDownload } from "@/lib/adAttribution";
 import { periodoCampanha, pareceParadaSemRegisto } from "@/lib/campaignPeriod";
 import {
@@ -40,9 +41,10 @@ import type { MarketingCampaign } from "@/types";
     nenhuma com cliente. Era uma análise vazia com ar de análise.
   - "Códigos de desconto": guardados em localStorage, semeados com quatro
     códigos que não existem e com 34.852 € de "receita gerada" — num negócio
-    que gastou 1.105 € em anúncios desde sempre. Há um sistema de vouchers a
-    sério no Laravel (Voucher, VoucherUsage); ligá-lo é trabalho a fazer, mas
-    mostrar os falsos entretanto é pior do que não mostrar nada.
+    que gastou 1.105 € em anúncios desde sempre. No lugar deles está agora a
+    lista de VOUCHERS reais, lida da tabela `vouchers` do Laravel (ver
+    Vouchers.tsx) — a mesma que a app consulta quando o cliente aplica o
+    código.
 
   Fica uma aba com as campanhas e as datas à frente, e outra com a comunicação.
 */
@@ -392,6 +394,10 @@ export default function MarketingPage() {
         {tab === "comunicacao" && (
           <div className="space-y-6">
             <PushCampanhas />
+            <div className="card p-4 space-y-3">
+              <SectionHeader title="Vouchers" />
+              <Vouchers />
+            </div>
             <details className="card p-4">
               <summary className="cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary">
                 Guiões de mensagens ({(scripts ?? []).length})
