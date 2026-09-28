@@ -243,23 +243,32 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
 
   it("zero em vez de ficção: GET a endpoint demo devolve o mock zerado", async () => {
     const { apiGet } = await load();
-    // /quality é demo e não-migrado → corre o fetcher mock e zera o resultado.
-    const res = await apiGet("/quality", () => ({ nps: 62, complaints: [{ id: "c1" }], meta: "Qualidade" }));
-    expect(res.data).toEqual({ nps: 0, complaints: [], meta: "Qualidade" });
+    /*
+      /product/bugs é demo e não-migrado → corre o fetcher mock e zera o
+      resultado. Era /quality até 28/09/2026, quando as avaliações passaram a
+      vir dos serviços do Laravel (services.rating_by_customer) e o endpoint
+      deixou esta lista — como está previsto acontecer a cada um destes à
+      medida que ganham fonte real.
+    */
+    const res = await apiGet("/product/bugs", () => ({ abertos: 62, itens: [{ id: "b1" }], meta: "Bugs" }));
+    expect(res.data).toEqual({ abertos: 0, itens: [], meta: "Bugs" });
   });
 
   it("sem backend configurado, o modo demo continua a mostrar os mocks", async () => {
     vi.resetModules();
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
     const { apiGet } = await import("@/services/api");
-    const res = await apiGet("/quality", () => ({ nps: 62 }));
-    expect(res.data).toEqual({ nps: 62 });
+    const res = await apiGet("/product/bugs", () => ({ abertos: 62 }));
+    expect(res.data).toEqual({ abertos: 62 });
   });
 
   it("trata como demo tudo o que não foi confirmado como real", async () => {
     const { isDemoEndpoint } = await load();
     expect(isDemoEndpoint("/dashboard/overview")).toBe(true); // o GMV calibrado
-    expect(isDemoEndpoint("/quality")).toBe(true);
+    expect(isDemoEndpoint("/product/bugs")).toBe(true);
+    // E o contrário, para esta rede apanhar o dia em que alguém ligar um
+    // endpoint real e se esquecer de o tirar da lista de ficção:
+    expect(isDemoEndpoint("/quality")).toBe(false);
     expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });

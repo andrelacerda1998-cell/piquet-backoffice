@@ -297,3 +297,19 @@ export async function createTestVendor(input: {
     throw new Error("Criar conta de teste precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }
+
+/* --------------------- Onboarding: o funil de quem se inscreveu -------------------- */
+
+/**
+ * Substitui o ecrã de Recrutamento, que mostrava candidatos e entrevistas
+ * inventados. Sem mock: um funil vazio de mentira daria a entender que está
+ * tudo em ordem quando há centenas de técnicos parados.
+ */
+export type { Funil, TecnicoNoFunil, Etapa } from "@/lib/onboardingTecnicos";
+import type { Funil as FunilDTO } from "@/lib/onboardingTecnicos";
+
+export async function getOnboardingTecnicos(): Promise<FunilDTO> {
+  return apiGet<FunilDTO>("/technicians/onboarding", () => {
+    throw new Error("O funil de técnicos precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}

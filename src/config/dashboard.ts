@@ -101,7 +101,7 @@ export const NAV_ITEMS = [
   { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
-  { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
+  { href: "/recrutamento", label: "Onboarding de técnicos", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
 ] as const;
@@ -132,7 +132,7 @@ export const NAV_DEEPLINKS: string[] = [
   "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados",
-  "/tecnicos?tab=recrutamento",
+  "/recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
 ];
 

@@ -130,42 +130,19 @@ export async function getZones(): Promise<{ zones: ZoneRow[]; coverageAvg: numbe
 
 /* ============================ QUALIDADE & CONFIANÇA ============================ */
 
-export interface QualityData {
-  kpis: { avgRating: number; nps: number; complaintRate: number; verifiedTechnicians: number };
-  ratingSeries: { name: string; value: number }[];
-  ratingDistribution: { name: string; value: number }[];
-  complaints: { id: string; customerName: string; category: string; status: string; openedAt: string }[];
-}
+export type { Qualidade } from "@/lib/qualidade";
+import type { Qualidade } from "@/lib/qualidade";
 
-export async function getQuality(): Promise<QualityData> {
-  return apiGet("/quality", () => {
-    const services = mockData.services;
-    const rated = services.filter((s) => s.rating);
-    const avgRating = rated.length ? +(rated.reduce((a, s) => a + (s.rating ?? 0), 0) / rated.length).toFixed(2) : 4.6;
-    const dist = [1, 2, 3, 4, 5].map((star) => ({
-      name: `${star}★`,
-      value: rated.filter((s) => Math.round(s.rating ?? 0) === star).length || (star >= 4 ? star * 30 : star * 4),
-    }));
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    const ratingSeries = months.map((m, i) => ({ name: m, value: +(4.3 + (i % 3) * 0.15).toFixed(2) }));
-    const complaints = services.filter((s) => s.hasComplaint).slice(0, 6).map((s, i) => ({
-      id: s.id,
-      customerName: s.customerName,
-      category: s.categoryName,
-      status: ["em_analise", "resolvido", "em_reclamacao"][i % 3],
-      openedAt: s.requestedAt,
-    }));
-    return {
-      kpis: {
-        avgRating,
-        nps: 62,
-        complaintRate: +((services.filter((s) => s.hasComplaint).length / Math.max(1, services.length)) * 100).toFixed(1),
-        verifiedTechnicians: mockData.technicians.filter((t) => t.documentationComplete).length,
-      },
-      ratingSeries,
-      ratingDistribution: dist,
-      complaints,
-    };
+/**
+ * Qualidade a partir das avaliacoes REAIS (ver /api/quality).
+ *
+ * Sem mock: o anterior devolvia NPS 62, uma serie mensal por formula e cinco
+ * motivos de reclamacao escritos a mao. Num ecra de qualidade, numeros
+ * inventados sao piores do que ecra vazio.
+ */
+export async function getQuality(): Promise<Qualidade> {
+  return apiGet<Qualidade>("/quality", () => {
+    throw new Error("As avaliacoes precisam da ligacao aos servicos do Laravel.");
   }).then((r) => r.data);
 }
 
@@ -448,48 +425,6 @@ export async function getTasksBoard(): Promise<{ tasks: TeamTask[]; workload: { 
   }).then((r) => r.data);
 }
 
-/* ============================ RECRUTAMENTO ============================ */
-
-export interface TechCandidate {
-  id: string;
-  name: string;
-  specialization: string;
-  city: string;
-  status: "por_validar" | "em_analise" | "entrevista" | "aprovado" | "recusado";
-  docsComplete: boolean;
-  appliedAt: string;
-}
-
-export interface JobOpening {
-  id: string;
-  title: string;
-  department: string;
-  type: "Promoção interna" | "Mobilidade interna" | "Nova posição";
-  candidates: number;
-  status: "aberta" | "entrevistas" | "fechada";
-  deadline: string;
-}
-
-export async function getRecruitment(): Promise<{ candidates: TechCandidate[]; openings: JobOpening[] }> {
-  return apiGet("/recruitment", () => {
-    const candidates: TechCandidate[] = [
-      { id: "c1", name: "Nuno Bernardes", specialization: "Canalização", city: "Lisboa", status: "por_validar", docsComplete: false, appliedAt: "2026-07-01" },
-      { id: "c2", name: "Patrícia Reis", specialization: "Eletricidade", city: "Amadora", status: "em_analise", docsComplete: true, appliedAt: "2026-06-29" },
-      { id: "c3", name: "Hugo Martins", specialization: "AVAC", city: "Sintra", status: "entrevista", docsComplete: true, appliedAt: "2026-06-27" },
-      { id: "c4", name: "Sara Lopes", specialization: "Limpeza e manutenção", city: "Loures", status: "aprovado", docsComplete: true, appliedAt: "2026-06-22" },
-      { id: "c5", name: "Diogo Fonseca", specialization: "Fechaduras e portas", city: "Cascais", status: "recusado", docsComplete: false, appliedAt: "2026-06-20" },
-    ];
-    const openings: JobOpening[] = [
-      { id: "v1", title: "Coordenador de Operações", department: "Operações", type: "Promoção interna", candidates: 4, status: "entrevistas", deadline: "2026-07-15" },
-      { id: "v2", title: "Agente de Suporte sénior", department: "Suporte", type: "Mobilidade interna", candidates: 3, status: "aberta", deadline: "2026-07-31" },
-      { id: "v3", title: "Analista de Dados", department: "Tecnologia", type: "Nova posição", candidates: 6, status: "aberta", deadline: "2026-08-10" },
-      { id: "v4", title: "Team Lead de Marketing", department: "Marketing", type: "Promoção interna", candidates: 2, status: "entrevistas", deadline: "2026-07-05" },
-      { id: "v5", title: "Engenheiro de Software sénior", department: "Tecnologia", type: "Promoção interna", candidates: 3, status: "aberta", deadline: "2026-08-22" },
-    ];
-    return { candidates, openings };
-  }).then((r) => r.data);
-}
-
 export interface Complaint {
   id: string;
   customerName: string;
@@ -740,67 +675,6 @@ export async function getCustomRequests(): Promise<CustomRequest[]> {
   return apiGet<CustomRequest[]>("/custom-requests", () => []).then((r) => r.data);
 
 }
-
-/* ==================== RECRUTAMENTO — TAREFAS & AGENDA ==================== */
-
-export const RECRUITERS = ["Sofia Antunes", "Mariana Quintela", "Helena Cruz"];
-
-export interface RecruitmentTask {
-  id: string;
-  title: string;
-  assignee: string;
-  candidate?: string;
-  priority: "critica" | "alta" | "media" | "baixa";
-  status: "aberta" | "em_curso" | "concluida";
-  due: string;
-}
-
-export async function getRecruitmentTasks(): Promise<RecruitmentTask[]> {
-  return apiGet("/recruitment/tasks", () => {
-    const data: RecruitmentTask[] = [
-      { id: "rt1", title: "Validar documentos", assignee: "Sofia Antunes", candidate: "Nuno Bernardes", priority: "alta", status: "em_curso", due: "2026-07-03" },
-      { id: "rt2", title: "Entrevista técnica", assignee: "Mariana Quintela", candidate: "Hugo Martins", priority: "alta", status: "aberta", due: "2026-07-04" },
-      { id: "rt3", title: "Verificar registo criminal", assignee: "Helena Cruz", candidate: "Patrícia Reis", priority: "media", status: "aberta", due: "2026-07-05" },
-      { id: "rt4", title: "Contactar referências", assignee: "Sofia Antunes", candidate: "Sara Lopes", priority: "media", status: "em_curso", due: "2026-07-03" },
-      { id: "rt5", title: "Fechar vaga Analista de Dados", assignee: "Mariana Quintela", priority: "baixa", status: "aberta", due: "2026-07-08" },
-      { id: "rt6", title: "Onboarding de aprovados", assignee: "Helena Cruz", priority: "critica", status: "aberta", due: "2026-07-03" },
-      { id: "rt7", title: "Publicar vaga de Suporte", assignee: "Sofia Antunes", priority: "baixa", status: "concluida", due: "2026-07-01" },
-    ];
-    return data;
-  }).then((r) => r.data);
-}
-
-export interface AgendaEvent {
-  id: string;
-  person: string;
-  date: string;   // YYYY-MM-DD
-  start: string;  // HH:mm
-  end: string;
-  title: string;
-  type: "entrevista" | "documentos" | "reuniao" | "follow_up";
-  candidate?: string;
-}
-
-export async function getRecruitmentAgenda(): Promise<AgendaEvent[]> {
-  return apiGet("/recruitment/agenda", () => {
-    // Semana de 2026-07-03 (sex) a 2026-07-09 (qui) — foco no dia atual (03) e semana.
-    const data: AgendaEvent[] = [
-      { id: "ag1", person: "Sofia Antunes", date: "2026-07-03", start: "09:30", end: "10:15", title: "Entrevista — Hugo Martins", type: "entrevista", candidate: "Hugo Martins" },
-      { id: "ag2", person: "Sofia Antunes", date: "2026-07-03", start: "11:00", end: "11:30", title: "Validar documentos — Nuno B.", type: "documentos", candidate: "Nuno Bernardes" },
-      { id: "ag3", person: "Sofia Antunes", date: "2026-07-03", start: "15:00", end: "15:45", title: "Follow-up referências", type: "follow_up", candidate: "Sara Lopes" },
-      { id: "ag4", person: "Mariana Quintela", date: "2026-07-03", start: "10:00", end: "11:00", title: "Reunião de recrutamento", type: "reuniao" },
-      { id: "ag5", person: "Mariana Quintela", date: "2026-07-03", start: "14:00", end: "14:45", title: "Entrevista — Patrícia Reis", type: "entrevista", candidate: "Patrícia Reis" },
-      { id: "ag6", person: "Helena Cruz", date: "2026-07-03", start: "09:00", end: "09:30", title: "Registo criminal — Patrícia R.", type: "documentos", candidate: "Patrícia Reis" },
-      { id: "ag7", person: "Helena Cruz", date: "2026-07-03", start: "16:00", end: "16:30", title: "Onboarding — Sara Lopes", type: "reuniao", candidate: "Sara Lopes" },
-      { id: "ag8", person: "Sofia Antunes", date: "2026-07-04", start: "10:00", end: "10:45", title: "Entrevista — candidato eletricista", type: "entrevista" },
-      { id: "ag9", person: "Mariana Quintela", date: "2026-07-05", start: "11:00", end: "12:00", title: "Triagem de candidaturas", type: "reuniao" },
-      { id: "ag10", person: "Helena Cruz", date: "2026-07-07", start: "09:30", end: "10:00", title: "Verificar IBAN — vários", type: "documentos" },
-      { id: "ag11", person: "Sofia Antunes", date: "2026-07-08", start: "15:00", end: "15:30", title: "Fecho de vaga Suporte", type: "reuniao" },
-    ];
-    return data;
-  }).then((r) => r.data);
-}
-
 
 /** Um acontecimento na vida de um pedido — só com data real. */
 export interface EventoPedido {
