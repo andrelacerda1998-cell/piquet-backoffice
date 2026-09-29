@@ -22,6 +22,9 @@ export interface InboxMessage {
   authorName: string;
   body: string;
   at: string;
+  /** URLs das fotos que o cliente juntou ao pedido. Ausente na esmagadora
+   *  maioria das mensagens — só existe quando há mesmo fotos. */
+  images?: string[];
 }
 
 export interface InboxTicket {

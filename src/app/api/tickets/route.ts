@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
+import { lerPedido } from "./_lib";
 
 /**
  * POST /api/tickets — receção PÚBLICA de tickets de suporte da app cliente
@@ -92,17 +93,77 @@ export async function GET(req: Request) {
   return NextResponse.json({ ok: true, tickets }, { status: 200, headers: CORS });
 }
 
+/** Quantas imagens um ticket aceita, e o peso máximo de cada uma. */
+const MAX_IMAGES = 3;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGES_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Formatos que um browser mostra numa <img>.
+ *
+ * O HEIC do iPhone NÃO está cá, de propósito: nenhum browser o desenha, e uma
+ * foto aceite em HEIC chegava ao backoffice como um ícone partido — a pior das
+ * falhas, porque parece que funcionou. A app converte para JPEG antes de
+ * enviar; esta lista é a rede por baixo, para versões antigas e para o dia em
+ * que alguém mudar o lado do cliente sem se lembrar deste.
+ */
+const TIPOS_ACEITES = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * Sobe as imagens que vieram com o ticket e devolve os CAMINHOS no bucket.
+ *
+ * Caminhos e não URLs: o bucket é privado e o backoffice assina um URL de curta
+ * duração quando abre o ticket. Guardar um URL na base de dados era guardar
+ * uma credencial permanente para uma foto de dentro de casa de alguém.
+ *
+ * Corre com a service role, do lado do servidor: é por isso que o telemóvel
+ * nunca precisa de uma credencial de escrita no Storage. O que falhar é
+ * ignorado em silêncio — uma foto que não sobe não pode impedir alguém de
+ * pedir ajuda, e o texto do ticket chega na mesma.
+ */
+async function subirImagens(files: File[]): Promise<string[]> {
+  const paths: string[] = [];
+  let total = 0;
+
+  for (const file of files.slice(0, MAX_IMAGES)) {
+    if (!TIPOS_ACEITES.includes(file.type)) continue;
+    if (file.size > MAX_IMAGE_BYTES) continue;
+    total += file.size;
+    if (total > MAX_IMAGES_BYTES) break;
+
+    // Nome gerado por nós: o que vem do telemóvel não é de confiança e podia
+    // trazer caminhos ("../") ou extensões enganosas.
+    const ext = (file.type.split("/")[1] || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
+    const path = `tickets/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const { error } = await supabaseAdmin()
+      .storage.from("ticket-images")
+      .upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false });
+    if (error) continue;
+
+    paths.push(path);
+  }
+
+  return paths;
+}
+
 export async function POST(req: Request) {
   if (!SUPABASE_ENABLED) {
     return NextResponse.json({ ok: false, error: "indisponível" }, { status: 503, headers: CORS });
   }
 
-  let body: Record<string, unknown>;
+  // Duas formas de entrar, e as duas têm de continuar a funcionar: as versões
+  // da app já instaladas mandam JSON, as novas mandam multipart quando há
+  // fotos. Ler o Content-Type em vez de assumir evita partir quem não
+  // actualizou — e quem nunca vai actualizar.
+  let lido: Awaited<ReturnType<typeof lerPedido>>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    lido = await lerPedido(req);
   } catch {
-    return NextResponse.json({ ok: false, error: "JSON inválido" }, { status: 400, headers: CORS });
+    return NextResponse.json({ ok: false, error: "pedido inválido" }, { status: 400, headers: CORS });
   }
+  const body = lido.body;
+  const imagens = lido.imagens;
 
   // Honeypot: humanos não veem o campo, bots preenchem-no. Falso sucesso.
   if (clip(body.website, 10)) {
@@ -128,6 +189,10 @@ export async function POST(req: Request) {
     );
   }
 
+  // Depois de validar o texto: uma mensagem vazia não merece um upload, e o
+  // honeypot acima já mandou os bots embora sem tocar no Storage.
+  const imagePaths = imagens.length > 0 ? await subirImagens(imagens) : [];
+
   const now = new Date().toISOString();
   const ticket = {
     channel: clip(body.channel, 30) === "app_tecnico" ? "app_tecnico" : "app_cliente",
@@ -139,7 +204,16 @@ export async function POST(req: Request) {
     category: clip(body.category, 100),
     service_id: clip(body.service_id, 100),
     messages: [
-      { id: `im_${Date.now()}`, from: "requester", authorName: name || "Cliente", body: message, at: now },
+      {
+        id: `im_${Date.now()}`,
+        from: "requester",
+        authorName: name || "Cliente",
+        body: message,
+        at: now,
+        // Só aparece quando há fotos: uma lista vazia em todas as mensagens
+        // antigas obrigaria a migrar o jsonb sem ganhar nada.
+        ...(imagePaths.length > 0 ? { images: imagePaths } : {}),
+      },
     ],
     unread: 1,
     opened_at: now,
