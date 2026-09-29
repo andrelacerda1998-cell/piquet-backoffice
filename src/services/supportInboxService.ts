@@ -136,10 +136,23 @@ let cache: InboxTicket[] = SEED.map((t) => ({ ...t, messages: [...t.messages] })
 
 /* ------------------------------- API -------------------------------------- */
 
-export async function getInboxTickets(): Promise<InboxTicket[]> {
-  return apiGet("/support/inbox", () =>
-    [...cache].sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1))
-  ).then((r) => r.data);
+export interface CaixaDeEntrada {
+  tickets: InboxTicket[];
+  /**
+   * Porque é que os tickets dos TÉCNICOS não vieram, se não vieram.
+   *
+   * São duas origens: os clientes vêm do Supabase, os técnicos do Laravel.
+   * Uma falha do lado do Laravel não pode esconder a outra metade nem deixar
+   * o ecrã em branco -- mostra-se o que há e diz-se o que falta.
+   */
+  avisoTecnicos: string | null;
+}
+
+export async function getInboxTickets(): Promise<CaixaDeEntrada> {
+  return apiGet<CaixaDeEntrada>("/support/inbox", () => ({
+    tickets: [...cache].sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1)),
+    avisoTecnicos: null,
+  })).then((r) => r.data);
 }
 
 export async function replyInboxTicket(id: string, body: string, authorName: string): Promise<InboxMessage> {
