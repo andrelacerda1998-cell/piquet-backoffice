@@ -89,17 +89,45 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
           conteúdo escondido atrás de um clique — que era metade do problema
           deste painel.
         */}
-        <div className="mx-auto max-w-[1400px] p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+        {/*
+          Colunas CSS e não `grid`.
+
+          Com `grid`, as células alinham por LINHA: o Resumo é alto, e os dois
+          cartões ao lado ficavam com um buraco por baixo até ao fim da linha.
+          Num serviço sem técnico e sem valores — onde metade dos cartões é
+          uma frase — metade do ecrã era espaço vazio.
+
+          `columns` empilha na vertical e só passa à coluna seguinte quando a
+          anterior enche, como uma página de jornal: sem linhas, sem buracos.
+          `break-inside-avoid` impede que um cartão seja cortado ao meio.
+        */}
+        <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 columns-1 lg:columns-2 xl:columns-3 gap-5">
           <Seccao titulo="Resumo"><Resumo service={service} /></Seccao>
           <Seccao titulo="Cronologia"><Cronologia service={service} /></Seccao>
-          <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
           <Seccao titulo="Pagamento"><Pagamento service={service} /></Seccao>
           <Seccao titulo="Faturas"><Faturas service={service} /></Seccao>
-          <Seccao titulo="Avaliação"><Avaliacoes service={service} /></Seccao>
-          <Seccao titulo="Reclamação"><Reclamacao service={service} /></Seccao>
+          <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
+          {/*
+            Avaliação e reclamação num cartão só: são as duas o que o cliente
+            achou no fim e, na esmagadora maioria dos serviços, são as duas
+            uma frase a dizer que não há. Dois cartões para duas frases era o
+            desperdício mais visível deste ecrã.
+          */}
+          <Seccao titulo="O que o cliente achou">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Avaliação</p>
+                <Avaliacoes service={service} />
+              </div>
+              <div className="pt-3 border-t border-surface-border">
+                <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Reclamação</p>
+                <Reclamacao service={service} />
+              </div>
+            </div>
+          </Seccao>
           <Seccao titulo="Notas internas"><Notas service={service} /></Seccao>
-          <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
           <Seccao titulo="Histórico"><Historico service={service} /></Seccao>
+          <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
         </div>
       </div>
     </div>
@@ -109,7 +137,7 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
 /** Um bloco do ecrã, com título. Substitui um separador. */
 function Seccao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="card p-4">
+    <section className="card p-4 mb-5 break-inside-avoid">
       <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-3">{titulo}</h3>
       {children}
     </section>

@@ -1,4 +1,18 @@
 import { describe, it, expect } from "vitest";
+/*
+  Estes quatro eram `await import(...)` dentro dos testes.
+
+  Nao havia razao para isso -- nao ha vi.resetModules() nem stubEnv neste
+  ficheiro -- e tinha um custo: a transformacao do modulo acontecia dentro do
+  limite de 5 segundos de CADA teste. Com a maquina carregada, o teste
+  "counts active filters" falhava por timeout e passava a seguir, sozinho. Um
+  teste que falha conforme a carga ensina toda a gente a carregar em "repetir"
+  sem ler o que falhou.
+*/
+import { formatCurrency, formatDate } from "@/lib/formatters";
+import { hasPermission } from "@/lib/permissions";
+import { getActiveFilterCount, DEFAULT_FILTER } from "@/lib/filters";
+import { mockData } from "@/mocks/data";
 import {
   calculatePiquetRevenue,
   buildMetricValue,
@@ -118,29 +132,25 @@ describe("Business metrics", () => {
 });
 
 describe("Formatters", () => {
-  it("formats currency in pt-PT", async () => {
-    const { formatCurrency } = await import("@/lib/formatters");
+  it("formats currency in pt-PT", () => {
     const formatted = formatCurrency(1234.56);
     expect(formatted).toContain("1");
     expect(formatted).toContain("234,56");
     expect(formatted).toContain("€");
   });
 
-  it("formats dates in pt-PT", async () => {
-    const { formatDate } = await import("@/lib/formatters");
+  it("formats dates in pt-PT", () => {
     expect(formatDate("2025-06-15")).toMatch(/\d{2}\/\d{2}\/\d{4}/);
   });
 });
 
 describe("Permissions", () => {
-  it("cto has all permissions", async () => {
-    const { hasPermission } = await import("@/lib/permissions");
+  it("cto has all permissions", () => {
     expect(hasPermission("cto", "view_salaries")).toBe(true);
     expect(hasPermission("cto", "manage_taxes")).toBe(true);
   });
 
-  it("ceo also has full access (só liderança tem login)", async () => {
-    const { hasPermission } = await import("@/lib/permissions");
+  it("ceo also has full access (só liderança tem login)", () => {
     expect(hasPermission("ceo", "manage_settings")).toBe(true);
     expect(hasPermission("ceo", "destructive_actions")).toBe(true);
     expect(hasPermission("ceo", "manage_employees")).toBe(true);
@@ -148,8 +158,7 @@ describe("Permissions", () => {
 });
 
 describe("Filters", () => {
-  it("counts active filters", async () => {
-    const { getActiveFilterCount, DEFAULT_FILTER } = await import("@/lib/filters");
+  it("counts active filters", () => {
     expect(getActiveFilterCount(DEFAULT_FILTER)).toBe(0);
     expect(getActiveFilterCount({ ...DEFAULT_FILTER, city: "Lisboa" })).toBe(1);
     expect(getActiveFilterCount({ ...DEFAULT_FILTER, city: "Lisboa", categoryId: "cat_1", period: "hoje" })).toBe(3);
@@ -157,23 +166,20 @@ describe("Filters", () => {
 });
 
 describe("Mock data consistency", () => {
-  it("has consistent revenue formula in services", async () => {
-    const { mockData } = await import("@/mocks/data");
+  it("has consistent revenue formula in services", () => {
     const sample = mockData.services.slice(0, 100);
     sample.forEach((s) => {
       expect(s.piquetRevenue).toBeCloseTo(s.totalCustomerValue - s.technicianValue, 1);
     });
   });
 
-  it("has expected demo data counts", async () => {
-    const { mockData } = await import("@/mocks/data");
+  it("has expected demo data counts", () => {
     expect(mockData.customers.length).toBe(752);
     expect(mockData.technicians.length).toBe(382);
     expect(mockData.isDemo).toBe(true);
   });
 
-  it("active technicians are subset of approved", async () => {
-    const { mockData } = await import("@/mocks/data");
+  it("active technicians are subset of approved", () => {
     const active = mockData.technicians.filter((t) => t.status === "ativo").length;
     const approved = mockData.technicians.filter((t) =>
       ["aprovado", "disponivel", "ativo"].includes(t.status)
