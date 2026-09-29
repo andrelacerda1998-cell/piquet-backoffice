@@ -35,31 +35,26 @@ import { getFotosDoCliente, type FotoDoCliente } from "@/services/dashboardServi
   "Fotos e vídeos" desenhava seis quadrados vazios, sempre seis. Agora lê as
   fotos verdadeiras -- e chama-se só "Fotos", porque vídeos não existem.
 */
-const TABS = [
-  { id: "resumo", label: "Resumo" },
-  { id: "crono", label: "Cronologia" },
-  { id: "media", label: "Fotos do cliente" },
-  { id: "pag", label: "Pagamento" },
-  { id: "fat", label: "Faturas" },
-  { id: "aval", label: "Avaliações" },
-  { id: "rec", label: "Reclamação" },
-  { id: "notas", label: "Notas internas" },
-  { id: "hist", label: "Histórico" },
-  { id: "conversa", label: "Conversa" },
-] as const;
 
-type TabId = (typeof TABS)[number]["id"];
 
 export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: ServiceRequest; onClose: () => void; onEdit?: (s: ServiceRequest) => void }) {
-  const [tab, setTab] = useState<TabId>("resumo");
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Serviço ${service.id}`} className="w-full max-w-xl bg-surface h-full overflow-y-auto shadow-elevated" onClick={(e) => e.stopPropagation()}>
+    /*
+      `!mt-0` não é decoração: este painel é renderizado dentro de um
+      contentor com `space-y-6`, e o Tailwind põe `margin-top: 1.5rem` em
+      todos os filhos menos o primeiro. Com `inset-0` e `bottom: 0`, essa
+      margem empurrava a sobreposição 24px para baixo E encurtava-a 24px --
+      ficava uma faixa da aplicação visível por cima do ecrã inteiro. O
+      seletor do `space-y` tem mais especificidade do que um `mt-0` simples,
+      daí o `!`.
+    */
+    <div className="fixed inset-0 z-50 bg-black/40 !mt-0" onClick={onClose}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Serviço ${service.id}`} className="w-full bg-surface h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Cabeçalho */}
         <div className="sticky top-0 bg-surface border-b border-surface-border px-6 py-4 z-10">
-          <div className="flex items-start justify-between">
+          <div className="mx-auto max-w-[1400px] flex items-start justify-between">
             <div>
               <p className="font-mono text-xs text-text-muted">{service.id}</p>
               <h2 className="text-lg font-bold mt-0.5">{service.serviceName}</h2>
@@ -67,7 +62,7 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
             </div>
             <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mx-auto max-w-[1400px] mt-3 flex items-center gap-2">
             <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
             {onEdit && (service.status === "concluido" || service.source === "manual") && (
               <button onClick={() => onEdit(service)} className="btn-secondary text-xs py-1">
@@ -83,38 +78,41 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
             ficaram por capturar. Declarar falta de técnico faz-se em
             Qualidade › Faltas, que é real e cobra mesmo.
           */}
-          {/* Separadores */}
-          <div className="mt-4 flex gap-1 overflow-x-auto -mb-4 pb-0">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
-                  tab === t.id ? "border-piquet text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary"
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
           </div>
-        </div>
 
-        {/* Conteúdo */}
-        <div className="p-6">
-          {tab === "resumo" && <Resumo service={service} />}
-          {tab === "crono" && <Cronologia service={service} />}
-          {tab === "media" && <Fotos service={service} />}
-          {tab === "pag" && <Pagamento service={service} />}
-          {tab === "fat" && <Faturas service={service} />}
-          {tab === "aval" && <Avaliacoes service={service} />}
-          {tab === "rec" && <Reclamacao service={service} />}
-          {tab === "notas" && <Notas service={service} />}
-          {tab === "hist" && <Historico service={service} />}
-          {tab === "conversa" && <Conversa service={service} />}
+        {/*
+          Tudo à vista, em colunas, em vez de dez separadores.
+
+          Isto era uma gaveta de 576px com dez abas: para ver o pagamento e a
+          cronologia do mesmo serviço era preciso saltar entre elas e guardar
+          uma na cabeça. Com o ecrã todo cabem lado a lado, e deixa de haver
+          conteúdo escondido atrás de um clique — que era metade do problema
+          deste painel.
+        */}
+        <div className="mx-auto max-w-[1400px] p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+          <Seccao titulo="Resumo"><Resumo service={service} /></Seccao>
+          <Seccao titulo="Cronologia"><Cronologia service={service} /></Seccao>
+          <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
+          <Seccao titulo="Pagamento"><Pagamento service={service} /></Seccao>
+          <Seccao titulo="Faturas"><Faturas service={service} /></Seccao>
+          <Seccao titulo="Avaliação"><Avaliacoes service={service} /></Seccao>
+          <Seccao titulo="Reclamação"><Reclamacao service={service} /></Seccao>
+          <Seccao titulo="Notas internas"><Notas service={service} /></Seccao>
+          <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
+          <Seccao titulo="Histórico"><Historico service={service} /></Seccao>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Um bloco do ecrã, com título. Substitui um separador. */
+function Seccao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="card p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-3">{titulo}</h3>
+      {children}
+    </section>
   );
 }
 
