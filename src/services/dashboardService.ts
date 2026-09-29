@@ -14,7 +14,7 @@ import {
 } from "@/lib/calculations";
 import { calculateEmployeeAnnualCost } from "@/lib/calculations";
 import type {
-  DashboardFilter, OverviewMetrics, FunnelStep, ChartDataPoint,
+  DashboardFilter, OverviewMetrics, ChartDataPoint,
   TimeSeriesPoint, PaginatedResult, SortParams, ServiceRequest,
 } from "@/types";
 
@@ -387,4 +387,20 @@ export async function getOperacao(): Promise<OperacaoDTO> {
   return apiGet<OperacaoDTO>("/services/operacao", () => {
     throw new Error("O desempenho da operação precisa da ligação aos serviços do Laravel.");
   }).then((r) => r.data);
+}
+
+/* ------------------- Fotografias que o cliente anexou ------------------- */
+
+/**
+ * As fotos do pedido (ver /api/services/:id/fotos).
+ *
+ * Sem mock: o painel desenhava seis quadrados vazios, sempre seis, e isso
+ * fazia parecer que havia fotos onde não há. Uma lista vazia é a resposta
+ * certa quando o cliente não anexou nada.
+ */
+export type { FotoDoCliente } from "@/app/api/services/[id]/fotos/route";
+import type { FotoDoCliente as FotoDTO } from "@/app/api/services/[id]/fotos/route";
+
+export async function getFotosDoCliente(servicoId: string): Promise<FotoDTO[]> {
+  return apiGet<FotoDTO[]>(`/services/${servicoId}/fotos`, () => []).then((r) => r.data);
 }

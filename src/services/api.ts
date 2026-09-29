@@ -514,6 +514,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (LIVE_DENY.has(path)) return false;
   if (LIVE_EXACT.has(path)) return true;
+  if (/^\/services\/[^/]+\/fotos$/.test(path)) return true; // fotos que o cliente anexou
   if (/^\/services\/[^/]+$/.test(path)) return true; // /services/:id (detalhe/write-back)
   if (/^\/tax\/obligations\/[^/]+\/pay$/.test(path)) return true; // marcar obrigação paga
   if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento

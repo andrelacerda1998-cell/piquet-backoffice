@@ -1,26 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
-import { toast } from "@/stores";
 import type { ServiceRequest } from "@/types";
-import { X, Image as ImageIcon, Star, MessageSquare, ArrowRight, CalendarClock, Ban, Undo2, Pencil } from "lucide-react";
+import { X, Star, Pencil, Lock } from "lucide-react";
+import { getFotosDoCliente, type FotoDoCliente } from "@/services/dashboardService";
 
+/*
+  ——— O que saiu deste painel, e porquê ———
+
+  As quatro ações do topo -- Avançar estado, Agendar, Cancelar, Reembolsar --
+  não faziam NADA. Cada uma mostrava só uma mensagem:
+
+      onClick={() => toast(`Serviço ${service.id} cancelado.`, "error")}
+
+  Nenhuma chamada a lado nenhum. Quem carregasse em "Cancelar" lia "Serviço
+  282 cancelado." e o serviço continuava de pé; "Reembolsar" diria que o
+  reembolso tinha começado e nenhum cêntimo sairia, com um cliente à espera.
+
+  E não é só que estavam por ligar: três das quatro não correspondem a
+  operação nenhuma. No Filament só existem duas ações sobre um serviço --
+  `retryCapture` e `abandonAndRefund` -- ambas só para super-admin e só
+  quando o pagamento ficou por capturar. Cancelar e agendar em nome de
+  alguém não existe em lado nenhum: quem cancela é o cliente ou o técnico,
+  na app.
+
+  Saiu também o separador "Chat", que eram três frases escritas no código,
+  iguais em todos os serviços, com uma caixa de escrever que não enviava.
+
+  "Fotos e vídeos" desenhava seis quadrados vazios, sempre seis. Agora lê as
+  fotos verdadeiras -- e chama-se só "Fotos", porque vídeos não existem.
+*/
 const TABS = [
   { id: "resumo", label: "Resumo" },
   { id: "crono", label: "Cronologia" },
-  { id: "chat", label: "Chat" },
-  { id: "media", label: "Fotos e vídeos" },
+  { id: "media", label: "Fotos do cliente" },
   { id: "pag", label: "Pagamento" },
   { id: "fat", label: "Faturas" },
   { id: "aval", label: "Avaliações" },
   { id: "rec", label: "Reclamação" },
   { id: "notas", label: "Notas internas" },
   { id: "hist", label: "Histórico" },
+  { id: "conversa", label: "Conversa" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -51,24 +76,13 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
             )}
           </div>
 
-          {/* Ações de gestão */}
-          {!["concluido", "cancelado_cliente", "cancelado_tecnico", "reembolsado"].includes(service.status) && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={() => toast(`Serviço ${service.id} avançou de estado.`)} className="btn-primary text-xs py-1.5">
-                <ArrowRight className="h-3.5 w-3.5" /> Avançar estado
-              </button>
-              <button onClick={() => toast(`Serviço ${service.id} agendado.`, "info")} className="btn-secondary text-xs py-1.5">
-                <CalendarClock className="h-3.5 w-3.5" /> Agendar
-              </button>
-              <button onClick={() => toast(`Serviço ${service.id} cancelado.`, "error")} className="btn-secondary text-xs py-1.5">
-                <Ban className="h-3.5 w-3.5" /> Cancelar
-              </button>
-              <button onClick={() => toast(`Reembolso do serviço ${service.id} iniciado.`, "info")} className="btn-secondary text-xs py-1.5">
-                <Undo2 className="h-3.5 w-3.5" /> Reembolsar
-              </button>
-            </div>
-          )}
-
+          {/*
+            Aqui estavam quatro botões que só mostravam mensagens. Não se
+            substituem por outros: as ações que existem de facto sobre um
+            serviço vivem no Filament e são duas, ambas para pagamentos que
+            ficaram por capturar. Declarar falta de técnico faz-se em
+            Qualidade › Faltas, que é real e cobra mesmo.
+          */}
           {/* Separadores */}
           <div className="mt-4 flex gap-1 overflow-x-auto -mb-4 pb-0">
             {TABS.map((t) => (
@@ -90,14 +104,14 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
         <div className="p-6">
           {tab === "resumo" && <Resumo service={service} />}
           {tab === "crono" && <Cronologia service={service} />}
-          {tab === "chat" && <Chat service={service} />}
-          {tab === "media" && <Media />}
+          {tab === "media" && <Fotos service={service} />}
           {tab === "pag" && <Pagamento service={service} />}
           {tab === "fat" && <Faturas service={service} />}
           {tab === "aval" && <Avaliacoes service={service} />}
           {tab === "rec" && <Reclamacao service={service} />}
           {tab === "notas" && <Notas service={service} />}
           {tab === "hist" && <Historico service={service} />}
+          {tab === "conversa" && <Conversa service={service} />}
         </div>
       </div>
     </div>
@@ -156,39 +170,101 @@ function Cronologia({ service }: { service: ServiceRequest }) {
   );
 }
 
-function Chat({ service }: { service: ServiceRequest }) {
-  const msgs = [
-    { from: "cliente", text: "Boa tarde, o problema é urgente. Conseguem hoje?" },
-    { from: "piquet", text: "Olá! Estamos a procurar o técnico mais próximo. Damos resposta em minutos." },
-    { from: "tecnico", text: service.technicianName ? `${service.technicianName}: A caminho, chego em ~20 min.` : "A aguardar atribuição de técnico." },
-  ];
+/**
+ * As fotografias que o CLIENTE anexou ao pedido.
+ *
+ * Aqui estavam seis quadrados vazios desenhados por
+ * `Array.from({ length: 6 })` — sempre seis, em qualquer serviço, sem ler
+ * nada. As fotos existem: o cliente junta-as no checkout, até cinco, para o
+ * técnico perceber o trabalho antes de chegar.
+ *
+ * Os URL são temporários (60 minutos, assinados pelo Laravel). Se o painel
+ * ficar aberto muito tempo, deixam de abrir — daí o aviso.
+ */
+function Fotos({ service }: { service: ServiceRequest }) {
+  const [fotos, setFotos] = useState<FotoDoCliente[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    getFotosDoCliente(service.id)
+      .then((f) => vivo && setFotos(f))
+      .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Não foi possível ler as fotografias."));
+    return () => { vivo = false; };
+  }, [service.id]);
+
+  if (erro) return <p className="text-sm text-danger">{erro}</p>;
+  if (fotos === null) return <p className="text-sm text-text-muted">A carregar…</p>;
+  if (fotos.length === 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-text-muted">Este pedido não tem fotografias.</p>
+        <p className="text-xs text-text-secondary">
+          O cliente anexa-as no checkout, e nem sempre anexa. Serviços registados à mão no backoffice nunca as têm.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {msgs.map((m, i) => (
-        <div key={i} className={cn("flex", m.from === "cliente" ? "justify-start" : "justify-end")}>
-          <div className={cn("max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-            m.from === "cliente" ? "bg-surface-subtle text-text-primary" : "bg-piquet/15 text-text-primary")}>
-            <p className="text-[11px] uppercase tracking-wide text-text-muted mb-0.5">{m.from}</p>
-            {m.text}
-          </div>
-        </div>
-      ))}
-      <div className="flex items-center gap-2 pt-2">
-        <input className="input-field" placeholder="Escrever mensagem..." />
-        <button className="btn-primary text-sm py-2"><MessageSquare className="h-4 w-4" /></button>
+      <p className="text-xs text-text-secondary">
+        {fotos.length} {fotos.length === 1 ? "fotografia anexada" : "fotografias anexadas"} pelo cliente, para o
+        técnico saber o que o espera. Não são o antes/depois do técnico — essas ficam do lado dele.
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {fotos.map((f) => (
+          <a
+            key={f.id}
+            href={f.url}
+            target="_blank"
+            rel="noreferrer"
+            className="aspect-square rounded-lg overflow-hidden bg-surface-subtle block hover:opacity-90 transition-opacity"
+            title="Abrir em tamanho real"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.url} alt="Fotografia do cliente" className="h-full w-full object-cover" />
+          </a>
+        ))}
       </div>
+      <p className="text-[11px] text-text-muted">
+        As ligações expiram ao fim de uma hora. Se alguma deixar de abrir, fecha e volta a abrir o painel.
+      </p>
     </div>
   );
 }
 
-function Media() {
+/**
+ * Onde está a conversa — e porque é que não está aqui.
+ *
+ * Aqui estavam três frases escritas no código ("Boa tarde, o problema é
+ * urgente. Conseguem hoje?"), iguais em todos os serviços, com uma caixa de
+ * escrever que não enviava para lado nenhum.
+ *
+ * A conversa existe mesmo, mas é entre o cliente e o técnico ATRIBUÍDO, nas
+ * apps, cifrada com a chave do próprio serviço. Não há hoje forma de a ler
+ * daqui: a API de admin não expõe mensagens. Dizer isto é mais útil do que
+ * um separador que finge.
+ */
+function Conversa({ service }: { service: ServiceRequest }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="aspect-square rounded-lg bg-surface-subtle flex items-center justify-center text-text-muted">
-          <ImageIcon className="h-6 w-6" />
-        </div>
-      ))}
+    <div className="space-y-3">
+      <div className="rounded-xl bg-surface-subtle px-4 py-3">
+        <p className="text-sm font-medium text-text-primary inline-flex items-center gap-2">
+          <Lock className="h-4 w-4 text-text-muted" />
+          A conversa deste serviço não passa por aqui
+        </p>
+        <p className="mt-1 text-sm text-text-secondary">
+          {service.technicianName
+            ? <>É entre o cliente e <strong className="text-text-primary">{service.technicianName}</strong>, dentro das apps, cifrada com a chave deste serviço.</>
+            : <>Só existe depois de haver técnico atribuído — sem segunda pessoa não há conversa. Este pedido ainda não tem técnico.</>}
+        </p>
+      </div>
+      <p className="text-xs text-text-secondary">
+        O backoffice não tem forma de a ler: a API de admin não expõe as mensagens. Se precisares delas para resolver
+        uma disputa, é preciso criar esse acesso de propósito — e decidir antes se o staff deve poder ler conversas
+        privadas entre duas pessoas.
+      </p>
     </div>
   );
 }
@@ -197,7 +273,6 @@ function Pagamento({ service }: { service: ServiceRequest }) {
   return (
     <div className="space-y-1">
       <Row label="Estado do pagamento" value={<StatusBadge status={service.paymentStatus} />} />
-      <Row label="Método" value="Cartão / MB Way" />
       <Row label="Valor cobrado" value={formatCurrency(service.totalCustomerValue)} />
       <Row label="IVA" value={formatCurrency(service.vatValue)} />
       <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
@@ -210,10 +285,18 @@ function Faturas({ service }: { service: ServiceRequest }) {
   return (
     <div className="space-y-1">
       <Row label="Estado da fatura" value={<StatusBadge status={service.invoiceStatus} />} />
-      <Row label="Nº fatura" value={`FT ${new Date(service.requestedAt).getFullYear()}/${service.id.replace(/\D/g, "").slice(0, 4)}`} />
-      <Row label="Data" value={formatDate(service.requestedAt)} />
+      <Row label="Data do pedido" value={formatDate(service.requestedAt)} />
       <Row label="Total" value={formatCurrency(service.totalCustomerValue)} />
-      <button className="btn-secondary text-sm mt-4">Descarregar fatura</button>
+      {/*
+        Saiu o "Nº fatura", que era inventado: `FT 2026/0282`, montado a
+        partir do ano e dos dígitos do id. O número verdadeiro é atribuído
+        pelo InvoiceXpress e não chega à API de admin. Saiu também o botão
+        "Descarregar fatura", que não descarregava nada.
+      */}
+      <p className="pt-3 text-xs text-text-secondary">
+        O número e o PDF da fatura são do InvoiceXpress e não chegam ao backoffice. Aqui fica o estado, que é o que
+        permite saber se já foi emitida.
+      </p>
     </div>
   );
 }
@@ -228,8 +311,14 @@ function Avaliacoes({ service }: { service: ServiceRequest }) {
         ))}
         <span className="ml-2 font-bold text-text-primary">{service.rating?.toFixed(1)}</span>
       </div>
-      <p className="mt-3 text-sm text-text-secondary">
-        “Serviço {service.rating && service.rating >= 4 ? "excelente, técnico muito profissional." : "razoável, houve algum atraso."}”
+      {/*
+        Aqui estava uma opinião escrita pelo código: "excelente, técnico muito
+        profissional" acima de 4 estrelas, "razoável, houve algum atraso"
+        abaixo. Punha aspas à volta de palavras que o cliente nunca disse. A
+        nota é real; o comentário não existe na API de admin.
+      */}
+      <p className="mt-3 text-xs text-text-secondary">
+        A nota é a que o cliente deu no fim do serviço. Comentários escritos não chegam ao backoffice.
       </p>
     </div>
   );
@@ -240,7 +329,16 @@ function Reclamacao({ service }: { service: ServiceRequest }) {
   return (
     <div className="rounded-lg border border-danger/30 bg-danger-light p-4">
       <p className="text-sm font-medium text-danger">Reclamação aberta</p>
-      <p className="mt-1 text-sm text-text-secondary">Cliente reportou insatisfação com o resultado. Em análise pela equipa de suporte.</p>
+      {/*
+        O texto que estava aqui -- "Cliente reportou insatisfação com o
+        resultado. Em análise pela equipa de suporte." -- era fixo, igual em
+        todas. O que existe de facto é a marca de que há reclamação; o teor
+        não vem na API.
+      */}
+      <p className="mt-1 text-sm text-text-secondary">
+        Este serviço está marcado como tendo reclamação. O que o cliente disse chega como ticket em Suporte, com o
+        número do serviço no assunto.
+      </p>
     </div>
   );
 }
@@ -252,10 +350,14 @@ function Notas({ service }: { service: ServiceRequest }) {
       {notes.map((n, i) => (
         <div key={i} className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">{n}</div>
       ))}
-      <div className="flex items-center gap-2 pt-2">
-        <input className="input-field" placeholder="Adicionar nota interna..." />
-        <button className="btn-primary text-sm py-2">Guardar</button>
-      </div>
+      {/*
+        Aqui estava uma caixa com um botão "Guardar" que não guardava. As
+        notas internas escrevem-se ao editar o serviço, onde há write-back a
+        sério (`internalNotes` em PATCH /api/services/:id).
+      */}
+      <p className="pt-2 text-xs text-text-secondary">
+        Para acrescentar uma nota, usa <strong className="text-text-primary">Editar</strong> no topo do painel.
+      </p>
     </div>
   );
 }
