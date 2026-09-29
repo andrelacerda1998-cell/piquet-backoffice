@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { apiOk, apiErr, withStaff } from "../../../../_lib/handler";
+import { ehTicketDeTecnico } from "@/lib/ticketsTecnicos";
 import { toInboxTicket, TICKET_PRIORITIES, type TicketRow } from "../../_lib";
 
 /**
@@ -10,6 +11,15 @@ import { toInboxTicket, TICKET_PRIORITIES, type TicketRow } from "../../_lib";
  * Sem isto, a etiqueta era decorativa.
  */
 export const PUT = withStaff(async (req, { params }) => {
+  /*
+    Nos tickets dos TÉCNICOS a importância não é guardada: é derivada do tipo
+    (uma contestação de falta é alta, o resto é média). Não há coluna para
+    escrever, e fingir que se guardou faria o valor voltar atrás ao recarregar.
+  */
+  if (ehTicketDeTecnico(params.id)) {
+    return apiErr("A importância de um ticket de técnico vem do tipo dele e não se muda à mão.", 400);
+  }
+
   const { id } = params;
   const b = (await req.json()) as { priority?: string };
   if (!b.priority || !TICKET_PRIORITIES.includes(b.priority)) {

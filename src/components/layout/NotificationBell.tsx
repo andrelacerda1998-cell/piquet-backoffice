@@ -55,7 +55,7 @@ export function NotificationBell() {
     let alive = true;
     const poll = async () => {
       try {
-        const tickets = await getInboxTickets();
+        const { tickets } = await getInboxTickets();
         if (!alive) return;
         const novos = tickets.filter((t) => t.status === "novo").slice(0, 8);
         const known = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));

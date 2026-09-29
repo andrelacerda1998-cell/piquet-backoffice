@@ -68,7 +68,7 @@ export function SupportInbox() {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (data) { setTickets(data); if (!seeded.current) { seeded.current = true; } }
+    if (data) { setTickets(data.tickets); if (!seeded.current) { seeded.current = true; } }
   }, [data]);
 
   // Deep-link `?ticket=<id>` (vindo de uma notificação) — reativo à mudança do URL.
@@ -216,6 +216,22 @@ export function SupportInbox() {
 
   return (
     <div className="space-y-4">
+      {/*
+        A caixa tem DUAS origens: os tickets do cliente vêm do Supabase e os
+        dos técnicos do Laravel. Se o lado do Laravel falhar, os do cliente
+        continuam a aparecer — mas metade da caixa fica em falta sem se notar.
+        Por isso diz-se.
+      */}
+      {data?.avisoTecnicos && (
+        <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+          <p className="text-sm font-semibold text-warning">Faltam aqui os tickets dos técnicos</p>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {data.avisoTecnicos} Até isto ficar resolvido, só se veem no Filament — e é lá que chegam as
+            contestações de faltas.
+          </p>
+        </div>
+      )}
+
       {/* Só aparece quando há exemplos por limpar — não estorva no dia a dia. */}
       {tickets.some((t) => t.id.startsWith("EX-")) && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-surface-border bg-surface-subtle/50 px-3 py-2">
