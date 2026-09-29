@@ -19,17 +19,12 @@ describe("contarPorRota", () => {
     expect(r["/suporte"]).toBe(1);
   });
 
-  it("ignora o que está à espera da decisão do cliente", () => {
-    const r = contarPorRota([a("orcamento-sem-resposta-1", "media", "lead")]);
-    expect(r["/leads"]).toBeUndefined();
-    expect(r["/alertas"]).toBeUndefined();
-  });
-
-  it("ignora também o grupo dos orçamentos à espera do cliente", () => {
-    const r = contarPorRota([a("grupo-orcamentos-sem-resposta", "media", "leads", "9 pedidos à espera do cliente")]);
-    expect(r["/alertas"]).toBeUndefined();
-  });
-
+  /*
+    Havia aqui duas exceções, para o alerta "orçamento à espera do cliente",
+    onde não havia nada a fazer além de esperar. Esse alerta desapareceu com o
+    estado que o gerava, e as exceções com ele: hoje tudo o que é alerta se
+    resolve deste lado e conta para a bolinha.
+  */
   it("conta trabalho nosso mesmo em urgência média — a fila de KYC é o caso real", () => {
     // Contava-se só crítica e alta, e a fila de documentos de técnicos é média
     // enquanto for pequena: ficavam técnicos parados à nossa espera, sem
@@ -48,9 +43,9 @@ describe("contarPorRota", () => {
     const r = contarPorRota([
       a("grupo-leads-sem-resposta", "critica", "leads", "8 pedidos sem resposta"),
       a("kyc-fila", "alta", "kyc"),
-      a("orcamento-sem-resposta-1", "media", "lead"),
+      a("despacho-por-decidir-1", "alta", "despacho"),
     ]);
-    expect(r["/alertas"]).toBe(9);
+    expect(r["/alertas"]).toBe(10);
   });
 
   it("não inventa rotas para entidades desconhecidas", () => {
@@ -98,5 +93,19 @@ describe("as rotas do menu batem certo com os destinos dos alertas", () => {
       expect(noMenu, `${entidade} não está no mapa do menu`).toBeTruthy();
       expect(noMenu, `${entidade}: menu vai para ${noMenu}, alerta vai para ${href}`).toBe(href);
     }
+  });
+});
+
+describe("despacho", () => {
+  /*
+    O Despacho era um ecrã à parte e a bolinha acendia lá. Deixou de existir:
+    tinha os mesmos pedidos e o mesmo painel dos Pedidos, e ter dois sítios
+    para o mesmo trabalho era a dúvida de qual usar. O aviso acende agora onde
+    o trabalho se faz.
+  */
+  it("um técnico à espera de decisão acende os Pedidos", () => {
+    const r = contarPorRota([a("despacho-por-decidir-1", "alta", "lead")]);
+    expect(r["/leads"]).toBe(1);
+    expect(r["/alertas"]).toBe(1);
   });
 });

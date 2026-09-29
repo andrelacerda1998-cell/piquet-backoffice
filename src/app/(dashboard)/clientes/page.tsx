@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Users } from "lucide-react";
+import { Users, UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -14,16 +14,16 @@ import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
 import {
-  getCustomers, getCustomerMetrics, getCustomersByLocation, getCustomersBySource, getRetentionData, getNewVsRecurringTrend,
+  getCustomers, getAllCustomers, getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend,
   blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
   type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
 import { CreditCard, Smartphone, Trash2 } from "lucide-react";
-import { type Complaint } from "@/services/extrasService";
+import { type Complaint, getLeads, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
 import { getServices } from "@/services/dashboardService";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatCurrency } from "@/lib/formatters";
+import { formatDate, formatCurrency, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -37,10 +37,6 @@ export default function CustomersPage() {
   // Lista real de clientes (App\Filament\Resources\CustomerResource migrado)
   // -- sem sort do lado do servidor (o Filament só ordenava name/created_at
   // por clique de coluna, e não vale a pena replicar já).
-  const { data: customers, loading, refetch: refetchCustomers } = useAsyncData(
-    () => getCustomers(page, pageSize, debouncedSearch || undefined),
-    [page, pageSize, debouncedSearch]
-  );
   // Clientes bloqueados (soft-delete real) -- separado do "Todos" tal como o
   // Filament faz com o TrashedFilter, para o separador "Bloqueados" e a
   // contagem no TabDef não dependerem da paginação da lista principal.
@@ -48,8 +44,16 @@ export default function CustomersPage() {
     () => getCustomers(1, 100, undefined, true),
     []
   );
+  // Leads (contactos da landing / WhatsApp) — potenciais clientes, antes de
+  // se registarem na app. Fonte diferente dos clientes registados (Supabase
+  // vs Laravel), mas mostradas na mesma tabela "Base de dados" com a origem.
+  const { data: leadsData } = useAsyncData(() => getLeads(), []);
+  const [leadRows, setLeadRows] = useState<Lead[]>([]);
+  useEffect(() => { setLeadRows(leadsData ?? []); }, [leadsData]);
+  const origemLabel = (s: string) =>
+    s === "whatsapp" ? "WhatsApp" : s === "landing" || s === "website" ? "Landing page" : (s || "—");
+
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
-  const { data: bySource } = useAsyncData(() => getCustomersBySource(), []);
   const { data: retention } = useAsyncData(() => getRetentionData(), []);
   const { data: trend } = useAsyncData(() => getNewVsRecurringTrend(), []);
   // Sem sistema de reclamações no Laravel nem no Filament -- lista de notas
@@ -108,27 +112,65 @@ export default function CustomersPage() {
     }
   };
 
-  // Filtro "pode pedir serviços". Como a lista é paginada pelo servidor,
-  // filtrar só a página daria contagens erradas — com filtro ativo carrega-se
-  // a lista completa e conta-se sobre o total.
+  // Filtro "pode pedir serviços". A vista "Base de dados" funde clientes
+  // registados + leads do lado do cliente, por isso carrega-se a lista
+  // COMPLETA de clientes (todas as páginas — o backend limita per_page a 100).
   const [reqFilter, setReqFilter] = useState<"" | "pode" | "nao_pode">("");
-  const { data: allCustomers, loading: allCustomersLoading } = useAsyncData(
-    () => (reqFilter ? getCustomers(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
-    [reqFilter, debouncedSearch]
+  const { data: allCustomers, loading: allCustomersLoading, refetch: refetchCustomers } = useAsyncData(
+    () => getAllCustomers(debouncedSearch || undefined),
+    [debouncedSearch]
   );
-  const reqFiltered = useMemo(() => {
-    const list = allCustomers?.data ?? [];
-    if (!reqFilter) return [];
-    return list.filter((c) => (reqFilter === "pode" ? c.can_request_service : !c.can_request_service));
-  }, [allCustomers, reqFilter]);
   const reqCounts = useMemo(() => {
-    const list = allCustomers?.data ?? [];
+    const list = allCustomers ?? [];
     return {
       pode: list.filter((c) => c.can_request_service).length,
       nao_pode: list.filter((c) => !c.can_request_service).length,
       carregados: list.length,
     };
   }, [allCustomers]);
+
+  // Linhas unificadas da "Base de dados": clientes registados (App) + leads
+  // (Landing page / WhatsApp), com a origem à vista. Fontes diferentes
+  // (Laravel vs Supabase) mas mostradas na mesma tabela, como pedido.
+  type UnifiedRow =
+    | { kind: "customer"; _id: string; date: string; customer: RealCustomer }
+    | { kind: "lead"; _id: string; date: string; lead: Lead };
+  const unifiedRows = useMemo<UnifiedRow[]>(() => {
+    const custs: UnifiedRow[] = (allCustomers ?? []).map((c) => ({
+      kind: "customer", _id: `c-${c.id}`, date: c.created_at ?? "", customer: c,
+    }));
+    const lds: UnifiedRow[] = leadRows.map((l) => ({
+      kind: "lead", _id: `l-${l.id}`, date: l.createdAt ?? "", lead: l,
+    }));
+    const q = debouncedSearch.trim().toLowerCase();
+    const matches = (r: UnifiedRow) => {
+      if (reqFilter) {
+        // "Pode pedir serviços" só se aplica a clientes — leads ficam de fora.
+        if (r.kind !== "customer") return false;
+        if (reqFilter === "pode" && !r.customer.can_request_service) return false;
+        if (reqFilter === "nao_pode" && r.customer.can_request_service) return false;
+      }
+      if (!q) return true;
+      const hay = r.kind === "customer"
+        ? `${r.customer.name} ${r.customer.email} ${r.customer.phone_number} ${r.customer.nif} ${r.customer.city ?? ""}`
+        : `${r.lead.name} ${r.lead.phone} ${r.lead.city} ${r.lead.source}`;
+      return hay.toLowerCase().includes(q);
+    };
+    return [...custs, ...lds].filter(matches).sort((a, b) => b.date.localeCompare(a.date));
+  }, [allCustomers, leadRows, reqFilter, debouncedSearch]);
+  const unifiedTotalPages = Math.max(1, Math.ceil(unifiedRows.length / pageSize));
+  const unifiedPage = Math.min(page, unifiedTotalPages);
+  const unifiedPageRows = unifiedRows.slice((unifiedPage - 1) * pageSize, unifiedPage * pageSize);
+
+  // Distribuição por origem real (a app não regista canal de aquisição, mas
+  // sabemos donde veio cada pessoa): registados = App; leads = Landing / WhatsApp.
+  const origemDistribuicao = useMemo(() => {
+    const counts = new Map<string, number>();
+    const add = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
+    (allCustomers ?? []).forEach(() => add("App"));
+    leadRows.forEach((l) => add(origemLabel(l.source)));
+    return [...counts.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [allCustomers, leadRows]);
 
   // Métodos de pagamento guardados — migrado do Filament
   // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
@@ -186,7 +228,7 @@ export default function CustomersPage() {
 
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
-    { id: "lista", label: "Lista" },
+    { id: "lista", label: "Todos os registos" },
     { id: "reclamacoes", label: "Reclamações", count: openComplaints },
   ];
 
@@ -212,34 +254,51 @@ export default function CustomersPage() {
     ) : <span className="text-text-muted text-xs">—</span> },
   ];
 
-  // Colunas do CustomerResource::table() do Filament (avatar/nif/email/telefone/
-  // canRequestService/created_at) -- sem os campos fictícios que a lista mock
-  // tinha (cidade, origem, valor gasto, avaliação, ...).
-  const columns: Column<RealCustomer>[] = [
-    { key: "name", label: "Nome", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
-    { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
-    { key: "email", label: "Email", render: (r) => (
-      <span className="inline-flex items-center gap-1.5">
-        {r.email ?? "—"}
-        {r.email && !r.email_verified && <span title="Email não verificado" className="text-warning">⚠</span>}
+  const unifiedColumns: Column<UnifiedRow>[] = [
+    { key: "name", label: "Nome", render: (r) => (
+      <span className="font-medium">{(r.kind === "customer" ? r.customer.name : r.lead.name) || "—"}</span>
+    ) },
+    { key: "contacto", label: "Contacto", render: (r) => {
+      const phone = r.kind === "customer" ? r.customer.phone_number : r.lead.phone;
+      const email = r.kind === "customer" ? r.customer.email : "";
+      return (
+        <div className="min-w-0">
+          {email && <p className="truncate text-text-secondary">{email}</p>}
+          {phone ? <p className="text-xs text-text-muted">{phone}</p> : (!email && <span className="text-text-muted">—</span>)}
+        </div>
+      );
+    } },
+    { key: "city", label: "Cidade", render: (r) => {
+      const city = r.kind === "lead" ? r.lead.city : (r.customer.city ?? "");
+      return city && city !== "—" ? <span className="text-text-secondary">{city}</span> : <span className="text-text-muted">—</span>;
+    } },
+    { key: "origem", label: "Origem", render: (r) => (
+      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        r.kind === "customer" ? "bg-piquet/12 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
+        {r.kind === "customer" ? "App" : origemLabel(r.lead.source)}
       </span>
     ) },
-    { key: "phone_number", label: "Contacto", render: (r) => (
-      <span className="inline-flex items-center gap-1.5">
-        {r.phone_number ?? "—"}
-        {r.phone_number && !r.phone_verified && <span title="Telefone não verificado" className="text-warning">⚠</span>}
-      </span>
+    { key: "estado", label: "Estado", render: (r) => r.kind === "customer" ? (
+      r.customer.blocked_at
+        ? <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-xs font-medium text-danger">Bloqueado</span>
+        : <span title={r.customer.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
+            className={cn("font-bold", r.customer.can_request_service ? "text-success" : "text-text-muted")}>{r.customer.can_request_service ? "✓" : "—"}</span>
+    ) : (
+      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.lead.stage))}>{LEAD_STAGE_LABEL[r.lead.stage] ?? r.lead.stage}</span>
     ) },
-    { key: "can_request_service", label: "Pode pedir", render: (r) => (
-      <span title={r.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
-        className={cn("font-bold", r.can_request_service ? "text-success" : "text-text-muted")}>
-        {r.can_request_service ? "✓" : "—"}
-      </span>
+    { key: "date", label: "Registo", render: (r) => r.date ? formatDate(r.date) : "—" },
+    { key: "acao", label: "", render: (r) => r.kind === "customer" ? (
+      r.customer.blocked_at
+        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleBlock(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
+    ) : (
+      // A lead não se gere aqui — abre-se no CRM, o dono do pipeline. Evita
+      // duplicar eliminação/estado nesta tabela (que é só um diretório).
+      <a href={`/leads?lead=${r.lead.id}`} onClick={(e) => e.stopPropagation()}
+        className="text-xs text-piquet-700 hover:underline inline-flex items-center gap-1">
+        Abrir no CRM <ArrowUpRight className="h-3.5 w-3.5" />
+      </a>
     ) },
-    { key: "created_at", label: "Registo", render: (r) => r.created_at ? formatDate(r.created_at) : "—" },
-    { key: "acao", label: "", render: (r) => r.blocked_at
-      ? <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleRestore(r); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
-      : <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleBlock(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button> },
   ];
 
   const blockedColumns: Column<RealCustomer>[] = [
@@ -259,6 +318,11 @@ export default function CustomersPage() {
           eyebrow="Pessoas"
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
           subtitle={`${metrics?.registered ?? 0} clientes registados`}
+          actions={
+            <a href="/leads" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+              <UserPlus className="h-4 w-4" /> Pipeline de leads
+            </a>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -274,13 +338,16 @@ export default function CustomersPage() {
                 {sub === "resumo" && (
                   <div className="space-y-6">
                     {metrics && (
-                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
-                        <MetricCard title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
-                        <MetricCard title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
-                        <MetricCard title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
-                        <MetricCard title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
+                      /* Uma linha só (cartões `compact`): estes números lêem-se
+                         em conjunto — registados vs ativos vs recorrentes só
+                         diz alguma coisa comparado lado a lado. */
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        <MetricCard compact title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
+                        <MetricCard compact title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
+                        <MetricCard compact title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
+                        <MetricCard compact title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
+                        <MetricCard compact title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
+                        <MetricCard compact title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
                       </div>
                     )}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -295,16 +362,19 @@ export default function CustomersPage() {
                   </div>
                 )}
                 {sub === "origem" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Clientes por origem"><BarChartComponent data={bySource ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por origem"><DonutChartComponent data={bySource ?? []} centerLabel="Clientes" /></ChartCard>
+                  <div className="space-y-3">
+                    <p className="text-xs text-text-muted">Donde vieram os contactos: registados na app + leads da landing e do WhatsApp.</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <ChartCard title="Por origem"><BarChartComponent data={origemDistribuicao} /></ChartCard>
+                      <ChartCard title="Distribuição por origem"><DonutChartComponent data={origemDistribuicao} centerLabel="Contactos" /></ChartCard>
+                    </div>
                   </div>
                 )}
+                {/* Só o circular: as barras e o donut liam os MESMOS `byLocation`. */}
                 {sub === "localizacao" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Clientes por localização"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por localização"><DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" /></ChartCard>
-                  </div>
+                  <ChartCard title="Cidades com mais clientes" subtitle="Distribuição por localização">
+                    <DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" />
+                  </ChartCard>
                 )}
               </>
             )}
@@ -314,7 +384,7 @@ export default function CustomersPage() {
         {tab === "reclamacoes" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-secondary">Notas manuais da equipa — sem sistema de reclamações no Laravel, guardado só neste browser.</p>
+              <p className="text-sm text-text-secondary">Notas escritas à mão pela equipa. Ficam guardadas apenas neste computador — não são partilhadas nem sincronizadas.</p>
               <button onClick={() => setNewComplaintOpen(true)} className="btn-primary text-sm py-2">Nova reclamação</button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -337,14 +407,14 @@ export default function CustomersPage() {
                 {sub === "todos" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
-                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar clientes..." />
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar nome, telefone, cidade..." />
                       <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
                           { id: "pode", label: "Podem pedir serviços" },
                           { id: "nao_pode", label: "Não podem" },
                         ] as const).map((f) => (
-                          <button key={f.id} onClick={() => setReqFilter(f.id)}
+                          <button key={f.id} onClick={() => { setReqFilter(f.id); setPage(1); }}
                             className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
                               reqFilter === f.id
                                 ? "border-piquet/30 bg-piquet/15 text-piquet-700"
@@ -359,27 +429,18 @@ export default function CustomersPage() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-xs text-text-muted">Clica numa linha para abrir o perfil do cliente.</p>
-
-                    {reqFilter ? (
-                      <>
-                        <p className="text-sm text-text-secondary">
-                          <b className="text-text-primary tabular-nums">{reqFiltered.length}</b>{" "}
-                          {reqFiltered.length === 1
-                            ? (reqFilter === "pode" ? "pode pedir serviços" : "não pode pedir serviços")
-                            : (reqFilter === "pode" ? "podem pedir serviços" : "não podem pedir serviços")}
-                          {reqCounts.carregados > 0 && ` · de ${reqCounts.carregados} clientes`}
-                        </p>
-                        <DataTable columns={columns} data={reqFiltered} keyField="id" loading={allCustomersLoading}
-                          onRowClick={setSelectedCustomer}
-                          emptyMessage={reqFilter === "pode" ? "Nenhum cliente pode pedir serviços." : "Todos os clientes podem pedir serviços 🎉"} />
-                      </>
-                    ) : (
-                      <>
-                        <DataTable columns={columns} data={customers?.data ?? []} keyField="id" loading={loading} onRowClick={setSelectedCustomer} />
-                        {customers && <Pagination page={page} totalPages={customers.totalPages} total={customers.total} pageSize={pageSize} onPageChange={setPage} />}
-                      </>
-                    )}
+                    <p className="text-sm text-text-secondary">
+                      <b className="text-text-primary tabular-nums">{unifiedRows.length}</b> {unifiedRows.length === 1 ? "registo" : "registos"}
+                      {" · "}clientes da app e leads (landing / WhatsApp) juntos. Clica num cliente para abrir o perfil.
+                    </p>
+                    <DataTable columns={unifiedColumns} data={unifiedPageRows} keyField="_id"
+                      loading={allCustomersLoading}
+                      onRowClick={(r) => {
+                        if (r.kind === "customer") setSelectedCustomer(r.customer);
+                        else window.location.href = `/leads?lead=${r.lead.id}`;
+                      }}
+                      emptyMessage="Sem clientes nem leads ainda." />
+                    <Pagination page={unifiedPage} totalPages={unifiedTotalPages} total={unifiedRows.length} pageSize={pageSize} onPageChange={setPage} />
                   </div>
                 )}
                 {sub === "bloqueados" && (

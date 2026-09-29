@@ -15,14 +15,22 @@ interface TaskRow {
   due: string | null;
 }
 
+const ESTADOS: TeamTask["status"][] = ["aberta", "em_curso", "concluida"];
+const PRIORIDADES: TeamTask["priority"][] = ["baixa", "media", "alta", "critica"];
+
+/**
+ * Normaliza a linha que chega pelo realtime. Estado/prioridade fora da lista
+ * conhecida caem no valor por omissão: a UI indexa mapas por estes campos e um
+ * valor inesperado deitava a aba inteira abaixo (ecrã branco).
+ */
 function toTask(r: TaskRow): TeamTask {
   return {
     id: r.id,
     title: r.title,
     assignee: r.assignee,
     department: r.department ?? "",
-    priority: r.priority,
-    status: r.status,
+    priority: PRIORIDADES.includes(r.priority) ? r.priority : "media",
+    status: ESTADOS.includes(r.status) ? r.status : "aberta",
     due: r.due ?? "",
   };
 }

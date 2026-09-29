@@ -88,3 +88,33 @@ export function downloadReportCsv(
   }
   saveCsv(filename, out.join("\n"));
 }
+
+/**
+ * Copia texto para a área de transferência. Devolve `true` se conseguiu.
+ *
+ * A API moderna só existe em contexto seguro (https/localhost) e pode ser
+ * recusada pelo browser; por isso há o recurso ao `execCommand` antigo, senão
+ * copiar um IBAN falhava em silêncio — pior do que não ter botão nenhum.
+ */
+export async function copiarParaAreaDeTransferencia(texto: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  } catch { /* cai para o método antigo */ }
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = texto;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}

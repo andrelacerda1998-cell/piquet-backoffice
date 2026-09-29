@@ -426,7 +426,7 @@ function AtividadeTab() {
         <h3 className="font-semibold">Atividade</h3>
         <DemoBadge endpoint="/audits" />
       </div>
-      <p className="text-sm text-text-secondary">Registo de auditoria da equipa — quem fez o quê, quando, e o que mudou. Ações feitas fora do Filament (via esta API de admin) ainda não têm autor identificado — ver nota no código.</p>
+      <p className="text-sm text-text-secondary">Registo de atividade da equipa — quem fez o quê, quando, e o que mudou. Algumas ações ainda aparecem sem autor identificado.</p>
       <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
     </div>
   );

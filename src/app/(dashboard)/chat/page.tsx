@@ -21,7 +21,7 @@ import { uploadChatImage } from "@/lib/uploadChatImage";
 import { useAuthStore, toast } from "@/stores";
 import { daysUntil, todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X, MessagesSquare } from "lucide-react";
+import { Hash, Send, Plus, Calendar, MapPin, Users, CheckCircle2, Circle, PlayCircle, ImagePlus, X, MessagesSquare, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
@@ -66,6 +66,11 @@ export default function TeamPage() {
           eyebrow="Equipa"
           title={<>Equipa <DemoBadge endpoint="/team/messages" /></>}
           subtitle="Conversas internas e agenda dos colaboradores"
+          actions={
+            <a href="/tarefas" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+              <ListChecks className="h-4 w-4" /> As minhas tarefas
+            </a>
+          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -399,7 +404,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
                 <span className="ml-auto text-xs text-text-muted font-normal">{evs.length} {evs.length === 1 ? "evento" : "eventos"}</span>
               </div>
               <div className="space-y-2">
-                {evs.length === 0 && <p className="text-xs text-text-muted py-3 text-center">Sem eventos</p>}
+                {evs.length === 0 && <p className="text-xs text-text-muted py-3 text-center">Nada marcado neste dia</p>}
                 {evs.map((e) => (
                   <div key={e.id} className={cn("rounded-lg border px-2.5 py-2 text-xs", EVENT_TONE[e.type])}>
                     <div className="flex items-center justify-between gap-2">
@@ -529,9 +534,11 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {filtered.length === 0 && <p className="text-sm text-text-muted py-6 text-center col-span-full">Sem tarefas para este membro.</p>}
         {filtered.map((t) => {
-          const Icon = STATUS_ICON[t.status];
+          // Estado desconhecido (ex.: vindo do realtime) não pode deitar a aba
+          // abaixo: sem fallback, `<Icon />` com undefined rebenta a página.
+          const Icon = STATUS_ICON[t.status] ?? Circle;
           const d = daysUntil(t.due);
-          const next = NEXT_STATUS[t.status];
+          const next = NEXT_STATUS[t.status] ?? null;
           return (
             <div key={t.id} className={cn("card p-4 space-y-2.5", t.status === "concluida" && "opacity-70")}>
               <div className="flex items-start justify-between gap-2">

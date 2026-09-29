@@ -225,7 +225,7 @@ export default function TarefasPage() {
         <PageHeader
           icon={KanbanSquare}
           eyebrow="Equipa & ferramentas"
-          title="Tarefas"
+          title="As minhas tarefas"
           subtitle="As tuas tarefas e iniciativas do negócio — arrasta os cartões entre colunas."
           actions={<button onClick={() => openAdd("backlog")} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Nova tarefa</button>}
         />

@@ -1,4 +1,4 @@
-import { apiGet, apiPut, apiPost } from "./api";
+import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import type { PaginatedResult } from "@/types";
 
 /**
@@ -20,6 +20,13 @@ export interface RealVendor {
   phone_number: string | null;
   price_rate: number | null;
   operation_areas: string[];
+  /*
+    Os serviços do catálogo que o técnico escolheu fazer. É por aqui que o
+    matching (VendorRankingService) decide se ele serve para um pedido --
+    `operation_areas` guarda categorias, mas está preenchido em pouquíssimos.
+    Opcional: só existe desde o PR #70 do backend (18/09/2026).
+  */
+  services_types?: string[];
   can_accept_service: boolean;
   at_valid: boolean;
   at_validated_at: string | null;
@@ -50,23 +57,30 @@ export interface RealVendor {
   at_checked_at?: string | null;
   at_check_error?: string | null;
   /**
-   * Dados de faturação do técnico — o que é preciso para emitir uma fatura em
-   * nome dele e para pagar. Nenhum destes campos vem hoje do VendorController
-   * (confirmado a 21/08: a API devolve 12 campos e nenhum é de faturação).
+   * Morada FISCAL (a que vai na fatura) e IBAN.
    *
-   * Ficam opcionais e com nomes alternativos: assim que o backend enviar
-   * qualquer um, aparece no perfil sem mexer no frontend.
+   * Sem `vat_regime`/`withholding_*`/`fiscal_name`: essas colunas NÃO existem
+   * na base de dados do Laravel -- não são campos por enviar, são campos que
+   * não há. A designação fiscal é a própria `company_name`.
    */
-  billing_name?: string | null;        // designação fiscal, se difere do nome
-  fiscal_name?: string | null;
   address?: string | null;             // morada da sede
   billing_address?: string | null;
   postal_code?: string | null;
   city?: string | null;
   iban?: string | null;                // sensível — ver nota na UI
-  vat_regime?: string | null;          // ex.: "isento_art53", "normal"
-  withholding_tax?: boolean | null;    // retenção na fonte
-  withholding_rate?: number | null;
+  /**
+   * Dados da empresa (CompanySection do Filament).
+   *
+   * `invoice_workspace` é o workspace de faturação no InvoiceXpress: sem ele a
+   * Piquet NÃO consegue emitir fatura em nome do técnico no fim do serviço --
+   * por isso `null` aqui é um bloqueio de negócio, não um detalhe cosmético.
+   * `invoice_workspace_blocker` diz porque é que ainda não se pode criar
+   * (null = pode); vem calculado do servidor porque depende de relações
+   * (documentos aprovados, morada fiscal) que a listagem não envia.
+   */
+  company_name?: string | null;
+  invoice_workspace?: string | null;
+  invoice_workspace_blocker?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
@@ -127,6 +141,35 @@ export async function setVendorAtValidation(id: number, valid: boolean): Promise
   await apiPut(`/technicians/${id}/at-validation`, { valid }, () => {
     throw new Error("Validar o subutilizador AT precisa da API de admin do Laravel configurada.");
   });
+}
+
+/**
+ * Apaga um técnico DE VEZ. Não tem volta.
+ *
+ * O `suspendVendor` faz soft delete e reverte-se com `restoreVendor`. Isto
+ * remove o utilizador e tudo o que pende dele. Devolve `orphan_services`: os
+ * serviços que a pessoa executou sobrevivem sem dono, e esse número é o custo
+ * real da operação -- quem chama tem de o mostrar, não de o esconder.
+ */
+export async function deleteVendorPermanently(id: number): Promise<{ id: number; orphan_services: number }> {
+  return apiDelete<{ id: number; deleted: boolean; orphan_services: number }>(
+    `/technicians/${id}/permanent`,
+    () => { throw new Error("Apagar técnicos precisa da API de admin do Laravel configurada."); },
+  ).then((r) => r.data);
+}
+
+/**
+ * Cria o workspace de faturação (InvoiceXpress) do técnico.
+ *
+ * É o passo que falta para a Piquet poder emitir fatura em nome dele quando o
+ * serviço fecha. O backend valida as mesmas condições do Filament (contacto
+ * verificado, documentos aprovados, IBAN, morada fiscal) e devolve a razão
+ * exata quando recusa -- não se replicam aqui, sob pena de divergirem.
+ */
+export async function createVendorInvoiceWorkspace(id: number): Promise<RealVendor> {
+  return apiPost<RealVendor>(`/technicians/${id}/invoice-workspace`, {}, () => {
+    throw new Error("Criar o workspace de faturação precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
 }
 
 /**
@@ -252,5 +295,21 @@ export async function createTestVendor(input: {
 }): Promise<NewTestVendor> {
   return apiPost<NewTestVendor>("/technicians/test-account", input, () => {
     throw new Error("Criar conta de teste precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+/* --------------------- Onboarding: o funil de quem se inscreveu -------------------- */
+
+/**
+ * Substitui o ecrã de Recrutamento, que mostrava candidatos e entrevistas
+ * inventados. Sem mock: um funil vazio de mentira daria a entender que está
+ * tudo em ordem quando há centenas de técnicos parados.
+ */
+export type { Funil, TecnicoNoFunil, Etapa } from "@/lib/onboardingTecnicos";
+import type { Funil as FunilDTO } from "@/lib/onboardingTecnicos";
+
+export async function getOnboardingTecnicos(): Promise<FunilDTO> {
+  return apiGet<FunilDTO>("/technicians/onboarding", () => {
+    throw new Error("O funil de técnicos precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }

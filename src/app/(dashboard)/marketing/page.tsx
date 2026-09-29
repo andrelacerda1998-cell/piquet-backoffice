@@ -2,57 +2,69 @@
 
 import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { DataTable, type Column } from "@/components/ui/DataTable";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, FunnelChartComponent, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
+import { DataTable } from "@/components/ui/DataTable";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getCampaigns, getMarketingFunnel, getCreativesPerformance, getChannelBreakdown, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
+import { getCampaigns, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
 import { getScripts } from "@/services/extrasService";
-import { SEED_PUSH, SEED_CODES, PUSH_SEGMENTS, type PushCampaign, type DiscountCode } from "@/services/backofficeService";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
-import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { MessageSquare, BellRing, TicketPercent, Plus, Send, Megaphone, RefreshCw } from "lucide-react";
+import { Megaphone, MessageSquare, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { CriarAnuncio } from "./CriarAnuncio";
+import { Anuncios } from "./Anuncios";
+import { PushCampanhas } from "./PushCampanhas";
+import { Vouchers } from "./Vouchers";
 import { costPerDownload } from "@/lib/adAttribution";
-import { campaignObjective, keyMetric, compararComPares, roasFazSentido, OBJECTIVE_LABEL, COMPARACAO_UI } from "@/lib/campaignObjective";
+import { periodoCampanha, pareceParadaSemRegisto } from "@/lib/campaignPeriod";
+import {
+  campaignObjective, keyMetric, compararComPares, roasFazSentido,
+  OBJECTIVE_LABEL, COMPARACAO_UI,
+} from "@/lib/campaignObjective";
 import type { MarketingCampaign } from "@/types";
 
+/*
+  ——— O que saiu deste ecrã, e porquê ———
+
+  Eram duas abas, oito sub-abas e as MESMAS 11 campanhas desenhadas de quatro
+  maneiras diferentes. `/marketing/campaigns`, `/marketing/channels` e
+  `/marketing/creatives` leem todos a tabela `campaigns`: a lista, o gráfico
+  "Canais" e a tabela "Desempenho por campanha" eram a mesma coisa três vezes.
+
+  - "Funil de marketing": inventado. Não havia rota `/marketing/funnel`; o ecrã
+    caía no mock e desenhava 500.000 impressões e taxas de conversão fixas que
+    nunca vieram de lado nenhum.
+  - "Canais": duas barras (Meta e Google) do mesmo agregado. O mesmo que a
+    repartição por plataforma, num sítio onde ocupava um ecrã inteiro.
+  - "CAC por canal": `lead_attribution` tem 30 linhas, nenhuma com campanha e
+    nenhuma com cliente. Era uma análise vazia com ar de análise.
+  - "Códigos de desconto": guardados em localStorage, semeados com quatro
+    códigos que não existem e com 34.852 € de "receita gerada" — num negócio
+    que gastou 1.105 € em anúncios desde sempre. No lugar deles está agora a
+    lista de VOUCHERS reais, lida da tabela `vouchers` do Laravel (ver
+    Vouchers.tsx) — a mesma que a app consulta quando o cliente aplica o
+    código.
+
+  Fica uma aba com as campanhas e as datas à frente, e outra com a comunicação.
+*/
+
 export default function MarketingPage() {
-  const [tab, setTab] = useState("desempenho");
+  const [criarAnuncioAberto, setCriarAnuncioAberto] = useState(false);
+  const [campanhaParaAbrir, setCampanhaParaAbrir] = useState<string | null>(null);
+  const [tab, setTab] = useState("campanhas");
   /**
-   * Incrementa ao fim de uma recolha manual. TUDO o que vem de `ad_metrics`
-   * depende dele: campanhas, criativos e canais são derivados das mesmas
-   * linhas que o gráfico de investimento, e deixá-los presos a `[]` fazia com
-   * que o botão "Atualizar anúncios" parecesse não ter feito nada — os dados
-   * novos estavam gravados, mas o ecrã continuava a mostrar os antigos até se
-   * recarregar a página à mão.
+   * Incrementa ao fim de uma recolha manual, para o ecrã mostrar já o que
+   * acabou de ser gravado em vez de continuar a mostrar o anterior.
    */
   const [recarga, setRecarga] = useState(0);
   const { data: campaigns } = useAsyncData(() => getCampaigns(), [recarga]);
-  const { data: funnel } = useAsyncData(() => getMarketingFunnel(), [recarga]);
-  const { data: creatives } = useAsyncData(() => getCreativesPerformance(), [recarga]);
-  const { data: scripts } = useAsyncData(() => getScripts(), []);
-  const { data: channels } = useAsyncData(() => getChannelBreakdown(), [recarga]);
-  // Investimento REAL em anúncios (ad_metrics: Meta + Google), dia a dia.
   const { data: spend } = useAsyncData(() => getAdSpend(), [recarga]);
+  const { data: scripts } = useAsyncData(() => getScripts(), []);
   const [aAtualizar, setAAtualizar] = useState(false);
-  /**
-   * A lista mostra por omissão só as campanhas A CORRER: são essas sobre as
-   * quais ainda se pode decidir alguma coisa. O histórico continua a um clique
-   * — foi preciso pedi-lo, e serve para comparar o que resultou no passado.
-   */
-  const [estadoCampanhas, setEstadoCampanhas] = useState<"ativas" | "concluidas" | "todas">("ativas");
+  const [estadoCampanhas, setEstadoCampanhas] = useState<"ativas" | "paradas" | "todas">("todas");
 
-  /**
-   * Vai buscar já o desempenho ao Meta e ao Google (a mesma rotina do cron das
-   * 06:20 UTC). O resultado é dito como é: quantas linhas entraram e, se uma
-   * plataforma não trouxe nada, que isso quer dizer campanhas sem gastos — não
-   * uma avaria.
-   */
+  /** Vai buscar já o desempenho ao Meta e ao Google (a rotina do cron das 06:20 UTC). */
   const atualizarAnuncios = async () => {
     setAAtualizar(true);
     try {
@@ -61,7 +73,7 @@ export default function MarketingPage() {
       const partes = [`${r.upsertedCount} dia(s) de campanha recolhidos`];
       if (r.campaignsWritten) partes.push(`${r.campaignsWritten} campanhas atualizadas`);
       toast(partes.join(" · "), "success");
-      // Plataforma sem gastos no período não é erro, mas convém dizê-lo.
+      // Plataforma sem gastos no período não é avaria, mas convém dizê-lo.
       for (const n of [...r.notes, ...r.skipped]) toast(n, "info");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Falha ao atualizar os anúncios.", "error");
@@ -91,7 +103,6 @@ export default function MarketingPage() {
     for (const m of mesesSelecionados) {
       for (const [k, v] of Object.entries(m.byPlatform)) plataformas[k] = (plataformas[k] ?? 0) + v;
     }
-    // Investimento e downloads por app, para o custo por download.
     const apps = mesesSelecionados.reduce((acc, m) => ({
       spendCliente: acc.spendCliente + m.spendCliente,
       spendProfissional: acc.spendProfissional + m.spendProfissional,
@@ -104,16 +115,17 @@ export default function MarketingPage() {
       cpdCliente: costPerDownload(apps.spendCliente, apps.dlCliente),
       cpdProfissional: costPerDownload(apps.spendProfissional, apps.dlProfissional),
       cpdTotal: costPerDownload(a.spend, apps.dlCliente + apps.dlProfissional),
-      // CPL com os leads REAIS que chegaram, não com as "conversions" que cada
-      // plataforma conta à sua maneira.
-      cpl: a.leads > 0 ? a.spend / a.leads : 0,
       cpc: a.clicks > 0 ? a.spend / a.clicks : 0,
       ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0,
       media: mesesSelecionados.length ? a.spend / mesesSelecionados.length : 0,
     };
   }, [mesesSelecionados]);
-  // Os dados de anúncios vêm de um cron. Se ele falha, o ecrã continua a
-  // mostrar os últimos números como se fossem atuais — daí este aviso.
+
+  /**
+   * Os dados de anúncios vêm de um cron. Se ele falha, o ecrã continua a
+   * mostrar os últimos números como se fossem de hoje — daí este aviso, que
+   * também serve para duvidar das campanhas marcadas como "a correr".
+   */
   const diasSemDados = useMemo(() => {
     if (!spend?.to) return null;
     const ms = Date.now() - new Date(spend.to + "T00:00:00Z").getTime();
@@ -126,131 +138,16 @@ export default function MarketingPage() {
     return `${MESES_PT[Number(m) - 1] ?? ym} ${y}`;
   };
 
-  /**
-   * Colunas do essencial: o que decide se se mantém ou corta uma campanha —
-   * quanto custou, o que rendeu e o retorno.
-   *
-   * As restantes ficam `hidden` (acessíveis no menu de colunas) em vez de
-   * eliminadas. Duas delas eram duplicados puros: `customers` é sempre igual a
-   * `leads` e `cac` sempre igual a `cpl` — as plataformas reportam conversões,
-   * não clientes distintos, por isso mostrá-las como métricas separadas dava a
-   * impressão de haver ali mais informação do que há.
-   */
-  const campanhasAtivas = (campaigns ?? []).filter((c) => c.status === "ativa");
-  const campanhasConcluidas = (campaigns ?? []).filter((c) => c.status !== "ativa");
+  const todas = campaigns ?? [];
+  const campanhasAtivas = todas.filter((c) => c.status === "ativa");
+  const campanhasParadas = todas.filter((c) => c.status !== "ativa");
   const campanhasVisiveis =
     estadoCampanhas === "ativas" ? campanhasAtivas
-    : estadoCampanhas === "concluidas" ? campanhasConcluidas
-    : (campaigns ?? []);
-
-  const campaignColumns: Column<MarketingCampaign>[] = [
-    {
-      key: "campaignName",
-      label: "Campanha",
-      render: (r) => (
-        <div className="min-w-0">
-          <p className="font-medium text-text-primary truncate" title={r.campaignName}>{r.campaignName}</p>
-          <p className="text-xs text-text-muted">
-            {r.platform}
-            {r.startDate && <> · {formatDate(r.startDate)}{r.endDate ? ` – ${formatDate(r.endDate)}` : " – hoje"}</>}
-          </p>
-        </div>
-      ),
-    },
-    { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment) },
-    { key: "clicks", label: "Cliques" },
-    {
-      key: "leads",
-      label: "Conversões",
-      // Numa campanha de instalação são instalações; numa de leads são leads.
-      // Chamar-lhe "Leads" em ambas dava a entender que havia 238 leads de uma
-      // campanha que só gerou downloads.
-      render: (r) => {
-        const o = campaignObjective(r.campaignName);
-        const que = o === "instalacao" ? "instalações" : o === "leads" ? "leads" : "conversões";
-        return <span title={`${r.leads} ${que} reportadas pela plataforma`}>{r.leads}</span>;
-      },
-    },
-    { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl), hidden: true },
-    { key: "impressions", label: "Impressões", hidden: true },
-    { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr), hidden: true },
-    { key: "platform", label: "Plataforma", hidden: true },
-    {
-      key: "objetivo",
-      label: "Objetivo",
-      render: (r) => (
-        <span className="text-xs font-medium text-text-secondary">
-          {OBJECTIVE_LABEL[campaignObjective(r.campaignName)]}
-        </span>
-      ),
-    },
-    {
-      key: "metricaChave",
-      label: "Métrica-chave",
-      // Cada objetivo é julgado pela sua: custo por instalação, por lead, por
-      // clique ou por mil pessoas. Antes era tudo ROAS.
-      render: (r) => {
-        const m = keyMetric(r);
-        return (
-          <span title={m.hint} className="cursor-help">
-            {m.value === null ? <span className="text-text-muted">—</span> : formatCurrency(m.value)}
-            <span className="block text-[11px] text-text-muted">{m.label}</span>
-          </span>
-        );
-      },
-    },
-    {
-      key: "roas",
-      label: "ROAS",
-      // Só se mostra onde diz alguma coisa: uma campanha de notoriedade não
-      // tem retorno direto, e apresentar 0,00× fazia-a parecer um fracasso.
-      render: (r) =>
-        roasFazSentido(r) ? (
-          <span title="Receita Piquet ÷ investimento (comissão de 25%)">{r.roas.toFixed(2)}x</span>
-        ) : (
-          <span className="text-text-muted" title="Esta campanha não foi feita para gerar receita direta — avalia-se pela métrica-chave do objetivo">—</span>
-        ),
-    },
-    { key: "rating", label: "Desempenho", render: (r) => {
-      const c = COMPARACAO_UI[compararComPares(r, campanhasVisiveis)];
-      return <span title={c.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", c.tone)}>{c.label}</span>;
-    } },
-    {
-      key: "piquetRevenue",
-      label: "Receita Piquet",
-      hidden: true,
-      render: (r) => (
-        <span
-          title={
-            r.platformRevenue
-              ? `${formatCurrency(r.platformRevenue)} em encomendas atribuídas · comissão de 25% = ${formatCurrency(r.piquetRevenue)}`
-              : "Comissão de 25% sobre as conversões atribuídas"
-          }
-        >
-          {formatCurrency(r.piquetRevenue)}
-        </span>
-      ),
-    },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} />, hidden: true },
-  ];
-
-  const creativeColumns: Column<Record<string, unknown>>[] = [
-    { key: "name", label: "Criativo" },
-    { key: "format", label: "Formato" },
-    { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
-    { key: "ctr", label: "CTR", render: (r) => formatPercent(r.ctr as number) },
-    { key: "cpl", label: "CPL", render: (r) => formatCurrency(r.cpl as number) },
-    // CAC é sempre igual ao CPL aqui (conversões ≠ clientes distintos): fica
-    // escondido para não parecer uma métrica independente.
-    { key: "cac", label: "CAC", render: (r) => formatCurrency(r.cac as number), hidden: true },
-    { key: "revenue", label: "Receita Piquet", render: (r) => formatCurrency(r.revenue as number) },
-    { key: "roas", label: "ROAS", render: (r) => `${(r.roas as number).toFixed(2)}x` },
-    { key: "recommendation", label: "Recomendação", render: (r) => <StatusBadge status={(r.recommendation as string) === "Escalar" ? "ativo" : (r.recommendation as string) === "Desativar" ? "cancelado_cliente" : "em_analise"} label={r.recommendation as string} /> },
-  ];
+    : estadoCampanhas === "paradas" ? campanhasParadas
+    : todas;
 
   const TABS: TabDef[] = [
-    { id: "desempenho", label: "Desempenho" },
-    { id: "campanhas", label: "Campanhas", count: campanhasAtivas.length },
+    { id: "campanhas", label: "Campanhas", count: todas.length },
     { id: "comunicacao", label: "Comunicação" },
   ];
 
@@ -261,7 +158,7 @@ export default function MarketingPage() {
           icon={Megaphone}
           eyebrow="Crescimento"
           title="Marketing"
-          subtitle="Investimento em anúncios, aquisição e retorno"
+          subtitle="O que se gastou em anúncios, quando, e o que rendeu"
           actions={
             <button
               onClick={atualizarAnuncios}
@@ -277,18 +174,16 @@ export default function MarketingPage() {
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "desempenho" && (
+        {tab === "campanhas" && (
           <div className="space-y-6">
-            {/* Investimento REAL, com período à escolha. Antes estes cartões
-                mostravam uma série simulada (monthlyGrowth), o que dava uma
-                tendência que nunca existiu. */}
+            {/* Investimento real (ad_metrics: Meta + Google), com período à escolha. */}
             <div className="card p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="font-semibold text-text-primary">Investimento em anúncios</h2>
                   <p className="text-xs text-text-secondary">
                     Meta e Google, dia a dia
-                    {spend?.from && spend?.to && ` · dados de ${formatDate(spend.from)} a ${formatDate(spend.to)}`}
+                    {spend?.from && spend?.to && ` · de ${formatDate(spend.from)} a ${formatDate(spend.to)}`}
                   </p>
                 </div>
                 <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="input-field w-auto" aria-label="Período">
@@ -302,452 +197,373 @@ export default function MarketingPage() {
 
               {diasSemDados != null && diasSemDados > 3 && (
                 <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-3 py-2">
-                  <p className="text-sm font-semibold text-danger">
-                    Dados parados há {diasSemDados} dias
-                  </p>
+                  <p className="text-sm font-semibold text-danger">Dados parados há {diasSemDados} dias</p>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    O último dia com investimento registado é {spend?.to ? formatDate(spend.to) : "—"}. A recolha de
-                    anúncios está a falhar, por isso estes números não incluem o que se gastou desde então —
-                    ver Produto › Integrações.
+                    O último dia com investimento registado é {spend?.to ? formatDate(spend.to) : "—"}. Enquanto a
+                    recolha estiver a falhar, estes números não incluem o que se gastou desde então e as campanhas
+                    marcadas como “a correr” podem já ter parado — ver Produto › Integrações.
                   </p>
                 </div>
               )}
 
               {mesesSelecionados.length === 0 ? (
-                <p className="py-6 text-center text-sm text-text-muted">
-                  Sem investimento registado neste período.
-                </p>
+                <p className="py-6 text-center text-sm text-text-muted">Sem investimento registado neste período.</p>
               ) : (
-                <>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-xs text-text-secondary">Investido</p>
-                      <p className="text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(resumo.spend)}</p>
-                      {mesesSelecionados.length > 1 && (
-                        <p className="text-[11px] text-text-muted">{formatCurrency(resumo.media)}/mês em média</p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs text-text-secondary">Leads recebidas</p>
-                      <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.leads}</p>
-                      <p className="text-[11px] text-text-muted">no mesmo período</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-text-secondary">Custo por lead</p>
-                      <p className="text-2xl font-bold text-text-primary tabular-nums">
-                        {resumo.leads > 0 ? formatCurrency(resumo.cpl) : "—"}
-                      </p>
-                      <p className="text-[11px] text-text-muted">investido ÷ leads reais</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-text-secondary">Cliques</p>
-                      <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.clicks.toLocaleString("pt-PT")}</p>
-                      <p className="text-[11px] text-text-muted">
-                        {formatCurrency(resumo.cpc)}/clique · CTR {resumo.ctr.toFixed(2).replace(".", ",")}%
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Custo por download, por app — só com o investimento que
-                      identifica a app; o resto fica de fora do cálculo. */}
-                  <div className="space-y-2">
-                    <SectionHeader title="Custo por download" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {([
-                        { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
-                        { app: "App Profissional", cor: "#3E7C8C", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
-                      ]).map((x) => (
-                        <div key={x.app} className="rounded-xl border border-surface-border p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
-                            <p className="text-sm font-medium text-text-secondary">{x.app}</p>
-                          </div>
-                          <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
-                            {x.cpd != null ? formatCurrency(x.cpd) : "—"}
-                          </p>
-                          <p className="text-[11px] text-text-muted">
-                            {x.gasto > 0
-                              ? <>{formatCurrency(x.gasto)} em campanhas dela ÷ {x.dl.toLocaleString("pt-PT")} downloads</>
-                              : <>sem campanhas identificadas para esta app · {x.dl.toLocaleString("pt-PT")} downloads no período</>}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    {resumo.spendGeral > 0 && (
-                      <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
-                        {formatCurrency(resumo.spendGeral)} foram para campanhas que não identificam app (tráfego para o
-                        site, notoriedade, landing pages) — ficam de fora destes custos, para não inflacionar nenhum.
-                        Contando tudo, o custo por download é {resumo.cpdTotal != null ? formatCurrency(resumo.cpdTotal) : "—"}.
-                      </p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <p className="text-xs text-text-secondary">Investido</p>
+                    <p className="text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(resumo.spend)}</p>
+                    {mesesSelecionados.length > 1 && (
+                      <p className="text-[11px] text-text-muted">{formatCurrency(resumo.media)}/mês em média</p>
                     )}
                   </div>
-
-                  {/* Onde foi o dinheiro */}
-                  {Object.keys(resumo.plataformas).length > 0 && (
-                    <div className="space-y-2">
-                      <SectionHeader title="Por plataforma" />
-                      {Object.entries(resumo.plataformas).sort((a, b) => b[1] - a[1]).map(([plat, valor]) => (
-                        <div key={plat}>
-                          <div className="flex items-baseline justify-between text-sm">
-                            <span className="font-medium text-text-primary capitalize">{plat}</span>
-                            <span className="text-text-secondary tabular-nums">
-                              {formatCurrency(valor)} · {resumo.spend > 0 ? Math.round((valor / resumo.spend) * 100) : 0}%
-                            </span>
-                          </div>
-                          <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
-                            <div className="h-full rounded-full bg-piquet"
-                              style={{ width: `${resumo.spend > 0 ? (valor / resumo.spend) * 100 : 0}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
+                  <div>
+                    <p className="text-xs text-text-secondary">Campanhas a correr</p>
+                    <p className="text-2xl font-bold text-text-primary tabular-nums">{campanhasAtivas.length}</p>
+                    <p className="text-[11px] text-text-muted">{campanhasParadas.length} já paradas</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-secondary">Cliques</p>
+                    <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.clicks.toLocaleString("pt-PT")}</p>
+                    <p className="text-[11px] text-text-muted">
+                      em {resumo.impressions.toLocaleString("pt-PT")} impressões · CTR {resumo.ctr.toFixed(2).replace(".", ",")}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-secondary">Custo por clique</p>
+                    <p className="text-2xl font-bold text-text-primary tabular-nums">
+                      {resumo.clicks > 0 ? formatCurrency(resumo.cpc) : "—"}
+                    </p>
+                    <p className="text-[11px] text-text-muted">investido ÷ cliques</p>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Detalhe mensal */}
-            {spendMeses.length > 0 && (
-              <div>
-                <SectionHeader title="Detalhe por mês" />
-                <DataTable
-                  columns={[
-                    { key: "month", label: "Mês", render: (m: SpendMonth) => <span className="font-medium capitalize">{nomeMes(m.month)}</span> },
-                    { key: "spend", label: "Investido", render: (m: SpendMonth) => formatCurrency(m.spend) },
-                    { key: "impressions", label: "Impressões", render: (m: SpendMonth) => m.impressions.toLocaleString("pt-PT") },
-                    { key: "clicks", label: "Cliques", render: (m: SpendMonth) => m.clicks.toLocaleString("pt-PT") },
-                    { key: "ctr", label: "CTR", render: (m: SpendMonth) => m.impressions > 0 ? `${((m.clicks / m.impressions) * 100).toFixed(2).replace(".", ",")}%` : "—" },
-                    { key: "leads", label: "Leads", render: (m: SpendMonth) => m.leads },
-                    { key: "cpl", label: "Custo/lead", render: (m: SpendMonth) => m.leads > 0 ? formatCurrency(m.spend / m.leads) : "—" },
-                  ]}
-                  data={[...spendMeses].reverse()}
-                  keyField="month"
-                  emptyMessage="Sem investimento registado."
-                />
+            {/* ——— As campanhas, com as datas à frente ——— */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  {([
+                    { id: "todas", label: "Todas", n: todas.length },
+                    { id: "ativas", label: "A correr", n: campanhasAtivas.length },
+                    { id: "paradas", label: "Paradas", n: campanhasParadas.length },
+                  ] as const).map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => setEstadoCampanhas(o.id)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                        estadoCampanhas === o.id
+                          ? "bg-piquet text-white"
+                          : "bg-surface-subtle text-text-secondary hover:text-text-primary",
+                      )}
+                    >
+                      {o.label} <span className="opacity-70">{o.n}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-text-muted">
+                  {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos nestas
+                </p>
               </div>
-            )}
-            <SubTabs
-              tabs={[
-                { id: "funil", label: "Funil" },
-                { id: "canais", label: "Canais" },
-                { id: "cac", label: "CAC por canal" },
-                { id: "investimento", label: "Investimento" },
-              ]}
-            >
-              {(sub) => (
-                <>
-                  {sub === "funil" && (
-                    <ChartCard title="Funil de marketing">
-                      <FunnelChartComponent data={(funnel ?? []).map((s) => ({ name: s.name, count: s.count, conversionRate: s.conversionRate }))} />
-                    </ChartCard>
-                  )}
-                  {sub === "canais" && (
-                    <ChartCard title="Performance por canal" subtitle="Investimento vs receita">
-                      <BarChartComponent
-                        data={(channels ?? []).map((c) => ({ name: c.name, investimento: c.investment, receita: c.revenue }))}
-                        bars={[{ key: "investimento", color: "#D6503B", name: "Investimento" }, { key: "receita", color: "#FAB347", name: "Receita" }]}
-                        currency
+
+              <p className="rounded-xl bg-surface-subtle/60 px-3 py-2 text-xs text-text-secondary">
+                Cada objetivo é julgado pela sua métrica — instalações pelo custo por instalação, leads pelo custo por
+                lead, tráfego pelo custo por clique, notoriedade pelo custo por mil pessoas. O{" "}
+                <strong className="text-text-primary">desempenho</strong> compara cada campanha com a mediana das outras
+                do mesmo objetivo, não com metas de mercado que não teríamos como fundamentar.
+              </p>
+
+              {campanhasVisiveis.length === 0 ? (
+                <p className="card p-6 text-center text-sm text-text-muted">
+                  {estadoCampanhas === "ativas" ? "Nenhuma campanha a correr neste momento." : "Sem campanhas neste estado."}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {[...campanhasVisiveis]
+                    .sort((a, b) => b.investment - a.investment)
+                    .map((c) => (
+                      <CartaoCampanha
+                        key={c.id}
+                        campanha={c}
+                        pares={campanhasVisiveis}
+                        diasSemDados={diasSemDados}
+                        onVerAnuncios={() => setCampanhaParaAbrir(c.campaignName)}
                       />
-                    </ChartCard>
-                  )}
-                  {sub === "cac" && (
-                    <div className="space-y-4">
-                      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
-                        <b className="text-text-primary">CAC = investimento ÷ clientes adquiridos.</b> Custo de aquisição por cliente pagante, por canal.
-                      </div>
-                      <ChartCard title="CAC por canal" subtitle="Menor é melhor">
-                        <BarChartComponent
-                          data={(channels ?? []).map((c) => ({ name: c.name, value: (c as { cac?: number }).cac ?? 0 }))}
-                          bars={[{ key: "value", color: "#3E7C8C", name: "CAC" }]}
-                          currency
-                        />
-                      </ChartCard>
-                      <DataTable
-                        columns={[
-                          { key: "name", label: "Canal", render: (r) => <span className="font-medium">{r.name as string}</span> },
-                          { key: "investment", label: "Investimento", render: (r) => formatCurrency(r.investment as number) },
-                          { key: "customers", label: "Clientes", render: (r) => `${(r.customers as number) ?? 0}` },
-                          { key: "cac", label: "CAC", render: (r) => <span className="font-semibold">{formatCurrency((r.cac as number) ?? 0)}</span> },
-                          { key: "roas", label: "ROAS", render: (r) => `${((r.roas as number) ?? 0).toFixed(2)}x` },
-                        ]}
-                        data={(channels ?? []) as unknown as Record<string, unknown>[]}
-                        keyField="name"
-                      />
-                    </div>
-                  )}
-                  {sub === "investimento" && (
-                    <ChartCard title="Distribuição do investimento por canal">
-                      <DonutChartComponent data={(channels ?? []).map((c) => ({ name: c.name, value: c.investment }))} currency centerLabel="Investido" />
-                    </ChartCard>
-                  )}
-                </>
+                    ))}
+                </div>
               )}
-            </SubTabs>
-          </div>
-        )}
+            </div>
 
-        {tab === "campanhas" && (
-          <SubTabs tabs={[{ id: "campanhas", label: "Campanhas" }, { id: "criativos", label: "Criativos" }]}>
-            {(sub) => (
-              <>
-                {sub === "campanhas" && (
-                  <div className="space-y-3">
-                    {/*
-                      Antes esta legenda explicava faixas de ROAS aplicadas a
-                      todas as campanhas por igual — o que marcava as de
-                      notoriedade como "Má" por terem 0,00×. Cada objetivo tem
-                      agora a sua métrica, e o desempenho é comparado só entre
-                      campanhas com o mesmo objetivo.
-                    */}
-                    <div className="rounded-xl bg-surface-subtle/60 px-3 py-2.5 text-xs text-text-secondary space-y-1">
-                      <p>
-                        <span className="font-medium text-text-primary">Cada objetivo é avaliado pela sua métrica:</span>{" "}
-                        instalações pelo custo por instalação · leads pelo custo por lead · tráfego pelo custo por clique ·
-                        notoriedade pelo custo por mil pessoas (CPM).
-                      </p>
-                      <p className="text-text-muted">
-                        O <strong>desempenho</strong> compara cada campanha com a mediana das outras do mesmo objetivo —
-                        não com metas de mercado, que não teríamos como fundamentar. O ROAS só aparece onde há receita medida.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-1.5">
-                        {([
-                          { id: "ativas", label: "A correr", n: campanhasAtivas.length },
-                          { id: "concluidas", label: "Concluídas", n: campanhasConcluidas.length },
-                          { id: "todas", label: "Todas", n: (campaigns ?? []).length },
-                        ] as const).map((o) => (
-                          <button
-                            key={o.id}
-                            onClick={() => setEstadoCampanhas(o.id)}
-                            className={cn(
-                              "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                              estadoCampanhas === o.id
-                                ? "bg-piquet text-white"
-                                : "bg-surface-subtle text-text-secondary hover:text-text-primary",
-                            )}
-                          >
-                            {o.label} <span className="opacity-70">{o.n}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-text-muted">
-                        {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos
-                        {estadoCampanhas === "ativas" && campanhasConcluidas.length > 0 &&
-                          ` · ${campanhasConcluidas.length} concluídas escondidas`}
-                      </p>
-                    </div>
-                    <DataTable
-                      columns={campaignColumns}
-                      data={campanhasVisiveis}
-                      keyField="id"
-                      emptyMessage={
-                        estadoCampanhas === "ativas"
-                          ? "Nenhuma campanha a correr neste momento."
-                          : "Sem campanhas neste estado."
-                      }
-                    />
-                  </div>
-                )}
-                {sub === "criativos" && (
-                  <DataTable columns={creativeColumns} data={(creatives ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
-                )}
-              </>
-            )}
-          </SubTabs>
-        )}
+            {/* Anúncios reais das contas (Meta + Google), que se podem ligar e desligar. */}
+            <Anuncios
+              onCriar={() => setCriarAnuncioAberto(true)}
+              abrirCampanha={campanhaParaAbrir}
+              onAbertaCampanha={(encontrada) => {
+                if (!encontrada) toast("Esta campanha não tem criativos ativos na conta de anúncios.", "info");
+                setCampanhaParaAbrir(null);
+              }}
+            />
 
-        {tab === "comunicacao" && (
-          <SubTabs tabs={[
-            { id: "push", label: "Push" },
-            { id: "codigos", label: "Códigos de desconto" },
-            { id: "guioes", label: "Guiões e mensagens" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "push" && <PushTab />}
-                {sub === "codigos" && <CodigosTab />}
-                {sub === "guioes" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(scripts ?? []).map((s) => (
-                      <div key={s.id} className="card p-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-text-primary">{s.title}</p>
-                            <p className="text-xs text-text-secondary">{s.purpose}</p>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-piquet/15 text-piquet-700">
-                            <MessageSquare className="h-3 w-3" />{s.channel}
+            {/*
+              Repartição do investimento: interessa uma vez por mês, não de
+              cada vez que se abre o ecrã. Fica fechada.
+            */}
+            <details className="card p-4">
+              <summary className="cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary">
+                Onde foi o dinheiro — por plataforma, por app e por mês
+              </summary>
+              <div className="mt-4 space-y-6">
+                {Object.keys(resumo.plataformas).length > 0 && (
+                  <div className="space-y-2">
+                    <SectionHeader title="Por plataforma" />
+                    {Object.entries(resumo.plataformas).sort((a, b) => b[1] - a[1]).map(([plat, valor]) => (
+                      <div key={plat}>
+                        <div className="flex items-baseline justify-between text-sm">
+                          <span className="font-medium text-text-primary capitalize">{plat}</span>
+                          <span className="text-text-secondary tabular-nums">
+                            {formatCurrency(valor)} · {resumo.spend > 0 ? Math.round((valor / resumo.spend) * 100) : 0}%
                           </span>
                         </div>
-                        <p className="mt-3 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{s.content}</p>
+                        <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+                          <div className="h-full rounded-full bg-piquet"
+                            style={{ width: `${resumo.spend > 0 ? (valor / resumo.spend) * 100 : 0}%` }} />
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </>
-            )}
-          </SubTabs>
+
+                {/* Custo por download, só com o investimento que identifica a app. */}
+                <div className="space-y-2">
+                  <SectionHeader title="Custo por download" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      { app: "App Cliente", cor: "#FAB347", cpd: resumo.cpdCliente, gasto: resumo.spendCliente, dl: resumo.dlCliente },
+                      { app: "App Profissional", cor: "#3E7C8C", cpd: resumo.cpdProfissional, gasto: resumo.spendProfissional, dl: resumo.dlProfissional },
+                    ]).map((x) => (
+                      <div key={x.app} className="rounded-xl border border-surface-border p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
+                          <p className="text-sm font-medium text-text-secondary">{x.app}</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
+                          {x.cpd != null ? formatCurrency(x.cpd) : "—"}
+                        </p>
+                        <p className="text-[11px] text-text-muted">
+                          {x.gasto > 0
+                            ? <>{formatCurrency(x.gasto)} em campanhas dela ÷ {x.dl.toLocaleString("pt-PT")} downloads</>
+                            : <>sem campanhas identificadas para esta app · {x.dl.toLocaleString("pt-PT")} downloads no período</>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {resumo.spendGeral > 0 && (
+                    <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
+                      {formatCurrency(resumo.spendGeral)} foram para campanhas que não identificam app (tráfego para o
+                      site, notoriedade) — ficam de fora destes custos, para não inflacionar nenhum. Contando tudo, o
+                      custo por download é {resumo.cpdTotal != null ? formatCurrency(resumo.cpdTotal) : "—"}.
+                    </p>
+                  )}
+                </div>
+
+                {spendMeses.length > 0 && (
+                  <div>
+                    <SectionHeader title="Mês a mês" />
+                    <DataTable
+                      columns={[
+                        { key: "month", label: "Mês", render: (m: SpendMonth) => <span className="font-medium capitalize">{nomeMes(m.month)}</span> },
+                        { key: "spend", label: "Investido", render: (m: SpendMonth) => formatCurrency(m.spend) },
+                        { key: "impressions", label: "Impressões", render: (m: SpendMonth) => m.impressions.toLocaleString("pt-PT") },
+                        { key: "clicks", label: "Cliques", render: (m: SpendMonth) => m.clicks.toLocaleString("pt-PT") },
+                        { key: "ctr", label: "CTR", render: (m: SpendMonth) => m.impressions > 0 ? `${((m.clicks / m.impressions) * 100).toFixed(2).replace(".", ",")}%` : "—" },
+                        { key: "cpc", label: "Custo/clique", render: (m: SpendMonth) => m.clicks > 0 ? formatCurrency(m.spend / m.clicks) : "—" },
+                      ]}
+                      data={[...spendMeses].reverse()}
+                      keyField="month"
+                      emptyMessage="Sem investimento registado."
+                    />
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
         )}
 
+        {tab === "comunicacao" && (
+          <div className="space-y-6">
+            <PushCampanhas />
+            <div className="card p-4 space-y-3">
+              <SectionHeader title="Vouchers" />
+              <Vouchers />
+            </div>
+            <details className="card p-4">
+              <summary className="cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary">
+                Guiões de mensagens ({(scripts ?? []).length})
+              </summary>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(scripts ?? []).map((s) => (
+                  <div key={s.id} className="rounded-xl border border-surface-border p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-text-primary">{s.title}</p>
+                        <p className="text-xs text-text-secondary">{s.purpose}</p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-piquet/15 text-piquet-700 shrink-0">
+                        <MessageSquare className="h-3 w-3" />{s.channel}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{s.content}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+        )}
+
+        <CriarAnuncio open={criarAnuncioAberto} onClose={() => setCriarAnuncioAberto(false)} />
       </div>
     </RouteGuard>
   );
 }
 
-/* ------------------------------ Push notifications ------------------------------ */
+/* ------------------------------ Uma campanha ------------------------------ */
 
-function PushTab() {
-  const [campaigns, setCampaigns] = usePersistentList<PushCampaign>("push-campaigns", SEED_PUSH);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", message: "", segment: PUSH_SEGMENTS[0] as string, when: "agora" as "agora" | "agendar", scheduledFor: "2026-07-10T10:00" });
+/**
+ * Uma campanha por cartão, em vez de uma linha de tabela.
+ *
+ * São onze campanhas ao todo — a densidade de uma tabela não compensa aqui, e
+ * era ela que empurrava as datas para um subtítulo de 11px ao lado do nome.
+ * O que se quer saber ao abrir isto é: quanto custou, quando correu, e se
+ * ainda corre. Fica tudo em tamanho legível.
+ */
+function CartaoCampanha({
+  campanha: c, pares, diasSemDados, onVerAnuncios,
+}: {
+  campanha: MarketingCampaign;
+  pares: MarketingCampaign[];
+  diasSemDados: number | null;
+  onVerAnuncios: () => void;
+}) {
+  const p = periodoCampanha(c);
+  const objetivo = campaignObjective(c.campaignName);
+  const metrica = keyMetric(c, objetivo);
+  const comparacao = COMPARACAO_UI[compararComPares(c, pares)];
+  const duvidosa = pareceParadaSemRegisto(p, diasSemDados);
+  const nomeConversoes = objetivo === "instalacao" ? "Instalações" : objetivo === "leads" ? "Leads" : "Conversões";
 
-  const create = () => {
-    if (!form.title.trim() || !form.message.trim()) { toast("Indica o título e a mensagem.", "error"); return; }
-    const now = form.when === "agora";
-    const c: PushCampaign = {
-      id: `push_${Date.now()}`, title: form.title.trim(), message: form.message.trim(), segment: form.segment,
-      status: now ? "enviada" : "agendada",
-      sentAt: now ? new Date().toISOString() : undefined,
-      scheduledFor: now ? undefined : form.scheduledFor,
-      delivered: now ? Math.round(300 + Math.random() * 200) : 0,
-      deliveryRate: now ? Math.round((92 + Math.random() * 6) * 10) / 10 : 0,
-      openRate: now ? Math.round((25 + Math.random() * 20) * 10) / 10 : 0,
-      conversions: now ? Math.round(5 + Math.random() * 30) : 0,
-    };
-    setCampaigns((prev) => [c, ...prev]);
-    setOpen(false);
-    setForm({ title: "", message: "", segment: PUSH_SEGMENTS[0], when: "agora", scheduledFor: "2026-07-10T10:00" });
-    toast(now ? `Push "${c.title}" enviada ao segmento "${c.segment}".` : `Push "${c.title}" agendada.`);
-  };
+  /**
+   * Nas campanhas de tráfego (e nas que não declaram objetivo) a métrica-chave
+   * É o custo por clique — que já tem coluna própria. Sem isto, o cartão
+   * mostrava "28,04 €" duas vezes seguidas, a mesma conta com dois nomes.
+   */
+  const chaveEhCpc = objetivo === "trafego" || objetivo === "indefinido";
 
-  const pushColumns: Column<PushCampaign>[] = [
-    { key: "title", label: "Campanha", render: (r) => <div><p className="font-medium">{r.title}</p><p className="text-xs text-text-muted truncate max-w-[280px]">{r.message}</p></div> },
-    { key: "segment", label: "Segmento" },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "enviada" ? "bg-success-light text-success" : r.status === "agendada" ? "bg-info-light text-info" : "bg-surface-subtle text-text-secondary")}>
-        {r.status === "enviada" ? "Enviada" : r.status === "agendada" ? "Agendada" : "Rascunho"}
-      </span>
-    ) },
-    { key: "delivered", label: "Entregues", render: (r) => r.status === "enviada" ? `${r.delivered} (${r.deliveryRate}%)` : "—" },
-    { key: "openRate", label: "Abertura", render: (r) => r.status === "enviada" ? formatPercent(r.openRate) : "—" },
-    { key: "conversions", label: "Conversões", render: (r) => r.status === "enviada" ? `${r.conversions}` : "—" },
-    { key: "when", label: "Quando", render: (r) => r.sentAt ? formatDate(r.sentAt) : r.scheduledFor ? `Agendada ${formatDate(r.scheduledFor)}` : "—" },
+  const numeros: Array<{ rotulo: string; valor: string; nota?: string; titulo?: string }> = [
+    {
+      rotulo: "Investido",
+      valor: formatCurrency(c.investment),
+      nota: p.gastoPorDia != null ? `${formatCurrency(p.gastoPorDia)}/dia` : undefined,
+    },
+    { rotulo: "Impressões", valor: c.impressions.toLocaleString("pt-PT") },
+    {
+      rotulo: "Cliques",
+      valor: c.clicks.toLocaleString("pt-PT"),
+      nota: c.impressions > 0 ? `CTR ${c.ctr.toFixed(2).replace(".", ",")}%` : undefined,
+    },
+    {
+      rotulo: "Custo por clique",
+      valor: c.clicks > 0 ? formatCurrency(c.investment / c.clicks) : "—",
+      nota: chaveEhCpc ? "é a métrica deste objetivo" : undefined,
+      titulo: chaveEhCpc ? metrica.hint : undefined,
+    },
+    {
+      rotulo: nomeConversoes,
+      valor: c.leads.toLocaleString("pt-PT"),
+      titulo: `${c.leads} ${nomeConversoes.toLowerCase()} reportadas pela plataforma`,
+    },
+    ...(chaveEhCpc ? [] : [{
+      rotulo: metrica.label,
+      valor: metrica.value == null ? "—" : formatCurrency(metrica.value),
+      titulo: metrica.hint,
+    }]),
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary inline-flex items-center gap-2"><BellRing className="h-4 w-4 text-piquet-600" /> Campanhas push para clientes e técnicos, por segmento.</p>
-        <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova campanha</button>
-      </div>
-      <DataTable columns={pushColumns} data={campaigns} keyField="id" emptyMessage="Sem campanhas push" />
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Nova campanha push" subtitle="Notificação para um segmento"
-        footer={<>
-          <button onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={create} className="btn-primary text-sm"><Send className="h-4 w-4" /> {form.when === "agora" ? "Enviar agora" : "Agendar"}</button>
-        </>}>
-        <div className="space-y-3">
-          <Field label="Título"><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Ex.: ☀️ Verão sem avarias" /></Field>
-          <Field label="Mensagem"><textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="input-field resize-none" rows={3} placeholder="Texto da notificação (máx. ~140 caracteres)" /></Field>
-          <Field label="Segmento"><select value={form.segment} onChange={(e) => setForm({ ...form, segment: e.target.value })} className="input-field">
-            {PUSH_SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Envio"><select value={form.when} onChange={(e) => setForm({ ...form, when: e.target.value as "agora" | "agendar" })} className="input-field">
-              <option value="agora">Enviar imediatamente</option>
-              <option value="agendar">Agendar</option>
-            </select></Field>
-            {form.when === "agendar" && (
-              <Field label="Data e hora"><input type="datetime-local" value={form.scheduledFor} onChange={(e) => setForm({ ...form, scheduledFor: e.target.value })} className="input-field" /></Field>
-            )}
-          </div>
+    <div className="card p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-text-primary break-words" title={c.campaignName}>{c.campaignName}</p>
+          <p className="text-sm text-text-secondary mt-0.5">
+            {c.platform} · {OBJECTIVE_LABEL[objetivo]}
+          </p>
         </div>
-      </Modal>
-    </div>
-  );
-}
-
-/* ------------------------------ Códigos de desconto ------------------------------ */
-
-function CodigosTab() {
-  const [codes, setCodes] = usePersistentList<DiscountCode>("discount-codes", SEED_CODES);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ code: "", kind: "percentagem" as DiscountCode["kind"], value: 10, usageLimit: 200, validUntil: "2026-09-30", categories: "Todas", cities: "Todas" });
-
-  const create = () => {
-    if (!form.code.trim()) { toast("Indica o código.", "error"); return; }
-    const c: DiscountCode = {
-      id: `dc_${Date.now()}`, code: form.code.trim().toUpperCase(), kind: form.kind, value: Number(form.value) || 0,
-      usageLimit: Number(form.usageLimit) || 0, used: 0, validUntil: form.validUntil,
-      categories: form.categories.trim() || "Todas", cities: form.cities.trim() || "Todas", active: true, revenue: 0,
-    };
-    setCodes((prev) => [c, ...prev]);
-    setOpen(false);
-    setForm({ code: "", kind: "percentagem", value: 10, usageLimit: 200, validUntil: "2026-09-30", categories: "Todas", cities: "Todas" });
-    toast(`Código ${c.code} criado e ativo.`);
-  };
-
-  const toggle = (id: string) => {
-    setCodes((prev) => prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
-    const c = codes.find((x) => x.id === id);
-    toast(`Código ${c?.code} ${c?.active ? "desativado" : "ativado"}.`, c?.active ? "info" : "success");
-  };
-
-  const codeColumns: Column<DiscountCode>[] = [
-    { key: "code", label: "Código", render: (r) => <span className="font-mono font-semibold">{r.code}</span> },
-    { key: "value", label: "Desconto", render: (r) => r.kind === "percentagem" ? `${r.value}%` : formatCurrency(r.value) },
-    { key: "used", label: "Utilizações", render: (r) => `${r.used}/${r.usageLimit}` },
-    { key: "revenue", label: "Receita gerada", sortable: true, render: (r) => formatCurrency(r.revenue) },
-    { key: "categories", label: "Categorias" },
-    { key: "cities", label: "Cidades" },
-    { key: "validUntil", label: "Válido até", render: (r) => formatDate(r.validUntil) },
-    { key: "active", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", r.active ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
-        {r.active ? "Ativo" : "Inativo"}
-      </span>
-    ) },
-    { key: "acao", label: "", render: (r) => (
-      <button onClick={() => toggle(r.id)} className={cn("text-xs hover:underline", r.active ? "text-danger" : "text-success")}>
-        {r.active ? "Desativar" : "Ativar"}
-      </button>
-    ) },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary inline-flex items-center gap-2"><TicketPercent className="h-4 w-4 text-piquet-600" /> Códigos promocionais — valor fixo ou percentagem, com limite e validade.</p>
-        <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo código</button>
-      </div>
-      <DataTable columns={codeColumns} data={codes} keyField="id" emptyMessage="Sem códigos de desconto" />
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Novo código de desconto"
-        footer={<>
-          <button onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={create} className="btn-primary text-sm">Criar código</button>
-        </>}>
-        <div className="space-y-3">
-          <Field label="Código"><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="input-field font-mono" placeholder="VERAO25" /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Tipo"><select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as DiscountCode["kind"] })} className="input-field">
-              <option value="percentagem">Percentagem (%)</option>
-              <option value="valor_fixo">Valor fixo (€)</option>
-            </select></Field>
-            <Field label={form.kind === "percentagem" ? "Desconto (%)" : "Desconto (€)"}><input type="number" min={0} value={form.value} onChange={(e) => setForm({ ...form, value: Number(e.target.value) })} className="input-field" /></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Limite de utilizações"><input type="number" min={1} value={form.usageLimit} onChange={(e) => setForm({ ...form, usageLimit: Number(e.target.value) })} className="input-field" /></Field>
-            <Field label="Válido até"><input type="date" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} className="input-field" /></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Categorias" hint="Ex.: AVAC, Limpeza — ou Todas"><input value={form.categories} onChange={(e) => setForm({ ...form, categories: e.target.value })} className="input-field" /></Field>
-            <Field label="Cidades" hint="Ex.: Lisboa, Cascais — ou Todas"><input value={form.cities} onChange={(e) => setForm({ ...form, cities: e.target.value })} className="input-field" /></Field>
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span title={comparacao.hint} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", comparacao.tone)}>
+            {comparacao.label}
+          </span>
+          <span className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+            p.aCorrer ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary",
+          )}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", p.aCorrer ? "bg-success" : "bg-text-muted")} />
+            {p.aCorrer ? "A correr" : "Parada"}
+          </span>
         </div>
-      </Modal>
+      </div>
+
+      {/* As datas, que é o que este ecrã passou a responder primeiro. */}
+      <div className="rounded-xl bg-surface-subtle/60 px-3 py-2">
+        <p className="text-sm text-text-primary">
+          {c.startDate ? (
+            <>
+              <span className="font-medium">{formatDate(c.startDate)}</span>
+              {" → "}
+              <span className="font-medium">{c.endDate ? formatDate(c.endDate) : "hoje"}</span>
+              {p.dias != null && <span className="text-text-secondary"> · {p.dias} {p.dias === 1 ? "dia" : "dias"}</span>}
+            </>
+          ) : (
+            <span className="text-text-muted">Sem datas registadas</span>
+          )}
+        </p>
+        {p.paradaHaDias != null && (
+          <p className="text-xs text-text-secondary mt-0.5">
+            {p.paradaHaDias === 0 ? "Parada hoje" : `Parada há ${p.paradaHaDias} ${p.paradaHaDias === 1 ? "dia" : "dias"}`}
+          </p>
+        )}
+        {duvidosa && (
+          <p className="text-xs text-warning mt-1">
+            Marcada como a correr, mas não há dados novos há {diasSemDados} dias — pode já ter parado na plataforma.
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {numeros.map((n) => (
+          <div key={n.rotulo} title={n.titulo}>
+            <p className="text-xs text-text-secondary">{n.rotulo}</p>
+            <p className="text-lg font-bold text-text-primary tabular-nums">{n.valor}</p>
+            {n.nota && <p className="text-[11px] text-text-muted">{n.nota}</p>}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        {/* O ROAS só aparece onde diz alguma coisa: numa campanha de
+            notoriedade, "0,00×" leria-se como fracasso em vez de "não é isso
+            que se lhe pede". */}
+        {roasFazSentido(c) ? (
+          <p className="text-xs text-text-secondary" title="Receita Piquet ÷ investimento (comissão de 25%)">
+            ROAS <strong className="text-text-primary">{c.roas.toFixed(2)}×</strong> · {formatCurrency(c.piquetRevenue)} de receita atribuída
+          </p>
+        ) : (
+          <span />
+        )}
+        <button onClick={onVerAnuncios} className="text-xs font-medium text-piquet-700 hover:underline">
+          Ver anúncios desta campanha
+        </button>
+      </div>
     </div>
   );
 }

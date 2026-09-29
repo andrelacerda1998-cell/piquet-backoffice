@@ -32,8 +32,15 @@ export function lossReasonLabel(id: string | null | undefined): string {
   return LEAD_LOSS_REASONS.find((r) => r.id === id)?.label ?? "";
 }
 
-/** Estados em que faz sentido perguntar o motivo. */
-export const ESTADOS_QUE_PEDEM_MOTIVO = ["recusado", "reembolsado"];
+/**
+ * Estados em que faz sentido perguntar o motivo.
+ *
+ * Era ["recusado", "reembolsado"], os dois estados que a lista de cinco
+ * substituiu por "perdido" a 08/09. Ficou para trás na renomeação e, enquanto
+ * ficou, nada aqui correspondia a estado nenhum: deixou de se perguntar o
+ * motivo e o gráfico de onde se perde o negócio contava zero.
+ */
+export const ESTADOS_QUE_PEDEM_MOTIVO = ["perdido"];
 
 export function pedeMotivo(estado: string): boolean {
   return ESTADOS_QUE_PEDEM_MOTIVO.includes(estado);

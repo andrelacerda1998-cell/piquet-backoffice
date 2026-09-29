@@ -21,6 +21,8 @@ export interface RealCustomer {
   email_verified: boolean;
   phone_verified: boolean;
   can_request_service: boolean;
+  /** Cidade da morada principal do cliente (pode ser null se não a preencheu). */
+  city: string | null;
   blocked_at: string | null;
   created_at: string | null;
 }
@@ -49,6 +51,25 @@ export async function getCustomers(
     pageSize: raw.meta.per_page,
     totalPages: raw.meta.last_page,
   };
+}
+
+/**
+ * Todos os clientes de uma vez — para a vista "Base de dados" que funde
+ * clientes + leads do lado do cliente. O backend limita `per_page` a 100, por
+ * isso pede-se a 1ª página, lê-se quantas há, e puxam-se as restantes em
+ * paralelo. À escala atual (poucos milhares no máximo) é perfeitamente viável.
+ */
+export async function getAllCustomers(search?: string): Promise<RealCustomer[]> {
+  const PER = 100;
+  const first = await getCustomers(1, PER, search);
+  const all = [...first.data];
+  if (first.totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, i) => getCustomers(i + 2, PER, search))
+    );
+    rest.forEach((r) => all.push(...r.data));
+  }
+  return all;
 }
 
 /**

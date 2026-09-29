@@ -65,47 +65,4 @@ export async function getSupportTickets(page = 1, pageSize = 20) {
   }).then((r) => r.data);
 }
 
-export async function getAppErrors(page = 1, pageSize = 20) {
-  return apiGet("/support/errors", () => {
-    return paginateArray(sortArray(mockData.appErrors, "occurredAt", "desc"), page, pageSize);
-  }).then((r) => r.data);
-}
 
-export async function getProductMetrics() {
-  return apiGet("/product/metrics", () => ({
-    dau: 1250,
-    mau: 8500,
-    newRegistrations: 342,
-    ordersStarted: 890,
-    ordersCompleted: 620,
-    ordersAbandoned: 120,
-    completionRate: 69.7,
-    paymentFailures: 23,
-    billingFailures: 8,
-    appErrors: mockData.appErrors.filter((e) => e.status !== "resolvido").length,
-    supportTickets: mockData.supportTickets.filter((t) => t.status !== "resolvido").length,
-    avgResolutionTime: 4.2,
-  })).then((r) => r.data);
-}
-
-export async function getOperationalMetrics(_filters: import("@/types").DashboardFilter) {
-  return apiGet("/services/operational-metrics", () => {
-    const services = mockData.services;
-    const completed = services.filter((s) => s.status === "concluido");
-    const cancelled = services.filter((s) => s.status.startsWith("cancelado"));
-    return {
-      avgResponseTime: 28,
-      avgTechnicianFindTime: 95,
-      avgQuoteToPaymentTime: 180,
-      avgOrderToExecutionTime: 1440,
-      avgServiceDuration: 120,
-      completionRate: services.length ? (completed.length / services.length) * 100 : 0,
-      cancellationRate: services.length ? (cancelled.length / services.length) * 100 : 0,
-      reschedulingRate: 5.2,
-      noTechnicianRate: 2.1,
-      firstVisitResolutionRate: 87.5,
-      overdueServices: 12,
-      paidWithoutTechnician: 3,
-    };
-  }).then((r) => r.data);
-}

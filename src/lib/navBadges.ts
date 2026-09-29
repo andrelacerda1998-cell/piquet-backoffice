@@ -29,21 +29,19 @@ const ROTA_POR_ENTIDADE: Record<string, string> = {
 };
 
 /**
- * O que NÃO vale uma bolinha: o que depende de terceiros.
+ * Tudo o que é alerta vale uma bolinha.
  *
  * A primeira versão contava só "crítica" e "alta". Parecia razoável e estava
  * errada: a fila de documentos de técnicos por aprovar é "média" enquanto for
  * pequena, e é trabalho inteiramente nosso — técnicos parados à espera de nós
  * para poderem trabalhar. Ficavam sem bolinha nenhuma.
  *
- * O critério certo é o mesmo das regras dos alertas: QUEM TEM A BOLA. Conta
- * tudo o que se resolve deste lado, seja qual for a urgência; fica de fora só
- * o que está à espera da decisão de um cliente, onde não há nada a fazer além
- * de esperar.
+ * A seguir passou a haver uma lista de exceções, para o alerta "orçamento à
+ * espera do cliente", onde não havia nada a fazer além de esperar. Esse alerta
+ * desapareceu com o estado que o gerava, e a lista de exceções com ele: hoje
+ * todos os alertas se resolvem deste lado.
  */
-const NAO_CONTAM = ["orcamento-sem-resposta-", "grupo-orcamentos-sem-resposta"];
-
-const contaParaBadge = (a: DashboardAlert) => !NAO_CONTAM.some((p) => a.id.startsWith(p));
+const contaParaBadge = (_a: DashboardAlert) => true;
 
 export function contarPorRota(alertas: DashboardAlert[]): Record<string, number> {
   const contas: Record<string, number> = {};

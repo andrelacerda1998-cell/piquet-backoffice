@@ -36,9 +36,15 @@ interface MetricCardProps {
   empty?: boolean;
   /** O que falta para o valor existir (aparece por baixo do "—"). */
   emptyHint?: string;
+  /**
+   * Cartão mais baixo e com texto menor. Para filas onde o que interessa é
+   * ver os números TODOS ao mesmo tempo (5-6 lado a lado) em vez de destacar
+   * cada um -- comparar exige tê-los na mesma linha.
+   */
+  compact?: boolean;
 }
 
-export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint, hideDelta, deltaLabel = "vs mês ant.", empty, emptyHint }: MetricCardProps) {
+export function MetricCard({ title, metric, format = "number", className, loading, demoEndpoint, hideDelta, deltaLabel = "vs mês ant.", empty, emptyHint, compact }: MetricCardProps) {
   if (loading) {
     return (
       <div className={cn("card p-4 animate-pulse", className)}>
@@ -57,9 +63,9 @@ export function MetricCard({ title, metric, format = "number", className, loadin
   const sparkData = (metric.sparkline ?? []).map((v, i) => ({ i, v }));
 
   return (
-    <div className={cn("card p-4 hover:shadow-elevated transition-shadow", className)}>
+    <div className={cn("card hover:shadow-elevated transition-shadow", compact ? "p-3" : "p-4", className)}>
       <div className="flex items-start justify-between mb-1">
-        <p className="text-sm text-text-secondary font-medium">
+        <p className={cn("text-text-secondary font-medium", compact ? "text-xs leading-tight" : "text-sm")}>
           {title}
           {demoEndpoint && <DemoBadge endpoint={demoEndpoint} className="ml-1.5 align-middle" />}
         </p>
@@ -71,11 +77,11 @@ export function MetricCard({ title, metric, format = "number", className, loadin
       </div>
       {empty ? (
         <>
-          <p className="text-2xl font-bold text-text-muted mb-1" title={emptyHint ?? "Sem fonte de dados"}>—</p>
+          <p className={cn("font-bold text-text-muted mb-1", compact ? "text-xl" : "text-2xl")} title={emptyHint ?? "Sem fonte de dados"}>—</p>
           {emptyHint && <p className="text-[11px] text-text-muted mb-1">{emptyHint}</p>}
         </>
       ) : (
-        <p className="text-2xl font-bold text-text-primary mb-2">{formattedValue}</p>
+        <p className={cn("font-bold text-text-primary tabular-nums", compact ? "text-xl mb-0" : "text-2xl mb-2")}>{formattedValue}</p>
       )}
       {/* Só se mostra variação quando ela EXISTE: sem histórico real (anterior
           igual ao atual, ou zero sem história) não há nada a comparar — mostrar

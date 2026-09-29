@@ -33,19 +33,8 @@ export const GET = withStaff(async () => {
     leadsPorResponder: await tenta("leads", async () => {
       const { data } = await db.from("leads").select("id, name, phone, stage, created_at").limit(500);
       return ((data ?? []) as Array<{ id: string; name: string; phone: string; stage: string; created_at: string }>)
-        .filter((l) => normalizeLeadStage(l.stage) === "nao_iniciado")
+        .filter((l) => normalizeLeadStage(l.stage) === "novo")
         .map((l) => ({ id: l.id, nome: l.name || l.phone || "Contacto sem nome", recebidaEm: l.created_at }));
-    }, []),
-
-    orcamentosSemResposta: await tenta("leads-orcamentos", async () => {
-      const { data } = await db.from("leads").select("id, name, phone, stage, created_at, quote_value").limit(500);
-      return ((data ?? []) as Array<{ id: string; name: string; phone: string; stage: string; created_at: string; quote_value: number | null }>)
-        .filter((l) => normalizeLeadStage(l.stage) === "aguarda_resposta")
-        .map((l) => ({
-          id: l.id, nome: l.name || l.phone || "Contacto sem nome",
-          enviadoDesde: l.created_at,
-          valor: l.quote_value != null ? Number(l.quote_value) : null,
-        }));
     }, []),
 
     faturasVencidas: await tenta("company_invoices", async () => {

@@ -77,7 +77,6 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/produto": ["view_dashboard"],
   "/servicos-personalizados": ["view_services"],
   "/recrutamento": ["view_employees", "view_technicians"],
-  "/despacho": ["view_services"],
   "/qualidade": ["view_support"],
   "/relatorios": ["export_data"],
   "/marketing": ["view_marketing"],
@@ -97,7 +96,15 @@ export function hasAnyPermission(role: UserRole, permissions: Permission[]): boo
 }
 
 export function canAccessRoute(role: UserRole, route: string): boolean {
-  const required = ROUTE_PERMISSIONS[route];
+  /*
+    Entradas de menu como "/financeiro?tab=impostos" apontam para um separador
+    do mesmo ecrã. Sem tirar a query, o `route` não existia em
+    ROUTE_PERMISSIONS e a função devolvia `true` -- ou seja, um separador de
+    um ecrã restrito ficava visível para toda a gente. A permissão é a do
+    caminho; o separador não é uma rota à parte.
+  */
+  const base = route.split("?")[0];
+  const required = ROUTE_PERMISSIONS[route] ?? ROUTE_PERMISSIONS[base];
   if (!required) return true;
   return hasAnyPermission(role, required);
 }

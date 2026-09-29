@@ -22,7 +22,13 @@ ligado um de cada vez (o `api.ts` já está preparado) — tu expões, eu mapeio
 
 ---
 
-## Prioridade 1 — Serviços / Reservas  ⭐ (o desbloqueio principal)
+## Prioridade 1 — Serviços / Reservas  ✅ ESCRITO, à espera de revisão
+
+> **08/09/2026 — deixou de ser um pedido.** O endpoint está escrito e num PR:
+> [backend#39](https://github.com/andrelacerda1998-cell/backend/pull/39)
+> (`App\Http\Controllers\Api\Admin\ServiceController`, um commit contra `main`).
+> Falta rever e publicar. A especificação abaixo fica como referência do que foi
+> implementado.
 
 Alimenta a aba **Operações** e, por derivação, **Clientes, Técnicos, GMV e Financeiro**.
 
@@ -146,23 +152,36 @@ derivação.
 
 ---
 
-## Estado: Serviços (Prioridade 1) — casca já pronta ✅
+## Estado: Serviços (Prioridade 1) — os dois lados escritos
 
-Do lado do Next já está feito o adaptador, **dormente** até dizeres que o
-endpoint existe. Ficheiro: `src/app/api/_lib/laravelServices.ts`; ligado em
-`src/app/api/services/route.ts` atrás de um interruptor.
+**Do lado do Laravel** (PR [backend#39](https://github.com/andrelacerda1998-cell/backend/pull/39)):
+`GET /v1/admin/services` e `GET /v1/admin/services/{service}`. Devolve também o
+estado do **matching** (`ServiceCandidate`): quantos técnicos foram notificados,
+aceitaram, recusaram ou deixaram expirar — é o que distingue "não apareceu
+ninguém" de "ninguém foi sequer perguntado".
 
-**Para ligar, faltam 3 passos (rápidos):**
+**Do lado do Next** já está tudo:
+- `src/app/api/_lib/laravelServices.ts` — o `LARAVEL_STATUS_MAP` deixou de estar
+  vazio; os estados do teu enum (`Pending`, `Matching`, `MatchingFailed`,
+  `Accepted`, `AwaitingPayment`, `Pending3DS`, `Closed`, `Finished`, `Canceled`,
+  `Refused`) estão todos traduzidos.
+- `src/app/api/_lib/appPedidos.ts` + cron `/api/cron/app-requests` (de 15 em 15
+  minutos) — traz cada serviço da app para a lista de **Pedidos**, casando pelo
+  `laravel_service_id`. É uma cópia: a verdade do serviço continua no Laravel.
 
-1. **Expor** `GET /v1/admin/services` (formato acima).
-2. **Confirmar** duas coisas no ficheiro `laravelServices.ts`:
-   - os **nomes exatos dos campos** que devolves (ajusto `LaravelServiceRow` se forem diferentes);
-   - os **valores de `status`** do teu lado → preencho `LARAVEL_STATUS_MAP` (ex.: `finished → concluido`). Se já usares as mesmas chaves pt-PT, passam diretas.
-3. **Ligar o interruptor**: env var `LARAVEL_SERVICES_ENABLED=true` na Vercel.
+**Faltam 2 passos:**
 
-Enquanto o passo 3 não é dado, o `/api/services` continua a ler o Supabase
-(serviços manuais) — zero risco. Assim que ligares, verifico contra os dados
-reais e depois é só replicar o mesmo padrão para Clientes, Técnicos e Pagamentos.
+1. **Rever e publicar** o PR #39. Dois pontos onde foi preciso inferir e que
+   convém confirmar com ambiente a correr: as chaves da morada
+   (`address['city']`, `address['address']`) e a relação `schedule`
+   (`scheduled_day` / `scheduled_time_start`).
+2. **Ligar o interruptor**: `LARAVEL_SERVICES_ENABLED=true` na Vercel (lado do
+   André).
+
+⚠️ **Isto passou a ser urgente.** A 08/09 o formulário de pedidos saiu da
+landing: os pedidos passam a entrar **só pela app**. Enquanto estes dois passos
+não estiverem dados, o backoffice não vê nenhum pedido feito na app — só os que
+chegam por WhatsApp — e a atribuição de campanhas (ROAS) fica sem origem.
 
 ---
 

@@ -3,16 +3,15 @@ import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import type { ServiceRequest, ServiceStatus, PaymentStatus, InvoiceStatus } from "@/types";
 
 /**
- * CASCA da ligação dos Serviços/Reservas à API de admin do Laravel
- * (`GET /v1/admin/services`), ainda **dormente**.
+ * Os pedidos feitos na app, vindos de `GET /v1/admin/services`.
  *
- * Está tudo pronto para ligar — só falta o Rodrigo expor o endpoint (ver
- * INTEGRACAO_LARAVEL_BACKOFFICE.md, Prioridade 1) e confirmar 2 coisas:
- *   1. os nomes exatos dos campos que devolve (ajustar `LaravelServiceRow`);
- *   2. os valores de `status` do lado dele (preencher `LARAVEL_STATUS_MAP`).
+ * É a ponte entre a app e o backoffice: os clientes pedem na app, o pedido fica
+ * no Laravel, e sem isto o backoffice só via as leads do formulário do site.
  *
- * Enquanto `LARAVEL_SERVICES_ENABLED` não estiver a "true" na Vercel, o
- * `/api/services` continua a ler do Supabase como hoje — nada muda.
+ * O endpoint foi escrito a 08/09/2026 (App\Http\Controllers\Api\Admin\
+ * ServiceController) e os nomes dos campos abaixo são os que ele devolve.
+ * Falta entrar em produção do lado do Laravel; até lá, `LARAVEL_SERVICES_ENABLED`
+ * fica por definir e o `/api/services` continua a ler do Supabase.
  */
 
 /** Interruptor DEDICADO: não basta o Laravel estar configurado para os outros
@@ -47,6 +46,14 @@ export interface LaravelServiceRow {
   payment_status?: string | null;
   invoice_status?: string | null;
   rating?: number | null;
+  customer_phone?: string | null;
+  customer_notes?: string | null;
+  /** Marcação: vive na tabela `schedules`, e o dia e a hora vêm separados. */
+  scheduled_day?: string | null;
+  scheduled_time?: string | null;
+  on_the_way_at?: string | null;
+  /** Estado do matching: a quantos se perguntou e quantos responderam o quê. */
+  candidates?: { notified?: number; accepted?: number; declined?: number; expired?: number } | null;
   has_complaint?: boolean | null;
   cancellation_reason?: string | null;
   response_time_minutes?: number | null;
@@ -70,9 +77,31 @@ const DASHBOARD_STATUSES = new Set<ServiceStatus>([
   "reembolsado", "em_reclamacao",
 ]);
 
-/** TODO(Rodrigo): preencher com os valores de `status` do Laravel → estado do
- *  dashboard. Ex.: { pending: "pedido_recebido", finished: "concluido", ... }. */
-const LARAVEL_STATUS_MAP: Record<string, ServiceStatus> = {};
+/*
+  Os estados do Laravel (App\Enums\Services\ServiceStatus) traduzidos para os
+  do backoffice. São PascalCase do lado de lá.
+
+  Duas traduções que merecem explicação:
+  - `MatchingFailed` é "sem técnico disponível" e não um cancelamento: ninguém
+    recusou o serviço, é que não apareceu ninguém. É a diferença entre um
+    problema da rede e uma decisão de alguém.
+  - `Pending3DS` e `AwaitingPayment` são ambos "à espera de pagamento" para quem
+    olha; a autenticação do cartão é detalhe do meio de pagamento, não um estado
+    do serviço.
+*/
+const LARAVEL_STATUS_MAP: Record<string, ServiceStatus> = {
+  Pending: "pedido_recebido",
+  Matching: "a_procurar_tecnico",
+  MatchingFailed: "sem_tecnico_disponivel",
+  Accepted: "tecnico_encontrado",
+  AwaitingPayment: "a_aguardar_pagamento",
+  Pending3DS: "a_aguardar_pagamento",
+  ClosedPendingPayment: "a_aguardar_pagamento",
+  Closed: "concluido",
+  Finished: "concluido",
+  Canceled: "cancelado_cliente",
+  Refused: "cancelado_tecnico",
+};
 
 function mapStatus(raw: string | null | undefined): ServiceStatus {
   const s = str(raw).trim();
@@ -81,6 +110,14 @@ function mapStatus(raw: string | null | undefined): ServiceStatus {
   return "pedido_recebido"; // fallback seguro até o mapa estar completo
 }
 
+/** Estados de pagamento do Laravel → os do backoffice. */
+const LARAVEL_PAYMENT_MAP: Record<string, PaymentStatus> = {
+  Pending: "pendente",
+  Paid: "pago",
+  Canceled: "falhado",
+  Refunded: "reembolsado",
+};
+
 const PAYMENT_STATUSES = new Set(["pendente", "pago", "parcial", "reembolsado", "falhado"]);
 const INVOICE_STATUSES = new Set(["nao_emitida", "emitida", "com_erro", "anulada"]);
 
@@ -88,7 +125,7 @@ const INVOICE_STATUSES = new Set(["nao_emitida", "emitida", "com_erro", "anulada
 export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
   const total = num(r.total_customer_value);
   const techValue = num(r.technician_value);
-  const payment = str(r.payment_status);
+  const payment = LARAVEL_PAYMENT_MAP[str(r.payment_status)] ?? str(r.payment_status);
   const invoice = str(r.invoice_status);
   return {
     id: str(r.id),
@@ -104,7 +141,9 @@ export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
     source: r.source ?? "app",
     status: mapStatus(r.status),
     requestedAt: r.requested_at ?? "",
-    scheduledAt: r.scheduled_at ?? undefined,
+    // O dia sozinho já serve a lista; a hora junta-se quando existe.
+    scheduledAt: r.scheduled_at
+      ?? (r.scheduled_day ? [r.scheduled_day, r.scheduled_time].filter(Boolean).join(" ") : undefined),
     startedAt: r.started_at ?? undefined,
     completedAt: r.completed_at ?? undefined,
     totalCustomerValue: total,
@@ -134,6 +173,36 @@ export interface ServicesQuery {
 
 /** Busca a lista paginada ao Laravel e devolve no MESMO envelope que a rota
  *  Supabase (`{ data, total, page, pageSize, totalPages }`). */
+/**
+ * TODOS os serviços do Laravel, percorrendo as páginas.
+ *
+ * O `fetchLaravelServices` devolve uma página, que é o que uma lista precisa.
+ * Quem agrega -- o Financeiro, as unit economics, o resultado operacional --
+ * precisa do conjunto inteiro: somar a primeira página e chamar-lhe receita
+ * seria pior do que não somar nada.
+ *
+ * O controlador do Laravel limita `per_page` a 100 (`min($perPage, 100)`), por
+ * isso pedir 1000 devolve 100 e cala-se. Foi assim que a cópia dos técnicos
+ * andou meses a ver 100 de 438.
+ */
+export async function fetchAllLaravelServices(): Promise<ServiceRequest[]> {
+  const todos: ServiceRequest[] = [];
+  let pagina = 1;
+  let ultima = 1;
+
+  do {
+    const res = await laravelAdminRequest<LaravelServicesResponse>(
+      `/v1/admin/services?per_page=100&page=${pagina}`,
+    );
+    const itens = res.items ?? [];
+    todos.push(...itens.map(mapLaravelService));
+    ultima = res.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
+    pagina++;
+  } while (pagina <= ultima && pagina <= 100); // trava: 10 000 serviços
+
+  return todos;
+}
+
 export async function fetchLaravelServices(query: ServicesQuery) {
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));

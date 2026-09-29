@@ -1,11 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { custosFixosMensais } from "@/lib/custosFixos";
-import { fetchAll } from "@/lib/fetchAll";
 import { rowToEmployee, type EmployeeRow } from "@/lib/supabase/adapters";
 import { computeEmployeeCost } from "@/services/employeesService";
 import { apiOk, withStaff } from "../../_lib/handler";
-
-interface Row { completed_at: string | null; requested_at: string; piquet_revenue: number }
+import { servicosConcluidos } from "../../_lib/finance";
 
 /**
  * GET /api/finance/operational-result — resultado operacional por mês
@@ -17,7 +15,7 @@ export const GET = withStaff(async () => {
   // Paginado: o PostgREST corta em 1000 linhas, e sem `.order()` as que
   // sobravam eram arbitrárias — o gráfico perdia meses inteiros sem avisar.
   const [servicos, empRes, custosRes] = await Promise.all([
-    fetchAll<Row>(admin.from("services").select("completed_at, requested_at, piquet_revenue").eq("status", "concluido")),
+    servicosConcluidos({ period: null }),
     admin.from("employees").select("*"),
     admin.from("company_invoices").select("amount, issue_date"),
   ]);

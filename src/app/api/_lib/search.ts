@@ -1,11 +1,20 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
+import { servicesFromLaravel } from "./laravelServices";
 
 /**
  * Pesquisa global de ENTIDADES (não navegação): serviços, clientes, técnicos,
  * faturas, leads e tickets. Cada fonte é consultada em paralelo e defensiva
- * (uma tabela em falta não parte a pesquisa). À medida que os dados reais
- * ligam (Laravel), passa a encontrar mais — a infraestrutura fica igual.
+ * (uma fonte em baixo não parte a pesquisa).
+ *
+ * Técnicos, clientes e serviços vêm do LARAVEL, que é onde estão.
+ *
+ * Durante meses vieram das tabelas locais `technicians`, `customers` e
+ * `services` -- que têm UMA linha cada, sobra de antes da ponte existir.
+ * Procurar um dos 438 técnicos pelo nome devolvia nada, na caixa de pesquisa
+ * mais visível do produto. As tabelas locais ficam como recurso para quando o
+ * Laravel não estiver ligado.
  */
 export type SearchType = "service" | "customer" | "technician" | "invoice" | "lead" | "ticket";
 
@@ -31,6 +40,18 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
 
   await Promise.all([
     safe(async () => {
+      if (servicesFromLaravel()) {
+        const r = await laravelAdminRequest<{ items: Array<Record<string, unknown>> }>(
+          `/v1/admin/services?per_page=6&search=${encodeURIComponent(q)}`,
+        );
+        for (const s of r.items ?? []) out.push({
+          type: "service", typeLabel: "Serviço", id: String(s.id),
+          title: String(s.service_name || s.customer_name || s.id),
+          subtitle: join([s.customer_name as string, s.technician_name as string, s.city as string]),
+          href: "/servicos",
+        });
+        return;
+      }
       const { data } = await admin.from("services")
         .select("id, service_name, customer_name, technician_name, city")
         .or(`id.ilike.${like},service_name.ilike.${like},customer_name.ilike.${like},technician_name.ilike.${like},city.ilike.${like}`)
@@ -42,6 +63,18 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       });
     }),
     safe(async () => {
+      if (LARAVEL_ADMIN_ENABLED) {
+        const r = await laravelAdminRequest<{ items: Array<Record<string, unknown>> }>(
+          `/v1/admin/customers?per_page=6&search=${encodeURIComponent(q)}`,
+        );
+        for (const c of r.items ?? []) out.push({
+          type: "customer", typeLabel: "Cliente", id: String(c.id),
+          title: String(c.name || "(sem nome)"),
+          subtitle: join([c.phone_number as string, c.email as string]),
+          href: "/clientes",
+        });
+        return;
+      }
       const { data } = await admin.from("customers").select("id, name, email, phone")
         .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
       for (const c of data ?? []) out.push({
@@ -50,6 +83,18 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       });
     }),
     safe(async () => {
+      if (LARAVEL_ADMIN_ENABLED) {
+        const r = await laravelAdminRequest<{ items: Array<Record<string, unknown>> }>(
+          `/v1/admin/vendors?per_page=6&search=${encodeURIComponent(q)}`,
+        );
+        for (const t of r.items ?? []) out.push({
+          type: "technician", typeLabel: "Técnico", id: String(t.id),
+          title: String(t.name || "(sem nome)"),
+          subtitle: join([t.phone_number as string, t.nif as string]),
+          href: "/tecnicos",
+        });
+        return;
+      }
       const { data } = await admin.from("technicians").select("id, name, email, phone")
         .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
       for (const t of data ?? []) out.push({
@@ -69,8 +114,8 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       const { data } = await admin.from("leads").select("id, name, phone, city")
         .or(`name.ilike.${like},phone.ilike.${like},city.ilike.${like}`).limit(6);
       for (const l of data ?? []) out.push({
-        type: "lead", typeLabel: "Lead", id: String(l.id),
-        title: l.name || "(sem nome)", subtitle: join([l.phone, l.city]), href: "/marketing?tab=crm",
+        type: "lead", typeLabel: "Pedido", id: String(l.id),
+        title: l.name || "(sem nome)", subtitle: join([l.phone, l.city]), href: "/leads",
       });
     }),
     safe(async () => {

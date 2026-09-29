@@ -2,6 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { serviceSortColumn, embedName } from "@/lib/supabase/adapters";
 import { getDateRangeFromPreset } from "@/lib/filters";
 import { apiOk, withStaff } from "../../_lib/handler";
+import { servicesFromLaravel } from "../../_lib/laravelServices";
+import { servicosConcluidos } from "../../_lib/finance";
 import type { PeriodPreset } from "@/types";
 
 interface Row {
@@ -40,6 +42,45 @@ export const GET = withStaff(async (req) => {
   const sortField = q.get("sort") ?? undefined;
   const dir = q.get("dir") === "asc" ? "asc" : "desc";
   const sortCol = (sortField && SORT[sortField]) || serviceSortColumn(sortField);
+
+  /*
+    Faturação por serviço: os serviços reais estão no Laravel.
+
+    Paginado em memória e não no pedido ao Laravel, porque a ordenação que este
+    ecrã oferece (por valor, por comissão, por data) não existe no endpoint de
+    lá -- ordenar só a página trazida daria uma ordem diferente em cada página.
+  */
+  if (servicesFromLaravel()) {
+    const todos = await servicosConcluidos({ period, categoryId, city });
+    const ordenados = [...todos].sort((a, b) => {
+      const va = (a as unknown as Record<string, unknown>)[sortCol];
+      const vb = (b as unknown as Record<string, unknown>)[sortCol];
+      const na = typeof va === "number" ? va : Date.parse(String(va ?? "")) || String(va ?? "");
+      const nb = typeof vb === "number" ? vb : Date.parse(String(vb ?? "")) || String(vb ?? "");
+      const cmp = na < nb ? -1 : na > nb ? 1 : 0;
+      return dir === "asc" ? cmp : -cmp;
+    });
+    const pagina = ordenados.slice((page - 1) * pageSize, page * pageSize);
+    return apiOk({
+      data: pagina.map((s) => ({
+        id: s.id,
+        serviceName: s.service_name,
+        customerName: s.customer_name || "—",
+        technicianName: s.technician_name || "—",
+        totalCustomerValue: s.total_customer_value,
+        technicianValue: s.technician_value,
+        piquetRevenue: s.piquet_revenue,
+        vat: s.vat_value,
+        paymentStatus: s.payment_status,
+        invoiceStatus: s.invoice_status,
+        completedAt: s.completed_at,
+      })),
+      total: ordenados.length,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(ordenados.length / pageSize)),
+    });
+  }
 
   let query = supabaseAdmin().from("services").select(SELECT, { count: "exact" }).eq("status", "concluido");
   if (categoryId) query = query.eq("category_id", categoryId);

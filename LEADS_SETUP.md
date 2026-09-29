@@ -1,3 +1,17 @@
+> ## ⚠️ FECHADO a 24/09/2026
+>
+> O formulário saiu da landing (decisão do André) e com ele o endpoint
+> `POST /api/leads`, que era o único do backoffice sem autenticação. Sem
+> formulário não havia quem lhe chamasse, e uma porta aberta para a rua sem
+> nada do outro lado deixa qualquer pessoa injetar pedidos falsos no CRM.
+>
+> **Para reabrir:** `git revert` do commit que apagou `src/app/api/leads/`, e
+> repor no site o formulário mais o script de registo. O resto deste documento
+> continua a descrever como tudo funcionava.
+>
+> Os pedidos feitos na **app** não passam por aqui -- entram pela ponte com o
+> Laravel (`src/app/api/_lib/appPedidos.ts`), que escreve direto na base.
+
 # Ligar o formulário da landing ao backoffice
 
 O backoffice recebe leads em `POST https://piquet-dashboard.vercel.app/api/leads`

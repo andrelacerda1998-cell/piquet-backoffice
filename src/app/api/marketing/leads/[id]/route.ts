@@ -126,20 +126,25 @@ export const PUT = withStaff(async (req, { params }) => {
     patch.service_id = await createServiceFromLead(admin, merged);
   }
 
-  /**
-   * Reembolso: o serviço que este pedido gerou em Operações tem de deixar de
-   * contar como receita. Sem isto, o CRM dizia "Reembolsado" e o Financeiro
-   * continuava a somar o serviço como concluído — dois ecrãs a contar
-   * histórias diferentes sobre o mesmo dinheiro.
-   */
-  if (patch.stage === "reembolsado" && lead.stage !== "reembolsado" && lead.service_id) {
+  /*
+    Perdido depois de concluído: o serviço que este pedido gerou em Operações
+    tem de deixar de contar como receita. Sem isto, o pedido dizia "Perdido" e
+    o Financeiro continuava a somar o serviço como concluído -- dois ecrãs a
+    contar histórias diferentes sobre o mesmo dinheiro.
+
+    Antes havia um estado "Reembolsado" só para isto. O reembolso é um
+    acontecimento financeiro, não um estado do pedido, e vive no Financeiro,
+    onde estão os botões que devolvem o dinheiro; aqui basta saber que o pedido
+    deixou de dar receita.
+  */
+  if (patch.stage === "perdido" && lead.stage !== "perdido" && lead.service_id) {
     const { error: svcErr } = await admin
       .from("services")
       .update({ status: "reembolsado" })
       .eq("id", lead.service_id);
-    // Não bloqueia a mudança de estado do pedido: o reembolso é um facto, e
-    // falhar aqui não deve impedir o registo — mas fica no log do servidor.
-    if (svcErr) console.error("[leads] falha ao reembolsar o serviço", lead.service_id, svcErr.message);
+    // Não bloqueia a mudança de estado: falhar aqui não deve impedir o registo
+    // do que aconteceu — mas fica no log do servidor.
+    if (svcErr) console.error("[leads] falha ao anular o serviço", lead.service_id, svcErr.message);
   }
 
   /**

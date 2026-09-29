@@ -1,40 +1,66 @@
 /**
- * Estados do funil do CRM — FONTE ÚNICA.
+ * Estados de um pedido — FONTE ÚNICA.
  *
  * Existiam três listas separadas: uma na leitura (`GET /api/marketing/leads`),
  * outra na escrita (`PUT /api/marketing/leads/[id]`) e outra na interface.
- * Ao acrescentar "reembolsado" atualizaram-se só duas, e o resultado foi o
- * pior tipo de falha: a gravação corria bem, mas a leitura não reconhecia o
- * estado e devolvia-o como "nao_iniciado" — o utilizador escolhia
- * "Reembolsado", via "Novo" a seguir, e nada no ecrã explicava porquê.
+ * Ao acrescentar um estado atualizavam-se só duas, e o resultado foi o pior
+ * tipo de falha: a gravação corria bem, mas a leitura não reconhecia o estado
+ * e devolvia-o como "novo" — escolhia-se um estado, via-se outro a seguir, e
+ * nada no ecrã explicava porquê.
  *
  * Qualquer estado novo acrescenta-se AQUI e passa a valer nos três sítios.
+ *
+ * ---
+ *
+ * A lista de cinco é de 08/09/2026 e descreve o que acontece mesmo:
+ * chega um pedido → pergunta-se a técnicos → há técnico → está feito.
+ *
+ * A anterior tinha "Aguarda resposta" e "Orçamento aceite", desenhados para um
+ * negócio onde se liga ao cliente, se dá um preço e se fecha. Aqui há um passo
+ * de despacho pelo meio, e como nenhum estado o descrevia, atribuir um técnico
+ * escrevia "Orçamento aceite" — que não era verdade e ninguém percebia.
+ *
+ * Estes avançam sozinhos: difundir põe em "À procura de técnico", atribuir põe
+ * em "Com técnico". Um funil mantido à mão só está certo enquanto alguém se
+ * lembrar de o manter.
  */
 export const LEAD_STAGE_IDS = [
-  "nao_iniciado",
-  "aguarda_resposta",
-  "orcamento_aceite",
+  "novo",
+  "a_procurar",
+  "com_tecnico",
   "concluido",
-  "recusado",
-  "reembolsado",
+  "perdido",
 ] as const;
 
 export type LeadStageId = (typeof LEAD_STAGE_IDS)[number];
 
-/** Estados antigos de marketing, de linhas anteriores ao CRM atual. */
+/**
+ * Estados antigos → estados de agora.
+ *
+ * Fica para sempre: as linhas na base de dados foram convertidas, mas um
+ * pedido gravado por uma versão anterior da app, ou reposto de uma cópia de
+ * segurança, ainda chega com o nome antigo. Sem isto cairia em "novo" e
+ * apagava o trabalho já feito.
+ */
 export const LEAD_STAGE_LEGACY: Record<string, LeadStageId> = {
-  novo: "nao_iniciado",
-  contactado: "aguarda_resposta",
-  qualificado: "orcamento_aceite",
+  // Primeira geração (marketing). "novo" e "perdido" já coincidem com os
+  // nomes de agora e por isso não precisam de tradução.
+  contactado: "a_procurar",
+  qualificado: "com_tecnico",
   convertido: "concluido",
-  perdido: "recusado",
-  /**
-   * "Orçamento enviado" saiu do funil (22/08) — na prática era o mesmo que
-   * estar à espera da resposta do cliente. Os pedidos que lá estavam passam a
-   * aparecer em "Aguardar resposta" em vez de caírem no fallback "Novo", que
-   * apagaria o trabalho já feito.
-   */
-  orcamento_enviado: "aguarda_resposta",
+  // Segunda geração (CRM).
+  nao_iniciado: "novo",
+  orcamento_enviado: "a_procurar",
+  aguarda_resposta: "a_procurar",
+  orcamento_aceite: "com_tecnico",
+  recusado: "perdido",
+  /*
+    O reembolso deixou de ser um estado do pedido: é um acontecimento
+    financeiro, tratado no Financeiro, onde estão os botões que devolvem o
+    dinheiro. Aqui só interessa que o pedido não deu receita — que é o que
+    "perdido" já diz.
+  */
+  reembolsado: "perdido",
 };
 
 export function isLeadStage(v: unknown): v is LeadStageId {
@@ -42,13 +68,13 @@ export function isLeadStage(v: unknown): v is LeadStageId {
 }
 
 /**
- * Normaliza o que está na base de dados para um estado do funil.
- * Só cai em "nao_iniciado" quando o valor é mesmo desconhecido.
+ * Normaliza o que está na base de dados para um estado.
+ * Só cai em "novo" quando o valor é mesmo desconhecido.
  */
 export function normalizeLeadStage(raw: string | null | undefined): LeadStageId {
   if (isLeadStage(raw)) return raw;
-  return LEAD_STAGE_LEGACY[String(raw ?? "")] ?? "nao_iniciado";
+  return LEAD_STAGE_LEGACY[String(raw ?? "")] ?? "novo";
 }
 
 /** Estados em que o pedido já não pode gerar receita. */
-export const LEAD_STAGES_SEM_RECEITA: LeadStageId[] = ["recusado", "reembolsado"];
+export const LEAD_STAGES_SEM_RECEITA: LeadStageId[] = ["perdido"];

@@ -8,10 +8,28 @@ export interface AdminVendor {
   nif: string | null;
   phone_number: string | null;
   price_rate: number | null;
+  /*
+    Categorias (CANALIZAÇÃO, LIMPEZAS, ...). Apesar do nome, não são zonas
+    geográficas -- e estão preenchidas em pouquíssimos técnicos.
+  */
   operation_areas: string[];
+  /*
+    Os serviços do catálogo que o técnico escolheu fazer ("Montar Cama de
+    Solteiro", "Instalação de Torneira", ...). É por aqui que o matching
+    decide se ele serve para um pedido, e é a resposta certa a "o que é que
+    este técnico faz". Exposto pelo PR #70 do backend (18/09/2026).
+  */
+  services_types?: string[];
   can_accept_service: boolean;
   at_valid: boolean;
   at_validated_at: string | null;
+  at_user?: string | null;
+  company_name?: string | null;
+  iban?: string | null;
+  /** Workspace de faturação (InvoiceXpress). `null` = ainda não criado. */
+  invoice_workspace?: string | null;
+  /** Porque é que ainda não se pode criar o workspace (`null` = pode). */
+  invoice_workspace_blocker?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;

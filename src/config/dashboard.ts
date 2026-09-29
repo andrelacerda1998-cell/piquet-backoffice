@@ -84,38 +84,44 @@ export const NAV_ITEMS = [
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/servicos", label: "Operações", icon: "Wrench" },
+  { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
-  { href: "/leads", label: "CRM & Leads", icon: "UserPlus" },
+  { href: "/leads", label: "Pedidos", icon: "Inbox" },
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
-  { href: "/tarefas", label: "Tarefas", icon: "ListChecks" },
+  { href: "/tarefas", label: "As minhas tarefas", icon: "ListChecks" },
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   // Separadores dentro dos grupos acima (consolidação 2026-07-20). Fora do
   // menu, mas acessíveis por ⌘K e por URL (deep-link ?tab=).
   { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
-  { href: "/servicos?tab=qualidade", label: "Qualidade", icon: "ShieldCheck" },
-  { href: "/tecnicos?tab=recrutamento", label: "Recrutamento", icon: "UserPlus" },
+  { href: "/recrutamento", label: "Onboarding de técnicos", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
-  { href: "/chat?tab=tarefas", label: "Tarefas e equipa", icon: "ListChecks" },
-  // Operacional próprio, ainda fora do menu.
-  { href: "/despacho", label: "Despacho ao vivo", icon: "Radio" },
+  { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
 ] as const;
 
 // Consolidação 2026-07-20: o menu passa a 9 grupos; cada um agrega os ecrãs
 // relacionados em separadores (ex.: Técnicos inclui Recrutamento; Financeiro
 // inclui Impostos e RH; Equipa inclui Tarefas e Desenvolvimento). Nada é
 // apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
+// Menu enxuto: Clientes é o hub de pessoas (absorve o CRM & Leads como
+// destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
+// tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
 export const NAV_PRIMARY: string[] = [
-  "/", "/alertas", "/servicos", "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento",
-  "/tarefas", "/configuracao",
+  "/", "/alertas",
+  "/servicos",
+  // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
+  // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
+  // coisas era o mesmo conteúdo em dois sítios.
+  "/qualidade",
+  "/clientes", "/tecnicos", "/financeiro", "/produto",
+  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -123,11 +129,11 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
 // Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
 export const NAV_DEEPLINKS: string[] = [
+  "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
-  "/servicos?tab=personalizados", "/servicos?tab=qualidade",
-  "/tecnicos?tab=recrutamento",
+  "/servicos?tab=personalizados",
+  "/recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
-  "/despacho",
 ];
 
 export const MARKETING_CHANNELS = [

@@ -10,6 +10,39 @@ const norm = (s: string) =>
  * Devolve "" quando nada corresponde (a categoria fica por preencher, para a
  * equipa escolher à mão — melhor do que guardar lixo).
  */
+/*
+  Como o cliente chama, e como o catálogo chama.
+
+  O formulário da landing oferece "Montagem de Móveis"; o catálogo diz
+  "Montagem de mobiliário". São a mesma coisa, mas nenhuma contém a outra, e
+  por isso a categoria ficava vazia -- e sem categoria o painel de técnicos não
+  consegue filtrar por ofício e mostra a rede toda.
+
+  As palavras do cliente não se mudam para caberem no catálogo: mudar o texto
+  do formulário para "mobiliário" era resolver do lado errado. Traduz-se aqui.
+
+  "Decoração", "Eletrodomésticos" e "Home appliances" também chegam do
+  formulário e não têm categoria nenhuma no catálogo -- ficam de fora de
+  propósito, porque criar categorias é decisão de negócio (mexe em comissões e
+  na qualificação dos técnicos no Laravel), não de uma tabela de sinónimos.
+*/
+const SINONIMOS: Record<string, string> = {
+  "montagem de moveis": "cat_mobiliario",
+  "montagem moveis": "cat_mobiliario",
+  moveis: "cat_mobiliario",
+  mobiliario: "cat_mobiliario",
+  "limpeza domestica": "cat_limpeza",
+  "fechaduras e portas": "cat_fechaduras",
+  "portas e fechaduras": "cat_fechaduras",
+  emergencia: "cat_emergencia",
+  urgencia: "cat_emergencia",
+  agua: "cat_canalizacao",
+  canalizador: "cat_canalizacao",
+  eletricista: "cat_eletricidade",
+  "ar condicionado": "cat_avac",
+  climatizacao: "cat_avac",
+};
+
 export function resolveCategoryId(input: unknown): string {
   const raw = typeof input === "string" ? input : "";
   const n = norm(raw);
@@ -19,7 +52,13 @@ export function resolveCategoryId(input: unknown): string {
   for (const c of DEFAULT_SETTINGS.categories) {
     if (norm(c.id) === n || norm(c.slug) === n || norm(c.name) === n) return c.id;
   }
-  // 2) Fallback tolerante: o texto contém o nome ou o slug da categoria
+  // 2) Como o cliente chama à mesma coisa. Antes das correspondências
+  //    tolerantes: é uma equivalência conhecida, não um palpite.
+  if (SINONIMOS[n]) return SINONIMOS[n];
+  for (const [termo, id] of Object.entries(SINONIMOS)) {
+    if (termo.includes(" ") && n.includes(termo)) return id;
+  }
+  // 3) Fallback tolerante: o texto contém o nome ou o slug da categoria
   //    (ex.: "Canalização e água" → Canalização). Nome antes do slug por ser
   //    mais distinto, e slug só a partir de 4 letras para evitar falsos AVAC.
   for (const c of DEFAULT_SETTINGS.categories) {

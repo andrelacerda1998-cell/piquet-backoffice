@@ -16,6 +16,8 @@ import { cn, downloadCsv } from "@/lib/utils";
 import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
+import { CronologiaPedido } from "@/components/ui/CronologiaPedido";
+import { mensagemBoasVindas } from "@/lib/leadReply";
 
 /**
  * A landing escreve "Serviço: X · Urgência: Y\n<descrição>". Separa as partes
@@ -33,6 +35,20 @@ function parseLeadMessage(message: string): { service: string; urgency: string; 
 
 /** Link click-to-chat do WhatsApp a partir de um número (só dígitos). */
 const waHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
+
+/**
+ * Mensagem genérica de resposta a uma lead — mesmo texto que o webhook envia
+ * automaticamente (ver src/lib/leadReply.ts). Aqui usam-se os campos já
+ * estruturados da lead (categoria, cidade); no webhook extraem-se do texto.
+ */
+function mensagemGenerica(lead: Lead): string {
+  const { service } = parseLeadMessage(lead.message || "");
+  return mensagemBoasVindas({
+    nome: lead.name,
+    servico: categoryName(lead.categoryId) || service || "",
+    localizacao: lead.city && lead.city !== "—" ? lead.city : "",
+  });
+}
 
 
 /**
@@ -81,12 +97,12 @@ function LeadsPageInner() {
   };
   /**
    * Por omissão a lista mostra só o que está NA MÃO DA EQUIPA: pedidos novos e
-   * orçamentos enviados à espera de resposta. Aceites, executados, recusados e
-   * reembolsados são consulta, não trabalho — aparecem pelo filtro de estado
+   * pedidos à procura de técnico. Com técnico, concluídos e perdidos são
+   * consulta, não trabalho — aparecem pelo filtro de estado
    * ou pelos cartões. O que fica oculto é dito por baixo da lista, para não
    * parecer que desapareceu.
    */
-  const ESTADOS_ATIVOS: LeadStage[] = ["nao_iniciado", "aguarda_resposta"];
+  const ESTADOS_ATIVOS: LeadStage[] = ["novo", "a_procurar"];
   const byStage = leadStage === ""
     ? baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage))
     : leadStage === "todos"
@@ -117,13 +133,14 @@ function LeadsPageInner() {
   const crm = (() => {
     const total = baseFiltered.length;
     const executadas = baseFiltered.filter((l) => l.stage === "concluido");
-    const porResponder = baseFiltered.filter((l) => l.stage === "nao_iniciado").length;
-    // Reembolsados: o serviço chegou a fechar e o dinheiro foi devolvido. Não
-    // entram no pipeline (já não podem fechar), não contam como executados, e
-    // o que se devolveu aparece à parte para não desaparecer da conta.
-    const reembolsadas = baseFiltered.filter((l) => l.stage === "reembolsado");
-    const valorReembolsado = reembolsadas.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
-    // Pipeline = só o que ainda pode fechar (recusados e reembolsados não).
+    const porResponder = baseFiltered.filter((l) => l.stage === "novo").length;
+    /*
+      O reembolso deixou de ser um estado do pedido: é um acontecimento
+      financeiro e vive no Financeiro, onde estão os botões que devolvem o
+      dinheiro. Aqui um pedido reembolsado é simplesmente "perdido" -- não deu
+      receita -- e o valor devolvido conta-se lá, sobre os pagamentos reais.
+    */
+    // Pipeline = só o que ainda pode fechar (os perdidos não).
     const emAberto = baseFiltered.filter((l) => !LEAD_STAGES_SEM_RECEITA.includes(l.stage));
     const pipeline = emAberto.reduce((acc, l) => acc + (l.quoteValue ?? 0), 0);
     const comissao = emAberto.reduce(
@@ -132,8 +149,6 @@ function LeadsPageInner() {
     return {
       total, porResponder, pipeline, comissao, ganho,
       executadas: executadas.length,
-      reembolsadas: reembolsadas.length,
-      valorReembolsado,
       conversao: total ? (executadas.length / total) * 100 : 0,
     };
   })();
@@ -178,13 +193,21 @@ function LeadsPageInner() {
   // Editar pedido (dados + orçamento + valor do técnico + data + classificação + estado).
   // Modelo: escreve-se o orçamento e o valor do técnico; a margem é sempre orçamento − técnico.
 
-  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "nao_iniciado" as LeadStage };
+  const EMPTY_EDIT = { name: "", phone: "", city: "", message: "", notes: "", technicianName: "", categoryId: "", quoteValue: "", technicianValue: "", executionDate: "", rating: "", stage: "novo" as LeadStage };
   const [editing, setEditing] = useState<Lead | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   // Ver o pedido SEM entrar em modo de edição: a mensagem que o cliente
   // escreveu estava só dentro do "Editar", uma caixa entre doze campos, e
   // ninguém a encontrava. Abrir a linha mostra-a inteira, de imediato.
   const [viewing, setViewing] = useState<Lead | null>(null);
+  /*
+    Entradas de WhatsApp da lead aberta: null enquanto não se sabe.
+    Serve para decidir se a mensagem recebida precisa de ser mostrada à
+    esquerda ou se já está visível na conversa à direita. Enquanto for null
+    não se mostra nada — mais vale esperar um instante do que piscar um
+    bloco que desaparece.
+  */
+  const [entradasWa, setEntradasWa] = useState<number | null>(null);
   /**
    * `?lead=<id>` — vindo de um alerta ("Lead sem resposta há 3 dias"). Abrir a
    * página no CRM não chegava: com dezenas de pedidos, encontrar aquele à mão
@@ -251,7 +274,7 @@ function LeadsPageInner() {
   /**
    * Perder um pedido sem dizer porquê é como não o registar: 88% das leads
    * acabam assim e não havia como saber se o problema é o preço, a demora ou
-   * a falta de técnico. Ao marcar recusado/reembolsado pergunta-se o motivo
+   * a falta de técnico. Ao marcar perdido pergunta-se o motivo
    * antes de gravar.
    */
   const [motivoPara, setMotivoPara] = useState<{ lead: Lead; stage: LeadStage } | null>(null);
@@ -334,7 +357,24 @@ function LeadsPageInner() {
   const leadColumns: Column<Lead>[] = [
     { key: "name", label: "Contacto", sortable: true, render: (r) => (
       <div className="min-w-0">
-        <p className="font-medium text-text-primary truncate">{r.name}</p>
+        <p className="font-medium text-text-primary truncate">
+          {r.name}
+          {/*
+            Este contacto é da rede, não um cliente. As mensagens de técnicos
+            já não criam leads; as que entraram antes dessa separação ficaram
+            cá e continuam a contar para a conversão e para os alertas. Ficam
+            marcadas em vez de apagadas — apagar dados reais não é decisão de
+            um filtro.
+          */}
+          {r.technicianContact && (
+            <span
+              title={`É um técnico (${r.technicianContact}), não um cliente. A conversa dele está no perfil, em Técnicos.`}
+              className="ml-2 inline-flex items-center rounded-full bg-surface-subtle px-1.5 py-0.5 text-[11px] font-semibold text-text-secondary align-middle"
+            >
+              técnico
+            </span>
+          )}
+        </p>
         {r.phone && (
           <div className="mt-0.5 flex items-center gap-1.5">
             <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-piquet-700 hover:underline">{r.phone}</a>
@@ -375,6 +415,9 @@ function LeadsPageInner() {
         </div>
       );
     } },
+    { key: "city", label: "Cidade", render: (r) => (
+      <span className="text-sm text-text-secondary whitespace-nowrap">{r.city && r.city !== "—" ? r.city : <span className="text-text-muted">—</span>}</span>
+    ) },
     { key: "quoteValue", label: "Orçamento", render: (r) => r.quoteValue != null ? (
       <span className="whitespace-nowrap">{formatCurrency(r.quoteValue)}
         {r.technicianValue != null && <span className="block text-xs text-text-muted">margem {formatCurrency(r.quoteValue - r.technicianValue)}</span>}
@@ -404,12 +447,14 @@ function LeadsPageInner() {
       <div className="space-y-6">
         <PageHeader
           icon={Headphones}
-          eyebrow="Crescimento"
-          title="CRM & Leads"
-          subtitle="Pedidos recebidos da landing e do WhatsApp — do primeiro contacto ao serviço executado."
+          eyebrow="Operação"
+          title="Pedidos"
+          subtitle="Tudo o que entrou, e em que ponto está: à procura de técnico, com técnico, ou fechado."
         />
 
           <div className="space-y-4">
+            {/* Ações da página. A vista "Base de dados" foi removida: esses
+                registos vivem agora em Clientes → Todos os registos. */}
             <div className="flex items-center justify-end gap-3">
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={exportLeads} className="btn-secondary text-sm">Exportar CSV</button>
@@ -417,36 +462,42 @@ function LeadsPageInner() {
               </div>
             </div>
 
-            {/* Números do período filtrado — valor do pipeline e o que falta responder. */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Valor em pipeline</p>
-                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">soma dos orçamentos</p>
+            {/* ── Vista CRM ────────────────────────────────────────────── */}
+            <>
+            {/*
+              Números do período, numa faixa só. Eram quatro cartões altos que
+              empurravam a lista para fora do ecrã — e três deles mostram 0
+              enquanto não houver orçamentos. O que exige ação ("por responder")
+              fica destacado; o resto é contexto e lê-se de relance.
+            */}
+            <div className="card px-4 py-3 flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div className={cn("flex items-baseline gap-2", crm.porResponder > 0 && "order-first")}>
+                <span className={cn("text-xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>
+                  {crm.porResponder}
+                </span>
+                <span className="text-xs text-text-secondary">por responder</span>
               </div>
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Comissão prevista</p>
-                <p className="mt-1 text-2xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">orçamento − técnico</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</span>
+                <span className="text-xs text-text-secondary">em pipeline</span>
               </div>
-              <div className="card p-4">
-                <p className="text-xs text-text-secondary">Taxa de conversão</p>
-                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">{crm.executadas} de {crm.total} executadas</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</span>
+                <span className="text-xs text-text-secondary">comissão prevista</span>
               </div>
-              <div className={cn("card p-4", crm.porResponder > 0 && "border-l-[3px] border-l-warning")}>
-                <p className="text-xs text-text-secondary">Por responder</p>
-                <p className={cn("mt-1 text-2xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>{crm.porResponder}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">no estado &quot;Novo&quot;</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</span>
+                <span className="text-xs text-text-secondary">conversão · {crm.executadas}/{crm.total}</span>
               </div>
             </div>
 
             {/*
-              Onde se perde o negócio. É a razão de existir do campo de motivo:
-              os cartões acima dizem QUANTO se perde, isto diz PORQUÊ. Só
-              aparece quando há perdas no período filtrado.
+              Onde se perde o negócio. Só aparece quando há pelo menos um motivo
+              REAL registado: enquanto tudo o que existe são pedidos antigos "sem
+              motivo", o painel ocupava meio ecrã para dizer "100% sem motivo" —
+              informação nenhuma. Volta sozinho assim que se registarem motivos.
             */}
-            {motivosPerda.length > 0 && (
+            {motivosPerda.some((m) => m.id !== "sem_motivo") && (
               <div className="card p-4">
                 <div className="flex items-baseline justify-between gap-3 mb-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
@@ -460,9 +511,9 @@ function LeadsPageInner() {
                   {motivosPerda.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setLeadStage(leadStage === "recusado" ? "" : "recusado")}
+                      onClick={() => setLeadStage(leadStage === "perdido" ? "" : "perdido")}
                       className="w-full flex items-center gap-3 group"
-                      title="Ver os pedidos recusados"
+                      title="Ver os pedidos perdidos"
                     >
                       <span className={cn("text-xs w-44 shrink-0 text-left truncate",
                         m.id === "sem_motivo" ? "text-text-muted italic" : "text-text-secondary")}>
@@ -501,11 +552,8 @@ function LeadsPageInner() {
                   <option value="">Todos os meses</option>
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
-                <select value={leadStage} onChange={(e) => setLeadStage(e.target.value as "" | "todos" | LeadStage)} className="input-field w-auto" aria-label="Filtrar por estado">
-                  <option value="">A trabalhar (novos e à espera de resposta)</option>
-                  <option value="todos">Todos os estados</option>
-                  {LEAD_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
+                {/* O estado filtra-se pelos chips por baixo — um dropdown a
+                    fazer o mesmo era escolha a dobrar. */}
                 <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
                   <option value="">Todas as categorias</option>
                   {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -541,23 +589,35 @@ function LeadsPageInner() {
               </div>
             </div>
 
-            {/* Cartões de estado — clicáveis para filtrar por esse estado. */}
-            <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-              {LEAD_STAGES.map((s) => {
-                const active = leadStage === s.id;
+            {/*
+              Estados como chips. Eram seis cartões altos (duas filas, quase
+              todos a zero) que empurravam a lista para baixo e repetiam o
+              dropdown de estado. Em chip, o mesmo filtro e as mesmas contagens
+              cabem numa linha — e são o único sítio onde se escolhe o estado.
+            */}
+            <div className="chip-row">
+              {([
+                { id: "" as const, label: "A trabalhar", total: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
+                ...LEAD_STAGES.map((s) => ({ id: s.id, label: s.label, total: baseFiltered.filter((l) => l.stage === s.id).length })),
+                { id: "todos" as const, label: "Todos", total: baseFiltered.length },
+              ]).map((c) => {
+                const active = leadStage === c.id;
                 return (
-                  <button key={s.id} onClick={() => setLeadStage(active ? "" : s.id)}
-                    className={cn("card p-3 text-left transition-shadow hover:shadow-elevated",
-                      active && "ring-2 ring-piquet border-piquet")}>
-                    <p className="text-xs text-text-secondary">{s.label}</p>
-                    <p className="text-xl font-bold text-text-primary tabular-nums">{baseFiltered.filter((l) => l.stage === s.id).length}</p>
+                  <button key={c.id || "ativos"} onClick={() => setLeadStage(c.id)}
+                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
+                      active
+                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
+                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
+                    {c.label}
+                    <span className={cn("tabular-nums text-xs", active ? "opacity-80" : "text-text-muted")}>{c.total}</span>
                   </button>
                 );
               })}
             </div>
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
-              onRowClick={setViewing}
+              onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
               emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
+            </>
           </div>
       </div>
 
@@ -577,7 +637,12 @@ function LeadsPageInner() {
         subtitle={viewing
           ? `Recebido a ${formatDate(viewing.createdAt)} · via ${viewing.source === "whatsapp" ? "WhatsApp" : viewing.source === "landing" || viewing.source === "website" ? "landing page" : viewing.source}`
           : undefined}
-        size="lg"
+        /*
+          "xl" e não "full": um pedido do WhatsApp cujo texto é "Ok" não tem
+          conteúdo para 92% do ecrã, e o que sobrava era meio ecrã de vazio ao
+          lado de um telefone. A altura passa a acompanhar o que há para ler.
+        */
+        size="xl"
         footer={
           <>
             <button onClick={() => setViewing(null)} className="btn-secondary text-sm">Fechar</button>
@@ -593,38 +658,76 @@ function LeadsPageInner() {
         }
       >
         {viewing && (() => {
-          const { service, urgency, urgent } = parseLeadMessage(viewing.message || "");
+          const parsed = parseLeadMessage(viewing.message || "");
+          const { service, urgency, urgent } = parsed;
           const catName = categoryName(viewing.categoryId);
+          /**
+           * Descrição livre do cliente — o que ele realmente escreveu, e o único
+           * campo que os factos abaixo não cobrem.
+           *
+           * Há DOIS formatos de mensagem e ambos têm de funcionar:
+           *  - WhatsApp:  "*Descrição:* texto"  (rótulo explícito)
+           *  - Landing:   "Servico: X · Urgencia: Y\ntexto"  (sem rótulo — é o
+           *               que vem depois da 1ª linha, que o parseLeadMessage já dá)
+           * Só se procurava o rótulo, por isso as leads da landing apareciam sem
+           * descrição nenhuma e o pedido do cliente ficava invisível.
+           */
+          const descricao =
+            (viewing.message || "").match(/\*?\s*descri[çc][ãa]o\s*:\*?\s*([\s\S]+?)(?:\n\s*_|\n\s*\*|$)/i)?.[1]?.trim()
+            || parsed.description;
+          /*
+            Quando não há descrição livre, mostra-se a mensagem em bruto.
+            Sem isto, uma lead da landing cujo texto é só
+            "Servico: X · Urgencia: Y" não mostrava a mensagem em lado nenhum:
+            o bloco desaparecia e a conversa ao lado está vazia (não houve
+            WhatsApp). Ficava-se com uma lead sem se ver o que a pessoa pediu.
+          */
+          const mensagemCrua = (viewing.message || "").trim();
+          /*
+            Só quando a conversa não a mostra. Uma lead do WhatsApp traz em
+            `message` a própria mensagem que está no histórico ao lado, e
+            repeti-la era dizer duas vezes a mesma coisa no mesmo ecrã.
+          */
+          const mostrarCrua = !descricao && mensagemCrua.length > 0 && entradasWa === 0;
           // O telefone só com dígitos (e indicativo PT quando vier local) para o
           // link do WhatsApp; o texto mostra o número tal como foi recebido.
           const digitos = (viewing.phone || "").replace(/\D/g, "");
           const waNumero = digitos.length === 9 ? `351${digitos}` : digitos;
           return (
-            <div className="space-y-4">
-              {/* A mensagem, em primeiro plano: é o motivo de abrir isto. */}
-              <div className="rounded-xl border border-surface-border bg-surface-subtle p-4">
-                <div className="flex items-center gap-1.5 mb-2 text-text-muted">
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">Mensagem recebida</span>
-                  {urgent && (
-                    <span className="ml-auto inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-[11px] font-semibold text-danger">
-                      Urgente
+            <div className="lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-6 space-y-4 lg:space-y-0">
+              {/* Coluna esquerda: os detalhes do pedido. */}
+              <div className="space-y-4">
+              {/* Os factos do pedido, um golpe de vista. A mensagem completa
+                  está na conversa ao lado — aqui só o essencial, sem repetir. */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {/*
+                  O estado existe sempre e é o que diz o que falta fazer.
+                  Faltava aqui: um pedido do WhatsApp sem serviço nem cidade
+                  mostrava um telefone e mais nada, e nem o estado se via.
+                */}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Estado</p>
+                  <p className="mt-0.5">
+                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                      getStatusColor(viewing.stage))}>
+                      {LEAD_STAGE_LABEL[viewing.stage] ?? viewing.stage}
                     </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                  {catName || service ? (
+                    <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
+                  ) : (
+                    /*
+                      Dizer que falta, em vez de esconder a linha. Sem serviço
+                      não há como filtrar os técnicos por categoria -- quem
+                      abre isto precisa de saber que o passo seguinte é
+                      perguntar ao cliente ou preencher no Editar.
+                    */
+                    <p className="text-sm text-text-muted mt-0.5 italic">Por identificar</p>
                   )}
                 </div>
-                {(viewing.message || "").trim()
-                  ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-text-primary">{viewing.message}</p>
-                  : <p className="text-sm text-text-muted">Sem mensagem registada.</p>}
-              </div>
-
-              {/* Os factos do pedido, um golpe de vista. */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {(catName || service) && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
-                    <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
-                  </div>
-                )}
                 {urgency && (
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Urgência</p>
@@ -659,19 +762,58 @@ function LeadsPageInner() {
                 )}
               </div>
 
-              {/* A descrição livre já vai dentro da mensagem inteira acima; só se
-                  mostra aqui em separado se houver, para quem quiser o essencial
-                  sem o cabeçalho "Serviço/Urgência". */}
+              {/*
+                O que o cliente escreveu — e, quando não escreveu nada, dizê-lo.
+
+                O campo de descrição é opcional no formulário e muita gente
+                deixa-o em branco. Enquanto o bloco desaparecia nesses casos,
+                quem abria o pedido não conseguia distinguir "o cliente não
+                escreveu" de "isto está avariado" -- e a diferença importa: no
+                primeiro caso o passo seguinte é ligar-lhe a perguntar o que
+                precisa.
+              */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
+                  {descricao || !mostrarCrua ? "Descrição" : "Mensagem recebida"}
+                </p>
+                {descricao ? (
+                  <p className="whitespace-pre-wrap text-sm text-text-primary">{descricao}</p>
+                ) : mostrarCrua ? (
+                  <p className="whitespace-pre-wrap text-sm text-text-secondary">{mensagemCrua}</p>
+                ) : (
+                  <p className="text-sm text-text-muted italic">
+                    O cliente não escreveu nada — o campo é opcional no formulário.
+                  </p>
+                )}
+              </div>
+
+
+              {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (
                 <div className="rounded-xl border border-surface-border p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}
+              </div>
 
-              {/* A conversa de WhatsApp, com o campo de resposta. Só aparece
-                  quando há um telefone para onde escrever. */}
-              <WhatsappConversa leadId={viewing.id} temTelefone={Boolean(viewing.phone)} />
+              {/* A cronologia acrescenta, não substitui: o estado, as notas e a
+                  conversa continuam onde estavam. Fecha a pergunta que não
+                  tinha resposta -- "o que é que já aconteceu a este pedido?" */}
+              <div className="pt-1">
+                <CronologiaPedido leadId={viewing.id} />
+              </div>
+
+              {/* Coluna direita: a conversa de WhatsApp com o campo de resposta
+                  (um só sítio para responder). O modelo genérico entra pelo
+                  botão "Inserir modelo". Só aparece quando há telefone. */}
+              <WhatsappConversa
+                leadId={viewing.id}
+                temTelefone={Boolean(viewing.phone)}
+                modelo={mensagemGenerica(viewing)}
+                waNumero={waNumero}
+                onEntradas={setEntradasWa}
+              />
             </div>
           );
         })()}
@@ -681,7 +823,7 @@ function LeadsPageInner() {
         open={showLead}
         onClose={() => setShowLead(false)}
         title="Registar pedido"
-        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra no CRM como “Não iniciado”."
+        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra como “Novo”."
         footer={
           <>
             <button onClick={() => setShowLead(false)} className="btn-secondary text-sm">Cancelar</button>
@@ -714,10 +856,8 @@ function LeadsPageInner() {
         title="Editar pedido"
         subtitle={
           editForm.stage === "concluido"
-            ? "Ao guardar como “Executado”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
-            : editForm.stage === "reembolsado"
-              ? "Ao guardar como “Reembolsado”, o serviço correspondente em Operações deixa de contar como receita."
-              : "Atualiza os dados e o estado do pedido."
+            ? "Ao guardar como “Concluído”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
+            : "Atualiza os dados e o estado do pedido."
         }
         size="lg"
         footer={

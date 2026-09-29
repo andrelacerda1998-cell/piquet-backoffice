@@ -1,8 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { sincronizarSeVelho } from "../../_lib/appPedidos";
 import { isMissingColumn } from "@/lib/missingColumn";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { apiOk, apiErr, withStaff } from "../../_lib/handler";
 import { resolveCategoryId, categoryFromMessage } from "@/lib/categories";
+import { fone9 } from "@/lib/telefone";
 
 /**
  * GET /api/marketing/leads — leads reais recebidas do formulário da landing
@@ -15,6 +17,7 @@ interface Row {
   message: string; source: string; stage: string; created_at: string;
   quote_value: number | null; technician_value: number | null; technician_name: string | null;
   category_id: string | null; execution_date: string | null; rating: number | null; service_id: string | null;
+  laravel_service_id: string | null;
   /** Opcionais: podem não vir se as migrações ainda não correram. */
   notes?: string | null;
   loss_reason?: string | null;
@@ -23,7 +26,9 @@ interface Row {
 
 // `notes` é opcional no SELECT: se a migração ainda não foi aplicada, a
 // leitura recorre à lista sem essa coluna em vez de devolver 500.
-const COLUNAS_BASE = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id";
+// `laravel_service_id` liga o pedido ao serviço na app -- é o que permite
+// mostrar a cronologia real (quando se procurou técnico, quem recusou).
+const COLUNAS_BASE = "id, name, email, phone, city, message, source, stage, created_at, quote_value, technician_value, technician_name, category_id, execution_date, rating, service_id, laravel_service_id";
 const SELECT = `${COLUNAS_BASE}, notes, loss_reason, loss_note`;
 
 // Estados do funil: fonte única em src/lib/leadStages.ts (leitura, escrita e
@@ -31,7 +36,7 @@ const SELECT = `${COLUNAS_BASE}, notes, loss_reason, loss_note`;
 // "reembolsado" voltar a aparecer como "Novo").
 
 /** Linha da BD → forma `Lead` que a página de Marketing consome. */
-function toLead(r: Row) {
+function toLead(r: Row, tecnicos?: Map<string, string>) {
   return {
     id: r.id,
     // Nome pode vir vazio do formulário — cai para o contacto que existir.
@@ -52,14 +57,39 @@ function toLead(r: Row) {
     executionDate: r.execution_date || "",
     rating: r.rating != null ? Number(r.rating) : null,
     serviceId: r.service_id || null,
+    /* Serviço correspondente na app, quando o pedido veio de lá. É a chave da cronologia. */
+    laravelServiceId: r.laravel_service_id || null,
     value: 0, // Sem valor estimado real — 0 em vez de inventado.
     createdAt: r.created_at,
+    /*
+      Esta lead é, afinal, um técnico?
+
+      Antes de os técnicos passarem a ter conversa própria, qualquer mensagem
+      da rede entrava aqui como pedido de serviço. Essas leads ficaram no CRM
+      e continuam a contar para tudo -- conversão, funil, alertas.
+
+      Fica marcada em vez de apagada ou escondida: apagar dados reais não é
+      decisão de um filtro, e esconder faria desaparecer, sem aviso, o pedido
+      de um técnico que também é cliente.
+    */
+    technicianContact: tecnicos?.get(fone9(r.phone || "")) || "",
   };
 }
 
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v : "").trim().slice(0, max);
 
 export const GET = withStaff(async () => {
+  /*
+    Antes de listar, traz os pedidos feitos na app.
+
+    A conta da Vercel é Hobby e os crons só correm uma vez por dia; um pedido
+    feito às 9h não pode esperar pela manhã seguinte para aparecer. Quando
+    alguém abre esta lista está a olhar para o backoffice, e é aí que a
+    frescura importa. Vem com intervalo próprio, por isso não é uma chamada ao
+    Laravel por cada carregamento, e uma falha nunca trava a listagem.
+  */
+  try { await sincronizarSeVelho(); } catch { /* a lista é mais importante */ }
+
   const ler = (colunas: string) =>
     supabaseAdmin()
       .from("leads")
@@ -74,7 +104,23 @@ export const GET = withStaff(async () => {
     ({ data, error } = await ler(COLUNAS_BASE));
   }
   if (error) throw new Error(error.message);
-  return apiOk(((data ?? []) as unknown as Row[]).map(toLead));
+
+  const linhas = (data ?? []) as unknown as Row[];
+
+  /*
+    Que destes contactos são técnicos. Uma leitura só, à cópia local -- não é
+    por lead, e uma falha aqui deixa apenas as marcas por fazer.
+  */
+  const tecnicos = new Map<string, string>();
+  try {
+    const { data: tp } = await supabaseAdmin()
+      .from("technician_phones").select("phone9, name");
+    for (const t of (tp ?? []) as { phone9: string; name: string }[]) {
+      tecnicos.set(t.phone9, t.name || "Técnico");
+    }
+  } catch { /* sem a tabela, ninguém fica marcado */ }
+
+  return apiOk(linhas.map((r) => toLead(r, tecnicos)));
 });
 
 /**
@@ -91,7 +137,7 @@ export const POST = withStaff(async (req) => {
     city: clip(b.city, 100),
     message: clip(b.message, 2000),
     source: clip(b.source, 100) || "whatsapp",
-    stage: "nao_iniciado",
+    stage: "novo",
   };
   if (categoryId) row.category_id = categoryId;
   if (!row.name && !row.phone) return apiErr("Indica pelo menos o nome ou o telefone.", 400);

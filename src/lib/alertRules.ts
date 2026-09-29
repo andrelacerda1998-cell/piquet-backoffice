@@ -22,8 +22,6 @@ export interface SinaisDoNegocio {
   ticketsAbertos: Array<{ id: string; assunto: string; canal: string; desde: string }>;
   /** Documentos de técnicos à espera de revisão. */
   documentosPendentes: number;
-  /** Orçamentos enviados que continuam sem resposta do cliente. */
-  orcamentosSemResposta: Array<{ id: string; nome: string; enviadoDesde: string; valor: number | null }>;
   /** Faturas de custos com o prazo de pagamento ultrapassado. */
   faturasVencidas: Array<{ fornecedor: string; valorEmDivida: number; venceuEm: string }>;
   /** Obrigações fiscais com o prazo ultrapassado e ainda não pagas. */
@@ -51,7 +49,14 @@ export interface SinaisDoNegocio {
  */
 export const LIMITES = {
   /** Uma lead por responder passa a alerta ao fim de 1 dia; crítica aos 3. */
-  leadDiasAlerta: 1,
+  /*
+    0 e não 1: a bolinha existe para provocar ação, e numa marketplace de
+    serviços ao domicílio a ação urgente é responder HOJE. A regra antiga só
+    acendia no dia seguinte — precisamente depois de passar a janela em que
+    responder ainda ganha o cliente. Uma lead que entra às 22h e é vista de
+    manhã costuma já estar perdida.
+  */
+  leadDiasAlerta: 0,
   leadDiasCritico: 3,
   /** Um cron falha ocasionalmente; 3 vezes seguidas é avaria. */
   cronFalhasSeguidas: 3,
@@ -65,7 +70,6 @@ export const LIMITES = {
    * é o funil a funcionar, não um problema — e fica-se por "média": insistir é
    * boa prática, não urgência.
    */
-  aguardaClienteDias: 3,
   /** Recolha de anúncios parada há mais de 2 dias. */
   diasSemAnuncios: 2,
 } as const;
@@ -96,9 +100,9 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `lead-sem-resposta-${l.id}`,
       "marketing",
       dias >= LIMITES.leadDiasCritico ? "critica" : "alta",
-      `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
+      dias === 0 ? "Lead nova por responder" : `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
       `${l.nome} pediu contacto e continua no estado "Novo".`,
-      "Abrir o pedido em CRM & Leads e responder ou marcar como recusado.",
+      "Abrir o pedido e responder, ou perguntar a técnicos.",
       l.recebidaEm, "lead", l.id,
     ));
   }
@@ -142,28 +146,6 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       "Técnicos à espera de aprovação não podem aceitar serviços.",
       "Rever em Técnicos › Aprovações e KYC.",
       new Date(agoraMs).toISOString(), "kyc",
-    ));
-  }
-
-  // --- À espera da decisão do cliente --------------------------------------
-  // Média, e só depois de 3 dias: a bola está do lado do cliente. Um orçamento
-  // à espera não é uma falha nossa — é o funil a decorrer. Marcá-lo como
-  // crítico só ensinaria a ignorar os alertas a vermelho.
-  //
-  // A data disponível é a de ENTRADA do pedido (não há registo de quando o
-  // estado mudou), por isso o texto fala do pedido e não do envio — impreciso
-  // mas honesto.
-  for (const o of s.orcamentosSemResposta) {
-    const dias = diasEntre(o.enviadoDesde, agoraMs);
-    if (dias < LIMITES.aguardaClienteDias) continue;
-    alertas.push(novo(
-      `orcamento-sem-resposta-${o.id}`,
-      "marketing",
-      "media",
-      `À espera do cliente há ${plural(dias, "dia", "dias")}`,
-      `${o.nome}${o.valor != null ? ` · ${o.valor.toFixed(2).replace(".", ",")} €` : ""} — sem decisão desde que o pedido entrou.`,
-      "Vale a pena insistir, ou marcar como recusado se já não houver interesse.",
-      o.enviadoDesde, "lead", o.id,
     ));
   }
 

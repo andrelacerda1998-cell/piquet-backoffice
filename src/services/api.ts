@@ -110,6 +110,9 @@ interface RequestOptions<T> {
  * À medida que se migram endpoints, acrescenta-se aqui.
  */
 const LIVE_EXACT = new Set<string>([
+  "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  // Pedidos personalizados reais (serviços com is_custom no Laravel, PR #83).
+  "/custom-requests",
   // Fase 1 — Serviços/Reservas
   "/services",
   "/dashboard/recent-services",
@@ -117,6 +120,7 @@ const LIVE_EXACT = new Set<string>([
   "/product/growth",
   "/product/ratings",
   "/product/integrations-status",
+  "/product/whatsapp-templates",
   "/product/funnel",
   // Fase 2 — Clientes
   "/customers",
@@ -131,6 +135,12 @@ const LIVE_EXACT = new Set<string>([
   "/technicians/by-category",
   "/technicians/by-location",
   "/technicians/top",
+  // Funil de quem se inscreveu e ficou a meio (Laravel: account_blocker).
+  // Avaliacoes reais dos clientes (services.rating_by_customer).
+  // Funil, estados e tempos, dos servicos reais do Laravel.
+  "/services/operacao",
+  "/quality",
+  "/technicians/onboarding",
   "/technicians/coverage",
   // Mapa ao vivo — técnicos Online com localização recente (informativo)
   "/technicians/live-locations",
@@ -163,6 +173,25 @@ const LIVE_EXACT = new Set<string>([
   "/marketing/refresh",
   // Diagnóstico: que contas de anúncios o token do Google consegue ver.
   "/marketing/google-access",
+  // Criação de anúncios na Meta (escrita). São REAIS por definição: um mock
+  // que devolvesse "criado" fazia acreditar que o anúncio estava no ar.
+  "/marketing/ads/options",
+  "/marketing/ads/list",
+  "/marketing/google-ads/list",
+  "/marketing/google-ads/options",
+  "/marketing/google-ads/campaigns",
+  "/marketing/google-ads/adgroups",
+  "/marketing/google-ads/search-ads",
+  "/marketing/google-ads/display-ads",
+  "/marketing/google-ads/status",
+  "/marketing/google-ads/tracking",
+  "/marketing/attribution/match",
+  "/marketing/roas",
+  "/marketing/ads/campaigns",
+  "/marketing/ads/adsets",
+  "/marketing/ads/creatives",
+  "/marketing/ads/ads",
+  "/marketing/ads/status",
   "/alerts",
   "/alerts/snooze",
   // Fase 5 — Equipa (chat, agenda e tarefas)
@@ -210,6 +239,8 @@ const LIVE_EXACT = new Set<string>([
   "/vendor-documents",
   // Fase 10 — Pagamentos a vendors (idem, via Laravel)
   "/vendor-payments",
+  // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
+  "/vendor-no-shows",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
   // sem apagar, ver notas nos controllers)
   "/services-types",
@@ -266,6 +297,42 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  // Pedidos personalizados: serviços com is_custom no Laravel (PR #83).
+  // Antes disto o ecrã caía num fallback com seis pedidos escritos à mão.
+  "/custom-requests",
+  /*
+    Deixaram de ser ficção a 21/09/2026 e o selo ficou a mentir ao contrário:
+    dizia "sem integração de dados reais" por cima de números verdadeiros.
+
+    `/finance/summary` passou a somar os serviços do Laravel, como o resto do
+    Financeiro. `/tax/obligations` tinha 27 obrigações semeadas com valores
+    impossíveis (11 mil euros de Segurança Social numa empresa sem
+    colaboradores registados); foram apagadas, e o que lá está agora -- nada --
+    é verdade.
+  */
+  "/finance/summary",
+  "/tax/obligations",
+  /*
+    Gráficos derivados dos serviços (08/09/2026).
+
+    Estavam marcados como demonstração enquanto o próprio `/services` já estava
+    marcado como real -- a mesma tabela dava um selo diferente conforme se
+    olhasse para a lista ou para o gráfico feito a partir dela. Derivam de
+    `services`, `employees` e `company_invoices`, e as três já são reais desde
+    que os seeds foram apagados.
+
+    O selo fica onde é verdade: `/finance/summary` e os `/tax/*` continuam
+    demonstração, porque somam `tax_obligations` -- 27 linhas escritas todas no
+    mesmo dia por um seed.
+  */
+  "/dashboard/recent-services",
+  "/dashboard/revenue-by-category",
+  "/finance/by-service",
+  "/finance/daily-revenue",
+  "/finance/operational-result",
+  "/finance/revenue-by-technician",
+  "/finance/revenue-vs-costs",
   // Tickets de suporte: chegam das apps por POST /api/tickets e ficam na tabela
   // support_tickets. São mensagens de pessoas reais — nunca foram semeados.
   // Sem isto, `deepZero` transformava a lista em [] e a caixa aparecia sempre
@@ -286,11 +353,34 @@ const REAL_DATA = new Set<string>([
   "/technicians/by-category",
   "/technicians/by-location",
   "/technicians/top",
+  // Funil de quem se inscreveu e ficou a meio (Laravel: account_blocker).
+  // Avaliacoes reais dos clientes (services.rating_by_customer).
+  // Funil, estados e tempos, dos servicos reais do Laravel.
+  "/services/operacao",
+  "/quality",
+  "/technicians/onboarding",
   "/technicians/coverage",
   "/technicians/live-locations",
   "/marketing/campaigns",
   "/marketing/metrics",
   "/marketing/channels",
+  "/marketing/ads/options",
+  "/marketing/ads/list",
+  "/marketing/google-ads/list",
+  "/marketing/google-ads/options",
+  "/marketing/google-ads/campaigns",
+  "/marketing/google-ads/adgroups",
+  "/marketing/google-ads/search-ads",
+  "/marketing/google-ads/display-ads",
+  "/marketing/google-ads/status",
+  "/marketing/google-ads/tracking",
+  "/marketing/attribution/match",
+  "/marketing/roas",
+  "/marketing/ads/campaigns",
+  "/marketing/ads/adsets",
+  "/marketing/ads/creatives",
+  "/marketing/ads/ads",
+  "/marketing/ads/status",
   "/marketing/creatives",
   "/marketing/leads", // Formulário da landing → POST /api/leads → tabela leads.
   "/finance/app-payments",
@@ -301,7 +391,8 @@ const REAL_DATA = new Set<string>([
   "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
-  "/product/integrations-status", // Saúde real das pipelines (cron_runs).
+  "/product/integrations-status",
+  "/product/whatsapp-templates", // Saúde real das pipelines (cron_runs).
   "/product/funnel", // Funil da app (Mixpanel); vazio/configured:false sem creds.
   "/goals", // Objetivos + métricas reais calculadas das fontes (metrics.ts).
   "/finance/company-invoices", // Faturas de custos reais (manuais + Outlook).
@@ -332,6 +423,8 @@ const REAL_DATA = new Set<string>([
   "/vendor-documents",
   // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
   "/vendor-payments",
+  // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
+  "/vendor-no-shows",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
   "/customers/trend",
   "/customers/retention",
@@ -387,6 +480,8 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
   // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
+  // Conversa com o técnico — real (whatsapp_messages.technician_id).
+  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return false;
   return true;
 }
 
@@ -419,6 +514,7 @@ export function isLiveEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (LIVE_DENY.has(path)) return false;
   if (LIVE_EXACT.has(path)) return true;
+  if (/^\/services\/[^/]+\/fotos$/.test(path)) return true; // fotos que o cliente anexou
   if (/^\/services\/[^/]+$/.test(path)) return true; // /services/:id (detalhe/write-back)
   if (/^\/tax\/obligations\/[^/]+\/pay$/.test(path)) return true; // marcar obrigação paga
   if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento
@@ -430,7 +526,9 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/finance\/budget\/[^/]+$/.test(path)) return true; // editar/apagar linha do orçamento
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
+  if (/^\/marketing\/push-campaigns\/[^/]+\/active$/.test(path)) return true; // ligar/desligar campanha
   if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
+  if (/^\/marketing\/leads\/[^/]+\/timeline$/.test(path)) return true; // cronologia do pedido
   if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
   if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex
@@ -443,6 +541,16 @@ export function isLiveEndpoint(endpoint: string): boolean {
   if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
   if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
   if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
+  /*
+    Validar o subutilizador da AT e criar o workspace de faturação.
+
+    As duas rotas existem e chamam o Laravel, mas faltavam aqui -- e sem
+    estarem nesta lista o pedido nunca sai do browser: cai no ramo de
+    demonstração, que lança "precisa da API de admin do Laravel configurada".
+    A mensagem culpava a configuração do servidor, que estava certa.
+  */
+  if (/^\/technicians\/[^/]+\/(at-validation|invoice-workspace|permanent)$/.test(path)) return true;
+  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return true; // conversa de WhatsApp do técnico
   if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
   if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
   if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona

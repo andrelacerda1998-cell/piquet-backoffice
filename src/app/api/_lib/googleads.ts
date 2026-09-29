@@ -24,7 +24,7 @@ export function googleAdsConfigured(): boolean {
   );
 }
 
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   const res = await fetchComPrazo("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -46,6 +46,71 @@ interface GoogleAdsResultRow {
   campaign?: { id?: string; name?: string; status?: string };
   segments?: { date?: string };
   metrics?: { costMicros?: string; impressions?: string; clicks?: string; conversions?: number; conversionsValue?: number };
+}
+
+/**
+ * Chama a Google Ads API, com o fallback de versão.
+ *
+ * Extraído de `fetchGoogleAdsInsights` para a escrita poder usá-lo: a lógica
+ * de rodar versões em 404 é a parte mais cara de acertar deste cliente (a
+ * Google reforma cada versão ao fim de ~1 ano, e já parou a recolha 30 dias),
+ * e duplicá-la era garantir que uma das cópias ficava para trás.
+ *
+ * `caminho` é relativo à versão, ex.: "customers/123/googleAds:search".
+ */
+export async function googleAdsRequest<T>(caminho: string, body: unknown): Promise<T> {
+  const token = await accessToken();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+    "Content-Type": "application/json",
+  };
+  if (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) {
+    headers["login-customer-id"] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, "");
+  }
+
+  const tentativas = versionsToTry(process.env.GOOGLE_ADS_API_VERSION);
+  let res: Response | null = null;
+  const reformadas: string[] = [];
+  for (const v of tentativas) {
+    const r = await fetchComPrazo(`https://googleads.googleapis.com/${v}/${caminho}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (shouldTryNextVersion(r.status)) { reformadas.push(v); continue; }
+    res = r;
+    break;
+  }
+  if (!res) {
+    throw new Error(
+      `Google Ads: nenhuma versão da API respondeu (404 em ${reformadas.join(", ")}). ` +
+      `A Google reformou-as todas — acrescentar a nova em src/lib/googleAdsVersion.ts ` +
+      `ou definir GOOGLE_ADS_API_VERSION.`
+    );
+  }
+  if (!res.ok) throw new Error(traduzErroGoogle(await res.text(), res.status));
+  return (await res.json()) as T;
+}
+
+/**
+ * Erros da Google em linguagem acionável.
+ *
+ * O corpo vem como JSON aninhado e enorme; a causa quase sempre relevante
+ * neste backoffice é o developer token estar em modo de teste, que só
+ * funciona contra contas de teste — e a mensagem crua não o diz assim.
+ */
+function traduzErroGoogle(corpo: string, status: number): string {
+  const bruto = corpo.slice(0, 2000);
+  if (/DEVELOPER_TOKEN_NOT_APPROVED|test account|TEST_ACCOUNT/i.test(bruto)) {
+    return "O developer token está em modo de teste, e nesse modo a API só responde a contas de teste — nunca à conta real. " +
+      "É preciso pedir Acesso Básico no Centro da API do Google Ads (conta de gestor).";
+  }
+  if (/USER_PERMISSION_DENIED/i.test(bruto)) {
+    return "A conta Google autorizada não tem acesso a esta conta de anúncios, ou falta o login-customer-id da MCC. " +
+      "Ver o diagnóstico em /api/marketing/google-access.";
+  }
+  return `Google Ads ${status}: ${bruto}`;
 }
 
 /** Converte a resposta GAQL em AdRow[] (exportado para testes). */

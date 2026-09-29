@@ -24,6 +24,8 @@ import {
   type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
   type InvoiceRecurrence,
   getTreasury, addTreasuryBalance,
+  refundAppPayment,
+  cancelAppPaymentHold,
 } from "@/services/financeService";
 import { buildMonthlyPlan, type PlanItem } from "@/lib/budgetPlan";
 import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService";
@@ -31,13 +33,14 @@ import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
 import { getVendorPayments, payVendor, type VendorPayment } from "@/services/vendorPaymentsService";
-import { buildMetricValue } from "@/lib/calculations";
+import { buildMetricValue, semIVA } from "@/lib/calculations";
+import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
-import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
+import { cn, copiarParaAreaDeTransferencia } from "@/lib/utils";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet, Copy } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS: TabDef[] = [
@@ -90,7 +93,24 @@ export default function FinancePage() {
   const { data: cashFlow } = useAsyncData(() => getCashFlowForecast(cashFlowScenario), [cashFlowScenario]);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
-  const { data: appPay } = useAsyncData(() => getAppPayments(), []);
+  const { data: appPay, refetch: refetchAppPay } = useAsyncData(() => getAppPayments(), []);
+  /*
+    Reembolsar / libertar cativo. São operações sobre dinheiro real, por isso
+    passam sempre por confirmação e o botão só aparece no estado em que a ação
+    faz sentido: reembolsar só o que já foi cobrado, libertar só o que está
+    cativo. O backend recusa na mesma se o serviço associado ainda estiver
+    vivo -- aí o caminho certo é cancelar o serviço em Operações.
+  */
+  const [payToRefund, setPayToRefund] = useState<AppPayment | null>(null);
+  const [payToRelease, setPayToRelease] = useState<AppPayment | null>(null);
+  const doRefund = async (p: AppPayment) => {
+    try { await refundAppPayment(p.id); toast(`Reembolso de ${formatCurrency(p.amount)} enviado ao Payshop.`); refetchAppPay(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error"); }
+  };
+  const doRelease = async (p: AppPayment) => {
+    try { await cancelAppPaymentHold(p.id); toast(`Cativo de ${formatCurrency(p.amount)} libertado.`); refetchAppPay(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Erro ao libertar o cativo.", "error"); }
+  };
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
   const { data: vendorPayments, loading: vendorPaymentsLoading, refetch: refetchVendorPayments } = useAsyncData(() => getVendorPayments(), []);
@@ -215,6 +235,13 @@ export default function FinancePage() {
     });
   const totalOutstanding = openInvoices.reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
 
+  // Faturas de custos (company_invoices) ainda por liquidar. "Em atraso" é o
+  // subconjunto já vencido -- ambos contam o que FALTA pagar, por isso uma
+  // parcial pesa pelo remanescente e não pelo valor cheio.
+  const totalOverdue = openInvoices
+    .filter((i) => i.overdue)
+    .reduce((s, i) => s + (i.status === "parcial" ? i.outstanding : i.amount), 0);
+
   // Vista da lista de faturas. Uma fatura paga sai da frente assim que é
   // marcada — o trabalho é pagar o que falta —, mas fica acessível em "Pagas"
   // para corrigir marcações erradas.
@@ -246,7 +273,7 @@ export default function FinancePage() {
   const { data: leadsData } = useAsyncData(() => getLeads(), []);
   const planLeadInflows = useMemo<PlanItem[]>(
     () => (leadsData ?? [])
-      .filter((l) => l.stage === "orcamento_aceite" && (l.quoteValue ?? 0) > 0)
+      .filter((l) => l.stage === "com_tecnico" && (l.quoteValue ?? 0) > 0)
       .map((l) => {
         const commission = l.technicianValue != null
           ? Math.max(0, (l.quoteValue ?? 0) - l.technicianValue)
@@ -451,9 +478,15 @@ export default function FinancePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricCard title="GMV do mês" metric={buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão Piquet" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
-                  <MetricCard title="GMV do ano" metric={buildMetricValue(gmvData?.year.gmv ?? 0, gmvData?.prevYearSame.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão do ano" metric={buildMetricValue(gmvData?.year.commission ?? 0, gmvData?.prevYearSame.commission ?? 0)} format="currency" />
+                  <MetricCard title="Comissão Piquet do mês" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
+                  {/*
+                    Faturas são CUSTOS (company_invoices), não receita -- por isso
+                    ficam a seguir ao GMV e não misturadas com ele. Sem comparação
+                    mensal: o total é acumulado e um "+0%" seria inventado.
+                  */}
+                  <MetricCard title="Faturas por pagar" metric={buildMetricValue(totalOutstanding, totalOutstanding)} format="currency" hideDelta />
+                  <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
+                    className={cn(totalOverdue > 0 && "border-danger/40")} />
                 </div>
               </div>
 
@@ -489,34 +522,34 @@ export default function FinancePage() {
                     </div>
                   ))}
                 </div>
-                {openInvoices.length > 0 && (
+                {openInvoices.length > 6 && (
                   <p className="text-xs text-text-muted mt-2">
-                    {openInvoices.length} fatura(s) por pagar · total em falta <b className="text-text-primary">{formatCurrency(totalOutstanding)}</b>
-                    {openInvoices.length > 6 && " · mostrando as 6 mais próximas"}
+                    A mostrar as 6 mais próximas de {openInvoices.length}.
                   </p>
                 )}
               </div>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
-              </div>
               {/*
-                A grelha ajusta-se ao ESPAÇO, não ao tamanho do ecrã. Eram seis
-                colunas fixas: num portátil de 1280px a área de conteúdo tem
-                ~950px, o que dava ~112px de texto por cartão para valores como
-                "42 296,66 €", que precisam de 137px — os números saíam fora da
-                caixa. Um `lg:`/`xl:` não resolvia, porque o que falta é
-                largura DENTRO da coluna e não no ecrã: a barra lateral pode
-                estar aberta ou recolhida.
+                Eram seis cartões; ficam três.
+                - "Receita s/ IVA" era `Receita Piquet / 1,23` — uma divisão à
+                  vista, não uma métrica.
+                - "IVA" saía deste mesmo `summary` fictício, e a aba Impostos e
+                  RH já mostra o IVA REAL (da comissão cobrada e das faturas de
+                  custo). Dois IVAs diferentes no mesmo backoffice, um deles
+                  inventado, é pior do que um só.
+                - "Runway" repetia-se tal e qual na Tesouraria, logo a seguir.
+                A grelha ajusta-se ao ESPAÇO e não ao tamanho do ecrã: a barra
+                lateral pode estar aberta ou recolhida, e valores como
+                "42 296,66 €" precisam de ~137px de texto.
               */}
               {summary && (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                  <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
-                  <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
-                  <MetricCard title="Receita s/ IVA" metric={buildMetricValue(summary.piquetRevenueWithoutVat, summary.piquetRevenueWithoutVat)} hideDelta format="currency" />
-                  <MetricCard title="IVA" metric={buildMetricValue(summary.vat, summary.vat)} hideDelta format="currency" />
-                  <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
-                  <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
+                  <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+                    <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
+                    <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
+                    <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -815,23 +848,95 @@ export default function FinancePage() {
               técnico por técnico × mês); "Processar" grava o registo do pagamento. */}
           {tab === "pagamentos" && (
             <div className="space-y-6">
-              <p className="text-sm text-text-secondary max-w-2xl">
-                Saldo por pagar a cada vendor (ledger interno). &ldquo;Pagar&rdquo; notifica o vendor e zera o saldo — a
-                transferência bancária em si é feita manualmente pelo admin com o IBAN abaixo <DemoBadge endpoint="/vendor-payments" />
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Vendors com saldo" metric={buildMetricValue(vendorPayments?.items.length ?? 0, vendorPayments?.items.length ?? 0)} />
-                <MetricCard title="Total por pagar" metric={buildMetricValue((vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0), (vendorPayments?.items ?? []).reduce((s, v) => s + v.balance, 0))} format="currency" />
-              </div>
+              {(() => {
+                const itens = vendorPayments?.items ?? [];
+                const iva = DEFAULT_TAX_CONFIG.vatRate;
+                const aPagar = itens.reduce((s, v) => s + v.balance, 0);
+                // Totais só existem depois de o backend os expor; somar nulls
+                // daria 0 € e passaria por número real.
+                const comTotais = itens.filter((v) => v.total_invoiced != null);
+                const faturado = comTotais.reduce((s, v) => s + (v.total_invoiced ?? 0), 0);
+                // Comissão: soma do que o backend devolve por técnico
+                // (amount - amount_for_vendor de cada serviço fechado). NÃO se
+                // usa a carteira do sistema -- esse saldo é caixa acumulada da
+                // Piquet e não corresponde à comissão desta lista de técnicos.
+                const comComissao = itens.filter((v) => v.commission != null);
+                const comissao = comComissao.reduce((s, v) => s + (v.commission ?? 0), 0);
+                /*
+                  Uma faixa só, em vez de duas filas de cartões mais dois
+                  parágrafos. Os seis números liam-se todos da mesma maneira e
+                  ocupavam meio ecrã antes da lista — que é onde está o trabalho.
+                  O "c/ IVA" fica em destaque e o líquido logo por baixo.
+                */
+                const stat = (label: string, comIva: number, destaque = false) => (
+                  <div key={label} className="min-w-[130px]">
+                    <p className="text-xs text-text-secondary">{label}</p>
+                    <p className={cn("text-xl font-bold tabular-nums leading-tight",
+                      destaque ? "text-success" : "text-text-primary")}>{formatCurrency(comIva)}</p>
+                    <p className="text-[11px] text-text-muted tabular-nums">{formatCurrency(semIVA(comIva, iva))} s/ IVA</p>
+                  </div>
+                );
+                return (
+                  <div className="card px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-4">
+                    <div className="min-w-[110px]">
+                      <p className="text-xs text-text-secondary">Técnicos com saldo</p>
+                      <p className="text-xl font-bold text-text-primary tabular-nums leading-tight">{itens.length}</p>
+                      <p className="text-[11px] text-text-muted">a aguardar transferência</p>
+                    </div>
+                    {stat("A pagar", aPagar)}
+                    {comComissao.length > 0 && stat("Comissão Piquet", comissao, true)}
+                    {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
+                    <p className="text-[11px] text-text-muted max-w-xs ml-auto">
+                      &ldquo;Pagar&rdquo; zera o saldo e avisa o técnico;
+                      a transferência é feita à mão com o IBAN. <DemoBadge endpoint="/vendor-payments" />
+                    </p>
+                  </div>
+                );
+              })()}
               <div>
                 <h2 className="font-semibold mb-3">Pagamentos a vendors</h2>
                 <DataTable
                   columns={[
                     { key: "vendor_name", label: "Vendor", render: (r: VendorPayment) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
                     { key: "iban", label: "IBAN", render: (r: VendorPayment) => r.iban
-                      ? <span className="font-mono text-xs">{r.iban}</span>
+                      ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-xs">{r.iban}</span>
+                          {/* Copia sem os espaços de formatação — é assim que o
+                              homebanking o quer, e reescrevê-lo à mão é onde se
+                              engana um dígito. */}
+                          <button
+                            onClick={async () => {
+                              const ok = await copiarParaAreaDeTransferencia((r.iban ?? "").replace(/\s/g, ""));
+                              toast(ok ? "IBAN copiado." : "Não foi possível copiar o IBAN.", ok ? "success" : "error");
+                            }}
+                            title="Copiar IBAN"
+                            aria-label={`Copiar IBAN de ${r.vendor_name ?? "técnico"}`}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-primary transition-colors shrink-0"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      )
                       : <span className="text-text-muted text-xs">Sem IBAN</span> },
-                    { key: "balance", label: "Saldo", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                    { key: "balance", label: "A pagar (c/ IVA)", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                    { key: "balance_sem_iva", label: "A pagar (s/ IVA)", render: (r: VendorPayment) => (
+                      <span className="whitespace-nowrap">{formatCurrency(semIVA(r.balance, DEFAULT_TAX_CONFIG.vatRate))}</span>
+                    ) },
+                    /* Faturado e comissão em colunas separadas para c/ e s/ IVA,
+                       tal como o "A pagar" acima — mesma leitura em toda a tabela. */
+                    { key: "total_invoiced", label: "Faturado (c/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap">{formatCurrency(r.total_invoiced)}</span> },
+                    { key: "total_invoiced_sem_iva", label: "Faturado (s/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap">{formatCurrency(semIVA(r.total_invoiced, DEFAULT_TAX_CONFIG.vatRate))}</span> },
+                    { key: "commission", label: "Comissão Piquet (c/ IVA)", render: (r: VendorPayment) => r.commission == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap font-medium">{formatCurrency(r.commission)}</span> },
+                    { key: "commission_sem_iva", label: "Comissão Piquet (s/ IVA)", render: (r: VendorPayment) => r.commission == null
+                      ? <span className="text-text-muted">—</span>
+                      : <span className="whitespace-nowrap font-medium">{formatCurrency(semIVA(r.commission, DEFAULT_TAX_CONFIG.vatRate))}</span> },
                     { key: "acao", label: "", render: (r: VendorPayment) => (
                       <button
                         disabled={!r.iban || payingId === r.id}
@@ -944,6 +1049,13 @@ export default function FinancePage() {
                         </span>
                       );
                     } },
+                    { key: "acoes", label: "", render: (r: AppPayment) => (
+                      r.state === "pago" ? (
+                        <button onClick={() => setPayToRefund(r)} className="text-xs text-danger hover:underline whitespace-nowrap">Reembolsar</button>
+                      ) : r.state === "cativado" ? (
+                        <button onClick={() => setPayToRelease(r)} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Libertar cativo</button>
+                      ) : <span className="text-text-muted">—</span>
+                    ) },
                   ]}
                   data={appPay.payments}
                   keyField="id"
@@ -1102,6 +1214,37 @@ export default function FinancePage() {
             </Field>
           </div>
         </Modal>
+
+        <ConfirmDialog
+          open={!!payToRefund}
+          onClose={() => setPayToRefund(null)}
+          onConfirm={async () => { if (payToRefund) { await doRefund(payToRefund); setPayToRefund(null); } }}
+          title="Reembolsar pagamento"
+          tone="danger"
+          confirmLabel="Reembolsar"
+          description={payToRefund && (
+            <>
+              Vais devolver <b className="text-text-primary">{formatCurrency(payToRefund.amount)}</b> ao cliente
+              <b className="text-text-primary"> {payToRefund.customer}</b>, pelo mesmo meio de pagamento ({payToRefund.method}).
+              O dinheiro sai da conta da Piquet e a operação não se desfaz.
+            </>
+          )}
+        />
+
+        <ConfirmDialog
+          open={!!payToRelease}
+          onClose={() => setPayToRelease(null)}
+          onConfirm={async () => { if (payToRelease) { await doRelease(payToRelease); setPayToRelease(null); } }}
+          title="Libertar valor cativo"
+          confirmLabel="Libertar"
+          description={payToRelease && (
+            <>
+              Os <b className="text-text-primary">{formatCurrency(payToRelease.amount)}</b> reservados na conta de
+              <b className="text-text-primary"> {payToRelease.customer}</b> deixam de estar bloqueados. Não é um reembolso:
+              este dinheiro nunca chegou a ser cobrado. Depois de libertado, cobrar exige um pagamento novo.
+            </>
+          )}
+        />
 
         <ConfirmDialog
           open={!!invToRemove}

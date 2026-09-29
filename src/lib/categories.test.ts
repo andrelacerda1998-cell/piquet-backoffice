@@ -49,3 +49,33 @@ describe("categoryFromMessage — extrair a categoria da mensagem da landing", (
     expect(categoryFromMessage("")).toBe("");
   });
 });
+
+describe("sinónimos do formulário", () => {
+  /*
+    O formulário da landing oferece "Montagem de Móveis" e o catálogo diz
+    "Montagem de mobiliário". Nenhuma contém a outra, e por isso a categoria
+    ficava vazia — sem categoria, o painel de técnicos não filtra por ofício.
+  */
+  it("as palavras do cliente chegam à categoria do catálogo", () => {
+    expect(resolveCategoryId("Montagem de Móveis")).toBe("cat_mobiliario");
+    expect(resolveCategoryId("montagem de moveis")).toBe("cat_mobiliario");
+    expect(resolveCategoryId("Limpeza Doméstica")).toBe("cat_limpeza");
+    expect(resolveCategoryId("Fechaduras e Portas")).toBe("cat_fechaduras");
+  });
+
+  it("também na mensagem que a landing escreve", () => {
+    expect(categoryFromMessage("Servico: Montagem de Móveis · Urgencia: Normal"))
+      .toBe("cat_mobiliario");
+  });
+
+  /*
+    Estes chegam do formulário e não têm categoria no catálogo. Ficam vazios de
+    propósito: criar categorias mexe em comissões e na qualificação dos
+    técnicos, e é decisão de negócio — não de uma tabela de sinónimos.
+  */
+  it("o que o catálogo não cobre continua por preencher", () => {
+    expect(resolveCategoryId("Decoração")).toBe("");
+    expect(resolveCategoryId("Outro")).toBe("");
+    expect(resolveCategoryId("Selecionar…")).toBe("");
+  });
+});

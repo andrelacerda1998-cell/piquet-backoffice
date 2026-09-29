@@ -95,7 +95,7 @@ export function NotificationBell() {
         if (!alive) return;
         const weekAgo = Date.now() - 7 * 864e5;
         const novasLeads = leads
-          .filter((l) => l.stage === "nao_iniciado" && new Date(l.createdAt).getTime() > weekAgo)
+          .filter((l) => l.stage === "novo" && new Date(l.createdAt).getTime() > weekAgo)
           .slice(0, 8);
         const knownLeads = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
         const freshLeads = novasLeads.filter((l) => !knownLeads.has(`lead:${l.id}`));

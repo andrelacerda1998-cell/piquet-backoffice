@@ -5,13 +5,28 @@ export function calculatePiquetRevenue(totalCustomerValue: number, technicianVal
   return Math.max(0, totalCustomerValue - technicianValue);
 }
 
+/**
+ * Bruto (com IVA) → líquido (sem IVA). Toda a moeda que vem do backend é
+ * BRUTA: o model `Service` do Laravel obtém o líquido exatamente assim
+ * (`amount / (1 + IVA)`), tanto para o valor do cliente como para o do técnico.
+ * Uma só função para não haver duas contas de IVA a divergir pelo dashboard.
+ */
+export function semIVA(comIVA: number, vatRate: number): number {
+  return comIVA / (1 + vatRate);
+}
+
+/** A parcela de IVA contida num valor bruto. */
+export function parcelaIVA(comIVA: number, vatRate: number): number {
+  return comIVA - semIVA(comIVA, vatRate);
+}
+
 /** receitaPiquetSemIVA = receitaPiquet / (1 + vatRate) */
 export function calculatePiquetRevenueWithoutVat(piquetRevenue: number, vatRate: number): number {
-  return piquetRevenue / (1 + vatRate);
+  return semIVA(piquetRevenue, vatRate);
 }
 
 export function calculateVatFromRevenue(piquetRevenue: number, vatRate: number): number {
-  return piquetRevenue - calculatePiquetRevenueWithoutVat(piquetRevenue, vatRate);
+  return parcelaIVA(piquetRevenue, vatRate);
 }
 
 /** ivaEstimado = ivaLiquidado - ivaDedutivel */

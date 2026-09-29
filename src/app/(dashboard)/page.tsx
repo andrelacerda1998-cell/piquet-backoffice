@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getFinanceGmv, getUnitEconomics, getFinanceSummary } from "@/services/financeService";
 import { getGoals, getLeads } from "@/services/extrasService";
+import { getServiceCounts } from "@/services/dashboardService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
@@ -21,7 +22,7 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale } from "lucide-react";
+import { LayoutDashboard, ListChecks, Target, TrendingUp, ArrowRight, Headphones, FileCheck2, Scale, FileText } from "lucide-react";
 
 function fmtGoal(v: number, unit: "currency" | "number" | "percentage") {
   if (unit === "currency") return formatCurrency(v);
@@ -145,6 +146,7 @@ export default function OverviewPage() {
   // perdemos dinheiro?") e a resposta estava só no Financeiro.
   const { data: fin } = useAsyncData(() => getFinanceSummary({ period: "este_mes" }), []);
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
+  const { data: svcCounts } = useAsyncData(() => getServiceCounts(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
   const { data: leads } = useAsyncData(() => getLeads(), []);
@@ -181,7 +183,7 @@ export default function OverviewPage() {
 
   // O que está à espera de alguém: leads por responder (e quantas urgentes) e
   // documentos KYC por validar. É o primeiro que se quer ver ao abrir o dia.
-  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "nao_iniciado");
+  const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "novo");
   const leadsUrgentes = leadsPorResponder.filter((l) => /urg[êe]ncia:\s*(urgente|hoje|emerg|imediat|agora)/i.test(l.message || "")).length;
   const kycPendentes = pendingDocs?.meta.total ?? 0;
 
@@ -305,6 +307,24 @@ export default function OverviewPage() {
               metric={buildMetricValue(commissionYear, commissionPrevYear, false, undefined, "A parte do GMV que é receita da Piquet (25%), acumulada desde 1 de janeiro.")} />
           </div>
 
+          {/*
+            Volume de trabalho, ao lado do dinheiro. Executados contam-se pela
+            data de conclusão e agendados pela data marcada -- um serviço
+            agendado para dezembro é volume de dezembro, não deste mês. Por
+            isso o "agendados no ano" olha para o ano inteiro, futuro incluído.
+          */}
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">Serviços</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+            <MetricCard compact title="Executados no mês" hideDelta
+              metric={buildMetricValue(svcCounts?.mes.executados ?? 0, svcCounts?.mes.executados ?? 0, false, undefined, "Serviços concluídos com data de conclusão dentro do mês corrente.")} />
+            <MetricCard compact title="Agendados no mês" hideDelta
+              metric={buildMetricValue(svcCounts?.mes.agendados ?? 0, svcCounts?.mes.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do mês corrente e ainda por concluir.")} />
+            <MetricCard compact title="Executados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.executados ?? 0, svcCounts?.ano.executados ?? 0, false, undefined, "Serviços concluídos desde 1 de janeiro.")} />
+            <MetricCard compact title="Agendados no ano" hideDelta
+              metric={buildMetricValue(svcCounts?.ano.agendados ?? 0, svcCounts?.ano.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do ano corrente e ainda por concluir — inclui os que estão no futuro.")} />
+          </div>
+
           {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}
           <div className="grid grid-cols-2 gap-3">
             <MetricCard title="Downloads App Cliente" format="number" hideDelta
@@ -386,6 +406,20 @@ export default function OverviewPage() {
               })}
             </div>
           )}
+        </div>
+
+        {/* Atalhos para as outras vistas da Visão Geral, para ficarem à mão. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button onClick={() => setTab("objetivos")} className="card p-4 text-left hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700 shrink-0"><Target className="h-5 w-5" /></span>
+            <div className="min-w-0"><p className="font-semibold text-text-primary">Objetivos do ano</p><p className="text-xs text-text-muted">Metas e progresso</p></div>
+            <ArrowRight className="h-4 w-4 text-text-muted ml-auto" />
+          </button>
+          <button onClick={() => setTab("relatorios")} className="card p-4 text-left hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-info-light text-info shrink-0"><FileText className="h-5 w-5" /></span>
+            <div className="min-w-0"><p className="font-semibold text-text-primary">Relatórios</p><p className="text-xs text-text-muted">Exportações e análises</p></div>
+            <ArrowRight className="h-4 w-4 text-text-muted ml-auto" />
+          </button>
         </div>
         </div>
         )}

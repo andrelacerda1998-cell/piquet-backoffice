@@ -24,6 +24,22 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/technicians/live-locations")).toBe(true);
   });
 
+  /*
+    Os dois botões da ficha do técnico. Estavam fora da allowlist e por isso o
+    pedido nunca saía do browser: caía no ramo de demonstração, que lança
+    "precisa da API de admin do Laravel configurada" -- uma mensagem que
+    culpava a configuração do servidor, estando ela certa.
+  */
+  it("marca como reais as ações da ficha do técnico (AT e faturação)", () => {
+    expect(isLiveEndpoint("/technicians/123/at-validation")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/invoice-workspace")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/permanent")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/suspend")).toBe(true);
+    expect(isLiveEndpoint("/technicians/123/restore")).toBe(true);
+    // Um subcaminho inventado continua fora: a regra é estreita de propósito.
+    expect(isLiveEndpoint("/technicians/123/qualquer-coisa")).toBe(false);
+  });
+
   it("marca como migrados os endpoints da Fase 3a (Financeiro derivável)", () => {
     expect(isLiveEndpoint("/finance/by-service?page=1")).toBe(true);
     expect(isLiveEndpoint("/finance/daily-revenue")).toBe(true);
@@ -156,9 +172,36 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // 2026-07-22: o seed foi apagado e passam a ser dados reais ou vazios.)
     // (/finance/payouts foi retirado a 2026-08-11: a página Relatórios passou
     // a usar o saldo real do /vendor-payments, ledger Laravel.)
-    for (const ep of ["/finance/summary", "/tax/obligations"]) {
+    // (/tax/obligations e /finance/summary saíram a 2026-09-22, pela MESMA
+    // regra das anteriores: as 27 obrigações semeadas foram apagadas e o
+    // resumo passou a somar os serviços do Laravel. Ficar na lista fazia o
+    // selo dizer "dados fictícios" por cima de números verdadeiros.)
+    for (const ep of ["/tax/summary", "/tax/vat"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
+    }
+  });
+
+  /*
+    A mesma tabela não pode ter selos diferentes conforme o ecrã. Os gráficos
+    do Financeiro derivam de `services`, que é real desde que o seed foi
+    apagado -- durante um tempo a lista era real e o gráfico feito a partir
+    dela dizia "demo".
+  */
+  it("o que deixou de vir do seed deixa de ter selo de demonstração", async () => {
+    const { isDemoEndpoint } = await load();
+    expect(isDemoEndpoint("/tax/obligations")).toBe(false);
+    expect(isDemoEndpoint("/finance/summary")).toBe(false);
+  });
+
+  it("um gráfico derivado de dados reais também é real", async () => {
+    const { isDemoEndpoint } = await load();
+    for (const ep of [
+      "/finance/by-service", "/finance/daily-revenue", "/finance/revenue-vs-costs",
+      "/finance/revenue-by-technician", "/finance/operational-result",
+      "/dashboard/revenue-by-category", "/dashboard/recent-services",
+    ]) {
+      expect(isDemoEndpoint(ep), `${ep} deriva de /services, que é real`).toBe(false);
     }
   });
 
@@ -200,23 +243,32 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
 
   it("zero em vez de ficção: GET a endpoint demo devolve o mock zerado", async () => {
     const { apiGet } = await load();
-    // /quality é demo e não-migrado → corre o fetcher mock e zera o resultado.
-    const res = await apiGet("/quality", () => ({ nps: 62, complaints: [{ id: "c1" }], meta: "Qualidade" }));
-    expect(res.data).toEqual({ nps: 0, complaints: [], meta: "Qualidade" });
+    /*
+      /product/bugs é demo e não-migrado → corre o fetcher mock e zera o
+      resultado. Era /quality até 28/09/2026, quando as avaliações passaram a
+      vir dos serviços do Laravel (services.rating_by_customer) e o endpoint
+      deixou esta lista — como está previsto acontecer a cada um destes à
+      medida que ganham fonte real.
+    */
+    const res = await apiGet("/product/bugs", () => ({ abertos: 62, itens: [{ id: "b1" }], meta: "Bugs" }));
+    expect(res.data).toEqual({ abertos: 0, itens: [], meta: "Bugs" });
   });
 
   it("sem backend configurado, o modo demo continua a mostrar os mocks", async () => {
     vi.resetModules();
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
     const { apiGet } = await import("@/services/api");
-    const res = await apiGet("/quality", () => ({ nps: 62 }));
-    expect(res.data).toEqual({ nps: 62 });
+    const res = await apiGet("/product/bugs", () => ({ abertos: 62 }));
+    expect(res.data).toEqual({ abertos: 62 });
   });
 
   it("trata como demo tudo o que não foi confirmado como real", async () => {
     const { isDemoEndpoint } = await load();
     expect(isDemoEndpoint("/dashboard/overview")).toBe(true); // o GMV calibrado
-    expect(isDemoEndpoint("/quality")).toBe(true);
+    expect(isDemoEndpoint("/product/bugs")).toBe(true);
+    // E o contrário, para esta rede apanhar o dia em que alguém ligar um
+    // endpoint real e se esquecer de o tirar da lista de ficção:
+    expect(isDemoEndpoint("/quality")).toBe(false);
     expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });

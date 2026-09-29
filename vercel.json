@@ -15,6 +15,14 @@
     {
       "path": "/api/cron/metric-snapshots",
       "schedule": "40 6 * * *"
+    },
+    {
+      "path": "/api/cron/technician-phones",
+      "schedule": "50 6 * * *"
+    },
+    {
+      "path": "/api/cron/app-requests",
+      "schedule": "5 7 * * *"
     }
   ]
 }

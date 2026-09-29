@@ -5,75 +5,6 @@ import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
 /* ============================ DESPACHO AO VIVO ============================ */
 
-export interface DispatchRequest {
-  id: string;
-  customerName: string;
-  categoryName: string;
-  serviceName: string;
-  city: string;
-  status: string;
-  waitingMinutes: number;
-  value: number;
-  radiusKm: number;
-}
-
-export interface AvailableTechnician {
-  id: string;
-  name: string;
-  city: string;
-  categories: string[];
-  rating: number;
-  distanceKm: number;
-  acceptanceRate: number;
-}
-
-export interface DispatchBoard {
-  kpis: { waiting: number; available: number; avgAssignMin: number; autoDispatchRate: number };
-  requests: DispatchRequest[];
-  technicians: AvailableTechnician[];
-}
-
-export async function getDispatchBoard(): Promise<DispatchBoard> {
-  return apiGet("/dispatch", () => {
-    const active = mockData.services.filter((s) =>
-      ["a_procurar_tecnico", "tecnico_encontrado", "a_aguardar_orcamento", "agendado", "em_execucao"].includes(s.status)
-    );
-    const requests: DispatchRequest[] = active.slice(0, 8).map((s, i) => ({
-      id: s.id,
-      customerName: s.customerName,
-      categoryName: s.categoryName,
-      serviceName: s.serviceName,
-      city: s.city,
-      status: s.status,
-      waitingMinutes: 3 + ((i * 7) % 41),
-      value: s.totalCustomerValue,
-      radiusKm: 5 + ((i * 3) % 12),
-    }));
-    const technicians: AvailableTechnician[] = mockData.technicians
-      .filter((t) => t.status === "ativo")
-      .slice(0, 7)
-      .map((t, i) => ({
-        id: t.id,
-        name: t.name,
-        city: t.city,
-        categories: t.categories.slice(0, 2),
-        rating: t.averageRating,
-        distanceKm: 1 + ((i * 2.4) % 9),
-        acceptanceRate: t.acceptanceRate,
-      }));
-    return {
-      kpis: {
-        waiting: active.length,
-        available: technicians.length,
-        avgAssignMin: 12,
-        autoDispatchRate: 74,
-      },
-      requests,
-      technicians,
-    };
-  }).then((r) => r.data);
-}
-
 /* ============================ CATÁLOGO ============================ */
 
 export interface CatalogCategory {
@@ -199,42 +130,19 @@ export async function getZones(): Promise<{ zones: ZoneRow[]; coverageAvg: numbe
 
 /* ============================ QUALIDADE & CONFIANÇA ============================ */
 
-export interface QualityData {
-  kpis: { avgRating: number; nps: number; complaintRate: number; verifiedTechnicians: number };
-  ratingSeries: { name: string; value: number }[];
-  ratingDistribution: { name: string; value: number }[];
-  complaints: { id: string; customerName: string; category: string; status: string; openedAt: string }[];
-}
+export type { Qualidade } from "@/lib/qualidade";
+import type { Qualidade } from "@/lib/qualidade";
 
-export async function getQuality(): Promise<QualityData> {
-  return apiGet("/quality", () => {
-    const services = mockData.services;
-    const rated = services.filter((s) => s.rating);
-    const avgRating = rated.length ? +(rated.reduce((a, s) => a + (s.rating ?? 0), 0) / rated.length).toFixed(2) : 4.6;
-    const dist = [1, 2, 3, 4, 5].map((star) => ({
-      name: `${star}★`,
-      value: rated.filter((s) => Math.round(s.rating ?? 0) === star).length || (star >= 4 ? star * 30 : star * 4),
-    }));
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    const ratingSeries = months.map((m, i) => ({ name: m, value: +(4.3 + (i % 3) * 0.15).toFixed(2) }));
-    const complaints = services.filter((s) => s.hasComplaint).slice(0, 6).map((s, i) => ({
-      id: s.id,
-      customerName: s.customerName,
-      category: s.categoryName,
-      status: ["em_analise", "resolvido", "em_reclamacao"][i % 3],
-      openedAt: s.requestedAt,
-    }));
-    return {
-      kpis: {
-        avgRating,
-        nps: 62,
-        complaintRate: +((services.filter((s) => s.hasComplaint).length / Math.max(1, services.length)) * 100).toFixed(1),
-        verifiedTechnicians: mockData.technicians.filter((t) => t.documentationComplete).length,
-      },
-      ratingSeries,
-      ratingDistribution: dist,
-      complaints,
-    };
+/**
+ * Qualidade a partir das avaliacoes REAIS (ver /api/quality).
+ *
+ * Sem mock: o anterior devolvia NPS 62, uma serie mensal por formula e cinco
+ * motivos de reclamacao escritos a mao. Num ecra de qualidade, numeros
+ * inventados sao piores do que ecra vazio.
+ */
+export async function getQuality(): Promise<Qualidade> {
+  return apiGet<Qualidade>("/quality", () => {
+    throw new Error("As avaliacoes precisam da ligacao aos servicos do Laravel.");
   }).then((r) => r.data);
 }
 
@@ -408,7 +316,12 @@ export interface CustomServiceRequest {
   phone: string;
   description: string;
   city: string;
-  urgency: "baixa" | "media" | "alta";
+  /*
+    O Laravel não guarda urgência num pedido personalizado. Fica `null` em vez
+    de "média" por omissão: um pedido urgente tratado como normal por causa de
+    um valor inventado é pior do que não se saber.
+  */
+  urgency: "baixa" | "media" | "alta" | null;
   status: "novo" | "em_analise" | "orcamento_enviado" | "aprovado" | "recusado";
   createdAt: string;
   estimate?: number;
@@ -512,48 +425,6 @@ export async function getTasksBoard(): Promise<{ tasks: TeamTask[]; workload: { 
   }).then((r) => r.data);
 }
 
-/* ============================ RECRUTAMENTO ============================ */
-
-export interface TechCandidate {
-  id: string;
-  name: string;
-  specialization: string;
-  city: string;
-  status: "por_validar" | "em_analise" | "entrevista" | "aprovado" | "recusado";
-  docsComplete: boolean;
-  appliedAt: string;
-}
-
-export interface JobOpening {
-  id: string;
-  title: string;
-  department: string;
-  type: "Promoção interna" | "Mobilidade interna" | "Nova posição";
-  candidates: number;
-  status: "aberta" | "entrevistas" | "fechada";
-  deadline: string;
-}
-
-export async function getRecruitment(): Promise<{ candidates: TechCandidate[]; openings: JobOpening[] }> {
-  return apiGet("/recruitment", () => {
-    const candidates: TechCandidate[] = [
-      { id: "c1", name: "Nuno Bernardes", specialization: "Canalização", city: "Lisboa", status: "por_validar", docsComplete: false, appliedAt: "2026-07-01" },
-      { id: "c2", name: "Patrícia Reis", specialization: "Eletricidade", city: "Amadora", status: "em_analise", docsComplete: true, appliedAt: "2026-06-29" },
-      { id: "c3", name: "Hugo Martins", specialization: "AVAC", city: "Sintra", status: "entrevista", docsComplete: true, appliedAt: "2026-06-27" },
-      { id: "c4", name: "Sara Lopes", specialization: "Limpeza e manutenção", city: "Loures", status: "aprovado", docsComplete: true, appliedAt: "2026-06-22" },
-      { id: "c5", name: "Diogo Fonseca", specialization: "Fechaduras e portas", city: "Cascais", status: "recusado", docsComplete: false, appliedAt: "2026-06-20" },
-    ];
-    const openings: JobOpening[] = [
-      { id: "v1", title: "Coordenador de Operações", department: "Operações", type: "Promoção interna", candidates: 4, status: "entrevistas", deadline: "2026-07-15" },
-      { id: "v2", title: "Agente de Suporte sénior", department: "Suporte", type: "Mobilidade interna", candidates: 3, status: "aberta", deadline: "2026-07-31" },
-      { id: "v3", title: "Analista de Dados", department: "Tecnologia", type: "Nova posição", candidates: 6, status: "aberta", deadline: "2026-08-10" },
-      { id: "v4", title: "Team Lead de Marketing", department: "Marketing", type: "Promoção interna", candidates: 2, status: "entrevistas", deadline: "2026-07-05" },
-      { id: "v5", title: "Engenheiro de Software sénior", department: "Tecnologia", type: "Promoção interna", candidates: 3, status: "aberta", deadline: "2026-08-22" },
-    ];
-    return { candidates, openings };
-  }).then((r) => r.data);
-}
-
 export interface Complaint {
   id: string;
   customerName: string;
@@ -583,25 +454,22 @@ export async function getComplaints(): Promise<Complaint[]> {
 
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
 
-// Estados do pedido de serviço (pipeline do CRM). A ordem é a do funil.
-/** Estados do funil — definidos em src/lib/leadStages.ts (fonte única). */
+/** Estados de um pedido — definidos em src/lib/leadStages.ts (fonte única). */
 export type LeadStage = LeadStageId;
 
-// Rótulos pedidos pelo André: Novo / Orçamento enviado / Aceite / Executado /
-// Recusado. Os `id` mantêm-se (a BD e a lógica de criar serviço no "concluido"
-// dependem deles); muda só o texto.
+/*
+  Os rótulos dizem o que se passa, não em que casa do funil se está.
+
+  "Aguardar resposta" e "Aceite" descreviam um negócio de orçamentos. Aqui, um
+  pedido está à procura de técnico ou já tem um -- e é isso que quem olha para
+  a lista precisa de saber para decidir o que fazer a seguir.
+*/
 export const LEAD_STAGES: { id: LeadStage; label: string }[] = [
-  { id: "nao_iniciado", label: "Novo" },
-  // Já se contactou o cliente e espera-se que ele diga alguma coisa — antes
-  // disto, um pedido contactado sem resposta ficava indistinguível de um novo.
-  { id: "aguarda_resposta", label: "Aguardar resposta" },
-  { id: "orcamento_aceite", label: "Aceite" },
-  { id: "concluido", label: "Executado" },
-  { id: "recusado", label: "Recusado" },
-  // Serviço que chegou a ser executado e pago, e cujo dinheiro foi depois
-  // devolvido ao cliente. É diferente de "Recusado" (nunca houve trabalho nem
-  // dinheiro) e não pode continuar a contar como ganho.
-  { id: "reembolsado", label: "Reembolsado" },
+  { id: "novo", label: "Novo" },
+  { id: "a_procurar", label: "À procura de técnico" },
+  { id: "com_tecnico", label: "Com técnico" },
+  { id: "concluido", label: "Concluído" },
+  { id: "perdido", label: "Perdido" },
 ];
 
 export { LEAD_STAGES_SEM_RECEITA } from "@/lib/leadStages";
@@ -632,7 +500,18 @@ export interface Lead {
   categoryId: string;
   executionDate: string;          // data de execução (ISO ou "")
   rating: number | null;          // classificação do serviço
-  serviceId: string | null;       // serviço criado em Operações quando concluído
+  serviceId: string | null;
+  /** Serviço correspondente na app, quando o pedido veio de lá. */
+  laravelServiceId?: string | null;       // serviço criado em Operações quando concluído
+  /**
+   * Nome do técnico, quando este contacto é da rede e não um cliente.
+   *
+   * Vazio para clientes. As mensagens de técnicos já não criam leads, mas as
+   * que entraram antes dessa separação ficaram cá -- e marcá-las é melhor do
+   * que apagá-las: apagar dados reais não é decisão de um filtro, e escondê-las
+   * faria desaparecer sem aviso o pedido de um técnico que também é cliente.
+   */
+  technicianContact?: string;
 }
 
 /** Campos editáveis de um pedido no CRM. */
@@ -679,34 +558,32 @@ export interface WaMensagem {
   createdAt: string;
 }
 
-/** A conversa de WhatsApp de uma lead, mais o estado do canal. */
+/** O histórico de WhatsApp de um pedido. Só leitura — não se envia do backoffice. */
 export interface Conversa {
   messages: WaMensagem[];
-  /** Há chaves da Meta na Vercel para poder enviar? */
-  configured: boolean;
-  /** Ainda se pode responder em texto livre (< 24h da última entrada)? */
-  windowOpen: boolean;
   /** A migração da tabela já correu? */
   migrated: boolean;
 }
 
-/** Lê a conversa de WhatsApp de uma lead. Sem backend, devolve vazio. */
+/** Lê o histórico de WhatsApp de uma lead. Sem backend, devolve vazio. */
 export async function getLeadMessages(id: string): Promise<Conversa> {
   return apiGet<Conversa>(
     `/marketing/leads/${id}/messages`,
-    () => ({ messages: [], configured: false, windowOpen: false, migrated: false }),
+    () => ({ messages: [], migrated: false }),
   ).then((r) => r.data);
 }
 
 /**
- * Envia uma resposta pelo WhatsApp. Lança com a mensagem do servidor quando não
- * dá (canal por ligar, janela de 24h fechada, ou a Meta recusou) — o ecrã
- * mostra esse motivo em vez de fingir que enviou.
+ * Histórico de WhatsApp de um técnico.
+ *
+ * Separada da do cliente: uma mensagem de um técnico deixou de precisar de uma
+ * lead para existir, e por isso deixou de aparecer no CRM como um pedido.
  */
-export async function sendLeadMessage(id: string, body: string): Promise<WaMensagem> {
-  return apiPost<WaMensagem>(`/marketing/leads/${id}/messages`, { body }, () => {
-    throw new Error("O envio pelo WhatsApp ainda não está ligado.");
-  }).then((r) => r.data);
+export async function getTechnicianMessages(id: string): Promise<Conversa> {
+  return apiGet<Conversa>(
+    `/technicians/${id}/messages`,
+    () => ({ messages: [], migrated: false }),
+  ).then((r) => r.data);
 }
 
 /** Elimina um pedido do CRM (DELETE /api/marketing/leads/:id). */
@@ -719,7 +596,7 @@ export async function createLead(input: NewLead): Promise<Lead> {
   const now = new Date().toISOString();
   return apiPost<Lead>("/marketing/leads", input, () => ({
     id: `lead_${Date.now()}`, ...input, source: input.source || "whatsapp",
-    stage: "nao_iniciado", value: 0, createdAt: now, notes: "", lossReason: "", lossNote: "",
+    stage: "novo", value: 0, createdAt: now, notes: "", lossReason: "", lossNote: "",
     quoteValue: null, technicianValue: null, technicianName: "", categoryId: "",
     executionDate: "", rating: null, serviceId: null,
   })).then((r) => r.data);
@@ -769,117 +646,53 @@ export interface CustomRequest {
   city: string;
   category: string;
   description: string;
-  urgency: "baixa" | "media" | "alta";
+  /*
+    O Laravel não guarda urgência num pedido personalizado. Fica `null` em vez
+    de "média" por omissão: um pedido urgente tratado como normal por causa de
+    um valor inventado é pior do que não se saber.
+  */
+  urgency: "baixa" | "media" | "alta" | null;
   status: CustomRequestStatus;
   createdAt: string;
   estimatedHours: number | null;   // definido pela Piquet
+  /** Quantas fotografias o cliente anexou na app (URLs só no detalhe). */
+  photosCount?: number;
   proposals: TechProposal[];       // 3 opções (vazio até estimar)
 }
 
-const SAMPLE_REVIEWS = [
-  "Trabalho impecável e muito profissional.",
-  "Rápido, limpo e explicou tudo.",
-  "Chegou à hora e resolveu logo.",
-  "Excelente relação qualidade/preço.",
-  "Muito cuidadoso e simpático.",
-  "Recomendo, voltarei a contratar.",
-];
-
-function makeProposals(seed: number, hours: number, category: string): TechProposal[] {
-  const techs = mockData.technicians.filter((t) => t.averageRating >= 4 && t.servicesCompleted > 5);
-  return Array.from({ length: 3 }).map((_, i) => {
-    const t = techs[(seed * 3 + i) % techs.length];
-    const hourly = 22 + ((seed + i) % 4) * 6; // 22–40€/h
-    return {
-      id: `prop_${seed}_${i}`,
-      technicianId: t?.id,
-      technicianName: t?.name ?? `Técnico ${i + 1}`,
-      rating: t?.averageRating ?? 4.6,
-      reviewsCount: (t?.servicesCompleted ?? 40) % 120 + 12,
-      specialization: category,
-      distanceKm: 1 + ((seed + i * 2) % 9),
-      fixedPrice: Math.round(hours * hourly + 15),
-      topReviews: [SAMPLE_REVIEWS[(seed + i) % SAMPLE_REVIEWS.length], SAMPLE_REVIEWS[(seed + i + 2) % SAMPLE_REVIEWS.length]],
-    };
-  });
-}
-
 export async function getCustomRequests(): Promise<CustomRequest[]> {
-  return apiGet("/custom-requests", () => {
-    const base: Omit<CustomRequest, "proposals">[] = [
-      { id: "cr_1", customerName: "Helena Marques", phone: "+351 912 345 678", city: "Cascais", category: "Instalações domésticas", description: "Instalação de painéis solares numa moradia T4, incluindo ligação ao quadro elétrico.", urgency: "media", status: "opcoes_enviadas", createdAt: "2026-06-28", estimatedHours: 8 },
-      { id: "cr_2", customerName: "Bruno Tavares", phone: "+351 934 111 222", city: "Lisboa", category: "Canalização", description: "Remodelação completa de casa de banho — substituir loiças, torneiras e canalização.", urgency: "baixa", status: "em_analise", createdAt: "2026-06-25", estimatedHours: 14 },
-      { id: "cr_3", customerName: "Condomínio Estrela", phone: "+351 210 998 877", city: "Lisboa", category: "AVAC", description: "Manutenção anual do sistema AVAC e limpeza das zonas comuns do edifício.", urgency: "alta", status: "novo", createdAt: "2026-07-01", estimatedHours: null },
-      { id: "cr_4", customerName: "Rita Nunes", phone: "+351 961 555 444", city: "Sintra", category: "Eletricidade", description: "Domótica — automação de estores, luzes e termostato em apartamento T3.", urgency: "media", status: "agendado", createdAt: "2026-06-20", estimatedHours: 6 },
-      { id: "cr_5", customerName: "Miguel Antunes", phone: "+351 926 777 000", city: "Loures", category: "Instalações domésticas", description: "Reparação de telhado após tempestade — substituir telhas e impermeabilizar.", urgency: "alta", status: "novo", createdAt: "2026-06-30", estimatedHours: null },
-      { id: "cr_6", customerName: "Sofia Melo", phone: "+351 915 222 333", city: "Amadora", category: "Montagem de mobiliário", description: "Montagem de cozinha completa em kit, com fixação de móveis suspensos.", urgency: "media", status: "opcoes_enviadas", createdAt: "2026-06-29", estimatedHours: 10 },
-    ];
-    return base.map((b, i) => ({
-      ...b,
-      // Só os já enviados/agendados trazem propostas; novos e em análise começam
-      // vazios, para a equipa escolher os 3 técnicos à mão.
-      proposals: (b.status === "opcoes_enviadas" || b.status === "agendado") && b.estimatedHours
-        ? makeProposals(i + 1, b.estimatedHours, b.category) : [],
-    }));
-  }).then((r) => r.data);
+  /*
+    Sem recurso a dados de exemplo.
+
+    Até 22/09/2026 este fallback devolvia SEIS pedidos escritos à mão -- Helena
+    Marques com painéis solares em Cascais, o Condomínio Estrela com AVAC --
+    que apareciam no ecrã como se fossem clientes. Os verdadeiros existiam na
+    base de dados das apps e nunca chegavam cá.
+
+    Agora vêm do Laravel (PR #83). Sem ligação, a lista vem vazia e o ecrã
+    di-lo -- que é a verdade, e não seis pessoas que não existem.
+  */
+  return apiGet<CustomRequest[]>("/custom-requests", () => []).then((r) => r.data);
+
 }
 
-/* ==================== RECRUTAMENTO — TAREFAS & AGENDA ==================== */
-
-export const RECRUITERS = ["Sofia Antunes", "Mariana Quintela", "Helena Cruz"];
-
-export interface RecruitmentTask {
-  id: string;
-  title: string;
-  assignee: string;
-  candidate?: string;
-  priority: "critica" | "alta" | "media" | "baixa";
-  status: "aberta" | "em_curso" | "concluida";
-  due: string;
+/** Um acontecimento na vida de um pedido — só com data real. */
+export interface EventoPedido {
+  em: string;
+  titulo: string;
+  detalhe?: string;
 }
 
-export async function getRecruitmentTasks(): Promise<RecruitmentTask[]> {
-  return apiGet("/recruitment/tasks", () => {
-    const data: RecruitmentTask[] = [
-      { id: "rt1", title: "Validar documentos", assignee: "Sofia Antunes", candidate: "Nuno Bernardes", priority: "alta", status: "em_curso", due: "2026-07-03" },
-      { id: "rt2", title: "Entrevista técnica", assignee: "Mariana Quintela", candidate: "Hugo Martins", priority: "alta", status: "aberta", due: "2026-07-04" },
-      { id: "rt3", title: "Verificar registo criminal", assignee: "Helena Cruz", candidate: "Patrícia Reis", priority: "media", status: "aberta", due: "2026-07-05" },
-      { id: "rt4", title: "Contactar referências", assignee: "Sofia Antunes", candidate: "Sara Lopes", priority: "media", status: "em_curso", due: "2026-07-03" },
-      { id: "rt5", title: "Fechar vaga Analista de Dados", assignee: "Mariana Quintela", priority: "baixa", status: "aberta", due: "2026-07-08" },
-      { id: "rt6", title: "Onboarding de aprovados", assignee: "Helena Cruz", priority: "critica", status: "aberta", due: "2026-07-03" },
-      { id: "rt7", title: "Publicar vaga de Suporte", assignee: "Sofia Antunes", priority: "baixa", status: "concluida", due: "2026-07-01" },
-    ];
-    return data;
-  }).then((r) => r.data);
-}
-
-export interface AgendaEvent {
-  id: string;
-  person: string;
-  date: string;   // YYYY-MM-DD
-  start: string;  // HH:mm
-  end: string;
-  title: string;
-  type: "entrevista" | "documentos" | "reuniao" | "follow_up";
-  candidate?: string;
-}
-
-export async function getRecruitmentAgenda(): Promise<AgendaEvent[]> {
-  return apiGet("/recruitment/agenda", () => {
-    // Semana de 2026-07-03 (sex) a 2026-07-09 (qui) — foco no dia atual (03) e semana.
-    const data: AgendaEvent[] = [
-      { id: "ag1", person: "Sofia Antunes", date: "2026-07-03", start: "09:30", end: "10:15", title: "Entrevista — Hugo Martins", type: "entrevista", candidate: "Hugo Martins" },
-      { id: "ag2", person: "Sofia Antunes", date: "2026-07-03", start: "11:00", end: "11:30", title: "Validar documentos — Nuno B.", type: "documentos", candidate: "Nuno Bernardes" },
-      { id: "ag3", person: "Sofia Antunes", date: "2026-07-03", start: "15:00", end: "15:45", title: "Follow-up referências", type: "follow_up", candidate: "Sara Lopes" },
-      { id: "ag4", person: "Mariana Quintela", date: "2026-07-03", start: "10:00", end: "11:00", title: "Reunião de recrutamento", type: "reuniao" },
-      { id: "ag5", person: "Mariana Quintela", date: "2026-07-03", start: "14:00", end: "14:45", title: "Entrevista — Patrícia Reis", type: "entrevista", candidate: "Patrícia Reis" },
-      { id: "ag6", person: "Helena Cruz", date: "2026-07-03", start: "09:00", end: "09:30", title: "Registo criminal — Patrícia R.", type: "documentos", candidate: "Patrícia Reis" },
-      { id: "ag7", person: "Helena Cruz", date: "2026-07-03", start: "16:00", end: "16:30", title: "Onboarding — Sara Lopes", type: "reuniao", candidate: "Sara Lopes" },
-      { id: "ag8", person: "Sofia Antunes", date: "2026-07-04", start: "10:00", end: "10:45", title: "Entrevista — candidato eletricista", type: "entrevista" },
-      { id: "ag9", person: "Mariana Quintela", date: "2026-07-05", start: "11:00", end: "12:00", title: "Triagem de candidaturas", type: "reuniao" },
-      { id: "ag10", person: "Helena Cruz", date: "2026-07-07", start: "09:30", end: "10:00", title: "Verificar IBAN — vários", type: "documentos" },
-      { id: "ag11", person: "Sofia Antunes", date: "2026-07-08", start: "15:00", end: "15:30", title: "Fecho de vaga Suporte", type: "reuniao" },
-    ];
-    return data;
-  }).then((r) => r.data);
+/**
+ * A cronologia de um pedido.
+ *
+ * `completo: false` quer dizer que só sabemos quando entrou -- ou porque veio
+ * do site (e aí não há passos automáticos), ou porque o serviço da app não
+ * está ao alcance agora. Não é erro; é o que há.
+ */
+export async function getLeadTimeline(id: string): Promise<{ eventos: EventoPedido[]; completo: boolean }> {
+  return apiGet<{ eventos: EventoPedido[]; completo: boolean }>(
+    `/marketing/leads/${id}/timeline`,
+    () => ({ eventos: [], completo: false }),
+  ).then((r) => r.data);
 }

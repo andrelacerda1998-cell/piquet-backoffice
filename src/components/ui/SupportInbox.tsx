@@ -458,6 +458,21 @@ export function SupportInbox() {
                       </div>
                       <div className={cn("inline-block rounded-2xl px-3 py-2 text-sm text-text-primary text-left whitespace-pre-wrap",
                         own ? "bg-piquet/15" : "bg-surface-subtle")}>{m.body}</div>
+                      {/* Fotos que o cliente juntou. Abrem em separador novo em
+                          tamanho real: a miniatura serve para saber que existem,
+                          não para ler a chapa de um esquentador. */}
+                      {Array.isArray(m.images) && m.images.length > 0 && (
+                        <div className={cn("flex flex-wrap gap-2 mt-1.5", own && "justify-end")}>
+                          {m.images.map((src) => (
+                            <a key={src} href={src} target="_blank" rel="noopener noreferrer"
+                               className="block rounded-xl overflow-hidden border border-surface-border hover:border-piquet transition-colors">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={src} alt="Foto enviada pelo cliente"
+                                   className="h-24 w-24 object-cover" loading="lazy" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

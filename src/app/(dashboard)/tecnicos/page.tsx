@@ -14,8 +14,9 @@ import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
-  getVendors, suspendVendor, restoreVendor, getVendorMetrics, getVendorsByCategory,
+  getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
 } from "@/services/vendorsService";
 
@@ -28,6 +29,8 @@ import {
   type VendorDocument, type VendorDocumentStatus,
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
@@ -58,8 +61,8 @@ export default function TechniciansPage() {
     () => getVendors(1, 100, undefined, true),
     []
   );
-  const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
+  const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
   // Cobertura por técnico — os técnicos declaram na própria app onde
@@ -229,6 +232,26 @@ export default function TechniciansPage() {
   // não o enviar de todo) — aceitamos qualquer um.
   const atUser = (v: RealVendor) => v.at_username || v.at_user || v.at_subuser || null;
   const [atSaving, setAtSaving] = useState(false);
+  /*
+    Criar o workspace de faturação. É o passo sem o qual a Piquet não consegue
+    emitir fatura em nome do técnico quando o serviço fecha -- daí estar aqui
+    e não escondido numa lista de ações.
+  */
+  const [wsSaving, setWsSaving] = useState(false);
+  const criarWorkspace = async (v: RealVendor) => {
+    setWsSaving(true);
+    try {
+      const atualizado = await createVendorInvoiceWorkspace(v.id);
+      toast(`Workspace de faturação criado para ${v.name ?? "o técnico"}.`);
+      setProfileVendor(atualizado);
+      refetchVendors();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao criar o workspace.", "error");
+    } finally {
+      setWsSaving(false);
+    }
+  };
+
   const setAtValidation = async (v: RealVendor, valid: boolean) => {
     setAtSaving(true);
     try {
@@ -308,6 +331,38 @@ export default function TechniciansPage() {
     }
   };
 
+  /*
+    Apagar de vez. Duas coisas diferentes do suspender:
+
+    1. Confirmação explícita, porque não há volta -- o `suspend` reverte-se
+       num clique, isto não se reverte de todo.
+    2. O resultado diz quantos serviços ficaram sem dono. É o custo real da
+       operação e o Laravel devolve-o de propósito; escondê-lo aqui seria
+       deixar a pessoa sem saber o que acabou de acontecer ao histórico.
+  */
+  const [vendorParaApagar, setVendorParaApagar] = useState<RealVendor | null>(null);
+  const [aApagar, setAApagar] = useState(false);
+  const apagarDeVez = async (v: RealVendor) => {
+    setAApagar(true);
+    try {
+      const r = await deleteVendorPermanently(v.id);
+      toast(
+        r.orphan_services > 0
+          ? `${v.name ?? v.id} apagado. ${r.orphan_services} ${r.orphan_services === 1 ? "serviço ficou" : "serviços ficaram"} sem técnico associado.`
+          : `${v.name ?? v.id} apagado.`,
+        "error",
+      );
+      setVendorParaApagar(null);
+      setProfileVendor(null);
+      refetchVendors();
+      refetchSuspended();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível apagar o técnico.", "error");
+    } finally {
+      setAApagar(false);
+    }
+  };
+
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Lista" },
@@ -362,8 +417,21 @@ export default function TechniciansPage() {
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
     { key: "suspended_at", label: "Suspenso em", render: (r) => r.suspended_at ? formatDate(r.suspended_at) : "—" },
+    /*
+      Reativar e apagar lado a lado, mas não com o mesmo peso.
+
+      Um técnico suspenso está à espera de uma de duas decisões: volta, ou vai
+      de vez. Fazer a segunda obrigava a abrir a ficha -- e é aqui que se olha
+      para a lista de quem está parado.
+
+      "Apagar" fica em cinzento e só fica vermelho ao passar o rato: a ação sem
+      retorno não deve ter o mesmo destaque da que se desfaz num clique.
+    */
     { key: "acao", label: "", render: (r) => (
-      <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
+      <div className="flex items-center justify-end gap-3">
+        <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-sm text-success hover:underline disabled:opacity-50">Reativar</button>
+        <button onClick={() => setVendorParaApagar(r)} className="text-sm text-text-muted hover:text-danger transition-colors">Apagar</button>
+      </div>
     ) },
   ];
 
@@ -427,7 +495,6 @@ export default function TechniciansPage() {
                         <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
                         <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
                         <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
-                        <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
                       </div>
                     )}
                     <div>
@@ -436,11 +503,13 @@ export default function TechniciansPage() {
                     </div>
                   </div>
                 )}
+                {/* Só o circular: as barras e o donut liam os MESMOS `byCategory`,
+                    lado a lado. Duas leituras do mesmo número não acrescentam
+                    nada — e a proporção é o que interessa aqui. */}
                 {sub === "categoria" && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <ChartCard title="Técnicos por categoria" subtitle="Áreas de operação em que estão registados"><BarChartComponent data={byCategory ?? []} /></ChartCard>
-                    <ChartCard title="Distribuição por categoria"><DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" /></ChartCard>
-                  </div>
+                  <ChartCard title="Distribuição de técnicos por categoria" subtitle="Áreas de operação em que estão registados">
+                    <DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" />
+                  </ChartCard>
                 )}
                 {sub === "cobertura" && (
                   <div className="space-y-5">
@@ -656,7 +725,7 @@ export default function TechniciansPage() {
                 { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
                   <div className="flex items-center gap-3 justify-end">
                     <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
-                    <button onClick={() => openDecline(r)} className="text-xs text-danger hover:underline">Recusar</button>
+                    <button onClick={() => openDecline(r)} className="text-sm text-danger hover:underline">Recusar</button>
                   </div>
                 ) : null },
               ]}
@@ -795,8 +864,33 @@ export default function TechniciansPage() {
           const atUi = AT_STATE_UI[at];
           const utilizador = atUser(v);
           const morada = v.address || v.billing_address || null;
-          const nomeFiscal = v.billing_name || v.fiscal_name || null;
-          const temFaturacao = Boolean(nomeFiscal || morada || v.postal_code || v.city || v.iban || v.vat_regime);
+          // A designação fiscal é a própria company_name -- não há coluna
+          // separada no backend.
+          const temFaturacao = Boolean(v.company_name || morada || v.postal_code || v.city || v.iban);
+
+          /*
+            Há workspace de faturação?
+
+            Três respostas, não duas -- e a diferença importa. `undefined` é o
+            backend a NÃO enviar o campo (a versão em produção ainda não o
+            expõe); `null`/"" é o backend a dizer que não existe. Tratar as
+            duas como "não existe" punha um aviso vermelho e um botão ativo em
+            técnicos que já têm workspace, e clicar dava erro.
+
+            E há uma prova indireta: `can_accept_service` é calculado no
+            Laravel e EXIGE invoice_workspace != null (Vendor::canAcceptService).
+            Se o técnico pode aceitar serviços, o workspace existe -- mesmo que
+            o seu nome não venha na resposta.
+          */
+          const wsDesconhecido = v.invoice_workspace === undefined;
+          const temWorkspace = Boolean(v.invoice_workspace) || (wsDesconhecido && v.can_accept_service);
+          const podeCriarWs = !temWorkspace && !wsDesconhecido && !v.invoice_workspace_blocker;
+          const wsMotivo = temWorkspace
+            ? null
+            : wsDesconhecido
+              ? "O backend em produção ainda não devolve o workspace de faturação, por isso não dá para saber se existe. Criar às cegas podia duplicá-lo."
+              : v.invoice_workspace_blocker
+                ?? null;
 
           /** Rótulo curto do que falta ou está feito — o essencial de relance. */
           const chip = (ok: boolean, texto: string) => (
@@ -842,7 +936,7 @@ export default function TechniciansPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* ------------------------- Documentos ------------------------- */}
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Documentos obrigatórios</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Documentos obrigatórios</p>
                   {REQUIRED_DOCS.map((req) => {
                     const st = states?.[req.key] ?? "em_falta";
                     const ui = DOC_STATE_UI[st];
@@ -851,7 +945,7 @@ export default function TechniciansPage() {
                       <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-text-primary">{req.label}</p>
-                          <p className={cn("text-xs", ui.tone)}>
+                          <p className={cn("text-sm", ui.tone)}>
                             {ui.symbol} {ui.label}
                             {doc?.created_at && st !== "em_falta" && ` · ${formatDate(doc.created_at)}`}
                             {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
@@ -868,7 +962,7 @@ export default function TechniciansPage() {
                           {doc && doc.status === "pending" && (
                             <>
                               <button onClick={() => { setProfileVendor(null); openApprove(doc); }}
-                                className="text-xs font-medium text-success hover:underline">Aprovar</button>
+                                className="text-sm font-medium text-success hover:underline">Aprovar</button>
                               <button onClick={() => { setProfileVendor(null); openDecline(doc); }}
                                 className="text-xs text-danger hover:underline">Recusar</button>
                             </>
@@ -898,60 +992,190 @@ export default function TechniciansPage() {
                   )}
                 </div>
 
-                {/* --------------------- AT + dados + faturação -------------------- */}
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Subutilizador AT</p>
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
-                      <div className="min-w-0">
-                        <p className={cn("text-sm font-medium", atUi.tone)}>{atUi.symbol} {atUi.label}</p>
-                        <p className="text-xs text-text-secondary truncate"
-                          title={utilizador ? undefined : "A API devolve só at_valid e at_validated_at. Falta expor at_username no VendorController."}>
-                          {utilizador
-                            ? <><span className="font-mono text-text-primary">{utilizador}</span>
-                                {v.at_validated_at && ` · ${formatDate(v.at_validated_at)}`}</>
-                            : "Identificador não enviado pelo backend"}
-                        </p>
-                      </div>
+                {/* ------------------- Faturação: AT + empresa + dados ------------------ */}
+                {/*
+                  Uma tabela só, não três blocos. O subutilizador AT aparecia em
+                  cima E outra vez nos dados da empresa (identificador, válido,
+                  validado em) -- as mesmas três linhas duas vezes eram metade
+                  do scroll deste painel.
+                */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Faturação e dados</p>
+                    <div className="flex items-center gap-2">
                       {at === "validado" ? (
                         <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
-                          className="text-xs text-warning hover:underline disabled:opacity-50 shrink-0">Retirar</button>
+                          className="text-sm text-warning hover:underline disabled:opacity-50">Retirar AT</button>
                       ) : (
                         <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
                           title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
-                          className="btn-primary text-xs py-1 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed">
-                          {atSaving ? "A gravar…" : "Validar"}
+                          className="btn-secondary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                          {atSaving ? "A gravar…" : "Validar AT"}
+                        </button>
+                      )}
+                      {!temWorkspace && (
+                        <button
+                          disabled={wsSaving || !podeCriarWs}
+                          onClick={() => criarWorkspace(v)}
+                          title={wsMotivo ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
+                          className="btn-primary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {wsSaving ? "A criar…" : "Criar workspace"}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Dados</p>
-                    <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
-                      {[
-                        ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
-                        ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
-                        ["Nome fiscal", nomeFiscal ?? "—"],
-                        ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
-                        ["IBAN", v.iban ? `${v.iban.slice(0, 8)}••••${v.iban.slice(-4)}` : "—"],
-                        ["Regime de IVA", v.vat_regime
-                          ? `${v.vat_regime}${v.withholding_tax != null ? (v.withholding_tax ? ` · retenção ${v.withholding_rate ?? "?"}%` : " · sem retenção") : ""}`
-                          : "—"],
-                      ].map(([rotulo, valor]) => (
-                        <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-2">
-                          <span className="text-xs text-text-muted shrink-0">{rotulo}</span>
-                          <span className="text-sm text-text-primary text-right truncate">{valor}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {!temFaturacao && (
-                      /* Uma linha, não uma caixa de seis. O detalhe fica no tooltip. */
-                      <p className="text-[11px] text-text-muted cursor-help"
-                        title="A API de admin devolve 12 campos por técnico e nenhum é de faturação. Falta no VendorController: morada + código postal, IBAN, regime de IVA/retenção e nome fiscal.">
-                        Dados de faturação por enviar pelo backend — está no quadro do Rodrigo.
+                  {/* Sem workspace não há fatura possível no fim do serviço --
+                      é aviso a sério, e diz a razão que o backend dá. */}
+                  {!temWorkspace && (
+                    <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+                      <p className="text-sm text-text-secondary">
+                        <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
+                        {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
                       </p>
-                    )}
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
+                    {([
+                      ["Workspace de faturação", temWorkspace
+                        ? (v.invoice_workspace ?? "Existe (nome não enviado)")
+                        : "—"],
+                      ["Nome da empresa", v.company_name ?? "—"],
+                      ["Subutilizador AT", utilizador
+                        ? <span key="at-user" className="font-mono">{utilizador}</span>
+                        : "—"],
+                      ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
+                        {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
+                      ["NIF", v.nif || "—"],
+                      ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
+                      ["IBAN", v.iban ? <span key="iban" className="font-mono text-sm">{v.iban}</span> : "—"],
+                      ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
+                      ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
+                    ] as [string, React.ReactNode][]).map(([rotulo, valor]) => (
+                      <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
+                        <span className="text-sm text-text-muted shrink-0">{rotulo}</span>
+                        <span className="text-sm text-text-primary text-right truncate">{valor}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/*
+                    Os serviços que o técnico escolheu fazer.
+
+                    Lista própria e não mais uma linha na tabela acima: são
+                    serviços do catálogo, não categorias, e um técnico costuma
+                    ter dezenas -- juntá-los por vírgulas numa linha truncada
+                    dava uma frase cortada que não responde a nada.
+
+                    Fechado por omissão, com a contagem à vista: quem abre a
+                    ficha quer saber QUANTOS e, às vezes, SE faz um em
+                    concreto. Aberto de origem, empurrava o resto do perfil
+                    para fora do ecrã.
+                  */}
+                  {(() => {
+                    const servicos = v.services_types ?? [];
+                    if (servicos.length === 0) {
+                      return (
+                        <p className="text-sm text-text-muted">
+                          Sem serviços escolhidos — este técnico não entra no matching de nenhum pedido.
+                        </p>
+                      );
+                    }
+                    return (
+                      <details open>
+                        <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
+                          Serviços que faz ({servicos.length})
+                        </summary>
+                        {/*
+                          Lista e não etiquetas: os nomes são frases ("Limpeza de
+                          Colchão de Casal"), e em etiquetas o olho tem de saltar
+                          entre linhas de larguras diferentes para ler cada uma.
+                          Em coluna, lê-se de cima a baixo.
+
+                          Duas colunas em ecrãs largos porque a maioria dos nomes
+                          é curta e uma coluna só desperdiçava metade da largura
+                          com dezenas de linhas.
+                        */}
+                        <ul className="mt-2 max-h-64 overflow-auto rounded-lg bg-surface-subtle p-3
+                                       columns-1 sm:columns-2 gap-x-6">
+                          {[...servicos].sort((a, b) => a.localeCompare(b, "pt")).map((nome) => (
+                            <li key={nome} className="break-inside-avoid py-1 pl-3 text-sm text-text-secondary
+                                                      relative before:absolute before:left-0 before:top-[0.6em]
+                                                      before:h-1 before:w-1 before:rounded-full before:bg-text-muted">
+                              {nome}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    );
+                  })()}
+
+                  {/*
+                    Aviso preciso, e só quando se aplica. As colunas existem
+                    todas na BD (company_name, at_user, iban, invoice_workspace
+                    e a morada FISCAL_ADDRESS): o que falta é o
+                    VendorController::present() as devolver, o que já está
+                    escrito na branch feat/admin-payment-refund-cancel e à
+                    espera de deploy da RW Interactive. Dizer "por enviar pelo
+                    backend" sem mais mandava procurar um problema que não
+                    existe.
+                  */}
+                  {/*
+                    O que a API devolve MESMO, para este técnico.
+                    Quando um campo aparece vazio no painel, a pergunta é
+                    sempre a mesma -- "o backend não manda, ou manda com outro
+                    nome?" -- e discutir isso de memória não leva a lado
+                    nenhum. Aqui vê-se a resposta crua, sem sair do ecrã.
+                  */}
+                  <details>
+                    <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                      Dados brutos da API ({Object.keys(v).length} campos)
+                    </summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2 text-[11px] leading-snug text-text-secondary">
+                      {JSON.stringify(v, null, 2)}
+                    </pre>
+                  </details>
+
+                  {!temFaturacao && !v.company_name && (
+                    <p className="text-xs text-text-muted cursor-help"
+                      title="Estes dados existem no sistema, mas ainda não chegam a este ecrã. Está a ser tratado.">
+                      Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
+                    </p>
+                  )}
+
+                  {/*
+                    Apagar de vez.
+
+                    Ao fundo, isolado por uma linha e em texto discreto: é a
+                    única ação da ficha que não tem volta, e não devia estar ao
+                    lado das que se carregam por engano. Quem o procura,
+                    encontra; quem não o procura, não lhe tropeça.
+                  */}
+                  <div className="border-t border-surface-border pt-3">
+                    <button
+                      onClick={() => setVendorParaApagar(v)}
+                      className="text-sm text-text-muted hover:text-danger transition-colors"
+                    >
+                      Apagar este técnico em definitivo
+                    </button>
+                  </div>
+
+                  {/*
+                    O que este técnico escreveu. Vive aqui porque é aqui que
+                    pertence: antes, uma mensagem dele só podia existir agarrada
+                    a uma lead, e por isso aparecia no CRM como um pedido de
+                    serviço vindo de quem os executa.
+                  */}
+                  <div className="pt-1">
+                    <WhatsappConversa
+                      tecnicoId={String(v.id)}
+                      temTelefone={Boolean(v.phone_number)}
+                      waNumero={(v.phone_number || "").replace(/\D/g, "").length === 9
+                        ? `351${(v.phone_number || "").replace(/\D/g, "")}`
+                        : (v.phone_number || "").replace(/\D/g, "")}
+                    />
                   </div>
                 </div>
               </div>
@@ -1078,6 +1302,42 @@ export default function TechniciansPage() {
           </div>
         )}
       </Modal>
+
+      {/*
+        A confirmação diz o que vai acontecer, com nomes e números, em vez de
+        "tem a certeza?". O que se perde aqui não se recupera, e a pessoa que
+        carrega merece ver a lista antes, não um aviso genérico.
+      */}
+      <ConfirmDialog
+        open={vendorParaApagar !== null}
+        onClose={() => setVendorParaApagar(null)}
+        onConfirm={async () => { if (vendorParaApagar) await apagarDeVez(vendorParaApagar); }}
+        title="Apagar o técnico em definitivo"
+        tone="danger"
+        confirmLabel="Apagar para sempre"
+        loading={aApagar}
+        description={
+          <div className="space-y-2 text-sm">
+            <p>
+              <b className="text-text-primary">{vendorParaApagar?.name ?? "Este técnico"}</b> e a conta dele
+              desaparecem. <b className="text-text-primary">Não há como desfazer.</b>
+            </p>
+            <p className="text-text-secondary">
+              Vão com ele: avaliações, documentos, candidaturas a pedidos, zonas, cidades,
+              tickets de suporte e agenda.
+            </p>
+            <p className="text-text-secondary">
+              <b className="text-text-primary">Os serviços que ele executou ficam</b>, mas sem técnico
+              associado. O total faturado não muda; o que ele faturou deixa de lhe ser atribuído, e
+              as faturas já emitidas passam a apontar para alguém que não existe.
+            </p>
+            <p className="text-text-muted">
+              Se a pessoa só saiu, <b className="text-text-primary">Suspender</b> faz o mesmo efeito na
+              prática e tem volta.
+            </p>
+          </div>
+        }
+      />
     </RouteGuard>
   );
 }

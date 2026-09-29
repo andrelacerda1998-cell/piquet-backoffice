@@ -4,32 +4,20 @@ import { useState, useMemo } from "react";
 import { useTabParam } from "@/hooks/useTabParam";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { DemoBadge } from "@/components/ui/DemoBadge";
-import { DataTable, type Column } from "@/components/ui/DataTable";
-import { StatusBadge, PriorityBadge } from "@/components/ui/StatusBadge";
+
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getProductMetrics, getAppErrors } from "@/services/supportService";
 import {
-  getAppsStatus, getBugs, getSystemLogs, getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel,
-  type Bug, type SystemLog, type StoreRatingInfo,
+  getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel,
+  type StoreRatingInfo,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Smartphone, Star, Activity, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { Star, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
-const LOG_TONE: Record<SystemLog["level"], string> = {
-  info: "bg-surface-subtle text-text-secondary",
-  aviso: "bg-warning-light text-warning",
-  erro: "bg-danger-light text-danger",
-};
-
-const BUG_STATUS_LABEL: Record<Bug["status"], string> = {
-  ativo: "Ativo", em_correcao: "Em correção", resolvido: "Resolvido",
-};
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -84,28 +72,36 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay 
 export default function ProdutoPage() {
   // Lê ?tab= para os alertas poderem apontar direto (ex.: Integrações).
   const [tab, setTab] = useTabParam("apps");
-  const { data: metrics } = useAsyncData(() => getProductMetrics(), []);
-  const { data: apps } = useAsyncData(() => getAppsStatus(), []);
-  const { data: bugs } = useAsyncData(() => getBugs(), []);
-  const { data: logs } = useAsyncData(() => getSystemLogs(), []);
   const { data: health } = useAsyncData(() => getIntegrationsStatus(), []);
-  const { data: errors } = useAsyncData(() => getAppErrors(1, 10), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
 
-  // Funil da app (Mixpanel): período à escolha — atalhos + meses de calendário.
-  const [funnelPeriod, setFunnelPeriod] = useState("30d");
+  /*
+    Funil da app (Mixpanel): período à escolha — meses de calendário + atalhos.
+    Por omissão o MÊS CORRENTE, e não "últimos 30 dias": o mês é a unidade em
+    que o negócio é lido em todo o resto do backoffice (GMV, comissão,
+    faturas), e uma janela deslizante nunca bate certo com esses números.
+  */
+  const mesCorrente = useMemo(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+  const [funnelPeriod, setFunnelPeriod] = useState(mesCorrente);
   const funnelOptions = useMemo(() => {
-    const opts: { value: string; label: string }[] = [
-      { value: "30d", label: "Últimos 30 dias" },
-      { value: "90d", label: "Últimos 90 dias" },
-      { value: "ano", label: "Este ano" },
-    ];
+    const opts: { value: string; label: string }[] = [];
     const now = new Date();
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1);
-      opts.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}` });
+      opts.push({
+        value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}${i === 0 ? " (mês atual)" : ""}`,
+      });
     }
+    opts.push(
+      { value: "30d", label: "Últimos 30 dias" },
+      { value: "90d", label: "Últimos 90 dias" },
+      { value: "ano", label: "Este ano" },
+    );
     return opts;
   }, []);
   const funnelRange = useMemo(() => {
@@ -115,9 +111,12 @@ export default function ProdutoPage() {
     if (funnelPeriod === "90d") return { from: iso(new Date(Date.now() - 90 * 864e5)), to: iso(now) };
     if (funnelPeriod === "ano") return { from: `${now.getUTCFullYear()}-01-01`, to: iso(now) };
     const [y, m] = funnelPeriod.split("-").map(Number);
+    // No mês a decorrer o fim é HOJE: pedir até ao último dia do mês era pedir
+    // dias que ainda não aconteceram.
+    if (funnelPeriod === mesCorrente) return { from: `${funnelPeriod}-01`, to: iso(now) };
     const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
     return { from: `${funnelPeriod}-01`, to: `${funnelPeriod}-${String(last).padStart(2, "0")}` };
-  }, [funnelPeriod]);
+  }, [funnelPeriod, mesCorrente]);
   const { data: funnel, loading: funnelLoading } = useAsyncData(() => getAppFunnel(funnelRange.from, funnelRange.to), [funnelPeriod]);
 
   // Totais e variação mês-a-mês derivados das séries de crescimento.
@@ -126,11 +125,10 @@ export default function ProdutoPage() {
   const last = <T,>(a: T[]) => a[a.length - 1];
   const prev = <T,>(a: T[]) => a[a.length - 2];
   const dlLast = last(dl), dlPrev = prev(dl);
-  const regLast = last(reg), regPrev = prev(reg);
+  const regLast = last(reg);
 
   // Downloads totais (as duas apps somadas) e crescimento mês-a-mês.
   const dlTotalLast = (dlLast?.Cliente ?? 0) + (dlLast?.Profissional ?? 0);
-  const dlTotalPrev = (dlPrev?.Cliente ?? 0) + (dlPrev?.Profissional ?? 0);
   // Novos downloads por mês (diferença dos acumulados) — o crescimento mensal.
   const dlMonthly = dl.map((d, i) => ({
     name: d.name,
@@ -148,33 +146,8 @@ export default function ProdutoPage() {
 
   const TABS: TabDef[] = [
     { id: "apps", label: "Apps" },
-    { id: "bugs", label: "Bugs", count: (bugs ?? []).filter((b) => b.status !== "resolvido").length },
-    { id: "funil", label: "Funil (app)" },
-    { id: "logs", label: "Logs" },
+    { id: "funil", label: "Funil do produto" },
     { id: "integracoes", label: "Integrações" },
-  ];
-
-  const bugColumns: Column<Bug>[] = [
-    { key: "title", label: "Bug", render: (r) => <span className="font-medium">{r.title}</span> },
-    { key: "app", label: "App" },
-    { key: "reports", label: "Reports", sortable: true },
-    { key: "priority", label: "Prioridade", render: (r) => <PriorityBadge priority={r.priority} /> },
-    { key: "reportedAt", label: "Reportado" },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "resolvido" ? "bg-success-light text-success" : r.status === "em_correcao" ? "bg-warning-light text-warning" : "bg-danger-light text-danger")}>
-        {BUG_STATUS_LABEL[r.status]}
-      </span>
-    ) },
-  ];
-
-  const errorColumns: Column<Record<string, unknown>>[] = [
-    { key: "type", label: "Tipo" },
-    { key: "message", label: "Mensagem" },
-    { key: "platform", label: "Plataforma" },
-    { key: "version", label: "Versão" },
-    { key: "frequency", label: "Frequência" },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status as string} /> },
   ];
 
   return (
@@ -184,7 +157,7 @@ export default function ProdutoPage() {
           icon={LineChart}
           eyebrow="Produto"
           title="Produto"
-          subtitle="App Cliente, App Profissional, bugs, logs e integrações"
+          subtitle="Adoção das apps, jornada do utilizador e saúde das integrações"
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -248,74 +221,6 @@ export default function ProdutoPage() {
               </ChartCard>
             </div>
 
-            <DemoBadge endpoint="/product/apps" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(apps ?? []).map((a) => (
-                <div key={a.app} className="card p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700"><Smartphone className="h-5 w-5" /></span>
-                      <div>
-                        <p className="font-semibold text-text-primary">App {a.app}</p>
-                        <p className="text-xs text-text-secondary">v{a.version} · deploy {a.lastDeploy}</p>
-                      </div>
-                    </div>
-                    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                      a.uptime >= 99.9 ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
-                      <Activity className="h-3 w-3" /> {a.uptime}% uptime
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="rounded-lg bg-surface-subtle px-2 py-2.5">
-                      <p className="text-lg font-bold text-text-primary">{a.activeUsers}</p>
-                      <p className="text-[11px] text-text-muted">utilizadores ativos</p>
-                    </div>
-                    <div className="rounded-lg bg-surface-subtle px-2 py-2.5">
-                      <p className={cn("text-lg font-bold", a.crashRate > 0.5 ? "text-warning" : "text-text-primary")}>{a.crashRate}%</p>
-                      <p className="text-[11px] text-text-muted">crash rate</p>
-                    </div>
-                    <div className="rounded-lg bg-surface-subtle px-2 py-2.5">
-                      <p className="text-lg font-bold text-text-primary inline-flex items-center gap-1">{a.storeRating}<Star className="h-4 w-4 text-piquet-500" /></p>
-                      <p className="text-[11px] text-text-muted">nas lojas</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {metrics && (
-              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <DemoBadge endpoint="/product/metrics" className="col-span-full" />
-                <MetricCard title="DAU" metric={buildMetricValue(metrics.dau, metrics.dau)} hideDelta />
-                <MetricCard title="MAU" metric={buildMetricValue(metrics.mau, metrics.mau)} hideDelta />
-                <MetricCard title="Novos registos" metric={buildMetricValue(metrics.newRegistrations, metrics.newRegistrations)} hideDelta />
-                <MetricCard title="Taxa conclusão" metric={buildMetricValue(metrics.completionRate, metrics.completionRate)} hideDelta format="percent" />
-                <MetricCard title="Falhas pagamento" metric={buildMetricValue(metrics.paymentFailures, metrics.paymentFailures)} hideDelta />
-                <MetricCard title="Erros app" metric={buildMetricValue(metrics.appErrors, metrics.appErrors)} hideDelta />
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "bugs" && (
-          <div className="space-y-6">
-            <DataTable columns={bugColumns} data={bugs ?? []} keyField="id" emptyMessage="Sem bugs registados 🎉" />
-            <div>
-              <h2 className="font-semibold mb-3 inline-flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-warning" /> Erros automáticos das apps</h2>
-              <DataTable columns={errorColumns} data={(errors?.data ?? []) as unknown as Record<string, unknown>[]} keyField="id" />
-            </div>
-          </div>
-        )}
-
-        {tab === "logs" && (
-          <div className="space-y-3">
-            {(logs ?? []).map((l) => (
-              <div key={l.id} className="card px-4 py-3 flex items-center gap-3">
-                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0", LOG_TONE[l.level])}>{l.level}</span>
-                <span className="text-xs font-medium text-text-muted uppercase tracking-wide shrink-0 w-24">{l.source}</span>
-                <span className="text-sm text-text-primary flex-1 min-w-0 truncate">{l.message}</span>
-                <span className="text-xs text-text-muted shrink-0">{formatDateTime(l.at)}</span>
-              </div>
-            ))}
           </div>
         )}
 
@@ -440,8 +345,12 @@ export default function ProdutoPage() {
                     {funnel.steps.map((s, i) => (
                       <div key={i} className="py-2">
                         <div className="flex items-baseline justify-between gap-3 mb-1">
+                          {/* O nome cru do evento fica à vista: sem ele não se
+                              sabe QUE evento do Mixpanel alimenta cada passo,
+                              e o rótulo bonito esconde exatamente isso. */}
                           <p className="text-sm font-medium text-text-primary truncate">
                             <span className="text-text-muted mr-1.5">{i + 1}.</span>{stepLabel(s.event)}
+                            <code className="ml-2 text-[11px] font-normal text-text-muted">{s.event}</code>
                           </p>
                           <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
                             <span className="text-sm font-semibold">{formatNumber(s.count)}</span>
@@ -463,13 +372,20 @@ export default function ProdutoPage() {
                         </div>
                       </div>
                     ))}
-                    <p className="text-xs text-text-muted pt-2">A percentagem é sobre o topo do funil; a seta é a queda face ao passo anterior — vermelho quando cai mais de metade.</p>
+                    <p className="text-xs text-text-muted pt-2">
+                      Os passos são os eventos do Mixpanel listados a cinzento
+                      (<code className="text-text-secondary">{funnel.steps.map((s) => s.event).join(", ")}</code>),
+                      definidos no funil <b className="text-text-secondary">{funnel.name || funnel.funnelId}</b> — para
+                      mudar quais se detetam, edita esse funil no Mixpanel.
+                      A percentagem é sobre o topo; a seta é a queda face ao passo anterior, vermelha quando cai mais de metade.
+                    </p>
                   </div>
                 );
               })()
             )}
           </div>
         )}
+
       </div>
     </RouteGuard>
   );

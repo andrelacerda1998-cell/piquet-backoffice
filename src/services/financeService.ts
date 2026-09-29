@@ -300,6 +300,32 @@ export async function getAppPayments(): Promise<AppPaymentsData> {
   } as AppPaymentsData)).then((r) => r.data);
 }
 
+/**
+ * Reembolso e libertação de cativo de um pagamento da app.
+ *
+ * Não têm fallback de demonstração de propósito: mexer em dinheiro real tem de
+ * falhar alto quando a ligação ao Laravel não existe. Um mock aqui devolvia
+ * "reembolsado" sem devolver cêntimo nenhum.
+ */
+export interface PaymentActionResult {
+  uuid: string;
+  status: string;
+  amount: number;
+  refunded: number;
+}
+
+export async function refundAppPayment(uuid: string, amountCents?: number): Promise<PaymentActionResult> {
+  return apiPost<PaymentActionResult>(`/finance/app-payments/${uuid}/refund`, { amountCents }, () => {
+    throw new Error("Reembolsos precisam da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
+export async function cancelAppPaymentHold(uuid: string): Promise<PaymentActionResult> {
+  return apiPost<PaymentActionResult>(`/finance/app-payments/${uuid}/cancel`, {}, () => {
+    throw new Error("Libertar cativos precisa da API de admin do Laravel configurada.");
+  }).then((r) => r.data);
+}
+
 /* ==================== UNIT ECONOMICS (LTV · CAC) ==================== */
 
 export interface UnitEconomics {

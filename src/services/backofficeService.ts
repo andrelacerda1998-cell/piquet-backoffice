@@ -17,60 +17,6 @@ const demoList = <T>(items: T[]): T[] => (USE_REAL_API ? [] : items);
  * existirem, basta acrescentá-los ao allowlist `isLiveEndpoint`.
  */
 
-/* ------------------------------ Operações ------------------------------ */
-
-export interface Incident {
-  id: string;
-  serviceId: string;
-  type: "tecnico_nao_compareceu" | "atraso" | "dano_material" | "pagamento_falhou" | "cliente_ausente";
-  description: string;
-  severity: "critica" | "alta" | "media";
-  status: "aberto" | "em_resolucao" | "resolvido";
-  openedAt: string;
-  assignee: string;
-}
-
-const INCIDENT_LABEL: Record<Incident["type"], string> = {
-  tecnico_nao_compareceu: "Técnico não compareceu",
-  atraso: "Atraso superior a 30 min",
-  dano_material: "Dano material reportado",
-  pagamento_falhou: "Falha no pagamento",
-  cliente_ausente: "Cliente ausente na morada",
-};
-
-export function incidentTypeLabel(t: Incident["type"]) {
-  return INCIDENT_LABEL[t];
-}
-
-export async function getIncidents(): Promise<Incident[]> {
-  return apiGet("/operations/incidents", () => [
-    { id: "inc_1", serviceId: "srv_0042", type: "tecnico_nao_compareceu", description: "Cliente esperou 40 min; técnico não respondeu ao contacto.", severity: "critica", status: "aberto", openedAt: "2026-07-05T09:20:00", assignee: "Maria Santos" },
-    { id: "inc_2", serviceId: "srv_0118", type: "atraso", description: "Trânsito na A5 — técnico avisou com 20 min de antecedência.", severity: "media", status: "resolvido", openedAt: "2026-07-04T14:00:00", assignee: "Maria Santos" },
-    { id: "inc_3", serviceId: "srv_0203", type: "dano_material", description: "Risco no chão da cozinha durante montagem. Seguro acionado.", severity: "alta", status: "em_resolucao", openedAt: "2026-07-03T16:45:00", assignee: "Inês Rodrigues" },
-    { id: "inc_4", serviceId: "srv_0250", type: "pagamento_falhou", description: "MB Way expirou duas vezes; cliente pagou por cartão.", severity: "media", status: "resolvido", openedAt: "2026-07-02T11:10:00", assignee: "Pedro Oliveira" },
-    { id: "inc_5", serviceId: "srv_0301", type: "cliente_ausente", description: "Ninguém na morada à hora agendada; remarcado.", severity: "media", status: "em_resolucao", openedAt: "2026-07-06T10:05:00", assignee: "Maria Santos" },
-  ] as Incident[]).then((r) => r.data);
-}
-
-/* ------------------------------- Produto ------------------------------- */
-
-export interface AppStatus {
-  app: "Cliente" | "Profissional";
-  version: string;
-  uptime: number;      // %
-  crashRate: number;   // %
-  activeUsers: number;
-  lastDeploy: string;
-  storeRating: number;
-}
-
-export async function getAppsStatus(): Promise<AppStatus[]> {
-  return apiGet("/product/apps", () => [
-    { app: "Cliente", version: "1.4.2", uptime: 99.92, crashRate: 0.4, activeUsers: 612, lastDeploy: "2026-07-02", storeRating: 4.6 },
-    { app: "Profissional", version: "1.2.0", uptime: 99.85, crashRate: 0.9, activeUsers: 214, lastDeploy: "2026-06-28", storeRating: 4.3 },
-  ] as AppStatus[]).then((r) => r.data);
-}
-
 /* --------- Crescimento das apps: downloads e registos ao longo do tempo --------- */
 
 export interface AppGrowth {
@@ -202,65 +148,6 @@ export async function getAppGrowth(): Promise<AppGrowth> {
   return apiGet("/product/growth", demoGrowth).then((r) => r.data);
 }
 
-export interface Bug {
-  id: string;
-  title: string;
-  app: "Cliente" | "Profissional" | "Backoffice";
-  priority: "critica" | "alta" | "media" | "baixa";
-  status: "ativo" | "em_correcao" | "resolvido";
-  reportedAt: string;
-  reports: number;
-}
-
-export async function getBugs(): Promise<Bug[]> {
-  return apiGet("/product/bugs", () => [
-    { id: "bug_1", title: "MB Way expira sem feedback ao cliente", app: "Cliente", priority: "critica", status: "em_correcao", reportedAt: "2026-07-04", reports: 23 },
-    { id: "bug_2", title: "Push duplicada ao confirmar reserva", app: "Cliente", priority: "media", status: "ativo", reportedAt: "2026-07-05", reports: 11 },
-    { id: "bug_3", title: "Upload do registo criminal falha em ficheiros >8MB", app: "Profissional", priority: "alta", status: "ativo", reportedAt: "2026-07-03", reports: 7 },
-    { id: "bug_4", title: "Mapa não centra na morada em Android 13", app: "Profissional", priority: "media", status: "resolvido", reportedAt: "2026-06-26", reports: 15 },
-    { id: "bug_5", title: "Filtro de período perde-se ao mudar de aba", app: "Backoffice", priority: "baixa", status: "resolvido", reportedAt: "2026-06-30", reports: 2 },
-  ] as Bug[]).then((r) => r.data);
-}
-
-export interface SystemLog {
-  id: string;
-  source: "pagamentos" | "faturacao" | "notificacoes";
-  level: "info" | "aviso" | "erro";
-  message: string;
-  at: string;
-}
-
-export async function getSystemLogs(): Promise<SystemLog[]> {
-  return apiGet("/product/logs", () => [
-    { id: "log_1", source: "pagamentos", level: "erro", message: "MB Way timeout (ref 8842) — retry agendado", at: "2026-07-06T11:42:00" },
-    { id: "log_2", source: "pagamentos", level: "info", message: "Pagamento cartão confirmado (srv_0311, 84,50 €)", at: "2026-07-06T11:38:00" },
-    { id: "log_3", source: "faturacao", level: "erro", message: "InvoiceXpress 422 — NIF inválido no cliente c_204", at: "2026-07-06T10:15:00" },
-    { id: "log_4", source: "faturacao", level: "info", message: "Fatura FT 2026/0154 emitida (srv_0308)", at: "2026-07-06T10:02:00" },
-    { id: "log_5", source: "notificacoes", level: "aviso", message: "Push com entrega parcial (94%) — 41 tokens expirados", at: "2026-07-06T09:00:00" },
-    { id: "log_6", source: "notificacoes", level: "info", message: "Email de recibo enviado (srv_0305)", at: "2026-07-06T08:47:00" },
-  ] as SystemLog[]).then((r) => r.data);
-}
-
-export interface Integration {
-  id: string;
-  name: string;
-  purpose: string;
-  status: "operacional" | "degradado" | "em_falha" | "por_configurar";
-  lastCheck: string;
-}
-
-export async function getIntegrations(): Promise<Integration[]> {
-  return apiGet("/product/integrations", () => [
-    { id: "int_1", name: "Gateway de pagamento", purpose: "Cartões", status: "operacional", lastCheck: "2026-07-06T11:45:00" },
-    { id: "int_2", name: "MB Way", purpose: "Pagamentos móveis", status: "degradado", lastCheck: "2026-07-06T11:45:00" },
-    { id: "int_3", name: "InvoiceXpress", purpose: "Faturação certificada", status: "operacional", lastCheck: "2026-07-06T11:40:00" },
-    { id: "int_4", name: "Google Maps", purpose: "Moradas e rotas", status: "operacional", lastCheck: "2026-07-06T11:45:00" },
-    { id: "int_5", name: "Push (FCM/APNs)", purpose: "Notificações", status: "operacional", lastCheck: "2026-07-06T11:30:00" },
-    { id: "int_6", name: "Email (transacional)", purpose: "Recibos e avisos", status: "operacional", lastCheck: "2026-07-06T11:00:00" },
-    { id: "int_7", name: "SMS", purpose: "Códigos e alertas", status: "por_configurar", lastCheck: "—" },
-  ] as Integration[]).then((r) => r.data);
-}
-
 /* ------------------------------ Marketing ------------------------------ */
 
 export const PUSH_SEGMENTS = [
@@ -287,27 +174,6 @@ export const SEED_PUSH: PushCampaign[] = demoList([
   { id: "push_1", title: "☀️ Verão sem avarias", message: "AC pronto para o calor? Manutenção com 15% desconto esta semana.", segment: "Clientes com serviços concluídos", status: "enviada", sentAt: "2026-07-01T10:00:00", delivered: 428, deliveryRate: 96.2, openRate: 41.5, conversions: 37 },
   { id: "push_2", title: "Sentimos a tua falta 👋", message: "Volta à Piquet — 10€ de desconto no próximo serviço com o código VOLTEI10.", segment: "Clientes inativos (60d)", status: "enviada", sentAt: "2026-06-24T18:30:00", delivered: 189, deliveryRate: 93.8, openRate: 28.0, conversions: 12 },
   { id: "push_3", title: "Fim de semana em Cascais", message: "Técnicos disponíveis no teu bairro este fim de semana. Marca já!", segment: "Clientes de Cascais", status: "agendada", scheduledFor: "2026-07-11T09:00:00", delivered: 0, deliveryRate: 0, openRate: 0, conversions: 0 },
-]);
-
-export interface DiscountCode {
-  id: string;
-  code: string;
-  kind: "percentagem" | "valor_fixo";
-  value: number;
-  usageLimit: number;
-  used: number;
-  validUntil: string;
-  categories: string;
-  cities: string;
-  active: boolean;
-  revenue: number;
-}
-
-export const SEED_CODES: DiscountCode[] = demoList([
-  { id: "dc_1", code: "VERAO25", kind: "percentagem", value: 15, usageLimit: 500, used: 212, validUntil: "2026-08-31", categories: "AVAC, Limpeza", cities: "Todas", active: true, revenue: 9840 },
-  { id: "dc_2", code: "VOLTEI10", kind: "valor_fixo", value: 10, usageLimit: 300, used: 64, validUntil: "2026-07-31", categories: "Todas", cities: "Todas", active: true, revenue: 3120 },
-  { id: "dc_3", code: "BEMVINDO5", kind: "valor_fixo", value: 5, usageLimit: 1000, used: 431, validUntil: "2026-12-31", categories: "Todas", cities: "Todas", active: true, revenue: 15680 },
-  { id: "dc_4", code: "PRIMAVERA", kind: "percentagem", value: 20, usageLimit: 200, used: 200, validUntil: "2026-05-31", categories: "Limpeza", cities: "Lisboa", active: false, revenue: 6212 },
 ]);
 
 /* ----------------------------- Financeiro ------------------------------ */
