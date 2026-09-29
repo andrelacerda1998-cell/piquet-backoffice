@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { lerPedido } from "./_lib";
+import { assinarImagensDoCliente, type MensagemGuardada } from "./_conversa";
+import { subirImagens } from "./_imagens";
 
 /**
  * POST /api/tickets — receção PÚBLICA de tickets de suporte da app cliente
@@ -72,11 +74,21 @@ export async function GET(req: Request) {
   if (error) {
     return NextResponse.json({ ok: false, error: "erro" }, { status: 500, headers: CORS });
   }
-  const tickets = (data ?? []).map((t) => {
-    const msgs = Array.isArray((t as { messages?: unknown[] }).messages) ? (t as { messages: unknown[] }).messages : [];
-    const lastAgent = [...msgs].reverse().find((m) => (m as { from?: string })?.from === "agente") as
-      | { body?: string }
-      | undefined;
+  // A conversa inteira, não só a última resposta. Um ticket é uma troca: o
+  // suporte pergunta, o cliente responde, e ambos precisam de ver o que já foi
+  // dito. Mandar um "preview" obrigava o cliente a ir ao email reconstruir o
+  // fio — e não havia forma de ele responder de volta.
+  const comConversa = await assinarImagensDoCliente(
+    (data ?? []).map((t) => ({
+      ...t,
+      messages: Array.isArray((t as { messages?: unknown[] }).messages)
+        ? ((t as { messages: unknown[] }).messages as MensagemGuardada[])
+        : [],
+    })),
+  );
+
+  const tickets = comConversa.map((t) => {
+    const lastAgent = [...t.messages].reverse().find((m) => m?.from === "agente");
     return {
       id: t.id,
       // Devolvido para a app casar a resposta com o ticket que tem em memória
@@ -87,64 +99,14 @@ export async function GET(req: Request) {
       status_label: STATUS_LABEL[t.status] ?? t.status,
       last_message_at: t.last_message_at,
       has_reply: !!lastAgent,
+      // Mantido para as versões da app já instaladas, que só sabem ler isto.
       reply_preview: lastAgent?.body ?? null,
+      messages: t.messages,
+      // Um ticket fechado não aceita resposta; os outros aceitam.
+      can_reply: t.status !== "fechado",
     };
   });
   return NextResponse.json({ ok: true, tickets }, { status: 200, headers: CORS });
-}
-
-/** Quantas imagens um ticket aceita, e o peso máximo de cada uma. */
-const MAX_IMAGES = 3;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_IMAGES_BYTES = 8 * 1024 * 1024;
-
-/**
- * Formatos que um browser mostra numa <img>.
- *
- * O HEIC do iPhone NÃO está cá, de propósito: nenhum browser o desenha, e uma
- * foto aceite em HEIC chegava ao backoffice como um ícone partido — a pior das
- * falhas, porque parece que funcionou. A app converte para JPEG antes de
- * enviar; esta lista é a rede por baixo, para versões antigas e para o dia em
- * que alguém mudar o lado do cliente sem se lembrar deste.
- */
-const TIPOS_ACEITES = ["image/jpeg", "image/png", "image/webp"];
-
-/**
- * Sobe as imagens que vieram com o ticket e devolve os CAMINHOS no bucket.
- *
- * Caminhos e não URLs: o bucket é privado e o backoffice assina um URL de curta
- * duração quando abre o ticket. Guardar um URL na base de dados era guardar
- * uma credencial permanente para uma foto de dentro de casa de alguém.
- *
- * Corre com a service role, do lado do servidor: é por isso que o telemóvel
- * nunca precisa de uma credencial de escrita no Storage. O que falhar é
- * ignorado em silêncio — uma foto que não sobe não pode impedir alguém de
- * pedir ajuda, e o texto do ticket chega na mesma.
- */
-async function subirImagens(files: File[]): Promise<string[]> {
-  const paths: string[] = [];
-  let total = 0;
-
-  for (const file of files.slice(0, MAX_IMAGES)) {
-    if (!TIPOS_ACEITES.includes(file.type)) continue;
-    if (file.size > MAX_IMAGE_BYTES) continue;
-    total += file.size;
-    if (total > MAX_IMAGES_BYTES) break;
-
-    // Nome gerado por nós: o que vem do telemóvel não é de confiança e podia
-    // trazer caminhos ("../") ou extensões enganosas.
-    const ext = (file.type.split("/")[1] || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
-    const path = `tickets/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-    const { error } = await supabaseAdmin()
-      .storage.from("ticket-images")
-      .upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false });
-    if (error) continue;
-
-    paths.push(path);
-  }
-
-  return paths;
 }
 
 export async function POST(req: Request) {

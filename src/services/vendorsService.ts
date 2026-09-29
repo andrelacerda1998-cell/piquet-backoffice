@@ -9,9 +9,11 @@ import type { PaginatedResult } from "@/types";
  * Forma mínima (id, nome, nif, contacto, preço/h, zonas, elegibilidade,
  * validação AT, estado, suspenso_em, criado_em) -- não os campos fictícios do
  * antigo `Technician` (categorias, avaliação, receita, serviços concluídos,
- * ...). Ver `Technician` em src/types para essa forma antiga (ainda usada
- * apenas pelo `TechnicianDetailDrawer`, que já não é alimentado por dados
- * reais nesta página).
+ * ...). Ver `Technician` em src/types para essa forma antiga.
+ *
+ * O `TechnicianDetailDrawer`, que era o último a usá-la, foi apagado a
+ * 29/09/2026: ninguém o renderizava desde que o perfil do técnico passou a
+ * ecrã inteiro.
  */
 export interface RealVendor {
   id: number;
