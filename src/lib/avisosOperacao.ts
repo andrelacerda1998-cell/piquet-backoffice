@@ -42,11 +42,15 @@ export interface DocumentoParaAviso {
   createdAt?: string | null;
 }
 
-/** Os dois estados que o André pediu, e o nome com que aparecem no aviso. */
-const ESTADOS: Record<string, string> = {
-  concluido: "concluído",
-  agendado: "agendado",
-};
+/**
+ * Estados em que uma marcação já não interessa: o serviço acabou ou morreu.
+ *
+ * Sem isto, um serviço concluído que tinha sido marcado para amanhã ainda
+ * avisava "agendado" depois de já estar feito.
+ */
+const ESTADOS_MORTOS = new Set([
+  "concluido", "cancelado_cliente", "cancelado_tecnico", "reembolsado", "sem_tecnico_disponivel",
+]);
 
 /**
  * O valor, como ele aparece no aviso.
@@ -59,11 +63,28 @@ export function valorDoAviso(total: number): string {
   return total > 0 ? formatCurrency(total) : "valor por definir";
 }
 
-/** A data a que o facto aconteceu, que é a que conta para a janela. */
-function quando(s: ServicoParaAviso): string | undefined {
-  if (s.status === "concluido") return s.completedAt ?? s.requestedAt;
-  if (s.status === "agendado") return s.scheduledAt ?? s.requestedAt;
-  return undefined;
+/**
+ * Há uma marcação que ainda interessa avisar?
+ *
+ * "Agendado" NÃO É UM ESTADO nos dados. O Laravel traduz onze estados
+ * (Pending, Matching, Accepted, Closed, ...) e nenhum deles dá "agendado" --
+ * o que não estiver no mapa cai em "pedido_recebido" em silêncio. Filtrar por
+ * `status === "agendado"` era procurar uma coisa que nunca aparece, e o aviso
+ * de agendamento nunca podia disparar. Só se deu por isso ao pôr o cron a
+ * contar: "agendados 0" em 250 serviços.
+ *
+ * O agendamento existe é como DATA (`scheduled_at`). É por ela que se vê.
+ *
+ * E a janela aqui não pode ser a mesma: uma marcação feita hoje para daqui a
+ * duas semanas ficava de fora de uma janela de 48h. Interessa qualquer data
+ * no futuro -- e também as das últimas horas, para não se perder uma marcação
+ * para hoje de manhã vista ao meio-dia.
+ */
+function temMarcacaoRelevante(s: ServicoParaAviso, agora: Date, janelaHoras: number): boolean {
+  if (!s.scheduledAt || ESTADOS_MORTOS.has(s.status)) return false;
+  const t = new Date(s.scheduledAt).getTime();
+  if (Number.isNaN(t)) return false;
+  return t >= agora.getTime() - janelaHoras * 3600_000;
 }
 
 /** Dia e hora curtos, à portuguesa. */
@@ -103,33 +124,38 @@ export function avisosDeServicos(
 ): Pendente[] {
   const saida: Pendente[] = [];
 
-  for (const s of servicos) {
-    const estado = ESTADOS[s.status];
-    if (!estado) continue;
+  /*
+    O corpo leva o tipo de serviço e a cidade, e NÃO o nome do cliente.
 
-    const data = quando(s);
-    if (!dentroDaJanela(data, agora, janelaHoras)) continue;
+    Numa notificação cabem poucas palavras antes de serem cortadas, e o nome
+    de quem pediu não ajuda a decidir nada de relance -- "Reparação de
+    canalização | Porto" diz o que aconteceu e onde. Quem foi descobre-se ao
+    tocar, que é para onde o aviso leva.
 
-    /*
-      O corpo leva o tipo de serviço e a cidade, e NÃO o nome do cliente.
-
-      Numa notificação cabem poucas palavras antes de serem cortadas, e o
-      nome de quem pediu não ajuda a decidir nada de relance -- "Reparação de
-      canalização — Porto" diz o que aconteceu e onde. Quem foi descobre-se
-      ao tocar, que é para onde o aviso leva.
-    */
+    Barra a separar serviço de cidade, ponto médio a separar o dia e a hora:
+    dois separadores diferentes para duas coisas diferentes, senão
+    "Eletricidade | Lisboa | 1/10" lê-se como três campos do mesmo tipo.
+  */
+  const aviso = (s: ServicoParaAviso, estado: "concluido" | "agendado", marca = ""): Pendente => {
     const partes = [s.serviceName, s.city].map((x) => x?.trim()).filter(Boolean);
-    const marca = s.status === "agendado" && s.scheduledAt ? marcacao(s.scheduledAt) : "";
-
-    saida.push({
-      id: `servico:${s.id}:${s.status}`,
-      titulo: `Serviço ${estado} · ${valorDoAviso(s.totalCustomerValue)}`,
-      // Barra a separar serviço de cidade, ponto a separar o que é dia e hora:
-      // dois separadores diferentes para duas coisas diferentes, senão
-      // "Eletricidade | Lisboa | 1/10" lê-se como três campos do mesmo tipo.
+    return {
+      id: `servico:${s.id}:${estado}`,
+      titulo: `Serviço ${estado === "concluido" ? "concluído" : "agendado"} · ${valorDoAviso(s.totalCustomerValue)}`,
       corpo: [partes.join(" | "), marca].filter(Boolean).join(" · ") || `Serviço ${s.id}`,
       url: `/servicos?servico=${s.id}`,
-    });
+    };
+  };
+
+  for (const s of servicos) {
+    // Concluído: pelo estado, que aqui existe mesmo (Closed/Finished).
+    if (s.status === "concluido" && dentroDaJanela(s.completedAt ?? s.requestedAt, agora, janelaHoras)) {
+      saida.push(aviso(s, "concluido"));
+    }
+
+    // Agendado: pela DATA marcada, não pelo estado. Ver temMarcacaoRelevante.
+    if (temMarcacaoRelevante(s, agora, janelaHoras)) {
+      saida.push(aviso(s, "agendado", marcacao(s.scheduledAt!)));
+    }
   }
 
   return saida;
@@ -156,4 +182,49 @@ export function avisosDeDocumentos(
         || `Documento ${d.id}`,
       url: `/tecnicos?documento=${d.id}`,
     }));
+}
+
+/**
+ * A data do último serviço concluído e do último agendado.
+ *
+ * Serve para distinguir duas situações que, vistas de fora, são idênticas:
+ * "não há avisos porque não aconteceu nada" e "não há avisos porque a
+ * tradução dos estados do Laravel está errada e nada é reconhecido como
+ * concluído". Sem isto, a única saída era abrir o ecrã e comparar à mão.
+ */
+export function ultimasDatas(servicos: ServicoParaAviso[]): {
+  concluido: string | null;
+  agendado: string | null;
+  /** Quantos serviços têm cada um destes estados, no total lido. */
+  contagem: { concluido: number; agendado: number };
+} {
+  let concluido: string | null = null;
+  let agendado: string | null = null;
+  const contagem = { concluido: 0, agendado: 0 };
+
+  const maisRecente = (a: string | null, b: string | undefined | null): string | null => {
+    if (!b) return a;
+    const t = new Date(b).getTime();
+    if (Number.isNaN(t)) return a;
+    return a === null || t > new Date(a).getTime() ? b : a;
+  };
+
+  for (const s of servicos) {
+    if (s.status === "concluido") {
+      contagem.concluido++;
+      concluido = maisRecente(concluido, s.completedAt ?? s.requestedAt);
+    }
+    /*
+      Conta pela DATA e não pelo estado, pela mesma razão que os avisos: não
+      existe estado "agendado" nos dados. Enquanto contou pelo estado, esta
+      linha dizia "agendados 0" com 250 serviços lidos -- e foi assim que o
+      problema apareceu.
+    */
+    if (s.scheduledAt && !ESTADOS_MORTOS.has(s.status)) {
+      contagem.agendado++;
+      agendado = maisRecente(agendado, s.scheduledAt);
+    }
+  }
+
+  return { concluido, agendado, contagem };
 }
