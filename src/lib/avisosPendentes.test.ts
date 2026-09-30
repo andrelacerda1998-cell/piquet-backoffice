@@ -23,6 +23,29 @@ describe("juntar", () => {
     expect(a?.corpo).toBe("t1 · t2 · t3");
   });
 
+  it("coisas iguais contam-se em vez de se repetirem", () => {
+    // Oito técnicos à espera do workspace davam três vezes a mesma frase e
+    // nenhuma informação.
+    const iguais = Array.from({ length: 8 }, (_, i) => p(String(i), "Workspace por criar"));
+    const a = juntar(iguais);
+    expect(a?.titulo).toBe("8 coisas à tua espera");
+    expect(a?.corpo).toBe("8× Workspace por criar");
+  });
+
+  it("mistura contagens com o que é único", () => {
+    const a = juntar([
+      p("1", "Workspace por criar"), p("2", "Workspace por criar"),
+      p("3", "Ticket de cliente"),
+    ]);
+    expect(a?.corpo).toBe("2× Workspace por criar · Ticket de cliente");
+  });
+
+  it("o resumo conta GRUPOS, não itens", () => {
+    // Quatro grupos: só os três primeiros cabem.
+    const a = juntar([p("1", "A"), p("2", "B"), p("3", "C"), p("4", "D")]);
+    expect(a?.corpo).toBe("A · B · C …");
+  });
+
   it("acima de três, resume", () => {
     const a = juntar([p("1"), p("2"), p("3"), p("4"), p("5")]);
     expect(a?.titulo).toBe("5 coisas à tua espera");

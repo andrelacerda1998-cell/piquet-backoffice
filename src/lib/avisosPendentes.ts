@@ -38,10 +38,24 @@ export function juntar(novos: Pendente[]): Aviso | null {
     return { titulo: u.titulo, corpo: u.corpo, url: u.url, tag: "pendentes" };
   }
 
+  /*
+    Agrupa por título antes de escrever o corpo.
+
+    Sem isto, oito técnicos à espera do workspace davam "Workspace de
+    faturação por criar · Workspace de faturação por criar · Workspace de
+    faturação por criar …" -- três vezes a mesma frase e nenhuma informação.
+    Com a contagem à frente, a mesma notificação diz "8× Workspace de
+    faturação por criar" e sobra espaço para o resto.
+  */
+  const porTitulo = new Map<string, number>();
+  for (const n of novos) porTitulo.set(n.titulo, (porTitulo.get(n.titulo) ?? 0) + 1);
+
+  const grupos = [...porTitulo.entries()].map(([titulo, n]) => (n > 1 ? `${n}× ${titulo}` : titulo));
+
   // Com vários, leva-se para o sítio do primeiro (o mais antigo a esperar).
   return {
     titulo: `${novos.length} coisas à tua espera`,
-    corpo: novos.slice(0, 3).map((n) => n.titulo).join(" · ") + (novos.length > 3 ? " …" : ""),
+    corpo: grupos.slice(0, 3).join(" · ") + (grupos.length > 3 ? " …" : ""),
     url: novos[0].url,
     tag: "pendentes",
   };
