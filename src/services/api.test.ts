@@ -269,6 +269,16 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // E o contrário, para esta rede apanhar o dia em que alguém ligar um
     // endpoint real e se esquecer de o tirar da lista de ficção:
     expect(isDemoEndpoint("/quality")).toBe(false);
+
+    /*
+      Estar em LIVE_EXACT não chega: essa lista só diz "vai buscar à API a
+      sério". É REAL_DATA que diz "estes números são verdadeiros, não os
+      zeres". O custo por instalação foi para a primeira e não para a
+      segunda, e o deepZero punha tudo a zero à chegada -- o cartão ficava a
+      "—" e o painel de cobertura desaparecia, sem erro nenhum a apontar
+      para a causa.
+    */
+    expect(isDemoEndpoint("/product/cost-per-download")).toBe(false);
     expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });

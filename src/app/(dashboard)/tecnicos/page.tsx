@@ -829,7 +829,7 @@ export default function TechniciansPage() {
       >
         {reviewDoc && reviewAction === "approve" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[40vh]" />}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[52vh] sm:h-[40vh]" />}
             <Field label="Data de expiração" hint="Opcional">
               <input type="date" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} className="input-field" />
             </Field>
@@ -837,7 +837,7 @@ export default function TechniciansPage() {
         )}
         {reviewDoc && reviewAction === "decline" && (
           <div className="space-y-4">
-            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[40vh]" />}
+            {reviewDoc.file_url && <DocumentPreview url={reviewDoc.file_url} docId={reviewDoc.id} heightClass="h-[52vh] sm:h-[40vh]" />}
             <Field label="Motivo" hint="Obrigatório — vai no email para o técnico">
               <textarea value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} rows={4} className="input-field" placeholder="Ex.: Documento ilegível, por favor envia uma foto mais nítida." />
             </Field>
@@ -1203,7 +1203,7 @@ export default function TechniciansPage() {
         }
       >
         {previewDoc?.file_url
-          ? <DocumentPreview url={previewDoc.file_url} docId={previewDoc.id} />
+          ? <DocumentPreview url={previewDoc.file_url} docId={previewDoc.id} heightClass="h-[68vh] sm:h-[62vh]" />
           : <p className="text-sm text-text-muted py-8 text-center">Este documento não tem ficheiro associado.</p>}
       </Modal>
 

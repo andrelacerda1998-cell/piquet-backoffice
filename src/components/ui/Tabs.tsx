@@ -45,7 +45,7 @@ export function Tabs({ tabs, active, onChange, className, variant = "underline" 
   }
 
   return (
-    <div className={cn("flex gap-1 border-b border-surface-border overflow-x-auto", className)}>
+    <div className={cn("flex gap-1 border-b border-surface-border overflow-x-auto tira-deslizante", className)}>
       {tabs.map((t) => {
         const isActive = active === t.id;
         return (

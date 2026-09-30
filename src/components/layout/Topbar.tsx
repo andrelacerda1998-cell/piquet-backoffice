@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useFilterStore, useAuthStore, useUiStore } from "@/stores";
 import { getActiveFilterCount } from "@/lib/filters";
 import { getPeriodLabel } from "@/lib/formatters";
-import { DEFAULT_SETTINGS } from "@/config/dashboard";
+import { DEFAULT_SETTINGS , NAV_ITEMS } from "@/config/dashboard";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -55,8 +55,24 @@ export function Topbar() {
   const pathname = usePathname();
   const filtrosValem = ECRAS_COM_FILTROS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 
+  /*
+    O nome do ecrã, só em telemóvel.
+
+    Instalada, a aplicação não tem barra de endereço -- desaparece a única
+    pista de onde se está. E a pesquisa, que ocupa este espaço no
+    computador, está escondida abaixo dos 640px: ficava aqui uma faixa vazia
+    entre o menu e os ícones.
+  */
+  const nomeDoEcra = NAV_ITEMS.find((i) => i.href === pathname)?.label
+    ?? (pathname === "/" ? "Visão geral" : "");
+
   return (
-    <header className="sticky top-0 z-20 bg-surface border-b border-surface-border">
+    /*
+      `pt-[var(--margem-topo)]`: em modo app a pagina ocupa o ecra todo, e sem
+      isto este cabecalho ficava por baixo do relogio e da bateria. No browser
+      e no computador a margem e zero.
+    */
+    <header className="sticky top-0 z-20 bg-surface border-b border-surface-border pt-[var(--margem-topo)]">
       <div className="flex items-center gap-3 px-4 h-16">
         <button
           onClick={() => setMobileSidebarOpen(true)}
@@ -65,6 +81,8 @@ export function Topbar() {
         >
           <Menu className="h-5 w-5" />
         </button>
+
+        <span className="sm:hidden flex-1 truncate font-semibold text-text-primary">{nomeDoEcra}</span>
 
         <div className="flex-1 max-w-md relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />

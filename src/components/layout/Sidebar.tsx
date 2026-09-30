@@ -183,6 +183,8 @@ export function Sidebar() {
       <aside
         className={cn(
           "hidden lg:flex flex-col fixed left-0 top-0 h-full bg-ink-deep border-r border-ink-border z-30 transition-all duration-300",
+          // Margens do telemovel: zero no computador.
+          "pt-[var(--margem-topo)] pb-[var(--margem-fundo)] pl-[var(--margem-esquerda)]",
           sidebarCollapsed ? "w-[68px]" : "w-64"
         )}
       >
@@ -198,6 +200,7 @@ export function Sidebar() {
       <aside
         className={cn(
           "lg:hidden fixed left-0 top-0 h-full w-64 bg-ink-deep border-r border-ink-border z-50 transform transition-transform duration-300",
+          "pt-[var(--margem-topo)] pb-[var(--margem-fundo)] pl-[var(--margem-esquerda)]",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >

@@ -22,6 +22,7 @@ import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Plus, ShieldCheck, FileCheck2, Settings, Pencil } from "lucide-react";
+import { Notificacoes } from "@/components/layout/Notificacoes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import CatalogPage from "./_tabs/catalogo";
 import PricingPage from "./_tabs/precos";
@@ -72,6 +73,7 @@ export default function ConfiguracaoPage() {
             { id: "documentos", label: "Documentos" },
             { id: "admins", label: "Administradores" },
             { id: "atividade", label: "Atividade" },
+            { id: "este-dispositivo", label: "Avisos neste dispositivo" },
             { id: "notificacoes", label: "Notificações enviadas" },
             { id: "sms", label: "Códigos SMS" },
           ]}>
@@ -80,6 +82,18 @@ export default function ConfiguracaoPage() {
                 {sub === "documentos" && <DocumentosTab />}
                 {sub === "admins" && <AdminsTab />}
                 {sub === "atividade" && <AtividadeTab />}
+                {sub === "este-dispositivo" && (
+                  <div className="card p-4 space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-text-primary">Avisos neste dispositivo</h3>
+                      <p className="text-sm text-text-secondary mt-0.5">
+                        O backoffice não tinha como te tocar no ombro: só se sabia de um pedido urgente ou de um
+                        ticket se alguém estivesse a olhar para o ecrã.
+                      </p>
+                    </div>
+                    <Notificacoes />
+                  </div>
+                )}
                 {sub === "notificacoes" && <NotificacoesTab />}
                 {sub === "sms" && <SmsCodesTab />}
               </>

@@ -51,7 +51,7 @@ export function PageHeader({ title, subtitle, icon: Icon, eyebrow, actions, clas
         scroll lateral se não couberem, ficam num gesto e numa faixa.
       */}
       {actions && (
-        <div className="flex items-center gap-2 shrink-0 overflow-x-auto sm:flex-wrap sm:overflow-visible -mx-1 px-1 [&>*]:shrink-0">
+        <div className="flex items-center gap-2 shrink-0 overflow-x-auto tira-deslizante sm:flex-wrap sm:overflow-visible -mx-1 px-1 [&>*]:shrink-0">
           {actions}
         </div>
       )}

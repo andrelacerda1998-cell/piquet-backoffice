@@ -302,7 +302,13 @@ export const useDataStore = create<DataOverridesState>()(
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: "light",
+      /*
+        Escuro por omissão. O backoffice é usado sobretudo no telemóvel e
+        muitas vezes à noite; e o menu lateral sempre foi escuro, por isso o
+        claro era a única parte do produto que destoava dele próprio.
+        Quem preferir o claro escolhe, e a escolha fica guardada.
+      */
+      theme: "dark",
       setTheme: (theme) => {
         applyThemeClass(theme);
         set({ theme });
