@@ -34,10 +34,23 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
+
+function Contagem({ rotulo, valor, nota, destaque }: {
+  rotulo: string; valor: number; nota: string; destaque?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-text-secondary">{rotulo}</p>
+      <p className={cn("text-2xl font-bold tabular-nums mt-0.5",
+        destaque ? "text-piquet" : "text-text-primary")}>{formatNumber(valor)}</p>
+      <p className="text-[11px] text-text-muted">{nota}</p>
+    </div>
+  );
+}
 
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
@@ -709,6 +722,32 @@ export default function TechniciansPage() {
 
         {tab === "aprovacoes" && (
           <div className="space-y-4">
+            {/*
+              O retrato da faturação, sempre visível.
+
+              A lista de quem falta some quando está vazia -- e é assim que
+              deve ser. Mas "quantos técnicos podem mesmo faturar?" não é
+              trabalho por fazer, é contexto, e não tinha resposta em lado
+              nenhum: via-se quem faltava, nunca quem já estava feito.
+            */}
+            {semWorkspace && semWorkspace.contagem.total > 0 && (
+              <div className="card p-4 sm:p-5">
+                <p className="text-sm font-semibold text-text-primary">Workspaces de faturação</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                  <Contagem rotulo="Podem faturar" valor={semWorkspace.contagem.comWorkspace}
+                    nota={`de ${formatNumber(semWorkspace.contagem.total)} técnicos`} destaque />
+                  <Contagem rotulo="À espera de nós" valor={semWorkspace.contagem.aEspera}
+                    nota="AT entregue, nada em falta" />
+                  <Contagem rotulo="Falta-lhes algo" valor={semWorkspace.contagem.bloqueados}
+                    nota="documento, IBAN ou morada" />
+                  <Contagem rotulo="Sem AT" valor={Math.max(0, semWorkspace.contagem.total
+                    - semWorkspace.contagem.comWorkspace - semWorkspace.contagem.aEspera
+                    - semWorkspace.contagem.bloqueados)}
+                    nota="ainda não entregaram" />
+                </div>
+              </div>
+            )}
+
             {(semWorkspace?.items.length ?? 0) > 0 && (
               <div className="card border-l-[3px] border-l-piquet overflow-hidden">
                 <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
