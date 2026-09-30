@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { Toaster } from "@/components/ui/Toaster";
+import { RegistarWorker } from "@/components/layout/RegistarWorker";
 import { useFilterStore } from "@/stores";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
       <CommandPalette />
       <Toaster />
+      <RegistarWorker />
     </div>
   );
 }
