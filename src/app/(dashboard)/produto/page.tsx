@@ -9,15 +9,74 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
 import {
-  getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel,
-  type StoreRatingInfo,
+  getAppGrowth, getStoreRatings, getIntegrationsStatus, getAppFunnel, getCustoPorDownload,
+  type StoreRatingInfo, type CustoDownloadApp, type CustoDownload,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatNumber, formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Star, AlertTriangle, Plug, Filter, ArrowDownRight, LineChart } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
+
+/**
+ * O que o custo por instalação NÃO conta.
+ *
+ * A despesa não tem campo "app": só o nome da campanha diz para quem é. A
+ * maior de todas -- o PMAX de tráfego para o site -- não diz, e sozinha vale
+ * a maior parte do investimento.
+ *
+ * Este painel existe para o número de cima não enganar. "0,36 € por
+ * instalação" é verdade e parece excelente; com 86% do dinheiro de fora,
+ * deixa de ser uma medida do que custa crescer. Quem olhar para o primeiro
+ * número tem de ver este ao lado.
+ */
+function CoberturaDoInvestimento({ custo }: { custo: CustoDownload | null }) {
+  if (!custo || custo.gastoTotal <= 0) return null;
+  const fora = Math.round((1 - custo.cobertura) * 100);
+  const periodo = custo.periodo
+    ? `${formatDate(custo.periodo.de)} a ${formatDate(custo.periodo.ate)}`
+    : "todo o histórico";
+
+  return (
+    <div className="card p-4 sm:p-5 space-y-3">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text-primary">
+            {fora}% do investimento não entra nestas contas
+          </p>
+          <p className="text-xs text-text-secondary mt-1">
+            O custo por instalação de cada app só conta campanhas cujo nome diz para que app são.
+            As restantes — tráfego para o site, angariação de pedidos, notoriedade — valem{" "}
+            <b className="text-text-primary">{formatCurrency(custo.gastoNaoAtribuido)}</b> de{" "}
+            {formatCurrency(custo.gastoTotal)} e não se sabe quantas instalações trouxeram.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 border-t border-surface-border pt-3">
+        <div>
+          <p className="text-xs text-text-secondary">Com tudo incluído</p>
+          <p className="text-xl font-bold text-text-primary tabular-nums mt-0.5">
+            {custo.custoPorDownloadTudoIncluido != null
+              ? formatCurrency(custo.custoPorDownloadTudoIncluido) : "—"}
+          </p>
+          {/* É o número para comparar com outro canal: o dinheiro do PMAX
+              saiu da mesma conta, atribuído ou não. */}
+          <p className="text-[11px] text-text-muted">todo o investimento ÷ todas as instalações</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-secondary">Período</p>
+          <p className="text-sm font-semibold text-text-primary mt-1.5">{periodo}</p>
+          <p className="text-[11px] text-text-muted">
+            a janela é a da despesa; as instalações contam-se só dentro dela
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -26,9 +85,10 @@ const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "
  * entraram no último mês (nº real + %) e como está avaliada nas lojas. Antes
  * isto estava espalhado por oito cartões que repetiam os mesmos números.
  */
-function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay }: {
+function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay, custo }: {
   app: string; accent: string; total: number; novos: number; pct: number;
   appStore: StoreRatingInfo | null; googlePlay: StoreRatingInfo | null;
+  custo?: CustoDownloadApp | null;
 }) {
   const notas = [appStore, googlePlay].filter(Boolean) as StoreRatingInfo[];
   const media = notas.length ? notas.reduce((s, r) => s + r.rating, 0) / notas.length : 0;
@@ -39,7 +99,7 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay 
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
         <p className="font-semibold text-text-primary">{app}</p>
       </div>
-      <div className="grid grid-cols-3 gap-3 px-5 py-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-4">
         <div>
           <p className="text-xs text-text-secondary">Instalações</p>
           <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">{formatNumber(total)}</p>
@@ -59,6 +119,22 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay 
             {media > 0 && <Star className="h-4 w-4 fill-piquet-500 text-piquet-500" />}
           </p>
           <p className="text-[11px] text-text-muted">{avaliacoes > 0 ? `${formatNumber(avaliacoes)} avaliações` : "nas duas lojas"}</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-secondary">Custo/instalação</p>
+          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">
+            {custo?.custoPorDownload != null ? formatCurrency(custo.custoPorDownload) : "—"}
+          </p>
+          {/*
+            O denominador ao lado do número. "0,36 €" sozinho não diz se saiu
+            de duas instalações ou de quatrocentas, e a diferença entre as
+            duas coisas é toda.
+          */}
+          <p className="text-[11px] text-text-muted">
+            {custo && custo.downloads > 0
+              ? `${formatCurrency(custo.gastoAtribuido)} ÷ ${formatNumber(custo.downloads)} no período`
+              : "sem investimento atribuído"}
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-4 border-t border-surface-border px-5 py-2 text-[11px] text-text-muted">
@@ -119,6 +195,10 @@ export default function ProdutoPage() {
   }, [funnelPeriod, mesCorrente]);
   const { data: funnel, loading: funnelLoading } = useAsyncData(() => getAppFunnel(funnelRange.from, funnelRange.to), [funnelPeriod]);
 
+  const { data: custo } = useAsyncData(() => getCustoPorDownload(), []);
+  const custoDe = (app: "cliente" | "profissional"): CustoDownloadApp | null =>
+    custo?.apps.find((a) => a.app === app) ?? null;
+
   // Totais e variação mês-a-mês derivados das séries de crescimento.
   const dl = growth?.downloads ?? [];
   const reg = growth?.registrations ?? [];
@@ -170,14 +250,16 @@ export default function ProdutoPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <AppAdoptionCard app="App Cliente" accent="#FAB347"
                   total={dlLast?.Cliente ?? 0} novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)}
-                  appStore={ratings?.cliente.appStore ?? null} googlePlay={ratings?.cliente.googlePlay ?? null} />
+                  appStore={ratings?.cliente.appStore ?? null} googlePlay={ratings?.cliente.googlePlay ?? null}
+                  custo={custoDe("cliente")} />
                 {/* Era #1C1A17, quase preto: no tema escuro a série da App
                     Profissional desaparecia contra o fundo (1,0:1 de
                     contraste — literalmente invisível). O azul-petróleo da
                     paleta lê-se nos dois temas. */}
                 <AppAdoptionCard app="App Profissional" accent="#3E7C8C"
                   total={dlLast?.Profissional ?? 0} novos={newProfissional} pct={growthPct(newProfissional, dlPrev?.Profissional ?? 0)}
-                  appStore={ratings?.profissional.appStore ?? null} googlePlay={ratings?.profissional.googlePlay ?? null} />
+                  appStore={ratings?.profissional.appStore ?? null} googlePlay={ratings?.profissional.googlePlay ?? null}
+                  custo={custoDe("profissional")} />
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
                 <MetricCard title="Instalações totais" hideDelta
@@ -188,6 +270,9 @@ export default function ProdutoPage() {
                   metric={buildMetricValue(regLast?.Clientes ?? 0, regLast?.Clientes ?? 0)} />
                 <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" hideDelta
                   metric={buildMetricValue(regLast?.Técnicos ?? 0, regLast?.Técnicos ?? 0)} />
+              </div>
+              <div className="mt-3">
+                <CoberturaDoInvestimento custo={custo ?? null} />
               </div>
             </div>
 

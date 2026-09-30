@@ -141,6 +141,38 @@ export async function getStoreRatings(): Promise<StoreRatings> {
   })).then((r) => r.data);
 }
 
+export interface CustoDownloadApp {
+  app: "cliente" | "profissional";
+  gastoAtribuido: number;
+  downloads: number;
+  custoPorDownload: number | null;
+}
+
+export interface CustoDownload {
+  /** Janela da DESPESA: é nela que as instalações são contadas. */
+  periodo: { de: string; ate: string } | null;
+  apps: CustoDownloadApp[];
+  gastoNaoAtribuido: number;
+  gastoTotal: number;
+  /** Fatia do investimento que entrou nas contas por app, de 0 a 1. */
+  cobertura: number;
+  custoPorDownloadTudoIncluido: number | null;
+}
+
+/**
+ * Custo por instalação, por app.
+ *
+ * Sem série demo: um custo por download inventado ao lado de números reais é
+ * pior do que um espaço vazio -- este é dos números com que se decide onde
+ * pôr o dinheiro.
+ */
+export async function getCustoPorDownload(): Promise<CustoDownload> {
+  return apiGet<CustoDownload>("/product/cost-per-download", () => ({
+    periodo: null, apps: [], gastoNaoAtribuido: 0, gastoTotal: 0,
+    cobertura: 0, custoPorDownloadTudoIncluido: null,
+  })).then((r) => r.data);
+}
+
 export async function getAppGrowth(): Promise<AppGrowth> {
   // Sem fallback para a série demo em produção: se a ingestão das lojas
   // falhar, o gráfico fica vazio — que é a verdade — em vez de mostrar

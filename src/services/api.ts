@@ -122,6 +122,7 @@ const LIVE_EXACT = new Set<string>([
   "/product/integrations-status",
   "/product/whatsapp-templates",
   "/product/funnel",
+  "/product/cost-per-download",
   // Fase 2 — Clientes
   "/customers",
   "/customers/metrics",
