@@ -39,6 +39,37 @@ import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
+/**
+ * Uma proporção com o seu denominador.
+ *
+ * A percentagem em cima e grande, o "N de M" por baixo. Um número absoluto
+ * sozinho não se compara com nada -- 69 técnicos é bom ou mau conforme sejam
+ * de 100 ou de 460 -- e uma percentagem sozinha esconde a dimensão.
+ */
+function Proporcao({ rotulo, pct, n, total, nota, destaque }: {
+  rotulo: string; pct?: number; n: number; total: number; nota: string; destaque?: boolean;
+}) {
+  // Sem `pct` é o próprio total: mostra-se o número em grande e não "100%".
+  const ehTotal = pct === undefined;
+  return (
+    <div>
+      <p className="text-xs text-text-secondary">{rotulo}</p>
+      <p className={cn("text-3xl font-bold tabular-nums mt-0.5",
+        destaque ? "text-piquet" : "text-text-primary")}>
+        {ehTotal
+          ? formatNumber(n)
+          : `${(Math.round(pct * 10) / 10).toString().replace(".", ",")}%`}
+      </p>
+      {!ehTotal && (
+        <p className="text-sm font-medium text-text-primary tabular-nums">
+          {formatNumber(n)} <span className="text-text-muted font-normal">de {formatNumber(total)}</span>
+        </p>
+      )}
+      <p className={cn("text-[11px] text-text-muted", ehTotal ? "mt-1.5" : "mt-0.5")}>{nota}</p>
+    </div>
+  );
+}
+
 function Contagem({ rotulo, valor, nota, destaque }: {
   rotulo: string; valor: number; nota: string; destaque?: boolean;
 }) {
@@ -544,37 +575,60 @@ export default function TechniciansPage() {
                     )}
 
                     {/*
-                      Onde é que os técnicos estão presos.
-
-                      "Podem aceitar serviço" (acima) é o fim da linha, mas
-                      sozinho não diz o que falta a quem lá não chegou. Estes
-                      dois números dizem: quantos já não dependem de nós, e
-                      quantos estão a UM passo -- um passo que é deles.
+                      Os dois números que resumem o funil, cada um com a sua
+                      percentagem. A percentagem é o que está em cima e maior:
+                      "69" não diz nada sem saber de quantos, e é a proporção
+                      que se compara de mês para mês.
                     */}
-                    {semWorkspace && semWorkspace.contagem.total > 0 && (
-                      <div className="card p-4 sm:p-5">
-                        <p className="text-sm font-semibold text-text-primary">Onde estão presos</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                          <Contagem rotulo="Podem aceitar serviços" valor={semWorkspace.contagem.podemAceitar}
-                            nota={`de ${formatNumber(semWorkspace.contagem.total)} registados`} destaque />
-                          <Contagem rotulo="Perfil completo" valor={semWorkspace.contagem.perfilCompleto}
-                            nota="documentos, IBAN e morada" />
-                          <Contagem rotulo="Só falta a AT" valor={semWorkspace.contagem.soFaltaAT}
-                            nota="a um passo, e o passo é deles" />
-                          <Contagem rotulo="À espera de nós" valor={semWorkspace.contagem.aEspera}
-                            nota="falta criar-lhes o workspace" />
+                    {semWorkspace && semWorkspace.contagem.total > 0 && (() => {
+                      const c = semWorkspace.contagem;
+                      const pct = (n: number) => (c.total > 0 ? (n / c.total) * 100 : 0);
+                      return (
+                        <div className="card p-4 sm:p-5">
+                          <p className="text-sm font-semibold text-text-primary">Estado dos técnicos</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+                            {/*
+                              O total é o DENOMINADOR das duas percentagens ao
+                              lado, e vem da mesma travessia. Há um cartão
+                              "Registados" mais acima vindo de outro endpoint;
+                              se os dois números divergirem, é sinal de que as
+                              fontes contam universos diferentes -- e mais vale
+                              ver isso do que escondê-lo usando o mesmo valor
+                              nos dois sítios.
+                            */}
+                            <Proporcao
+                              rotulo="Técnicos registados"
+                              n={c.total} total={c.total}
+                              nota="o universo de que saem as percentagens"
+                            />
+                            <Proporcao
+                              rotulo="Podem aceitar serviços"
+                              pct={pct(c.podemAceitar)} n={c.podemAceitar} total={c.total} destaque
+                              nota="tudo aprovado, incluindo AT e workspace"
+                            />
+                            <Proporcao
+                              rotulo="Perfil completo"
+                              pct={pct(c.perfilCompleto)} n={c.perfilCompleto} total={c.total}
+                              nota="documentos validados e workspace criado"
+                            />
+                          </div>
+                          {/*
+                            O `perfilCompleto` é derivado, não medido -- ver a
+                            nota na rota. Se houver técnicos por classificar,
+                            diz-se quantos em vez de apresentar o número como
+                            se fosse exacto.
+                          */}
+                          {c.contactoPorVerificar > 0 && (
+                            <p className="text-xs text-text-muted mt-3">
+                              <b className="text-warning">{formatNumber(c.contactoPorVerificar)}</b> técnicos não se
+                              conseguem classificar quanto a documentos (têm ambos os contactos por verificar, o que
+                              tapa o resto). O "perfil completo" pode estar até esse número abaixo do real.
+                            </p>
+                          )}
                         </div>
-                        {/*
-                          A distinção que mais confunde: "perfil completo" não
-                          quer dizer "pode trabalhar". Falta-lhe ainda a AT
-                          (dele) e o workspace (nosso).
-                        */}
-                        <p className="text-xs text-text-muted mt-3">
-                          Perfil completo é não ter nada em falta <b className="text-text-secondary">do lado dele</b> —
-                          não chega para aceitar serviços, que exige ainda o subutilizador da AT e o workspace de faturação.
-                        </p>
-                      </div>
-                    )}
+                      );
+                    })()}
+
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
                       <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />

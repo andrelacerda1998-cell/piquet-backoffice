@@ -42,13 +42,26 @@ export interface ContagemWorkspaces {
   /** Entregaram a AT mas falta-lhes documento, IBAN ou morada fiscal. */
   bloqueados: number;
   /**
-   * Perfil completo: nada em falta DO LADO DELE.
+   * Perfil completo: documentos validados E workspace criado.
    *
-   * É o `account_blocker` a null -- contactos verificados, documentos
-   * aprovados, IBAN e morada fiscal. NÃO quer dizer que possa aceitar
-   * serviços: falta-lhe ainda o workspace (que é connosco) e a AT.
+   * O Laravel não expõe `all_documents_verified` por técnico -- só o usa numa
+   * contagem agregada noutro endpoint. Deriva-se do `account_blocker`, que
+   * devolve o PRIMEIRO problema pela ordem: contactos, documentos, IBAN,
+   * morada fiscal. Se o código for `iban_missing` ou `fiscal_address_missing`,
+   * passou-se a verificação dos documentos e portanto estão validados.
+   *
+   * Fica um caso cego: `contact_unverified` vem antes e tapa o que vem a
+   * seguir. Esse é contado em `contactoPorVerificar` -- se for zero, este
+   * número é exacto; se não for, é o erro máximo possível, e não se esconde.
    */
   perfilCompleto: number;
+  /**
+   * Quantos técnicos não se conseguem classificar quanto a documentos.
+   *
+   * É a margem de erro do `perfilCompleto`, e existe para não se apresentar
+   * um número derivado como se fosse medido.
+   */
+  contactoPorVerificar: number;
   /**
    * Podem aceitar serviços. É o `can_accept_service` do Laravel, que é a
    * autoridade -- não se recalcula aqui, porque duas contas da mesma coisa
@@ -92,7 +105,7 @@ export const GET = withStaff(async () => {
     const espera: TecnicoSemWorkspace[] = [];
     const contagem: ContagemWorkspaces = {
       total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0,
-      perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0,
+      perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
     };
     let pagina = 1;
     let ultima = 1;
@@ -114,11 +127,18 @@ export const GET = withStaff(async () => {
         else if (temAT && v.account_blocker) contagem.bloqueados++;
 
         if (v.can_accept_service) contagem.podemAceitar++;
-        if (!v.account_blocker) {
-          contagem.perfilCompleto++;
-          // Nada em falta do lado dele, exceto a AT -- está a um passo.
-          if (!temAT) contagem.soFaltaAT++;
-        }
+
+        // Ver a nota em `perfilCompleto`: estes dois códigos só aparecem
+        // DEPOIS de os documentos passarem, logo garantem que passaram.
+        const docsValidados = !v.account_blocker
+          || v.account_blocker === "iban_missing"
+          || v.account_blocker === "fiscal_address_missing";
+
+        if (v.account_blocker === "contact_unverified") contagem.contactoPorVerificar++;
+        if (docsValidados && v.invoice_workspace) contagem.perfilCompleto++;
+
+        // Nada a bloquear do lado dele, exceto a AT -- está a um passo.
+        if (!v.account_blocker && !temAT) contagem.soFaltaAT++;
 
         const aguarda = esperaPeloWorkspace({
           id: v.id,

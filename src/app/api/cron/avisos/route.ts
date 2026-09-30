@@ -275,6 +275,12 @@ function avisoDeExemplo(): Aviso | null {
   return { titulo: p.titulo, corpo: `${p.corpo} · exemplo`, url: "/servicos", tag: "exemplo" };
 }
 
+/** Percentagem com uma casa, à portuguesa. */
+function pct(n: number, total: number): string {
+  if (total <= 0) return "—";
+  return `${(Math.round((n / total) * 1000) / 10).toString().replace(".", ",")}%`;
+}
+
 /**
  * Técnicos que já entregaram o acesso à AT e esperam pelo workspace.
  *
@@ -338,17 +344,32 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       `podemAceitar` vem do Laravel (`can_accept_service`) e não é recontado
       aqui -- a autoridade é de lá.
     */
-    const perfilCompleto = todos.filter((t) => !t.blocker).length;
+    /*
+      Perfil completo = documentos validados E workspace criado.
+
+      O Laravel não expõe `all_documents_verified` por técnico. Deriva-se do
+      código de bloqueio, que devolve o PRIMEIRO problema pela ordem
+      contactos → documentos → IBAN → morada: se chegou a `iban_missing` ou a
+      `fiscal_address_missing`, os documentos já passaram. O `contact_unverified`
+      tapa o resto, e esses contam-se à parte para a margem ficar à vista.
+    */
+    const docsValidados = (t: TecnicoParaAviso) =>
+      !t.blocker || t.blocker === "iban_missing" || t.blocker === "fiscal_address_missing";
+
+    const perfilCompleto = todos.filter((t) => docsValidados(t) && t.invoiceWorkspace).length;
+    const porClassificar = todos.filter((t) => t.blocker === "contact_unverified").length;
     const soFaltaAT = todos.filter((t) => !t.blocker && !temAT(t)).length;
     const podemAceitar = todos.filter((t) => t.podeAceitar).length;
     const avisos = avisosDeWorkspace(todos);
 
     return {
       avisos,
-      retrato: `${todos.length} técnicos · ${podemAceitar} podem aceitar serviços`
-             + ` · ${perfilCompleto} perfil completo · ${soFaltaAT} só falta a AT`
-             + ` · ${comWorkspace} podem faturar · ${avisos.length} à espera`
-             + ` · ${bloqueados} com algo em falta`,
+      retrato: `${todos.length} registados`
+             + ` · ${podemAceitar} podem aceitar (${pct(podemAceitar, todos.length)})`
+             + ` · ${perfilCompleto} perfil completo (${pct(perfilCompleto, todos.length)})`
+             + ` · ${comWorkspace} podem faturar · ${soFaltaAT} só falta a AT`
+             + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`
+             + (porClassificar > 0 ? ` · ${porClassificar} por classificar` : ""),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
