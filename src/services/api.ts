@@ -390,6 +390,7 @@ const REAL_DATA = new Set<string>([
   "/finance/treasury", // registado pelo staff — real por definição.
   "/dev-tasks",
   "/tasks", // Tarefas pessoais (pipeline Kanban) — escritas pelo André.
+  "/product/cost-per-download", // gasto real (ad_metrics) ÷ instalações reais (app_metrics)
   "/product/growth", // Downloads das lojas; os registos devolvem 0 na rota.
   "/product/ratings", // Avaliações reais nas lojas (iTunes lookup + Play).
   "/product/integrations-status",

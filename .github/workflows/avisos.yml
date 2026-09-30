@@ -1,0 +1,78 @@
+name: Avisos
+
+# Chama o cron dos avisos de 15 em 15 minutos.
+#
+# PORQUE ISTO EXISTE FORA DA VERCEL: o plano Hobby recusa qualquer cron mais
+# frequente do que diário -- e recusa o DEPLOY INTEIRO, não só o cron. Com um
+# aviso por dia, "avisa-me quando um serviço fica concluído" deixa de ser um
+# aviso e passa a ser um relatório da véspera.
+#
+# O endpoint já estava escrito para frequência alta: guarda o que já avisou e
+# junta tudo numa notificação só, por isso correr de 15 em 15 minutos não
+# multiplica as vibrações. Também não avisa fora das 8h-21h (Lisboa), o que
+# torna inofensivas as corridas da noite.
+#
+# Os minutos são 3, 18, 33, 48 e não 0, 15, 30, 45: à hora certa o GitHub tem
+# toda a gente agendada ao mesmo tempo e os arranques atrasam-se mais.
+#
+# PRECISA DE UM SEGREDO no repositório (Settings > Secrets and variables >
+# Actions > New repository secret):
+#   CRON_SECRET  — o mesmo valor que está nas variáveis de ambiente da Vercel.
+#
+# Sem ele o endpoint devolve 401 e este workflow falha, de propósito: um
+# agendamento que falha em silêncio é pior do que não existir.
+
+on:
+  schedule:
+    - cron: "3,18,33,48 * * * *"
+  # Para experimentar sem esperar pelos 15 minutos.
+  workflow_dispatch:
+
+# Uma corrida de cada vez. Se uma demorar, a seguinte espera em vez de somar
+# uma segunda passagem pelas mesmas pendências.
+concurrency:
+  group: avisos
+  cancel-in-progress: false
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chamar o cron dos avisos
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::Falta o segredo CRON_SECRET no repositório."
+            exit 1
+          fi
+
+          # O corpo vai para um ficheiro e o código HTTP para stdout: assim
+          # dá para mostrar a resposta E decidir com base no estado.
+          codigo=$(curl --silent --show-error --fail-with-body \
+            --max-time 120 --retry 2 --retry-delay 10 \
+            --output resposta.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            https://backoffice.piquetapp.com/api/cron/avisos) || {
+              echo "::error::O pedido falhou (HTTP ${codigo:-?})."
+              cat resposta.json || true
+              exit 1
+            }
+
+          echo "HTTP ${codigo}"
+          cat resposta.json
+          echo
+
+          # Resumo legível na página da corrida, para não ser preciso abrir
+          # os registos só para saber se foi enviado alguma coisa.
+          {
+            echo "### Avisos"
+            echo ""
+            echo '```json'
+            cat resposta.json
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

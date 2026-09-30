@@ -11,15 +11,18 @@ import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 /**
  * Avisa quem gere a Piquet do que está à espera.
  *
- * ATENÇÃO AO HORÁRIO NO vercel.json: está DIÁRIO, e devia ser de 15 em 15
- * minutos. Não é escolha — o plano Hobby da Vercel recusa qualquer expressão
- * que corra mais do que uma vez por dia, e recusa o DEPLOY INTEIRO, não só o
- * cron. Um aviso por dia sobre um pedido urgente serve de pouco: isto fica a
- * meio caminho até ser chamado de fora (GitHub Actions ou o scheduler do
- * Laravel, ambos sem custo) ou até o plano mudar.
+ * QUEM CHAMA ISTO: uma GitHub Action, de 15 em 15 minutos
+ * (.github/workflows/avisos.yml). Não é excentricidade — o plano Hobby da
+ * Vercel recusa qualquer cron mais frequente do que diário, e recusa o DEPLOY
+ * INTEIRO, não só o cron. Um aviso por dia sobre um serviço concluído deixa
+ * de ser aviso e passa a ser relatório da véspera.
  *
- * A função em si está certa para a frequência alta — daí a memória do que já
- * foi avisado e o agrupamento num aviso só.
+ * A entrada no vercel.json fica na mesma, uma vez por dia: é a rede de
+ * segurança para o dia em que a Action falhar ou o segredo expirar. Chamar
+ * duas vezes não duplica nada — a memória do que já foi avisado trata disso.
+ *
+ * A função está escrita para frequência alta — daí a memória do que já foi
+ * avisado e o agrupamento num aviso só.
  *
  * Só avisa entre as 8h e as 21h. Fora disso não avisa: um telemóvel a vibrar
  * às 3 da manhã por causa de um ticket não resolve o ticket e ensina a pessoa
