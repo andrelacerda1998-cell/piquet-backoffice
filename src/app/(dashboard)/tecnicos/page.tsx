@@ -810,28 +810,18 @@ export default function TechniciansPage() {
         {tab === "aprovacoes" && (
           <div className="space-y-4">
             {/*
-              O retrato da faturação, sempre visível.
+              Quem entregou a AT mas tem algo por resolver do lado dele.
 
-              A lista de quem falta some quando está vazia -- e é assim que
-              deve ser. Mas "quantos técnicos podem mesmo faturar?" não é
-              trabalho por fazer, é contexto, e não tinha resposta em lado
-              nenhum: via-se quem faltava, nunca quem já estava feito.
+              Uma frase e não um cartão com um número grande: não é uma
+              métrica para acompanhar, é uma lista de pessoas para contactar.
             */}
-            {semWorkspace && semWorkspace.contagem.total > 0 && (
-              <div className="card p-4 sm:p-5">
-                <p className="text-sm font-semibold text-text-primary">Workspaces de faturação</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                  <Contagem rotulo="Podem faturar" valor={semWorkspace.contagem.comWorkspace}
-                    nota={`de ${formatNumber(semWorkspace.contagem.total)} técnicos`} destaque />
-                  <Contagem rotulo="À espera de nós" valor={semWorkspace.contagem.aEspera}
-                    nota="AT entregue, nada em falta" />
-                  <Contagem rotulo="Falta-lhes algo" valor={semWorkspace.contagem.bloqueados}
-                    nota="documento, IBAN ou morada" />
-                  <Contagem rotulo="Sem AT" valor={Math.max(0, semWorkspace.contagem.total
-                    - semWorkspace.contagem.comWorkspace - semWorkspace.contagem.aEspera
-                    - semWorkspace.contagem.bloqueados)}
-                    nota="ainda não entregaram" />
-                </div>
+            {(semWorkspace?.contagem.bloqueados ?? 0) > 0 && (
+              <div className="card border-l-[3px] border-l-warning p-4">
+                <p className="text-sm text-text-secondary">
+                  <b className="text-text-primary">{semWorkspace!.contagem.bloqueados} técnicos</b> entregaram o acesso
+                  à AT mas têm um documento, o IBAN ou a morada fiscal por resolver — não lhes conseguimos criar o
+                  workspace até isso ficar feito.
+                </p>
               </div>
             )}
 
@@ -877,10 +867,15 @@ export default function TechniciansPage() {
 
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/*
+                  Só o que é de KYC. A "Taxa de conclusão de perfil" e os
+                  "Podem aceitar serviço" saíram daqui: vivem na Visão geral,
+                  e tê-los nos dois sítios dava oito números no mesmo ecrã,
+                  dois deles a dizer a mesma coisa com valores diferentes por
+                  virem de fontes distintas.
+                */}
                 <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
                 <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
-                <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate)} hideDelta format="percent" />
-                <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
               </div>
             )}
             {docsIncompletos > 0 && (
