@@ -301,6 +301,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       id: number; name: string | null; at_user?: string | null;
       invoice_workspace?: string | null; account_blocker?: string | null;
       can_accept_service?: boolean;
+      created_at?: string | null;
     }>;
     meta?: { last_page?: number };
   }
@@ -320,6 +321,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
         invoiceWorkspace: v.invoice_workspace,
         blocker: v.account_blocker,
         podeAceitar: v.can_accept_service,
+        criadoEm: v.created_at,
       })));
       ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
       pagina++;
@@ -362,6 +364,27 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
     const podemAceitar = todos.filter((t) => t.podeAceitar).length;
     const avisos = avisosDeWorkspace(todos);
 
+    /*
+      Onde é que os técnicos estão presos, repartido pelo motivo.
+
+      O `account_blocker` devolve só o PRIMEIRO problema, por isso isto não é
+      "quantos têm cada problema" -- é "quantos estão travados naquele degrau".
+      Serve para saber onde atacar, que é diferente de saber quantos faltam.
+
+      Para os contactos por verificar vai também a idade: uma inscrição de
+      ontem por verificar é normal, uma de há seis meses é um registo
+      abandonado, e as duas coisas pedem respostas diferentes.
+    */
+    const porMotivo = new Map<string, number>();
+    for (const t of todos) porMotivo.set(t.blocker ?? "nada", (porMotivo.get(t.blocker ?? "nada") ?? 0) + 1);
+    const degraus = [...porMotivo.entries()].sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k}:${n}`).join(" ");
+
+    const HA_90_DIAS = Date.now() - 90 * 864e5;
+    const semContactoRecentes = todos.filter(
+      (t) => t.blocker === "contact_unverified" && t.criadoEm && new Date(t.criadoEm).getTime() >= HA_90_DIAS,
+    ).length;
+
     return {
       avisos,
       retrato: `${todos.length} registados`
@@ -369,7 +392,9 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
              + ` · ${perfilCompleto} perfil completo (${pct(perfilCompleto, todos.length)})`
              + ` · ${comWorkspace} podem faturar · ${soFaltaAT} só falta a AT`
              + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`
-             + (porClassificar > 0 ? ` · ${porClassificar} por classificar` : ""),
+             + (porClassificar > 0 ? ` · ${porClassificar} por classificar` : "")
+      + ` · degraus ${degraus}`
+      + (porClassificar > 0 ? ` · ${semContactoRecentes} destes dos últimos 90 dias` : ""),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

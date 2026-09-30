@@ -245,6 +245,8 @@ export interface TecnicoParaAviso {
    * daria um número diferente do que o ecrã mostra.
    */
   podeAceitar?: boolean;
+  /** Quando se registou. Só para o retrato do funil, não decide avisos. */
+  criadoEm?: string | null;
 }
 
 /**
