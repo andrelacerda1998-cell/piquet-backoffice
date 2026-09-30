@@ -206,6 +206,27 @@ export interface ContagemWorkspaces {
   soFaltaAT: number;
 }
 
+export interface DocumentoEmFalta { nome: string; em?: string | null; motivo?: string | null }
+export interface TecnicoComDocumento { id: number; name: string | null; documentos: DocumentoEmFalta[] }
+export interface ResumoDocumentos {
+  total: number;
+  completos: number;
+  com_expirado: number;
+  com_recusado: number;
+  com_por_rever: number;
+  nunca_submeteram: number;
+  expirados: TecnicoComDocumento[];
+  recusados: TecnicoComDocumento[];
+}
+
+/** Porque é que a documentação está incompleta, e quem se resolve hoje. */
+export async function getResumoDocumentos(): Promise<ResumoDocumentos> {
+  return apiGet<ResumoDocumentos>("/technicians/documentos", () => ({
+    total: 0, completos: 0, com_expirado: 0, com_recusado: 0,
+    com_por_rever: 0, nunca_submeteram: 0, expirados: [], recusados: [],
+  })).then((r) => r.data);
+}
+
 export async function getTecnicosSemWorkspace(): Promise<{
   items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces;
 }> {

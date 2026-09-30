@@ -19,6 +19,7 @@ import {
   createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces,
   getTecnicosSemWorkspace, type TecnicoSemWorkspace,
+  getResumoDocumentos, type TecnicoComDocumento,
 } from "@/services/vendorsService";
 
 // Leaflet mexe em `window`/`document` na inicialização — sem ssr:false a
@@ -121,6 +122,54 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
   );
 }
 
+/**
+ * Um grupo de técnicos com o mesmo problema de documentação.
+ *
+ * Cada linha diz QUEM, QUE documento e PORQUÊ — os três sem abrir nada. Uma
+ * lista que obriga a abrir cada perfil para saber o que falta não poupa
+ * trabalho a ninguém.
+ */
+function GrupoDeDocumentos({ titulo, nota, tecnicos, detalhe, onAbrir }: {
+  titulo: string;
+  nota: string;
+  tecnicos: TecnicoComDocumento[];
+  detalhe: (d: TecnicoComDocumento["documentos"][number]) => string;
+  /** Leva à Lista já filtrada por este técnico. */
+  onAbrir: (nome: string) => void;
+}) {
+  return (
+    <div className="border-b border-surface-border last:border-0">
+      <div className="px-4 sm:px-5 py-2 bg-surface-subtle">
+        <p className="text-xs font-semibold text-text-primary">
+          {titulo} <span className="font-normal text-text-muted">· {nota}</span>
+        </p>
+      </div>
+      <ul className="divide-y divide-surface-border">
+        {tecnicos.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">{t.name ?? `Técnico ${t.id}`}</p>
+              <p className="text-xs text-text-muted">
+                {t.documentos.map((d) => `${d.nome} — ${detalhe(d)}`).join(" · ")}
+              </p>
+            </div>
+            {/*
+              Leva à Lista filtrada pelo nome, e não ao perfil directamente: o
+              perfil abre com o objeto completo do técnico, que esta lista não
+              tem -- só id e nome. Filtrar a lista chega lá em dois cliques em
+              vez de um, e não obriga a ir buscar o técnico inteiro só para
+              ter um botão.
+            */}
+            <button onClick={() => onAbrir(t.name ?? String(t.id))} className="btn-secondary text-xs shrink-0">
+              Ver na lista
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
@@ -152,6 +201,13 @@ export default function TechniciansPage() {
     dispara a notificação (lib/avisosOperacao.ts), importada e não copiada.
   */
   const { data: semWorkspace, refetch: refetchSemWorkspace } = useAsyncData(() => getTecnicosSemWorkspace(), []);
+
+  /*
+    Quem tem documentos expirados ou recusados. São os dois grupos em que uma
+    pessoa resolve uma pessoa -- ao contrário dos 337 que nunca submeteram,
+    que se resolvem no funil de inscrição e não aqui.
+  */
+  const { data: docs, refetch: refetchDocs } = useAsyncData(() => getResumoDocumentos(), []);
 
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
@@ -836,6 +892,49 @@ export default function TechniciansPage() {
 
         {tab === "aprovacoes" && (
           <div className="space-y-4">
+            {docs && (docs.expirados.length > 0 || docs.recusados.length > 0) && (
+              <div className="card overflow-hidden">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <p className="font-semibold text-text-primary">Documentação a tratar</p>
+                  {/*
+                    Porque é que só estes dois aparecem em lista: são os únicos
+                    em que uma pessoa resolve uma pessoa. Os que nunca
+                    submeteram são 337 -- isso não é uma lista de trabalho, é
+                    um relatório, e resolve-se no funil de inscrição.
+                  */}
+                  <p className="text-sm text-text-secondary mt-1">
+                    {docs.com_expirado > 0 && <><b className="text-text-primary">{docs.com_expirado}</b> com documentos caducados</>}
+                    {docs.com_expirado > 0 && docs.com_recusado > 0 && " · "}
+                    {docs.com_recusado > 0 && <><b className="text-text-primary">{docs.com_recusado}</b> com documentos recusados</>}
+                    {". "}
+                    Os outros {formatNumber(docs.nunca_submeteram)} nunca submeteram — esses resolvem-se na inscrição.
+                  </p>
+                </div>
+
+                {docs.expirados.length > 0 && (
+                  <GrupoDeDocumentos
+                    titulo="Caducados"
+                    // Já tiveram tudo aprovado: provavelmente já trabalharam e
+                    // pararam sem dar por isso. É o grupo com melhor retorno.
+                    nota="já tiveram tudo aprovado — basta reenviarem"
+                    tecnicos={docs.expirados}
+                    detalhe={(d) => (d.em ? `caducou ${formatDate(d.em)}` : "caducado")}
+                    onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
+                  />
+                )}
+
+                {docs.recusados.length > 0 && (
+                  <GrupoDeDocumentos
+                    titulo="Recusados"
+                    nota="submeteram e foi-lhes dito que não"
+                    tecnicos={docs.recusados}
+                    detalhe={(d) => d.motivo || "sem motivo registado"}
+                    onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
+                  />
+                )}
+              </div>
+            )}
+
             {/*
               Quem entregou a AT mas tem algo por resolver do lado dele.
 
