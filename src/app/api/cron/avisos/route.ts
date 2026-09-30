@@ -301,6 +301,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       id: number; name: string | null; at_user?: string | null;
       invoice_workspace?: string | null; account_blocker?: string | null;
       can_accept_service?: boolean;
+      all_documents_verified?: boolean;
       created_at?: string | null;
     }>;
     meta?: { last_page?: number };
@@ -322,6 +323,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
         blocker: v.account_blocker,
         podeAceitar: v.can_accept_service,
         criadoEm: v.created_at,
+        documentosValidados: v.all_documents_verified,
       })));
       ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
       pagina++;
@@ -355,11 +357,18 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       `fiscal_address_missing`, os documentos já passaram. O `contact_unverified`
       tapa o resto, e esses contam-se à parte para a margem ficar à vista.
     */
+    // O campo verdadeiro quando existe; a dedução só como recurso. Mesma
+    // regra da rota /technicians/funil, de propósito -- se divergissem, o
+    // registo e o ecrã voltavam a dizer números diferentes.
     const docsValidados = (t: TecnicoParaAviso) =>
-      !t.blocker || t.blocker === "iban_missing" || t.blocker === "fiscal_address_missing";
+      typeof t.documentosValidados === "boolean"
+        ? t.documentosValidados
+        : (!t.blocker || t.blocker === "iban_missing" || t.blocker === "fiscal_address_missing");
 
     const perfilCompleto = todos.filter((t) => docsValidados(t) && t.invoiceWorkspace).length;
-    const porClassificar = todos.filter((t) => t.blocker === "contact_unverified").length;
+    const porClassificar = todos.filter(
+      (t) => typeof t.documentosValidados !== "boolean" && t.blocker === "contact_unverified",
+    ).length;
     const soFaltaAT = todos.filter((t) => !t.blocker && !temAT(t)).length;
     const podemAceitar = todos.filter((t) => t.podeAceitar).length;
     const avisos = avisosDeWorkspace(todos);

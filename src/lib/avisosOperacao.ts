@@ -247,6 +247,8 @@ export interface TecnicoParaAviso {
   podeAceitar?: boolean;
   /** Quando se registou. Só para o retrato do funil, não decide avisos. */
   criadoEm?: string | null;
+  /** `all_documents_verified` do Laravel. Ausente em backends anteriores a #127. */
+  documentosValidados?: boolean;
 }
 
 /**

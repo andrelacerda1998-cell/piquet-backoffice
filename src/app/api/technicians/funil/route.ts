@@ -111,6 +111,8 @@ interface Resposta {
     invoice_workspace?: string | null;
     account_blocker?: string | null;
     can_accept_service?: boolean;
+    /** Exposto por técnico desde backend #127. Ausente = backend mais antigo. */
+    all_documents_verified?: boolean;
     created_at?: string | null;
   }>;
   meta?: { last_page?: number };
@@ -150,15 +152,28 @@ export const GET = withStaff(async () => {
 
         if (v.can_accept_service) contagem.podemAceitar++;
 
-        // Ver a nota em `perfilCompleto`: estes dois códigos só aparecem
-        // DEPOIS de os documentos passarem, logo garantem que passaram.
-        const docsValidados = !v.account_blocker
-          || v.account_blocker === "iban_missing"
-          || v.account_blocker === "fiscal_address_missing";
+        /*
+          O campo verdadeiro quando existe; a dedução só como recurso.
+
+          O Laravel passou a expor `all_documents_verified` por técnico
+          (#127). Enquanto não estiver em produção em todo o lado, o recurso
+          é a dedução pelo código de bloqueio -- que só acerta em quem já
+          passou o degrau dos contactos, e por isso subestima.
+
+          O `contactoPorVerificar` só conta quando se está a deduzir: com o
+          campo verdadeiro não há incerteza nenhuma a anunciar.
+        */
+        const temCampo = typeof v.all_documents_verified === "boolean";
+        const docsValidados = temCampo
+          ? v.all_documents_verified === true
+          : (!v.account_blocker
+             || v.account_blocker === "iban_missing"
+             || v.account_blocker === "fiscal_address_missing");
 
         switch (v.account_blocker) {
           case "contact_unverified": {
-            contagem.contactoPorVerificar++;
+            // Só é "por classificar" quando não há campo para consultar.
+            if (!temCampo) contagem.contactoPorVerificar++;
             contagem.degraus.semContacto++;
             // Uma inscrição de ontem por verificar é normal; uma de há seis
             // meses é um registo abandonado, e pedem respostas diferentes.
