@@ -16,7 +16,11 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Piquet — Gestão",
-    short_name: "Piquet",
+    /*
+      O `short_name` é o que o Android põe por baixo do ícone. "Piquet"
+      confundia-se com a app dos clientes; aqui cabem os dois nomes.
+    */
+    short_name: "Piquet Gestão",
     description: "Backoffice da Piquet: serviços, técnicos, suporte e dinheiro.",
     start_url: "/",
     display: "standalone",

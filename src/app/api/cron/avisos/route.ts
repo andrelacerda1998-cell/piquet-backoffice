@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verificarChave } from "../../_lib/webhookAuth";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
-import { avisar, PUSH_CONFIGURADO } from "@/lib/push";
+import { avisar, PUSH_CONFIGURADO, type Aviso } from "@/lib/push";
 import { juntar, apenasNovos, memoriaAtualizada, type Pendente } from "@/lib/avisosPendentes";
 import { avisosDeServicos, avisosDeDocumentos, type DocumentoParaAviso } from "@/lib/avisosOperacao";
 import { fetchAllLaravelServices, servicesFromLaravel } from "../../_lib/laravelServices";
@@ -85,7 +85,7 @@ function resumoDoPedido(mensagem: string): string {
 }
 
 /** O que está pendente agora, nas fontes que o backoffice já lê. */
-async function recolherPendentes(): Promise<Pendente[]> {
+async function recolherPendentes(): Promise<{ pendentes: Pendente[]; fonteServicos: string }> {
   const db = supabaseAdmin();
   const pendentes: Pendente[] = [];
 
@@ -121,10 +121,11 @@ async function recolherPendentes(): Promise<Pendente[]> {
   }
 
   // 3. Serviços concluídos e agendados, e documentos submetidos.
-  pendentes.push(...(await recolherServicos()));
+  const servicos = await recolherServicos();
+  pendentes.push(...servicos.avisos);
   pendentes.push(...(await recolherDocumentos()));
 
-  return pendentes;
+  return { pendentes, fonteServicos: servicos.fonte };
 }
 
 /**
@@ -137,11 +138,11 @@ async function recolherPendentes(): Promise<Pendente[]> {
  * Uma falha aqui NÃO pode calar os avisos de tickets e pedidos que já
  * funcionavam -- daí o try/catch por fonte em vez de um à volta de tudo.
  */
-async function recolherServicos(): Promise<Pendente[]> {
+async function recolherServicos(): Promise<{ avisos: Pendente[]; fonte: string }> {
   try {
     if (servicesFromLaravel()) {
       const todos = await fetchAllLaravelServices();
-      return avisosDeServicos(todos);
+      return { avisos: avisosDeServicos(todos), fonte: `laravel (${todos.length})` };
     }
 
     const { data } = await supabaseAdmin()
@@ -149,8 +150,9 @@ async function recolherServicos(): Promise<Pendente[]> {
       .select("id, status, customer_name, service_name, city, total_customer_value, scheduled_at, completed_at, requested_at")
       .in("status", ["concluido", "agendado"]);
 
-    return avisosDeServicos(
-      ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    const linhas = (data ?? []) as Array<Record<string, unknown>>;
+    return { fonte: `supabase (${linhas.length})`, avisos: avisosDeServicos(
+      linhas.map((r) => ({
         id: String(r.id),
         status: String(r.status ?? ""),
         customerName: (r.customer_name as string) ?? undefined,
@@ -161,10 +163,16 @@ async function recolherServicos(): Promise<Pendente[]> {
         completedAt: (r.completed_at as string) ?? undefined,
         requestedAt: (r.requested_at as string) ?? undefined,
       })),
-    );
+    ) };
   } catch (e) {
-    console.error("[cron avisos] serviços:", e instanceof Error ? e.message : e);
-    return [];
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[cron avisos] serviços:", msg);
+    /*
+      A fonte vai para o registo da corrida porque "zero serviços" e "a
+      leitura rebentou" dão exatamente o mesmo resultado visto de fora -- e
+      passei tempo a tentar distinguir os dois sem nada que os separasse.
+    */
+    return { avisos: [], fonte: `erro: ${msg.slice(0, 80)}` };
   }
 }
 
@@ -214,6 +222,39 @@ async function recolherDocumentos(): Promise<Pendente[]> {
   }
 }
 
+/**
+ * Um aviso de exemplo, para se ver como fica no telemóvel.
+ *
+ * Existe porque a alternativa era pior: para ver um aviso de serviço
+ * concluído sem haver nenhum, teria de se inventar um serviço na base de
+ * dados de produção -- e um serviço falso de 85 € entra no GMV e no
+ * Financeiro. Aqui não se escreve nada: o serviço vive só nesta função.
+ *
+ * Passa pelo MESMO `avisosDeServicos` que formata os reais, senão não
+ * provava nada sobre o que se vai receber de facto.
+ *
+ * O corpo diz "exemplo" de propósito. O título fica igual ao verdadeiro,
+ * que é o que se quer ver, mas alguém que receba isto tem de conseguir
+ * perceber que não há serviço nenhum à espera.
+ */
+function avisoDeExemplo(): Aviso | null {
+  const agora = new Date();
+  const [p] = avisosDeServicos(
+    [{
+      id: "exemplo",
+      status: "concluido",
+      serviceName: "Reparação de canalização",
+      city: "Porto",
+      totalCustomerValue: 85,
+      completedAt: agora.toISOString(),
+    }],
+    { agora },
+  );
+  if (!p) return null;
+  // Tag própria: não se mistura nem apaga os avisos verdadeiros.
+  return { titulo: p.titulo, corpo: `${p.corpo} · exemplo`, url: "/servicos", tag: "exemplo" };
+}
+
 export async function GET(req: Request) {
   const auth = verificarChave(
     req.headers.get("authorization")?.replace(/^Bearer /, "") ?? null,
@@ -232,13 +273,27 @@ export async function GET(req: Request) {
     await logCronRun("avisos", true, "sem chaves VAPID");
     return NextResponse.json({ ok: true, nota: "sem chaves VAPID" });
   }
+  /*
+    ?exemplo=1 manda um aviso de demonstração e sai. Fica ANTES da janela de
+    horas e antes de tudo o resto: quem pede um exemplo quer vê-lo agora, e
+    não deve mexer na memória do que já foi avisado -- senão um teste fazia
+    desaparecer avisos verdadeiros.
+  */
+  if (new URL(req.url).searchParams.get("exemplo")) {
+    const aviso = avisoDeExemplo();
+    if (!aviso) return NextResponse.json({ error: "não foi possível montar o exemplo" }, { status: 500 });
+    const r = await avisar(aviso);
+    await logCronRun("avisos", r.erros.length === 0, `exemplo → ${r.enviados} dispositivos`);
+    return NextResponse.json({ ok: true, exemplo: aviso, ...r });
+  }
+
   if (!dentroDeHoras()) {
     await logCronRun("avisos", true, "fora de horas");
     return NextResponse.json({ ok: true, nota: "fora de horas" });
   }
 
   try {
-    const pendentes = await recolherPendentes();
+    const { pendentes, fonteServicos } = await recolherPendentes();
     const memoria = await lerMemoria();
     const novos = apenasNovos(pendentes, memoria);
     const aviso = juntar(novos);
@@ -251,14 +306,14 @@ export async function GET(req: Request) {
     await gravarMemoria(memoriaAtualizada(pendentes, memoria));
 
     if (!aviso) {
-      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo`);
-      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0 });
+      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo · serviços: ${fonteServicos}`);
+      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0, fonteServicos });
     }
 
     const r = await avisar(aviso);
-    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos`);
+    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos · serviços: ${fonteServicos}`);
 
-    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, ...r });
+    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, fonteServicos, ...r });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "erro";
     await logCronRun("avisos", false, msg);

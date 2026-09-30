@@ -27,6 +27,11 @@ on:
     - cron: "3,18,33,48 * * * *"
   # Para experimentar sem esperar pelos 15 minutos.
   workflow_dispatch:
+    inputs:
+      exemplo:
+        description: "Mandar um aviso de EXEMPLO em vez de ver o que está pendente"
+        type: boolean
+        default: false
 
 # Uma corrida de cada vez. Se uma demorar, a seguinte espera em vez de somar
 # uma segunda passagem pelas mesmas pendências.
@@ -42,6 +47,7 @@ jobs:
       - name: Chamar o cron dos avisos
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          EXEMPLO: ${{ inputs.exemplo }}
         run: |
           set -euo pipefail
 
@@ -52,11 +58,19 @@ jobs:
 
           # O corpo vai para um ficheiro e o código HTTP para stdout: assim
           # dá para mostrar a resposta E decidir com base no estado.
+          # O exemplo não mexe na memória do que já foi avisado: serve só
+          # para ver como fica a notificação no telemóvel.
+          url="https://backoffice.piquetapp.com/api/cron/avisos"
+          if [ "${EXEMPLO:-false}" = "true" ]; then
+            url="${url}?exemplo=1"
+            echo "A mandar um aviso de EXEMPLO."
+          fi
+
           codigo=$(curl --silent --show-error --fail-with-body \
             --max-time 120 --retry 2 --retry-delay 10 \
             --output resposta.json --write-out '%{http_code}' \
             --header "Authorization: Bearer ${CRON_SECRET}" \
-            https://backoffice.piquetapp.com/api/cron/avisos) || {
+            "${url}") || {
               echo "::error::O pedido falhou (HTTP ${codigo:-?})."
               cat resposta.json || true
               exit 1

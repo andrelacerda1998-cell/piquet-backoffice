@@ -53,9 +53,12 @@ describe("avisosDeServicos", () => {
     expect(a.titulo).toBe(`Serviço agendado · ${EUR("85,00")}`);
   });
 
-  it("o corpo diz de quem é e do quê", () => {
+  it("o corpo diz o tipo de serviço e a cidade, e não quem pediu", () => {
+    // Numa notificação cabem poucas palavras antes de serem cortadas, e o
+    // nome de quem pediu não ajuda a decidir nada de relance.
     const [a] = avisosDeServicos([servico()], { agora: AGORA });
-    expect(a.corpo).toBe("Maria Silva — Canalização — Porto");
+    expect(a.corpo).toBe("Canalização | Porto");
+    expect(a.corpo).not.toContain("Maria Silva");
   });
 
   it("um agendamento diz a que horas", () => {
@@ -64,7 +67,7 @@ describe("avisosDeServicos", () => {
       { agora: AGORA },
     );
     // Lisboa está em UTC+1 a 1 de outubro, por isso 14:30 UTC são 15:30.
-    expect(a.corpo).toBe("Maria Silva — Canalização — Porto · 1/10, 15:30");
+    expect(a.corpo).toBe("Canalização | Porto · 1/10, 15:30");
   });
 
   it("o mesmo serviço avisa duas vezes na vida, uma por estado", () => {
@@ -108,7 +111,7 @@ describe("avisosDeServicos", () => {
   });
 
   it("sem nome de cliente ainda diz de que serviço se trata", () => {
-    const anonimo = servico({ customerName: undefined, serviceName: undefined, city: undefined });
+    const anonimo = servico({ serviceName: undefined, city: undefined });
     expect(avisosDeServicos([anonimo], { agora: AGORA })[0].corpo).toBe("Serviço 282");
   });
 
