@@ -67,11 +67,29 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
       tom: "bg-text-muted",
       destaque: false,
     },
-    { rotulo: "Documentos por aprovar", n: d.documentosPorAprovar,
-      nota: "já verificaram contactos e submeteram — espera por nós", tom: "bg-piquet", destaque: true },
+    /*
+      NÃO é "documentos na fila de revisão" -- essa fila está noutro sítio
+      (Aprovações) e pode estar a zero ao mesmo tempo que isto marca 158.
+
+      `all_documents_verified` exige, para CADA documento obrigatório, um
+      aprovado e não expirado. Falha para quem nunca submeteu, para quem foi
+      recusado e para quem tem um documento expirado -- e nenhum desses está
+      à espera de revisão. Chamar-lhe "por aprovar" mandava alguém procurar
+      trabalho que não existe.
+    */
+    { rotulo: "Documentação incompleta", n: d.documentosPorAprovar,
+      nota: "não submeteram, foram recusados ou expiraram — depende deles",
+      tom: "bg-warning", destaque: false },
     { rotulo: "IBAN em falta", n: d.semIban, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
     { rotulo: "Morada fiscal em falta", n: d.semMoradaFiscal, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
     { rotulo: "Nada em falta", n: d.nadaEmFalta, nota: "passaram todos os degraus", tom: "bg-success", destaque: false },
+  ];
+
+  // O que depende de NÓS vai à parte, e só aparece quando existe. Nenhum dos
+  // degraus acima é trabalho nosso: todos dependem do técnico.
+  const nossos = [
+    { rotulo: "À espera de nós", n: contagem.aEspera,
+      nota: "têm tudo — falta criar-lhes o workspace de faturação" },
   ];
 
   return (
@@ -81,7 +99,7 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
         Cada técnico conta no primeiro degrau que falha. Resolver um não leva ninguém ao fim — passa-o ao seguinte.
       </p>
       <ul className="space-y-2.5">
-        {passos.map((passo) => (
+        {passos.concat(nossos.filter((n) => n.n > 0).map((n) => ({ ...n, tom: "bg-piquet", destaque: true }))).map((passo) => (
           <li key={passo.rotulo}>
             <div className="flex items-baseline justify-between gap-3">
               <span className={cn("text-sm", passo.destaque ? "font-semibold text-text-primary" : "text-text-secondary")}>

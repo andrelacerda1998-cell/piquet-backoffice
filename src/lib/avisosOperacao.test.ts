@@ -278,12 +278,18 @@ describe("avisosDeWorkspace", () => {
     expect(a.url).toBe("/tecnicos?tecnico=94");
   });
 
-  it("o at_user sem barra está por acabar, não por validar", () => {
-    // É o formato do subutilizador (NIF/nome), e é o que o Laravel exige em
-    // canAcceptService. O NIF sozinho não serve.
-    expect(avisosDeWorkspace([tecnico({ atUser: "512345678" })])).toEqual([]);
-    expect(avisosDeWorkspace([tecnico({ atUser: "" })])).toEqual([]);
-    expect(avisosDeWorkspace([tecnico({ atUser: null })])).toEqual([]);
+  it("a AT não é condição para lhe criarmos o workspace", () => {
+    /*
+      Criar o workspace depende só do `invoicingBlocker()` -- contactos,
+      documentos, IBAN e morada fiscal. Não depende da AT.
+
+      Isto já exigiu a AT, e escondia do alerta os técnicos que completam tudo
+      sem ela. Desde 30/09 a AT só é exigida ao quarto serviço, portanto esses
+      passaram a existir.
+    */
+    expect(avisosDeWorkspace([tecnico({ atUser: null })])).toHaveLength(1);
+    expect(avisosDeWorkspace([tecnico({ atUser: "" })])).toHaveLength(1);
+    expect(avisosDeWorkspace([tecnico({ atUser: "512345678" })])).toHaveLength(1);
   });
 
   it("não avisa de trabalho já feito", () => {

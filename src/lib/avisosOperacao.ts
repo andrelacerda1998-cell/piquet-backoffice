@@ -279,7 +279,22 @@ export interface TecnicoParaAviso {
  * contrário. Já aconteceu neste projeto com a urgência dos pedidos.
  */
 export function esperaPeloWorkspace(t: TecnicoParaAviso): boolean {
-  return (t.atUser ?? "").includes("/") && !t.invoiceWorkspace && !t.blocker;
+  /*
+    A AT NÃO ENTRA AQUI, e já entrou -- foi um erro.
+
+    Criar o workspace depende só do `invoicingBlocker()` do Laravel: contactos
+    verificados, documentos aprovados, IBAN e morada fiscal. Não depende do
+    subutilizador da AT (ver CompanySection::getWorkspaceDisabledReason).
+
+    Enquanto a AT era exigida à entrada, pedi-la aqui dava o mesmo resultado e
+    parecia inofensivo. Desde 30/09 deixou de ser exigida antes do quarto
+    serviço -- e a partir daí vão chegar técnicos com tudo pronto e sem AT,
+    que esta condição escondia do alerta e da lista.
+
+    Mesmo erro que já apareceu duas vezes hoje do lado do Laravel: uma regra
+    copiada com um pressuposto que depois mudou.
+  */
+  return !t.invoiceWorkspace && !t.blocker;
 }
 
 export function avisosDeWorkspace(tecnicos: TecnicoParaAviso[]): Pendente[] {
