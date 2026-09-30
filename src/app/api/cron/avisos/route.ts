@@ -85,7 +85,7 @@ function resumoDoPedido(mensagem: string): string {
 }
 
 /** O que está pendente agora, nas fontes que o backoffice já lê. */
-async function recolherPendentes(): Promise<Pendente[]> {
+async function recolherPendentes(): Promise<{ pendentes: Pendente[]; fonteServicos: string }> {
   const db = supabaseAdmin();
   const pendentes: Pendente[] = [];
 
@@ -121,10 +121,11 @@ async function recolherPendentes(): Promise<Pendente[]> {
   }
 
   // 3. Serviços concluídos e agendados, e documentos submetidos.
-  pendentes.push(...(await recolherServicos()));
+  const servicos = await recolherServicos();
+  pendentes.push(...servicos.avisos);
   pendentes.push(...(await recolherDocumentos()));
 
-  return pendentes;
+  return { pendentes, fonteServicos: servicos.fonte };
 }
 
 /**
@@ -137,11 +138,11 @@ async function recolherPendentes(): Promise<Pendente[]> {
  * Uma falha aqui NÃO pode calar os avisos de tickets e pedidos que já
  * funcionavam -- daí o try/catch por fonte em vez de um à volta de tudo.
  */
-async function recolherServicos(): Promise<Pendente[]> {
+async function recolherServicos(): Promise<{ avisos: Pendente[]; fonte: string }> {
   try {
     if (servicesFromLaravel()) {
       const todos = await fetchAllLaravelServices();
-      return avisosDeServicos(todos);
+      return { avisos: avisosDeServicos(todos), fonte: `laravel (${todos.length})` };
     }
 
     const { data } = await supabaseAdmin()
@@ -149,8 +150,9 @@ async function recolherServicos(): Promise<Pendente[]> {
       .select("id, status, customer_name, service_name, city, total_customer_value, scheduled_at, completed_at, requested_at")
       .in("status", ["concluido", "agendado"]);
 
-    return avisosDeServicos(
-      ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    const linhas = (data ?? []) as Array<Record<string, unknown>>;
+    return { fonte: `supabase (${linhas.length})`, avisos: avisosDeServicos(
+      linhas.map((r) => ({
         id: String(r.id),
         status: String(r.status ?? ""),
         customerName: (r.customer_name as string) ?? undefined,
@@ -161,10 +163,16 @@ async function recolherServicos(): Promise<Pendente[]> {
         completedAt: (r.completed_at as string) ?? undefined,
         requestedAt: (r.requested_at as string) ?? undefined,
       })),
-    );
+    ) };
   } catch (e) {
-    console.error("[cron avisos] serviços:", e instanceof Error ? e.message : e);
-    return [];
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[cron avisos] serviços:", msg);
+    /*
+      A fonte vai para o registo da corrida porque "zero serviços" e "a
+      leitura rebentou" dão exatamente o mesmo resultado visto de fora -- e
+      passei tempo a tentar distinguir os dois sem nada que os separasse.
+    */
+    return { avisos: [], fonte: `erro: ${msg.slice(0, 80)}` };
   }
 }
 
@@ -238,7 +246,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const pendentes = await recolherPendentes();
+    const { pendentes, fonteServicos } = await recolherPendentes();
     const memoria = await lerMemoria();
     const novos = apenasNovos(pendentes, memoria);
     const aviso = juntar(novos);
@@ -251,14 +259,14 @@ export async function GET(req: Request) {
     await gravarMemoria(memoriaAtualizada(pendentes, memoria));
 
     if (!aviso) {
-      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo`);
-      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0 });
+      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo · serviços: ${fonteServicos}`);
+      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0, fonteServicos });
     }
 
     const r = await avisar(aviso);
-    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos`);
+    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos · serviços: ${fonteServicos}`);
 
-    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, ...r });
+    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, fonteServicos, ...r });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "erro";
     await logCronRun("avisos", false, msg);
