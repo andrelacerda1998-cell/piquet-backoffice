@@ -157,3 +157,41 @@ export function avisosDeDocumentos(
       url: `/tecnicos?documento=${d.id}`,
     }));
 }
+
+/**
+ * A data do último serviço concluído e do último agendado.
+ *
+ * Serve para distinguir duas situações que, vistas de fora, são idênticas:
+ * "não há avisos porque não aconteceu nada" e "não há avisos porque a
+ * tradução dos estados do Laravel está errada e nada é reconhecido como
+ * concluído". Sem isto, a única saída era abrir o ecrã e comparar à mão.
+ */
+export function ultimasDatas(servicos: ServicoParaAviso[]): {
+  concluido: string | null;
+  agendado: string | null;
+  /** Quantos serviços têm cada um destes estados, no total lido. */
+  contagem: { concluido: number; agendado: number };
+} {
+  let concluido: string | null = null;
+  let agendado: string | null = null;
+  const contagem = { concluido: 0, agendado: 0 };
+
+  const maisRecente = (a: string | null, b: string | undefined | null): string | null => {
+    if (!b) return a;
+    const t = new Date(b).getTime();
+    if (Number.isNaN(t)) return a;
+    return a === null || t > new Date(a).getTime() ? b : a;
+  };
+
+  for (const s of servicos) {
+    if (s.status === "concluido") {
+      contagem.concluido++;
+      concluido = maisRecente(concluido, s.completedAt ?? s.requestedAt);
+    } else if (s.status === "agendado") {
+      contagem.agendado++;
+      agendado = maisRecente(agendado, s.scheduledAt ?? s.requestedAt);
+    }
+  }
+
+  return { concluido, agendado, contagem };
+}

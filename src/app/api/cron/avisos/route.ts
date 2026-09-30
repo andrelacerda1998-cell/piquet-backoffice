@@ -4,7 +4,7 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
 import { avisar, PUSH_CONFIGURADO, type Aviso } from "@/lib/push";
 import { juntar, apenasNovos, memoriaAtualizada, type Pendente } from "@/lib/avisosPendentes";
-import { avisosDeServicos, avisosDeDocumentos, type DocumentoParaAviso } from "@/lib/avisosOperacao";
+import { avisosDeServicos, avisosDeDocumentos, ultimasDatas, type DocumentoParaAviso } from "@/lib/avisosOperacao";
 import { fetchAllLaravelServices, servicesFromLaravel } from "../../_lib/laravelServices";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 
@@ -142,7 +142,19 @@ async function recolherServicos(): Promise<{ avisos: Pendente[]; fonte: string }
   try {
     if (servicesFromLaravel()) {
       const todos = await fetchAllLaravelServices();
-      return { avisos: avisosDeServicos(todos), fonte: `laravel (${todos.length})` };
+      /*
+        A data do último concluído vai para o registo porque "não há avisos
+        porque não aconteceu nada" e "não há avisos porque nenhum serviço é
+        reconhecido como concluído" são indistinguíveis de fora. Com a
+        contagem ao lado, uma linha responde às duas.
+      */
+      const d = ultimasDatas(todos);
+      const dia = (iso: string | null) => (iso ? iso.slice(0, 10) : "nenhum");
+      return {
+        avisos: avisosDeServicos(todos),
+        fonte: `laravel (${todos.length}) · concluídos ${d.contagem.concluido}, últ. ${dia(d.concluido)}`
+             + ` · agendados ${d.contagem.agendado}, últ. ${dia(d.agendado)}`,
+      };
     }
 
     const { data } = await supabaseAdmin()
