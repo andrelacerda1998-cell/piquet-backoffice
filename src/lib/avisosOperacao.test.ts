@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  avisosDeServicos, avisosDeDocumentos, valorDoAviso, ultimasDatas,
-  type ServicoParaAviso, type DocumentoParaAviso,
+  avisosDeServicos, avisosDeDocumentos, avisosDeWorkspace, valorDoAviso, ultimasDatas,
+  type ServicoParaAviso, type DocumentoParaAviso, type TecnicoParaAviso,
 } from "./avisosOperacao";
 
 const AGORA = new Date("2026-09-30T12:00:00Z");
@@ -258,5 +258,57 @@ describe("avisosDeServicos — agendamento pela data, não pelo estado", () => {
       { agora: AGORA },
     );
     expect(r).toEqual([]);
+  });
+});
+
+describe("avisosDeWorkspace", () => {
+  const tecnico = (p: Partial<TecnicoParaAviso> = {}): TecnicoParaAviso => ({
+    id: 94,
+    nome: "Adriano Rocha",
+    atUser: "512345678/piquet",
+    invoiceWorkspace: null,
+    blocker: null,
+    ...p,
+  });
+
+  it("avisa quem já entregou a AT e espera pelo workspace", () => {
+    const [a] = avisosDeWorkspace([tecnico()]);
+    expect(a.titulo).toBe("Workspace de faturação por criar");
+    expect(a.corpo).toBe("Adriano Rocha já entregou o acesso à AT");
+    expect(a.url).toBe("/tecnicos?tecnico=94");
+  });
+
+  it("o at_user sem barra está por acabar, não por validar", () => {
+    // É o formato do subutilizador (NIF/nome), e é o que o Laravel exige em
+    // canAcceptService. O NIF sozinho não serve.
+    expect(avisosDeWorkspace([tecnico({ atUser: "512345678" })])).toEqual([]);
+    expect(avisosDeWorkspace([tecnico({ atUser: "" })])).toEqual([]);
+    expect(avisosDeWorkspace([tecnico({ atUser: null })])).toEqual([]);
+  });
+
+  it("não avisa de trabalho já feito", () => {
+    expect(avisosDeWorkspace([tecnico({ invoiceWorkspace: "rwinteractive" })])).toEqual([]);
+  });
+
+  it("não avisa quando o botão de criar está desligado", () => {
+    /*
+      "Já dá para validar" é literal. Se ainda faltam documentos, IBAN ou
+      morada fiscal, o aviso só mandava alguém dar de caras com um botão
+      bloqueado -- e um aviso que não se pode resolver ensina a ignorar os
+      outros.
+    */
+    for (const b of ["documents_pending", "iban_missing", "fiscal_address_missing", "contact_unverified"]) {
+      expect(avisosDeWorkspace([tecnico({ blocker: b })]), b).toEqual([]);
+    }
+  });
+
+  it("sem nome, ainda diz de quem se trata", () => {
+    expect(avisosDeWorkspace([tecnico({ nome: null })])[0].corpo)
+      .toBe("Técnico 94 já entregou o acesso à AT");
+  });
+
+  it("cada técnico tem o seu id, para não se repetir o aviso", () => {
+    const r = avisosDeWorkspace([tecnico(), tecnico({ id: 95 })]);
+    expect(r.map((x) => x.id)).toEqual(["workspace:94", "workspace:95"]);
   });
 });
