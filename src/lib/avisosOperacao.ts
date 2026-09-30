@@ -124,7 +124,10 @@ export function avisosDeServicos(
     saida.push({
       id: `servico:${s.id}:${s.status}`,
       titulo: `Serviço ${estado} · ${valorDoAviso(s.totalCustomerValue)}`,
-      corpo: [partes.join(" — "), marca].filter(Boolean).join(" · ") || `Serviço ${s.id}`,
+      // Barra a separar serviço de cidade, ponto a separar o que é dia e hora:
+      // dois separadores diferentes para duas coisas diferentes, senão
+      // "Eletricidade | Lisboa | 1/10" lê-se como três campos do mesmo tipo.
+      corpo: [partes.join(" | "), marca].filter(Boolean).join(" · ") || `Serviço ${s.id}`,
       url: `/servicos?servico=${s.id}`,
     });
   }

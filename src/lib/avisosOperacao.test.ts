@@ -57,7 +57,7 @@ describe("avisosDeServicos", () => {
     // Numa notificação cabem poucas palavras antes de serem cortadas, e o
     // nome de quem pediu não ajuda a decidir nada de relance.
     const [a] = avisosDeServicos([servico()], { agora: AGORA });
-    expect(a.corpo).toBe("Canalização — Porto");
+    expect(a.corpo).toBe("Canalização | Porto");
     expect(a.corpo).not.toContain("Maria Silva");
   });
 
@@ -67,7 +67,7 @@ describe("avisosDeServicos", () => {
       { agora: AGORA },
     );
     // Lisboa está em UTC+1 a 1 de outubro, por isso 14:30 UTC são 15:30.
-    expect(a.corpo).toBe("Canalização — Porto · 1/10, 15:30");
+    expect(a.corpo).toBe("Canalização | Porto · 1/10, 15:30");
   });
 
   it("o mesmo serviço avisa duas vezes na vida, uma por estado", () => {
