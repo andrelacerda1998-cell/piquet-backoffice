@@ -4,7 +4,10 @@ import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
 import { avisar, PUSH_CONFIGURADO, type Aviso } from "@/lib/push";
 import { juntar, apenasNovos, memoriaAtualizada, type Pendente } from "@/lib/avisosPendentes";
-import { avisosDeServicos, avisosDeDocumentos, ultimasDatas, type DocumentoParaAviso } from "@/lib/avisosOperacao";
+import {
+  avisosDeServicos, avisosDeDocumentos, avisosDeWorkspace, ultimasDatas,
+  type DocumentoParaAviso, type TecnicoParaAviso,
+} from "@/lib/avisosOperacao";
 import { fetchAllLaravelServices, servicesFromLaravel } from "../../_lib/laravelServices";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 
@@ -31,10 +34,10 @@ import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
  * Só avisa do que é NOVO desde o último aviso, e junta tudo numa notificação
  * só — ver lib/avisosPendentes.ts, onde está a regra e os testes.
  *
- * Avisa de quatro coisas: tickets por responder, pedidos por contactar,
- * serviços que ficaram concluídos ou agendados, e documentos que os técnicos
- * submeteram. As duas últimas vêm do Laravel e a regra está em
- * lib/avisosOperacao.ts.
+ * Avisa de cinco coisas: tickets por responder, pedidos por contactar,
+ * serviços que ficaram concluídos ou agendados, documentos que os técnicos
+ * submeteram, e técnicos à espera do workspace de faturação. As três últimas
+ * vêm do Laravel e as regras estão em lib/avisosOperacao.ts.
  *
  * Nos serviços, o estado e o valor vão no TÍTULO e não no corpo: com várias
  * novidades a notificação mostra só os títulos, e o valor desaparecia
@@ -124,6 +127,7 @@ async function recolherPendentes(): Promise<{ pendentes: Pendente[]; fonteServic
   const servicos = await recolherServicos();
   pendentes.push(...servicos.avisos);
   pendentes.push(...(await recolherDocumentos()));
+  pendentes.push(...(await recolherWorkspaces()));
 
   return { pendentes, fonteServicos: servicos.fonte };
 }
@@ -265,6 +269,55 @@ function avisoDeExemplo(): Aviso | null {
   if (!p) return null;
   // Tag própria: não se mistura nem apaga os avisos verdadeiros.
   return { titulo: p.titulo, corpo: `${p.corpo} · exemplo`, url: "/servicos", tag: "exemplo" };
+}
+
+/**
+ * Técnicos que já entregaram o acesso à AT e esperam pelo workspace.
+ *
+ * O workspace de faturação é criado pela equipa da Piquet, não pelo técnico —
+ * e sem ele o técnico não pode ficar online. Ele faz a parte dele e fica
+ * parado à espera de alguém que não sabe que está à espera. É o mesmo buraco
+ * dos documentos submetidos, noutro sítio do mesmo funil.
+ *
+ * A regra e os testes estão em lib/avisosOperacao.ts. Aqui só se vão buscar
+ * as páginas: o controlador do Laravel trava o `per_page` em 100, a mesma
+ * lição dos documentos.
+ */
+async function recolherWorkspaces(): Promise<Pendente[]> {
+  if (!LARAVEL_ADMIN_ENABLED) return [];
+
+  interface Resposta {
+    items: Array<{
+      id: number; name: string | null; at_user?: string | null;
+      invoice_workspace?: string | null; account_blocker?: string | null;
+    }>;
+    meta?: { last_page?: number };
+  }
+
+  try {
+    const todos: TecnicoParaAviso[] = [];
+    let pagina = 1;
+    let ultima = 1;
+
+    do {
+      const r = await laravelAdminRequest<Resposta>(`/v1/admin/vendors?per_page=100&page=${pagina}`);
+      const itens = r.items ?? [];
+      todos.push(...itens.map((v) => ({
+        id: v.id,
+        nome: v.name,
+        atUser: v.at_user,
+        invoiceWorkspace: v.invoice_workspace,
+        blocker: v.account_blocker,
+      })));
+      ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
+      pagina++;
+    } while (pagina <= ultima && pagina <= 20);
+
+    return avisosDeWorkspace(todos);
+  } catch (e) {
+    console.error("[cron avisos] workspaces:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 export async function GET(req: Request) {

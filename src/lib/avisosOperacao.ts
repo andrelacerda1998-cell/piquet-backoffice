@@ -228,3 +228,50 @@ export function ultimasDatas(servicos: ServicoParaAviso[]): {
 
   return { concluido, agendado, contagem };
 }
+
+/** O que estes avisos precisam de saber de um técnico. */
+export interface TecnicoParaAviso {
+  id: number | string;
+  nome?: string | null;
+  /** Subutilizador da AT, no formato `NIF/subutilizador`. */
+  atUser?: string | null;
+  /** Workspace de faturação. Vazio ou nulo = ainda não foi criado. */
+  invoiceWorkspace?: string | null;
+  /** Código do que falta antes de se poder criar. `null` = nada falta. */
+  blocker?: string | null;
+}
+
+/**
+ * Técnicos que já entregaram o subutilizador da AT e estão à espera que lhes
+ * criem o workspace de faturação.
+ *
+ * O workspace NÃO é criado pelo técnico: é a equipa da Piquet que o cria no
+ * backoffice. Enquanto não for criado, o técnico não pode ficar online --
+ * `canAcceptService` exige `invoice_workspace != null`. Ou seja, ele faz a
+ * parte dele, e depois fica parado à espera de alguém, sem que esse alguém
+ * saiba que está à espera. É o mesmo buraco dos documentos submetidos.
+ *
+ * Três condições, e as três importam:
+ *
+ * O `at_user` tem de ter uma barra. É o formato do subutilizador
+ * (`NIF/nome`), e é o que `canAcceptService` exige do lado do Laravel -- um
+ * campo preenchido com o NIF sozinho está por acabar, não por validar.
+ *
+ * O workspace tem de estar por criar, senão avisava-se de trabalho já feito.
+ *
+ * E não pode haver bloqueio. "Já dá para validar" é literal: se ainda faltam
+ * documentos, IBAN ou morada fiscal, o botão de criar está desligado e o
+ * aviso só mandava alguém dar de caras com ele.
+ */
+export function avisosDeWorkspace(tecnicos: TecnicoParaAviso[]): Pendente[] {
+  return tecnicos
+    .filter((t) => (t.atUser ?? "").includes("/"))
+    .filter((t) => !t.invoiceWorkspace)
+    .filter((t) => !t.blocker)
+    .map((t) => ({
+      id: `workspace:${t.id}`,
+      titulo: "Workspace de faturação por criar",
+      corpo: `${t.nome?.trim() || `Técnico ${t.id}`} já entregou o acesso à AT`,
+      url: `/tecnicos?tecnico=${t.id}`,
+    }));
+}

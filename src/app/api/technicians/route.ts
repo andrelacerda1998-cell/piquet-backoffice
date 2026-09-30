@@ -30,6 +30,13 @@ export interface AdminVendor {
   invoice_workspace?: string | null;
   /** Porque é que ainda não se pode criar o workspace (`null` = pode). */
   invoice_workspace_blocker?: string | null;
+  /*
+    O MESMO bloqueio, em código em vez de frase: "documents_pending",
+    "iban_missing", "fiscal_address_missing", "contact_unverified", ou `null`
+    quando não falta nada. A frase é para mostrar ao lado de um botão; o
+    código é o que se pode agrupar e testar.
+  */
+  account_blocker?: string | null;
   status: string | null;
   suspended_at: string | null;
   created_at: string | null;
