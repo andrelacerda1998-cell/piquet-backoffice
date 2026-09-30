@@ -198,3 +198,65 @@ describe("ultimasDatas", () => {
     expect(r.concluido).toBe("2026-09-01T10:00:00Z");
   });
 });
+
+describe("avisosDeServicos — agendamento pela data, não pelo estado", () => {
+  it("avisa um serviço com data marcada, seja qual for o estado", () => {
+    /*
+      O caso que faltava. "agendado" NÃO É UM ESTADO nos dados: o Laravel
+      traduz onze estados e nenhum deles dá "agendado". Um serviço marcado
+      chega como "tecnico_encontrado" com scheduled_at preenchido, e o filtro
+      antigo -- status === "agendado" -- nunca o apanhava.
+    */
+    const r = avisosDeServicos(
+      [servico({ status: "tecnico_encontrado", completedAt: undefined, scheduledAt: "2026-10-02T09:00:00Z" })],
+      { agora: AGORA },
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].titulo).toBe(`Serviço agendado · ${EUR("85,00")}`);
+    expect(r[0].id).toBe("servico:282:agendado");
+  });
+
+  it("uma marcação para daqui a duas semanas conta", () => {
+    // A janela de 48h é para o que JÁ aconteceu. Uma marcação futura não
+    // deixa de interessar por estar longe -- pelo contrário.
+    const r = avisosDeServicos(
+      [servico({ status: "pago", completedAt: undefined, scheduledAt: "2026-10-14T09:00:00Z" })],
+      { agora: AGORA },
+    );
+    expect(r).toHaveLength(1);
+  });
+
+  it("um serviço já concluído não volta a avisar que está agendado", () => {
+    const r = avisosDeServicos(
+      [servico({ status: "concluido", scheduledAt: "2026-10-02T09:00:00Z" })],
+      { agora: AGORA },
+    );
+    expect(r.map((x) => x.id)).toEqual(["servico:282:concluido"]);
+  });
+
+  it("um serviço cancelado com marcação não avisa", () => {
+    for (const status of ["cancelado_cliente", "cancelado_tecnico", "reembolsado"]) {
+      const r = avisosDeServicos(
+        [servico({ status, completedAt: undefined, scheduledAt: "2026-10-02T09:00:00Z" })],
+        { agora: AGORA },
+      );
+      expect(r, status).toEqual([]);
+    }
+  });
+
+  it("uma marcação antiga já não interessa", () => {
+    const r = avisosDeServicos(
+      [servico({ status: "pago", completedAt: undefined, scheduledAt: "2026-08-01T09:00:00Z" })],
+      { agora: AGORA },
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("sem data marcada não há aviso de agendamento", () => {
+    const r = avisosDeServicos(
+      [servico({ status: "pago", completedAt: undefined, scheduledAt: undefined })],
+      { agora: AGORA },
+    );
+    expect(r).toEqual([]);
+  });
+});
