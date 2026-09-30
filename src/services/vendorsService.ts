@@ -168,6 +168,27 @@ export async function deleteVendorPermanently(id: number): Promise<{ id: number;
  * verificado, documentos aprovados, IBAN, morada fiscal) e devolve a razão
  * exata quando recusa -- não se replicam aqui, sob pena de divergirem.
  */
+export interface TecnicoSemWorkspace {
+  id: number;
+  name: string | null;
+  at_user: string | null;
+  created_at: string | null;
+}
+
+/**
+ * Técnicos que entregaram o acesso à AT e esperam pelo workspace.
+ *
+ * Rota própria porque a lista de técnicos é paginada: filtrar a página aberta
+ * encontrava alguns e escondia os outros. Sem série demo -- uma lista de
+ * pessoas inventadas à espera de uma ação real seria pior do que um vazio.
+ */
+export async function getTecnicosSemWorkspace(): Promise<{ items: TecnicoSemWorkspace[]; total: number }> {
+  return apiGet<{ items: TecnicoSemWorkspace[]; total: number }>(
+    "/technicians/awaiting-workspace",
+    () => ({ items: [], total: 0 }),
+  ).then((r) => r.data);
+}
+
 export async function createVendorInvoiceWorkspace(id: number): Promise<RealVendor> {
   return apiPost<RealVendor>(`/technicians/${id}/invoice-workspace`, {}, () => {
     throw new Error("Criar o workspace de faturação precisa da API de admin do Laravel configurada.");

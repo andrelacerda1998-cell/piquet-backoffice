@@ -262,12 +262,19 @@ export interface TecnicoParaAviso {
  * E não pode haver bloqueio. "Já dá para validar" é literal: se ainda faltam
  * documentos, IBAN ou morada fiscal, o botão de criar está desligado e o
  * aviso só mandava alguém dar de caras com ele.
+ *
+ * A condição vive em `esperaPeloWorkspace` e não aqui dentro porque o ecrã de
+ * Técnicos mostra a MESMA lista. Duas cópias da regra divergiriam ao primeiro
+ * ajuste, e o resultado seria um aviso a apontar para um ecrã vazio -- ou o
+ * contrário. Já aconteceu neste projeto com a urgência dos pedidos.
  */
+export function esperaPeloWorkspace(t: TecnicoParaAviso): boolean {
+  return (t.atUser ?? "").includes("/") && !t.invoiceWorkspace && !t.blocker;
+}
+
 export function avisosDeWorkspace(tecnicos: TecnicoParaAviso[]): Pendente[] {
   return tecnicos
-    .filter((t) => (t.atUser ?? "").includes("/"))
-    .filter((t) => !t.invoiceWorkspace)
-    .filter((t) => !t.blocker)
+    .filter(esperaPeloWorkspace)
     .map((t) => ({
       id: `workspace:${t.id}`,
       titulo: "Workspace de faturação por criar",

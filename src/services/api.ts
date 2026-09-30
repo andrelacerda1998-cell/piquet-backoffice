@@ -131,6 +131,7 @@ const LIVE_EXACT = new Set<string>([
   "/customers/trend",
   "/customers/retention",
   // Fase 2 — Técnicos
+  "/technicians/awaiting-workspace",
   "/technicians",
   "/technicians/metrics",
   "/technicians/by-category",
@@ -349,6 +350,7 @@ const REAL_DATA = new Set<string>([
   "/customers/metrics",
   "/customers/by-location",
   "/customers/by-source",
+  "/technicians/awaiting-workspace", // vendors reais do Laravel, filtrados no servidor
   "/technicians",
   "/technicians/metrics",
   "/technicians/by-category",
