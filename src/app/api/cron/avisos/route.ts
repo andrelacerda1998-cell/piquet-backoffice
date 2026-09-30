@@ -39,6 +39,26 @@ async function gravarMemoria(ids: string[]): Promise<void> {
   await supabaseAdmin().from("app_state").upsert({ chave: CHAVE_MEMORIA, valor: ids }, { onConflict: "chave" });
 }
 
+/*
+  A urgência de um pedido NÃO é uma coluna: vem escrita no texto, num campo
+  "Urgência:" que a landing preenchia. A mesma regra do ecrã de pedidos
+  (parseLeadMessage em leads/page.tsx) -- se divergissem, o aviso dizia
+  urgente e o ecrã não, ou ao contrário.
+
+  Selecionar uma coluna `urgency` inexistente faria a consulta devolver 400 e
+  os pedidos desapareciam dos avisos em silêncio.
+*/
+function ehUrgente(mensagem: string): boolean {
+  const campo = mensagem.match(/urg[êe]ncia:\s*([^\n·]+)/i)?.[1] ?? "";
+  return /urgente|hoje|emerg|imediat|agora/i.test(campo);
+}
+
+/** A primeira linha do pedido é o serviço; é o que diz do que se trata. */
+function resumoDoPedido(mensagem: string): string {
+  const servico = mensagem.match(/servi[çc]o:\s*([^·\n]+)/i)?.[1]?.trim();
+  return (servico || mensagem.replace(/\s+/g, " ").trim()).slice(0, 80);
+}
+
 /** O que está pendente agora, nas fontes que o backoffice já lê. */
 async function recolherPendentes(): Promise<Pendente[]> {
   const db = supabaseAdmin();
@@ -63,14 +83,14 @@ async function recolherPendentes(): Promise<Pendente[]> {
   // 2. Pedidos recebidos que ainda ninguém contactou.
   const { data: leads } = await db
     .from("leads")
-    .select("id, name, message, stage, urgency")
+    .select("id, name, message, stage")
     .eq("stage", "novo");
 
   for (const l of (leads ?? []) as Array<Record<string, string>>) {
     pendentes.push({
       id: `lead:${l.id}`,
-      titulo: l.urgency === "urgente" ? "Pedido URGENTE por responder" : "Pedido por responder",
-      corpo: `${l.name || "Alguém"}: ${(l.message || "").slice(0, 80)}`,
+      titulo: ehUrgente(l.message ?? "") ? "Pedido URGENTE por responder" : "Pedido por responder",
+      corpo: `${l.name || "Alguém"}: ${resumoDoPedido(l.message ?? "")}`,
       url: `/leads?lead=${l.id}`,
     });
   }
