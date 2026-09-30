@@ -16,7 +16,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className={cn("transition-all duration-300", sidebarCollapsed ? "lg:pl-[68px]" : "lg:pl-64")}>
         <Topbar />
-        <main className="p-4 md:p-6 max-w-[1600px] mx-auto">
+        {/*
+          O fundo leva a margem do indicador de home: sem isto, o ultimo
+          botao de cada ecra ficava por baixo da barra de gestos e nao se
+          conseguia tocar nele.
+        */}
+        <main className="p-4 md:p-6 max-w-[1600px] mx-auto pb-[calc(1rem+var(--margem-fundo))] md:pb-[calc(1.5rem+var(--margem-fundo))]">
           {children}
         </main>
       </div>

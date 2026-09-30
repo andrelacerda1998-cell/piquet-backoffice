@@ -113,6 +113,25 @@
 }
 
 @layer base {
+  /*
+    Margens seguras do telemovel (entalhe, cantos arredondados, indicador de
+    home).
+
+    So fazem falta em modo app: no browser o Safari ja desenha as suas
+    barras por cima dessas zonas. Instalada, a pagina ocupa o ecra todo --
+    incluindo o que esta por baixo do relogio e da barra de gestos -- e sem
+    isto o cabecalho ficava cortado em cima e os botoes do fundo por baixo
+    do indicador de home.
+
+    Zero no computador, porque `env()` devolve zero onde nao ha entalhe.
+  */
+  :root {
+    --margem-topo: env(safe-area-inset-top, 0px);
+    --margem-fundo: env(safe-area-inset-bottom, 0px);
+    --margem-esquerda: env(safe-area-inset-left, 0px);
+    --margem-direita: env(safe-area-inset-right, 0px);
+  }
+
   html {
     @apply scroll-smooth;
     /* Base da tipografia: as classes Tailwind são em rem, por isso este valor
@@ -169,4 +188,23 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--surface-strong));
+}
+
+/*
+  Tiras que deslizam na horizontal (separadores, filtros) sem barra visível.
+
+  Uma barra de 8px por baixo de uma fila de separadores parece um erro de
+  desenho, sobretudo em modo app onde nada mais no ecrã tem barras. O
+  conteúdo continua a deslizar com o dedo e com a roda do rato — só a barra
+  desaparece.
+
+  Mantém-se nas TABELAS e nas listas longas, onde a barra é a única pista de
+  que há mais conteúdo ao lado.
+*/
+.tira-deslizante {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* Edge antigo */
+}
+.tira-deslizante::-webkit-scrollbar {
+  display: none;                  /* Chrome, Safari */
 }

@@ -21,8 +21,15 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Piquet",
-    // A barra de estado fica escura como o resto da aplicação.
-    statusBarStyle: "black-translucent",
+    /*
+      `default` e NAO `black-translucent`.
+      
+      Translucida, a barra de estado fica transparente com texto BRANCO --
+      por cima do tema claro (#FFFFFF) o relogio e a bateria desapareciam.
+      E, sendo transparente, o conteudo passava-lhe por baixo: era isso que
+      fazia o topo do ecra parecer desalinhado em modo app.
+    */
+    statusBarStyle: "default",
   },
   /*
     O Next emite `mobile-web-app-capable`, que é o nome atual. O iOS mais
