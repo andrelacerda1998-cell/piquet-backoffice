@@ -191,6 +191,15 @@ export interface ContagemWorkspaces {
   perfilCompleto: number;
   /** Margem de erro do `perfilCompleto` — ver a nota na rota. */
   contactoPorVerificar: number;
+  /** Onde cada técnico está travado, pela ordem em que se atravessam. */
+  degraus: {
+    semContacto: number;
+    semContactoRecentes: number;
+    documentosPorAprovar: number;
+    semIban: number;
+    semMoradaFiscal: number;
+    nadaEmFalta: number;
+  };
   /** `can_accept_service` do Laravel — a autoridade, não uma recontagem. */
   podemAceitar: number;
   /** Tudo o resto aprovado; falta só o subutilizador da AT. */
@@ -204,7 +213,8 @@ export async function getTecnicosSemWorkspace(): Promise<{
     "/technicians/funil",
     () => ({
       items: [], total: 0,
-      contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0, perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0 },
+      contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0, perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
+        degraus: { semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0, semIban: 0, semMoradaFiscal: 0, nadaEmFalta: 0 } },
     }),
   ).then((r) => r.data);
 }

@@ -76,6 +76,24 @@ export interface ContagemWorkspaces {
    * validar; aqui falta uma coisa que só o técnico pode entregar.
    */
   soFaltaAT: number;
+  /**
+   * Onde cada técnico está travado, pela ordem em que os degraus se
+   * atravessam.
+   *
+   * O `account_blocker` do Laravel devolve só o PRIMEIRO problema, por isso
+   * isto não é "quantos têm cada problema" -- é "quantos estão parados
+   * naquele degrau". A diferença importa: resolver o primeiro degrau não
+   * liberta ninguém para o fim, só o empurra para o degrau seguinte.
+   */
+  degraus: {
+    semContacto: number;
+    /** Destes, os que se registaram há menos de 90 dias -- valem um empurrão. */
+    semContactoRecentes: number;
+    documentosPorAprovar: number;
+    semIban: number;
+    semMoradaFiscal: number;
+    nadaEmFalta: number;
+  };
 }
 
 export interface TecnicoSemWorkspace {
@@ -106,6 +124,10 @@ export const GET = withStaff(async () => {
     const contagem: ContagemWorkspaces = {
       total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0,
       perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
+      degraus: {
+        semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0,
+        semIban: 0, semMoradaFiscal: 0, nadaEmFalta: 0,
+      },
     };
     let pagina = 1;
     let ultima = 1;
@@ -134,7 +156,21 @@ export const GET = withStaff(async () => {
           || v.account_blocker === "iban_missing"
           || v.account_blocker === "fiscal_address_missing";
 
-        if (v.account_blocker === "contact_unverified") contagem.contactoPorVerificar++;
+        switch (v.account_blocker) {
+          case "contact_unverified": {
+            contagem.contactoPorVerificar++;
+            contagem.degraus.semContacto++;
+            // Uma inscrição de ontem por verificar é normal; uma de há seis
+            // meses é um registo abandonado, e pedem respostas diferentes.
+            const t = v.created_at ? new Date(v.created_at).getTime() : 0;
+            if (t >= Date.now() - 90 * 864e5) contagem.degraus.semContactoRecentes++;
+            break;
+          }
+          case "documents_pending": contagem.degraus.documentosPorAprovar++; break;
+          case "iban_missing": contagem.degraus.semIban++; break;
+          case "fiscal_address_missing": contagem.degraus.semMoradaFiscal++; break;
+          default: contagem.degraus.nadaEmFalta++;
+        }
         if (docsValidados && v.invoice_workspace) contagem.perfilCompleto++;
 
         // Nada a bloquear do lado dele, exceto a AT -- está a um passo.

@@ -17,7 +17,7 @@ import {
   getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
-  createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
+  createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces,
   getTecnicosSemWorkspace, type TecnicoSemWorkspace,
 } from "@/services/vendorsService";
 
@@ -40,6 +40,68 @@ import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 
+
+/**
+ * Onde é que os técnicos estão travados, pela ordem em que os degraus se
+ * atravessam.
+ *
+ * NÃO é ordenado por tamanho, de propósito: é um caminho, e ver os degraus
+ * fora de ordem esconde que resolver o primeiro não liberta ninguém para o
+ * fim -- só o empurra para o segundo.
+ *
+ * Um total diz onde se está; isto diz o que fazer a seguir.
+ */
+function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
+  const d = contagem.degraus;
+  const antigos = d.semContacto - d.semContactoRecentes;
+
+  const passos = [
+    {
+      rotulo: "Contactos por verificar",
+      n: d.semContacto,
+      nota: antigos > 0
+        ? formatNumber(antigos) + " há mais de 90 dias — registos abandonados"
+        : "nem email nem telemóvel confirmados",
+      // O que está parado há meses não é trabalho pendente, é ruído no
+      // denominador -- e por isso não se pinta da cor de quem espera por nós.
+      tom: "bg-text-muted",
+      destaque: false,
+    },
+    { rotulo: "Documentos por aprovar", n: d.documentosPorAprovar,
+      nota: "já verificaram contactos e submeteram — espera por nós", tom: "bg-piquet", destaque: true },
+    { rotulo: "IBAN em falta", n: d.semIban, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
+    { rotulo: "Morada fiscal em falta", n: d.semMoradaFiscal, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
+    { rotulo: "Nada em falta", n: d.nadaEmFalta, nota: "passaram todos os degraus", tom: "bg-success", destaque: false },
+  ];
+
+  return (
+    <div className="card p-4 sm:p-5">
+      <p className="text-sm font-semibold text-text-primary">Onde estão travados</p>
+      <p className="text-xs text-text-secondary mt-0.5 mb-3">
+        Cada técnico conta no primeiro degrau que falha. Resolver um não leva ninguém ao fim — passa-o ao seguinte.
+      </p>
+      <ul className="space-y-2.5">
+        {passos.map((passo) => (
+          <li key={passo.rotulo}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={cn("text-sm", passo.destaque ? "font-semibold text-text-primary" : "text-text-secondary")}>
+                {passo.rotulo}
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-text-primary shrink-0">
+                {formatNumber(passo.n)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-surface-muted mt-1 overflow-hidden">
+              <div className={cn("h-full rounded-full", passo.tom)}
+                style={{ width: (contagem.total > 0 ? (passo.n / contagem.total) * 100 : 0) + "%" }} />
+            </div>
+            <p className="text-[11px] text-text-muted mt-0.5">{passo.nota}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
@@ -554,6 +616,10 @@ export default function TechniciansPage() {
                           />
                         )}
                       </div>
+                    )}
+
+                    {semWorkspace && semWorkspace.contagem.total > 0 && (
+                      <Degraus contagem={semWorkspace.contagem} />
                     )}
 
                     {/*
