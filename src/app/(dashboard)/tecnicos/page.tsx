@@ -18,6 +18,7 @@ import {
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
+  getTecnicosSemWorkspace, type TecnicoSemWorkspace,
 } from "@/services/vendorsService";
 
 // Leaflet mexe em `window`/`document` na inicialização — sem ssr:false a
@@ -61,6 +62,15 @@ export default function TechniciansPage() {
     () => getVendors(1, 100, undefined, true),
     []
   );
+  /*
+    Quem entregou o acesso à AT e espera que lhe criem o workspace.
+
+    Rota própria e não um filtro da lista: a lista é paginada, e filtrar a
+    página aberta mostrava dois ou três dos oito. A condição é a mesma que
+    dispara a notificação (lib/avisosOperacao.ts), importada e não copiada.
+  */
+  const { data: semWorkspace, refetch: refetchSemWorkspace } = useAsyncData(() => getTecnicosSemWorkspace(), []);
+
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
@@ -249,6 +259,28 @@ export default function TechniciansPage() {
       toast(e instanceof Error ? e.message : "Erro ao criar o workspace.", "error");
     } finally {
       setWsSaving(false);
+    }
+  };
+
+  /*
+    Criar o workspace a partir da LISTA, sem abrir o perfil.
+
+    O botão já existia no perfil de cada técnico, mas para lá chegar era
+    preciso saber quem procurar -- e era precisamente isso que faltava. Aqui
+    já se sabe: são estes, todos, e por ordem de quem espera há mais tempo.
+  */
+  const [wsDaLista, setWsDaLista] = useState<number | null>(null);
+  const criarWorkspaceDaLista = async (t: TecnicoSemWorkspace) => {
+    setWsDaLista(t.id);
+    try {
+      await createVendorInvoiceWorkspace(t.id);
+      toast(`Workspace de faturação criado para ${t.name ?? "o técnico"}.`);
+      refetchSemWorkspace();
+      refetchVendors();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Erro ao criar o workspace.", "error");
+    } finally {
+      setWsDaLista(null);
     }
   };
 
@@ -677,6 +709,46 @@ export default function TechniciansPage() {
 
         {tab === "aprovacoes" && (
           <div className="space-y-4">
+            {(semWorkspace?.items.length ?? 0) > 0 && (
+              <div className="card border-l-[3px] border-l-piquet overflow-hidden">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <p className="font-semibold text-text-primary">
+                    {semWorkspace!.total} técnico{semWorkspace!.total === 1 ? "" : "s"} à espera do workspace de faturação
+                  </p>
+                  {/*
+                    Porque é que isto está no topo: enquanto não houver
+                    workspace, o técnico NÃO pode ficar online nem aceitar um
+                    serviço (Vendor::canAcceptService exige-o). Ele fez a parte
+                    dele; falta a nossa.
+                  */}
+                  <p className="text-sm text-text-secondary mt-1">
+                    Já entregaram o subutilizador da AT e não têm nada em falta. Sem workspace não podem ficar
+                    online nem aceitar serviços. Os mais antigos aparecem primeiro.
+                  </p>
+                </div>
+                <ul className="divide-y divide-surface-border">
+                  {semWorkspace!.items.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">{t.name ?? `Técnico ${t.id}`}</p>
+                        <p className="text-xs text-text-muted">
+                          AT: {t.at_user ?? "—"}
+                          {t.created_at ? ` · inscrito ${formatDate(t.created_at)}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => criarWorkspaceDaLista(t)}
+                        disabled={wsDaLista === t.id}
+                        className="btn-primary text-xs shrink-0 disabled:opacity-60"
+                      >
+                        {wsDaLista === t.id ? "A criar…" : "Criar workspace"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />

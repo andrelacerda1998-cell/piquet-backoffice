@@ -279,6 +279,12 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
       para a causa.
     */
     expect(isDemoEndpoint("/product/cost-per-download")).toBe(false);
+
+    // Mesma armadilha, segunda vez: LIVE_EXACT faz o pedido sair, REAL_DATA
+    // impede o deepZero de o esvaziar à chegada. Faltar a segunda dava uma
+    // lista vazia sem erro nenhum.
+    expect(isDemoEndpoint("/technicians/awaiting-workspace")).toBe(false);
+    expect(isLiveEndpoint("/technicians/awaiting-workspace")).toBe(true);
     expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });
