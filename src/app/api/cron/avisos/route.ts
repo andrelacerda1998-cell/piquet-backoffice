@@ -88,7 +88,9 @@ function resumoDoPedido(mensagem: string): string {
 }
 
 /** O que está pendente agora, nas fontes que o backoffice já lê. */
-async function recolherPendentes(): Promise<{ pendentes: Pendente[]; fonteServicos: string }> {
+async function recolherPendentes(): Promise<{
+  pendentes: Pendente[]; fonteServicos: string; faturacao: string;
+}> {
   const db = supabaseAdmin();
   const pendentes: Pendente[] = [];
 
@@ -127,9 +129,11 @@ async function recolherPendentes(): Promise<{ pendentes: Pendente[]; fonteServic
   const servicos = await recolherServicos();
   pendentes.push(...servicos.avisos);
   pendentes.push(...(await recolherDocumentos()));
-  pendentes.push(...(await recolherWorkspaces()));
 
-  return { pendentes, fonteServicos: servicos.fonte };
+  const workspaces = await recolherWorkspaces();
+  pendentes.push(...workspaces.avisos);
+
+  return { pendentes, fonteServicos: servicos.fonte, faturacao: workspaces.retrato };
 }
 
 /**
@@ -283,8 +287,8 @@ function avisoDeExemplo(): Aviso | null {
  * as páginas: o controlador do Laravel trava o `per_page` em 100, a mesma
  * lição dos documentos.
  */
-async function recolherWorkspaces(): Promise<Pendente[]> {
-  if (!LARAVEL_ADMIN_ENABLED) return [];
+async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: string }> {
+  if (!LARAVEL_ADMIN_ENABLED) return { avisos: [], retrato: "laravel desligado" };
 
   interface Resposta {
     items: Array<{
@@ -313,10 +317,27 @@ async function recolherWorkspaces(): Promise<Pendente[]> {
       pagina++;
     } while (pagina <= ultima && pagina <= 20);
 
-    return avisosDeWorkspace(todos);
+    /*
+      O retrato da faturação vai para o registo da corrida pela mesma razão
+      que o dos serviços: "quantos técnicos podem faturar?" não tinha resposta
+      em lado nenhum sem abrir o backoffice com sessão iniciada. Esta linha
+      responde a cada corrida, e fica visível em Integrações.
+    */
+    const comWorkspace = todos.filter((t) => t.invoiceWorkspace).length;
+    const bloqueados = todos.filter(
+      (t) => !t.invoiceWorkspace && (t.atUser ?? "").includes("/") && t.blocker,
+    ).length;
+    const avisos = avisosDeWorkspace(todos);
+
+    return {
+      avisos,
+      retrato: `${todos.length} técnicos · ${comWorkspace} podem faturar`
+             + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`,
+    };
   } catch (e) {
-    console.error("[cron avisos] workspaces:", e instanceof Error ? e.message : e);
-    return [];
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[cron avisos] workspaces:", msg);
+    return { avisos: [], retrato: `erro: ${msg.slice(0, 60)}` };
   }
 }
 
@@ -358,7 +379,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { pendentes, fonteServicos } = await recolherPendentes();
+    const { pendentes, fonteServicos, faturacao } = await recolherPendentes();
     const memoria = await lerMemoria();
     const novos = apenasNovos(pendentes, memoria);
     const aviso = juntar(novos);
@@ -371,14 +392,14 @@ export async function GET(req: Request) {
     await gravarMemoria(memoriaAtualizada(pendentes, memoria));
 
     if (!aviso) {
-      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo · serviços: ${fonteServicos}`);
-      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0, fonteServicos });
+      await logCronRun("avisos", true, `${pendentes.length} pendentes, nada novo · serviços: ${fonteServicos} · faturação: ${faturacao}`);
+      return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: 0, fonteServicos, faturacao });
     }
 
     const r = await avisar(aviso);
-    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos · serviços: ${fonteServicos}`);
+    await logCronRun("avisos", r.erros.length === 0, `${novos.length} novos → ${r.enviados} dispositivos · serviços: ${fonteServicos} · faturação: ${faturacao}`);
 
-    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, fonteServicos, ...r });
+    return NextResponse.json({ ok: true, pendentes: pendentes.length, novos: novos.length, fonteServicos, faturacao, ...r });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "erro";
     await logCronRun("avisos", false, msg);
