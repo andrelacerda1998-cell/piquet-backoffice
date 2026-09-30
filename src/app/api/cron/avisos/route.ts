@@ -243,7 +243,6 @@ function avisoDeExemplo(): Aviso | null {
     [{
       id: "exemplo",
       status: "concluido",
-      customerName: "Maria Silva",
       serviceName: "Reparação de canalização",
       city: "Porto",
       totalCustomerValue: 85,

@@ -23,6 +23,7 @@ import type { Pendente } from "./avisosPendentes";
 export interface ServicoParaAviso {
   id: string;
   status: string;
+  /** Não entra no aviso — fica por ser o que a fonte devolve. */
   customerName?: string;
   serviceName?: string;
   city?: string;
@@ -109,7 +110,15 @@ export function avisosDeServicos(
     const data = quando(s);
     if (!dentroDaJanela(data, agora, janelaHoras)) continue;
 
-    const partes = [s.customerName, s.serviceName, s.city].map((x) => x?.trim()).filter(Boolean);
+    /*
+      O corpo leva o tipo de serviço e a cidade, e NÃO o nome do cliente.
+
+      Numa notificação cabem poucas palavras antes de serem cortadas, e o
+      nome de quem pediu não ajuda a decidir nada de relance -- "Reparação de
+      canalização — Porto" diz o que aconteceu e onde. Quem foi descobre-se
+      ao tocar, que é para onde o aviso leva.
+    */
+    const partes = [s.serviceName, s.city].map((x) => x?.trim()).filter(Boolean);
     const marca = s.status === "agendado" && s.scheduledAt ? marcacao(s.scheduledAt) : "";
 
     saida.push({
