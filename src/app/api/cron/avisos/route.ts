@@ -389,6 +389,24 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
     const degraus = [...porMotivo.entries()].sort((a, b) => b[1] - a[1])
       .map(([k, n]) => `${k}:${n}`).join(" ");
 
+    /*
+      Porque é que a documentação está incompleta, do endpoint agregado do
+      Laravel (#128). "158 incompletos" não diz o que fazer: os EXPIRADOS são
+      técnicos que já trabalharam e pararam sem dar por isso, e estavam
+      indistinguíveis de quem nunca submeteu.
+
+      Falha em silêncio de propósito: é informação a mais no registo, não pode
+      derrubar os avisos se o endpoint ainda não existir num backend antigo.
+    */
+    let documentos = "";
+    try {
+      const d = await laravelAdminRequest<Record<string, number>>("/v1/admin/vendors/documents-summary");
+      documentos = ` · documentos: ${d.com_expirado} expirados, ${d.com_recusado} recusados,`
+                 + ` ${d.com_por_rever} por rever, ${d.nunca_submeteram} nunca submeteram`;
+    } catch (e) {
+      console.error("[cron avisos] documents-summary:", e instanceof Error ? e.message : e);
+    }
+
     const HA_90_DIAS = Date.now() - 90 * 864e5;
     const semContactoRecentes = todos.filter(
       (t) => t.blocker === "contact_unverified" && t.criadoEm && new Date(t.criadoEm).getTime() >= HA_90_DIAS,
@@ -403,6 +421,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
              + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`
              + (porClassificar > 0 ? ` · ${porClassificar} por classificar` : "")
       + ` · degraus ${degraus}`
+      + documentos
       + (porClassificar > 0 ? ` · ${semContactoRecentes} destes dos últimos 90 dias` : ""),
     };
   } catch (e) {
