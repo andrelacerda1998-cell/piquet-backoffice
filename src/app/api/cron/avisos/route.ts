@@ -294,6 +294,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
     items: Array<{
       id: number; name: string | null; at_user?: string | null;
       invoice_workspace?: string | null; account_blocker?: string | null;
+      can_accept_service?: boolean;
     }>;
     meta?: { last_page?: number };
   }
@@ -312,6 +313,7 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
         atUser: v.at_user,
         invoiceWorkspace: v.invoice_workspace,
         blocker: v.account_blocker,
+        podeAceitar: v.can_accept_service,
       })));
       ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
       pagina++;
@@ -323,16 +325,30 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       em lado nenhum sem abrir o backoffice com sessão iniciada. Esta linha
       responde a cada corrida, e fica visível em Integrações.
     */
+    const temAT = (t: TecnicoParaAviso) => (t.atUser ?? "").includes("/");
+
     const comWorkspace = todos.filter((t) => t.invoiceWorkspace).length;
-    const bloqueados = todos.filter(
-      (t) => !t.invoiceWorkspace && (t.atUser ?? "").includes("/") && t.blocker,
-    ).length;
+    const bloqueados = todos.filter((t) => !t.invoiceWorkspace && temAT(t) && t.blocker).length;
+    /*
+      As mesmas contagens que a rota /technicians/funil mostra no ecrã, e
+      calculadas da mesma maneira de propósito: se divergissem, o registo e o
+      ecrã diziam números diferentes sobre a mesma coisa e ninguém saberia
+      qual acreditar.
+
+      `podemAceitar` vem do Laravel (`can_accept_service`) e não é recontado
+      aqui -- a autoridade é de lá.
+    */
+    const perfilCompleto = todos.filter((t) => !t.blocker).length;
+    const soFaltaAT = todos.filter((t) => !t.blocker && !temAT(t)).length;
+    const podemAceitar = todos.filter((t) => t.podeAceitar).length;
     const avisos = avisosDeWorkspace(todos);
 
     return {
       avisos,
-      retrato: `${todos.length} técnicos · ${comWorkspace} podem faturar`
-             + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`,
+      retrato: `${todos.length} técnicos · ${podemAceitar} podem aceitar serviços`
+             + ` · ${perfilCompleto} perfil completo · ${soFaltaAT} só falta a AT`
+             + ` · ${comWorkspace} podem faturar · ${avisos.length} à espera`
+             + ` · ${bloqueados} com algo em falta`,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

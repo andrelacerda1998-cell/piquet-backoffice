@@ -239,6 +239,12 @@ export interface TecnicoParaAviso {
   invoiceWorkspace?: string | null;
   /** Código do que falta antes de se poder criar. `null` = nada falta. */
   blocker?: string | null;
+  /**
+   * `can_accept_service` do Laravel. Não entra na decisão de avisar -- está
+   * aqui só para o retrato que o cron regista, e porque recontá-lo deste lado
+   * daria um número diferente do que o ecrã mostra.
+   */
+  podeAceitar?: boolean;
 }
 
 /**
