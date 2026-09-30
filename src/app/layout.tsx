@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Open_Sans } from "next/font/google";
 import "./globals.css";
+import { VERSAO_ICONES } from "@/lib/versaoIcones";
 
 const openSans = Open_Sans({
   subsets: ["latin"],
@@ -60,11 +61,18 @@ export const metadata: Metadata = {
     por isso vão os dois.
   */
   other: { "apple-mobile-web-app-capable": "yes" },
+  /*
+    O `?v=` não é enfeite: sem ele o ícone não muda no browser, por mais
+    deploys que se façam. Os favicons são guardados numa base de dados própria
+    do browser, à parte da cache HTTP e indexada pelo URL -- e o URL era
+    sempre o mesmo. Com o resumo do conteúdo lá dentro, mudar o desenho muda o
+    endereço, e um endereço novo nunca está em cache.
+  */
   icons: {
-    apple: "/icones/apple-touch-icon.png",
+    apple: `/icones/apple-touch-icon.png?v=${VERSAO_ICONES}`,
     icon: [
-      { url: "/icones/icone-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icones/icone-512.png", sizes: "512x512", type: "image/png" },
+      { url: `/icones/icone-192.png?v=${VERSAO_ICONES}`, sizes: "192x192", type: "image/png" },
+      { url: `/icones/icone-512.png?v=${VERSAO_ICONES}`, sizes: "512x512", type: "image/png" },
     ],
   },
 };
