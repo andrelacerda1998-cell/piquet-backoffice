@@ -8,9 +8,19 @@ import { juntar, apenasNovos, memoriaAtualizada, type Pendente } from "@/lib/avi
 /**
  * Avisa quem gere a Piquet do que está à espera.
  *
- * De 15 em 15 minutos, durante o horário em que alguém pode fazer alguma
- * coisa. Fora dele não avisa: um telemóvel a vibrar às 3 da manhã por causa
- * de um ticket não resolve o ticket e ensina a pessoa a desligar isto.
+ * ATENÇÃO AO HORÁRIO NO vercel.json: está DIÁRIO, e devia ser de 15 em 15
+ * minutos. Não é escolha — o plano Hobby da Vercel recusa qualquer expressão
+ * que corra mais do que uma vez por dia, e recusa o DEPLOY INTEIRO, não só o
+ * cron. Um aviso por dia sobre um pedido urgente serve de pouco: isto fica a
+ * meio caminho até ser chamado de fora (GitHub Actions ou o scheduler do
+ * Laravel, ambos sem custo) ou até o plano mudar.
+ *
+ * A função em si está certa para a frequência alta — daí a memória do que já
+ * foi avisado e o agrupamento num aviso só.
+ *
+ * Só avisa entre as 8h e as 21h. Fora disso não avisa: um telemóvel a vibrar
+ * às 3 da manhã por causa de um ticket não resolve o ticket e ensina a pessoa
+ * a desligar isto.
  *
  * Só avisa do que é NOVO desde o último aviso, e junta tudo numa notificação
  * só — ver lib/avisosPendentes.ts, onde está a regra e os testes.
