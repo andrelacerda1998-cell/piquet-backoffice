@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verificarChave } from "../../_lib/webhookAuth";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
-import { avisar, PUSH_CONFIGURADO } from "@/lib/push";
+import { avisar, PUSH_CONFIGURADO, type Aviso } from "@/lib/push";
 import { juntar, apenasNovos, memoriaAtualizada, type Pendente } from "@/lib/avisosPendentes";
 import { avisosDeServicos, avisosDeDocumentos, type DocumentoParaAviso } from "@/lib/avisosOperacao";
 import { fetchAllLaravelServices, servicesFromLaravel } from "../../_lib/laravelServices";
@@ -222,6 +222,40 @@ async function recolherDocumentos(): Promise<Pendente[]> {
   }
 }
 
+/**
+ * Um aviso de exemplo, para se ver como fica no telemóvel.
+ *
+ * Existe porque a alternativa era pior: para ver um aviso de serviço
+ * concluído sem haver nenhum, teria de se inventar um serviço na base de
+ * dados de produção -- e um serviço falso de 85 € entra no GMV e no
+ * Financeiro. Aqui não se escreve nada: o serviço vive só nesta função.
+ *
+ * Passa pelo MESMO `avisosDeServicos` que formata os reais, senão não
+ * provava nada sobre o que se vai receber de facto.
+ *
+ * O corpo diz "exemplo" de propósito. O título fica igual ao verdadeiro,
+ * que é o que se quer ver, mas alguém que receba isto tem de conseguir
+ * perceber que não há serviço nenhum à espera.
+ */
+function avisoDeExemplo(): Aviso | null {
+  const agora = new Date();
+  const [p] = avisosDeServicos(
+    [{
+      id: "exemplo",
+      status: "concluido",
+      customerName: "Maria Silva",
+      serviceName: "Reparação de canalização",
+      city: "Porto",
+      totalCustomerValue: 85,
+      completedAt: agora.toISOString(),
+    }],
+    { agora },
+  );
+  if (!p) return null;
+  // Tag própria: não se mistura nem apaga os avisos verdadeiros.
+  return { titulo: p.titulo, corpo: `${p.corpo} · exemplo`, url: "/servicos", tag: "exemplo" };
+}
+
 export async function GET(req: Request) {
   const auth = verificarChave(
     req.headers.get("authorization")?.replace(/^Bearer /, "") ?? null,
@@ -240,6 +274,20 @@ export async function GET(req: Request) {
     await logCronRun("avisos", true, "sem chaves VAPID");
     return NextResponse.json({ ok: true, nota: "sem chaves VAPID" });
   }
+  /*
+    ?exemplo=1 manda um aviso de demonstração e sai. Fica ANTES da janela de
+    horas e antes de tudo o resto: quem pede um exemplo quer vê-lo agora, e
+    não deve mexer na memória do que já foi avisado -- senão um teste fazia
+    desaparecer avisos verdadeiros.
+  */
+  if (new URL(req.url).searchParams.get("exemplo")) {
+    const aviso = avisoDeExemplo();
+    if (!aviso) return NextResponse.json({ error: "não foi possível montar o exemplo" }, { status: 500 });
+    const r = await avisar(aviso);
+    await logCronRun("avisos", r.erros.length === 0, `exemplo → ${r.enviados} dispositivos`);
+    return NextResponse.json({ ok: true, exemplo: aviso, ...r });
+  }
+
   if (!dentroDeHoras()) {
     await logCronRun("avisos", true, "fora de horas");
     return NextResponse.json({ ok: true, nota: "fora de horas" });
