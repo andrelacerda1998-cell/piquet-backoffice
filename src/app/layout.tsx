@@ -20,7 +20,17 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Piquet",
+    /*
+      É este o nome do ícone no ecrã inicial, e é o que o iOS mostra como
+      origem das notificações ("... de Piquet Gestão").
+
+      "Piquet" seria ambíguo: a app dos clientes já se chama assim, e ficavam
+      duas iguais no mesmo telemóvel. Mesma razão por que o ícone é diferente.
+
+      O iOS lê isto no momento em que se adiciona ao ecrã inicial, e deixa
+      editar o campo -- por isso um nome antigo escrito à mão ganha a este.
+    */
+    title: "Piquet Gestão",
     /*
       `default` e NAO `black-translucent`.
       
