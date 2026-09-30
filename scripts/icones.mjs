@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
  * olhos antes de fixar.
  */
 
-const LETRA = "Futura";
+const LETRA = "Bodoni 72";
 const PESO = "bold";
 
 const TINTA = "#1C1A17";
@@ -77,14 +77,33 @@ const inverso = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512
   <path d="${CAMPO}" fill="${TINTA}"/>
 </svg>`;
 
-/** O "P" como máscara, à altura certa e centrado nos 512. */
-async function mascara() {
-  const grande = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1400">
-    <text x="700" y="1100" text-anchor="middle" font-family="${LETRA}" font-weight="${PESO}" font-size="1000" fill="#fff">P</text>
+/**
+ * O "P" como máscara, à altura certa e centrado nos 512.
+ *
+ * @param espessa  quanto engordar o traço, em pixéis à escala de 512.
+ *
+ * A Bodoni é uma letra de alto contraste: o traço fino do bojo mede uns 6px
+ * a 512, o que dá 0,7px quando o sistema a mostra a 60. A esse tamanho o
+ * traço acinzenta e o "P" aparece PARTIDO ao meio.
+ *
+ * Engordar o traço nos tamanhos pequenos é compensação ótica -- a mesma razão
+ * por que uma família a sério tem cortes diferentes para texto e para cartaz.
+ * O 512 fica com as hastes verdadeiras; o 192 e o 180 levam engorda.
+ */
+async function mascara(espessa) {
+  const desenhar = (traco) => `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1400">
+    <text x="700" y="1100" text-anchor="middle" font-family="${LETRA}" font-weight="${PESO}"
+          font-size="1000" fill="#fff" stroke="#fff" stroke-width="${traco}" stroke-linejoin="round">P</text>
   </svg>`;
+
   // trim() dá a caixa real do glifo; sem isso a letra fica descentrada pelo
   // espaço que a fonte reserva por baixo da linha de base.
-  const apertada = await sharp(Buffer.from(grande)).png().trim().toBuffer();
+  const medida = await sharp(Buffer.from(desenhar(0))).png().trim().toBuffer();
+  const { height: alturaCrua } = await sharp(medida).metadata();
+  // A engorda é pedida à escala final, mas aplica-se antes de reduzir.
+  const traco = espessa / (ALT / alturaCrua);
+
+  const apertada = await sharp(Buffer.from(desenhar(traco))).png().trim().toBuffer();
   const redim = await sharp(apertada).resize({ height: ALT }).toBuffer();
   const { width, height } = await sharp(redim).metadata();
   return sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
@@ -96,22 +115,22 @@ async function mascara() {
 const base = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "icones");
 
 const ficheiros = [
-  { nome: "icone-192.png", size: 192, raio: 112 },
-  { nome: "icone-512.png", size: 512, raio: 112 },
+  { nome: "icone-192.png", size: 192, raio: 112, espessa: 9 },
+  { nome: "icone-512.png", size: 512, raio: 112, espessa: 2 },
   /*
     Maskable: o Android recorta isto em círculo. Vai sem cantos arredondados
     -- senão sobra transparência nos cantos -- e conta com a letra estar
     dentro dos 80% centrais, que é a zona que o recorte garante.
   */
-  { nome: "icone-maskable-512.png", size: 512, raio: 0 },
+  { nome: "icone-maskable-512.png", size: 512, raio: 0, espessa: 2 },
   /* O iOS arredonda sozinho e não aceita transparência. */
-  { nome: "apple-touch-icon.png", size: 180, raio: 0 },
+  { nome: "apple-touch-icon.png", size: 180, raio: 0, espessa: 9 },
 ];
 
-const m = await mascara();
-const letra = await sharp(Buffer.from(inverso)).composite([{ input: m, blend: "dest-in" }]).png().toBuffer();
-
 for (const f of ficheiros) {
+  const m = await mascara(f.espessa);
+  const letra = await sharp(Buffer.from(inverso)).composite([{ input: m, blend: "dest-in" }]).png().toBuffer();
+
   /*
     Em dois passos de propósito: o sharp aplica o resize ANTES do composite
     na mesma cadeia, e a base encolhia para 192 com a letra ainda a 512.
