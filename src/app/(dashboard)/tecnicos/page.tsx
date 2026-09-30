@@ -622,7 +622,7 @@ export default function TechniciansPage() {
                             <p className="text-xs text-text-muted mt-3">
                               <b className="text-warning">{formatNumber(c.contactoPorVerificar)}</b> técnicos não se
                               conseguem classificar quanto a documentos (têm ambos os contactos por verificar, o que
-                              tapa o resto). O "perfil completo" pode estar até esse número abaixo do real.
+                              tapa o resto). O «perfil completo» pode estar até esse número abaixo do real.
                             </p>
                           )}
                         </div>
