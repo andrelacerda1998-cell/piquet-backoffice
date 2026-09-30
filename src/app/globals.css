@@ -174,6 +174,27 @@
   }
 }
 
+/*
+  No iPhone, tocar num campo com menos de 16px faz o Safari DAR ZOOM sozinho
+  -- e depois fica assim, com o ecrã encostado e a pedir que se afaste os
+  dedos para voltar ao sítio. Não é uma preferência: é uma regra do WebKit,
+  e a única maneira de a desligar é o campo ter mesmo 16px.
+
+  Os campos estão todos a `text-sm` (14px), que é o certo no computador. Por
+  isso sobem para 16px só em ecrãs estreitos, onde o zoom acontece.
+
+  Vale para qualquer campo, e não só para os que usam `.input-field`: o
+  `select` de um filtro ou um `textarea` solto davam o mesmo salto.
+*/
+@media (max-width: 640px) {
+  .input-field,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Scrollbar styling — tons quentes */
 ::-webkit-scrollbar {
   width: 8px;

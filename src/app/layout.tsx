@@ -29,7 +29,19 @@ export const metadata: Metadata = {
       E, sendo transparente, o conteudo passava-lhe por baixo: era isso que
       fazia o topo do ecra parecer desalinhado em modo app.
     */
-    statusBarStyle: "default",
+    /*
+      `black` desde que o escuro passou a ser o defeito.
+
+      `default` pinta a barra de estado de BRANCO, e por cima de uma app
+      escura era uma faixa clara no topo -- o mesmo desalinhamento que já se
+      tinha corrigido, mas ao contrário. `black` fica bem nos dois temas:
+      uma barra preta sobre o tema claro é o que metade das apps do telemóvel
+      faz.
+
+      Isto é lido no momento em que se instala no ecrã inicial: só muda
+      depois de remover e voltar a adicionar.
+    */
+    statusBarStyle: "black",
   },
   /*
     O Next emite `mobile-web-app-capable`, que é o nome atual. O iOS mais
@@ -47,22 +59,28 @@ export const metadata: Metadata = {
   },
 };
 
-/*
-  `viewport-fit=cover` para o conteúdo passar por baixo do entalhe, e
-  `themeColor` para a barra de estado acompanhar o tema em vez de ficar um
-  rectângulo branco por cima de um ecrã escuro.
-*/
+/* `viewport-fit=cover` para o conteúdo passar por baixo do entalhe. */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAF8F5" },
-    { media: "(prefers-color-scheme: dark)", color: "#1C1A17" },
-  ],
+  /*
+    Um valor só, e escuro. As variantes por `prefers-color-scheme` seguiam o
+    tema do TELEMÓVEL, e o backoffice não segue o telemóvel -- tem tema
+    próprio, agora escuro por omissão. Com o telemóvel em claro e a app em
+    escuro, a barra ficava clara por cima de um ecrã escuro.
+  */
+  themeColor: "#1C1A17",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
-const themeScript = `(function(){try{var t=JSON.parse(localStorage.getItem('piquet-theme'));var m=t&&t.state&&t.state.theme;if(m==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`;
+/*
+  Corre antes de o browser pintar, para não haver um clarão branco antes de o
+  React arrancar. Agora o escuro é o DEFEITO: só se tira a classe a quem
+  escolheu o claro, em vez de só se pôr a quem escolheu o escuro. Se o
+  localStorage estiver inacessível (janela privada), fica escuro -- que é o
+  que o resto da app assume.
+*/
+const themeScript = `(function(){try{var t=JSON.parse(localStorage.getItem('piquet-theme'));var m=t&&t.state&&t.state.theme;if(m!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
