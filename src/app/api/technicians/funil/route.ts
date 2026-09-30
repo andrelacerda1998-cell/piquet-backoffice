@@ -4,13 +4,18 @@ import { esperaPeloWorkspace } from "@/lib/avisosOperacao";
 import { ApiError } from "@/services/http";
 
 /**
- * GET /api/technicians/awaiting-workspace — quem já entregou o acesso à AT e
- * espera que lhe criem o workspace de faturação.
+ * GET /api/technicians/funil — onde é que cada técnico está preso no caminho
+ * até poder aceitar serviços.
  *
  * Existe como rota própria, e não como filtro da lista, porque a lista é
  * PAGINADA: filtrar a página aberta encontrava dois ou três dos oito, e quem
  * olhasse ficava a achar que eram só esses. Aqui percorrem-se as páginas do
- * lado do servidor e devolve-se só quem interessa.
+ * lado do servidor.
+ *
+ * Chamava-se `awaiting-workspace` quando só sabia contar a fila do workspace.
+ * Passou a responder a "onde é que os técnicos estão presos", que é a mesma
+ * travessia e mais três contagens -- e um nome que dissesse só metade levava
+ * a próxima pessoa a criar uma segunda rota a percorrer os mesmos 460.
  *
  * A condição é a MESMA que dispara a notificação (`esperaPeloWorkspace`),
  * importada e não copiada: duas cópias divergiriam ao primeiro ajuste, e o
@@ -36,6 +41,28 @@ export interface ContagemWorkspaces {
   aEspera: number;
   /** Entregaram a AT mas falta-lhes documento, IBAN ou morada fiscal. */
   bloqueados: number;
+  /**
+   * Perfil completo: nada em falta DO LADO DELE.
+   *
+   * É o `account_blocker` a null -- contactos verificados, documentos
+   * aprovados, IBAN e morada fiscal. NÃO quer dizer que possa aceitar
+   * serviços: falta-lhe ainda o workspace (que é connosco) e a AT.
+   */
+  perfilCompleto: number;
+  /**
+   * Podem aceitar serviços. É o `can_accept_service` do Laravel, que é a
+   * autoridade -- não se recalcula aqui, porque duas contas da mesma coisa
+   * acabam sempre por discordar.
+   */
+  podemAceitar: number;
+  /**
+   * Têm tudo o resto aprovado e falta-lhes SÓ o subutilizador da AT.
+   *
+   * São os que estão a um passo, e o passo é deles. Distinguem-se dos
+   * "bloqueados" porque ali o que falta são documentos ou dados nossos de
+   * validar; aqui falta uma coisa que só o técnico pode entregar.
+   */
+  soFaltaAT: number;
 }
 
 export interface TecnicoSemWorkspace {
@@ -52,6 +79,7 @@ interface Resposta {
     at_user?: string | null;
     invoice_workspace?: string | null;
     account_blocker?: string | null;
+    can_accept_service?: boolean;
     created_at?: string | null;
   }>;
   meta?: { last_page?: number };
@@ -62,7 +90,10 @@ export const GET = withStaff(async () => {
 
   try {
     const espera: TecnicoSemWorkspace[] = [];
-    const contagem: ContagemWorkspaces = { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0 };
+    const contagem: ContagemWorkspaces = {
+      total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0,
+      perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0,
+    };
     let pagina = 1;
     let ultima = 1;
 
@@ -77,8 +108,17 @@ export const GET = withStaff(async () => {
 
       for (const v of itens) {
         contagem.total++;
+        const temAT = (v.at_user ?? "").includes("/");
+
         if (v.invoice_workspace) contagem.comWorkspace++;
-        else if ((v.at_user ?? "").includes("/") && v.account_blocker) contagem.bloqueados++;
+        else if (temAT && v.account_blocker) contagem.bloqueados++;
+
+        if (v.can_accept_service) contagem.podemAceitar++;
+        if (!v.account_blocker) {
+          contagem.perfilCompleto++;
+          // Nada em falta do lado dele, exceto a AT -- está a um passo.
+          if (!temAT) contagem.soFaltaAT++;
+        }
 
         const aguarda = esperaPeloWorkspace({
           id: v.id,

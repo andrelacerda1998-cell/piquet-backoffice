@@ -542,6 +542,39 @@ export default function TechniciansPage() {
                         <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
                       </div>
                     )}
+
+                    {/*
+                      Onde é que os técnicos estão presos.
+
+                      "Podem aceitar serviço" (acima) é o fim da linha, mas
+                      sozinho não diz o que falta a quem lá não chegou. Estes
+                      dois números dizem: quantos já não dependem de nós, e
+                      quantos estão a UM passo -- um passo que é deles.
+                    */}
+                    {semWorkspace && semWorkspace.contagem.total > 0 && (
+                      <div className="card p-4 sm:p-5">
+                        <p className="text-sm font-semibold text-text-primary">Onde estão presos</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                          <Contagem rotulo="Podem aceitar serviços" valor={semWorkspace.contagem.podemAceitar}
+                            nota={`de ${formatNumber(semWorkspace.contagem.total)} registados`} destaque />
+                          <Contagem rotulo="Perfil completo" valor={semWorkspace.contagem.perfilCompleto}
+                            nota="documentos, IBAN e morada" />
+                          <Contagem rotulo="Só falta a AT" valor={semWorkspace.contagem.soFaltaAT}
+                            nota="a um passo, e o passo é deles" />
+                          <Contagem rotulo="À espera de nós" valor={semWorkspace.contagem.aEspera}
+                            nota="falta criar-lhes o workspace" />
+                        </div>
+                        {/*
+                          A distinção que mais confunde: "perfil completo" não
+                          quer dizer "pode trabalhar". Falta-lhe ainda a AT
+                          (dele) e o workspace (nosso).
+                        */}
+                        <p className="text-xs text-text-muted mt-3">
+                          Perfil completo é não ter nada em falta <b className="text-text-secondary">do lado dele</b> —
+                          não chega para aceitar serviços, que exige ainda o subutilizador da AT e o workspace de faturação.
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
                       <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />

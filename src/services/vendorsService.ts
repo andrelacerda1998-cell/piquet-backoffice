@@ -187,14 +187,23 @@ export interface ContagemWorkspaces {
   comWorkspace: number;
   aEspera: number;
   bloqueados: number;
+  /** Nada em falta do lado dele: contactos, documentos, IBAN, morada fiscal. */
+  perfilCompleto: number;
+  /** `can_accept_service` do Laravel — a autoridade, não uma recontagem. */
+  podemAceitar: number;
+  /** Tudo o resto aprovado; falta só o subutilizador da AT. */
+  soFaltaAT: number;
 }
 
 export async function getTecnicosSemWorkspace(): Promise<{
   items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces;
 }> {
   return apiGet<{ items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces }>(
-    "/technicians/awaiting-workspace",
-    () => ({ items: [], total: 0, contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0 } }),
+    "/technicians/funil",
+    () => ({
+      items: [], total: 0,
+      contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0, perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0 },
+    }),
   ).then((r) => r.data);
 }
 
