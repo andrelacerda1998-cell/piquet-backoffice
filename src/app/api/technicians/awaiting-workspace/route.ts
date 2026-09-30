@@ -19,6 +19,25 @@ import { ApiError } from "@/services/http";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * O retrato completo, e não só a fila.
+ *
+ * "Quantos técnicos podem mesmo faturar?" não tinha resposta em lado nenhum:
+ * o ecrã mostrava quem faltava, nunca quem já estava feito. Como a rota já
+ * percorre todos os técnicos para encontrar a fila, contar os outros sai de
+ * graça -- e um total sem denominador não diz nada.
+ */
+export interface ContagemWorkspaces {
+  /** Técnicos lidos do Laravel. */
+  total: number;
+  /** Já têm workspace de faturação criado: estes podem faturar. */
+  comWorkspace: number;
+  /** Entregaram a AT e não têm nada em falta -- é a fila. */
+  aEspera: number;
+  /** Entregaram a AT mas falta-lhes documento, IBAN ou morada fiscal. */
+  bloqueados: number;
+}
+
 export interface TecnicoSemWorkspace {
   id: number;
   name: string | null;
@@ -43,6 +62,7 @@ export const GET = withStaff(async () => {
 
   try {
     const espera: TecnicoSemWorkspace[] = [];
+    const contagem: ContagemWorkspaces = { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0 };
     let pagina = 1;
     let ultima = 1;
 
@@ -56,6 +76,10 @@ export const GET = withStaff(async () => {
       const itens = r.items ?? [];
 
       for (const v of itens) {
+        contagem.total++;
+        if (v.invoice_workspace) contagem.comWorkspace++;
+        else if ((v.at_user ?? "").includes("/") && v.account_blocker) contagem.bloqueados++;
+
         const aguarda = esperaPeloWorkspace({
           id: v.id,
           atUser: v.at_user,
@@ -63,6 +87,7 @@ export const GET = withStaff(async () => {
           blocker: v.account_blocker,
         });
         if (aguarda) {
+          contagem.aEspera++;
           espera.push({
             id: v.id,
             name: v.name,
@@ -79,7 +104,7 @@ export const GET = withStaff(async () => {
     // Os mais antigos primeiro: são os que estão à espera há mais tempo.
     espera.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
 
-    return apiOk({ items: espera, total: espera.length });
+    return apiOk({ items: espera, total: espera.length, contagem });
   } catch (e) {
     return apiErr(
       e instanceof ApiError ? e.message : "Erro ao ler os técnicos.",

@@ -182,10 +182,19 @@ export interface TecnicoSemWorkspace {
  * encontrava alguns e escondia os outros. Sem série demo -- uma lista de
  * pessoas inventadas à espera de uma ação real seria pior do que um vazio.
  */
-export async function getTecnicosSemWorkspace(): Promise<{ items: TecnicoSemWorkspace[]; total: number }> {
-  return apiGet<{ items: TecnicoSemWorkspace[]; total: number }>(
+export interface ContagemWorkspaces {
+  total: number;
+  comWorkspace: number;
+  aEspera: number;
+  bloqueados: number;
+}
+
+export async function getTecnicosSemWorkspace(): Promise<{
+  items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces;
+}> {
+  return apiGet<{ items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces }>(
     "/technicians/awaiting-workspace",
-    () => ({ items: [], total: 0 }),
+    () => ({ items: [], total: 0, contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0 } }),
   ).then((r) => r.data);
 }
 
