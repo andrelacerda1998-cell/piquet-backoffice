@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { VERSAO_ICONES } from "@/lib/versaoIcones";
 
 /**
  * O backoffice como aplicação instalável.
@@ -33,14 +34,16 @@ export default function manifest(): MetadataRoute.Manifest {
     */
     background_color: "#1C1A17",
     theme_color: "#1C1A17",
+    // `?v=` pela mesma razão do layout: sem ele o browser fica com o ícone
+    // antigo indefinidamente, porque o endereço nunca muda.
     icons: [
-      { src: "/icones/icone-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icones/icone-512.png", sizes: "512x512", type: "image/png" },
+      { src: `/icones/icone-192.png?v=${VERSAO_ICONES}`, sizes: "192x192", type: "image/png" },
+      { src: `/icones/icone-512.png?v=${VERSAO_ICONES}`, sizes: "512x512", type: "image/png" },
       /*
         `maskable` é o que o Android recorta em círculo. Sem uma versão
         própria, ele recorta a normal e come os cantos do desenho.
       */
-      { src: "/icones/icone-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: `/icones/icone-maskable-512.png?v=${VERSAO_ICONES}`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     /*
       Atalhos: aparecem ao manter o ícone premido. São os dois sítios onde

@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -46,3 +48,28 @@ for (const f of ficheiros) {
     .toFile(join(DESTINO, f.nome));
   console.log(`  ${f.nome}  ${f.size}x${f.size}  ${Math.round(info.size / 1024)} KB`);
 }
+
+/*
+  A VERSÃO DOS ÍCONES, escrita num ficheiro que o site importa.
+
+  Sem isto o ícone não mudava no browser, por mais deploys que se fizessem. Os
+  browsers guardam os favicons numa base de dados PRÓPRIA, à parte da cache
+  HTTP e indexada pelo URL -- e o URL era sempre o mesmo, `/icones/icone-192
+  .png`. Não havia razão nenhuma para irem buscar outra vez, e o
+  `must-revalidate` não se aplica a essa base.
+
+  Com o resumo do conteúdo no URL, mudar o desenho muda o endereço, e um
+  endereço novo nunca está em cache. Escrito por este script, e não à mão,
+  porque uma versão que é preciso lembrar de subir é uma versão que se esquece
+  -- e o sintoma seria exatamente este outra vez.
+*/
+const resumo = createHash("sha256");
+for (const f of ficheiros) resumo.update(readFileSync(join(DESTINO, f.nome)));
+const versao = resumo.digest("hex").slice(0, 8);
+
+writeFileSync(
+  join(base, "..", "src", "lib", "versaoIcones.ts"),
+  `/** Gerado por scripts/icones.mjs — não editar à mão. */\n`
+  + `export const VERSAO_ICONES = "${versao}";\n`,
+);
+console.log(`  versão dos ícones: ${versao}`);
