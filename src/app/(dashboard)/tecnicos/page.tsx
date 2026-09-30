@@ -39,49 +39,7 @@ import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
-/**
- * Uma proporção com o seu denominador.
- *
- * A percentagem em cima e grande, o "N de M" por baixo. Um número absoluto
- * sozinho não se compara com nada -- 69 técnicos é bom ou mau conforme sejam
- * de 100 ou de 460 -- e uma percentagem sozinha esconde a dimensão.
- */
-function Proporcao({ rotulo, pct, n, total, nota, destaque }: {
-  rotulo: string; pct?: number; n: number; total: number; nota: string; destaque?: boolean;
-}) {
-  // Sem `pct` é o próprio total: mostra-se o número em grande e não "100%".
-  const ehTotal = pct === undefined;
-  return (
-    <div>
-      <p className="text-xs text-text-secondary">{rotulo}</p>
-      <p className={cn("text-3xl font-bold tabular-nums mt-0.5",
-        destaque ? "text-piquet" : "text-text-primary")}>
-        {ehTotal
-          ? formatNumber(n)
-          : `${(Math.round(pct * 10) / 10).toString().replace(".", ",")}%`}
-      </p>
-      {!ehTotal && (
-        <p className="text-sm font-medium text-text-primary tabular-nums">
-          {formatNumber(n)} <span className="text-text-muted font-normal">de {formatNumber(total)}</span>
-        </p>
-      )}
-      <p className={cn("text-[11px] text-text-muted", ehTotal ? "mt-1.5" : "mt-0.5")}>{nota}</p>
-    </div>
-  );
-}
 
-function Contagem({ rotulo, valor, nota, destaque }: {
-  rotulo: string; valor: number; nota: string; destaque?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-xs text-text-secondary">{rotulo}</p>
-      <p className={cn("text-2xl font-bold tabular-nums mt-0.5",
-        destaque ? "text-piquet" : "text-text-primary")}>{formatNumber(valor)}</p>
-      <p className="text-[11px] text-text-muted">{nota}</p>
-    </div>
-  );
-}
 
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
@@ -571,63 +529,48 @@ export default function TechniciansPage() {
                         <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
                         <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
                         <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
+                        {/*
+                          Na MESMA fila dos outros, e não num bloco à parte.
+
+                          Esteve num bloco próprio enquanto o "Podem aceitar
+                          serviço" ao lado estava errado (dizia 41 onde eram
+                          69, por o backend filtrar pela regra antiga da AT).
+                          Dois blocos a dizer a mesma coisa com números
+                          diferentes é pior do que um número a menos —
+                          corrigida a origem (backend #124), o duplicado sai.
+                        */}
+                        {semWorkspace && semWorkspace.contagem.total > 0 && (
+                          <MetricCard
+                            title="Perfil completo"
+                            hideDelta
+                            metric={buildMetricValue(
+                              semWorkspace.contagem.perfilCompleto,
+                              semWorkspace.contagem.perfilCompleto,
+                              false,
+                              undefined,
+                              `${((semWorkspace.contagem.perfilCompleto / semWorkspace.contagem.total) * 100)
+                                .toFixed(1).replace(".", ",")}% — documentos validados e workspace criado`,
+                            )}
+                          />
+                        )}
                       </div>
                     )}
 
                     {/*
-                      Os dois números que resumem o funil, cada um com a sua
-                      percentagem. A percentagem é o que está em cima e maior:
-                      "69" não diz nada sem saber de quantos, e é a proporção
-                      que se compara de mês para mês.
+                      O `perfilCompleto` é DERIVADO, não medido: o Laravel não
+                      expõe `all_documents_verified` por técnico, e o código de
+                      bloqueio só revela o primeiro problema. Quem tem os dois
+                      contactos por verificar fica por classificar — e isso
+                      diz-se, em vez de se apresentar o número como exacto.
                     */}
-                    {semWorkspace && semWorkspace.contagem.total > 0 && (() => {
-                      const c = semWorkspace.contagem;
-                      const pct = (n: number) => (c.total > 0 ? (n / c.total) * 100 : 0);
-                      return (
-                        <div className="card p-4 sm:p-5">
-                          <p className="text-sm font-semibold text-text-primary">Estado dos técnicos</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
-                            {/*
-                              O total é o DENOMINADOR das duas percentagens ao
-                              lado, e vem da mesma travessia. Há um cartão
-                              "Registados" mais acima vindo de outro endpoint;
-                              se os dois números divergirem, é sinal de que as
-                              fontes contam universos diferentes -- e mais vale
-                              ver isso do que escondê-lo usando o mesmo valor
-                              nos dois sítios.
-                            */}
-                            <Proporcao
-                              rotulo="Técnicos registados"
-                              n={c.total} total={c.total}
-                              nota="o universo de que saem as percentagens"
-                            />
-                            <Proporcao
-                              rotulo="Podem aceitar serviços"
-                              pct={pct(c.podemAceitar)} n={c.podemAceitar} total={c.total} destaque
-                              nota="tudo aprovado, incluindo AT e workspace"
-                            />
-                            <Proporcao
-                              rotulo="Perfil completo"
-                              pct={pct(c.perfilCompleto)} n={c.perfilCompleto} total={c.total}
-                              nota="documentos validados e workspace criado"
-                            />
-                          </div>
-                          {/*
-                            O `perfilCompleto` é derivado, não medido -- ver a
-                            nota na rota. Se houver técnicos por classificar,
-                            diz-se quantos em vez de apresentar o número como
-                            se fosse exacto.
-                          */}
-                          {c.contactoPorVerificar > 0 && (
-                            <p className="text-xs text-text-muted mt-3">
-                              <b className="text-warning">{formatNumber(c.contactoPorVerificar)}</b> técnicos não se
-                              conseguem classificar quanto a documentos (têm ambos os contactos por verificar, o que
-                              tapa o resto). O «perfil completo» pode estar até esse número abaixo do real.
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {(semWorkspace?.contagem.contactoPorVerificar ?? 0) > 0 && (
+                      <p className="text-xs text-text-muted -mt-3">
+                        O «perfil completo» pode estar até{" "}
+                        <b className="text-warning">{formatNumber(semWorkspace!.contagem.contactoPorVerificar)}</b>{" "}
+                        abaixo do real: esses técnicos têm ambos os contactos por verificar, o que tapa o estado dos
+                        documentos.
+                      </p>
+                    )}
 
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
