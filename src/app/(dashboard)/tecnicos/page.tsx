@@ -930,6 +930,76 @@ export default function TechniciansPage() {
 
         {tab === "aprovacoes" && (
           <div className="space-y-4">
+            {/*
+              A ordem desta aba é a ordem do TRABALHO, e não a ordem por que
+              as coisas foram sendo acrescentadas -- que era o que estava, e
+              por isso parecia desarrumada.
+
+                1. os números, para se saber onde se está;
+                2. a fila de documentos por rever, que é O trabalho desta aba
+                   e por isso vem antes de tudo o resto;
+                3. a documentação a tratar (caducados e recusados), que é
+                   trabalho de contacto e não de revisão;
+                4. os workspaces, que dependem de nós mas raramente existem.
+
+              O aviso da lista incompleta fica colado à tabela a que se
+              refere: longe dela não se percebia de que lista falava.
+            */}
+            {metrics && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/*
+                  Só o que é de KYC. A "Taxa de conclusão de perfil" e os
+                  "Podem aceitar serviço" saíram daqui: vivem na Visão geral,
+                  e tê-los nos dois sítios dava oito números no mesmo ecrã,
+                  dois deles a dizer a mesma coisa com valores diferentes por
+                  virem de fontes distintas.
+                */}
+                <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
+                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
+              </div>
+            )}
+            {docsIncompletos > 0 && (
+              <div className="card border-l-[3px] border-l-warning p-4">
+                <p className="font-semibold text-text-primary">Lista incompleta</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  O backend não conseguiu devolver cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos
+                  (erro do servidor em algumas páginas). Os estados mostrados nas colunas e nos perfis podem estar
+                  incompletos para esses técnicos — não quer dizer que não tenham entregado.
+                </p>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-text-secondary max-w-2xl">
+                Documentos enviados pelos técnicos, à espera de revisão. Aprovar ou recusar notifica o técnico a sério (email + push) <DemoBadge endpoint="/vendor-documents" />
+              </p>
+              <div className="flex gap-1 shrink-0">
+                {([
+                  { id: "pending", label: "Pendentes" },
+                  { id: "approved", label: "Aprovados" },
+                  { id: "declined", label: "Recusados" },
+                ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
+                  <button key={s.id} onClick={() => setDocStatus(s.id)}
+                    className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <DataTable
+              columns={[
+                { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
+                { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
+                { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
+                { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
+                  ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
+                      <Eye className="h-3.5 w-3.5" /> Pré-visualizar
+                    </button>
+                  : <span className="text-text-muted text-xs">—</span> },
+                { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
+                  <div className="flex items-center gap-3 justify-end">
+                    <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
+                    <button onClick={() => openDecline(r)} className="text-sm text-danger hover:underline">Recusar</button>
+
             {docs && (docs.expirados.length > 0 || docs.recusados.length > 0) && (
               <div className="card overflow-hidden">
                 <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
@@ -1029,60 +1099,6 @@ export default function TechniciansPage() {
               </div>
             )}
 
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/*
-                  Só o que é de KYC. A "Taxa de conclusão de perfil" e os
-                  "Podem aceitar serviço" saíram daqui: vivem na Visão geral,
-                  e tê-los nos dois sítios dava oito números no mesmo ecrã,
-                  dois deles a dizer a mesma coisa com valores diferentes por
-                  virem de fontes distintas.
-                */}
-                <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
-                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
-              </div>
-            )}
-            {docsIncompletos > 0 && (
-              <div className="card border-l-[3px] border-l-warning p-4">
-                <p className="font-semibold text-text-primary">Lista incompleta</p>
-                <p className="text-sm text-text-secondary mt-1">
-                  O backend não conseguiu devolver cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos
-                  (erro do servidor em algumas páginas). Os estados mostrados nas colunas e nos perfis podem estar
-                  incompletos para esses técnicos — não quer dizer que não tenham entregado.
-                </p>
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <p className="text-sm text-text-secondary max-w-2xl">
-                Documentos enviados pelos técnicos, à espera de revisão. Aprovar ou recusar notifica o técnico a sério (email + push) <DemoBadge endpoint="/vendor-documents" />
-              </p>
-              <div className="flex gap-1 shrink-0">
-                {([
-                  { id: "pending", label: "Pendentes" },
-                  { id: "approved", label: "Aprovados" },
-                  { id: "declined", label: "Recusados" },
-                ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
-                  <button key={s.id} onClick={() => setDocStatus(s.id)}
-                    className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <DataTable
-              columns={[
-                { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
-                { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
-                { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
-                { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
-                  ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
-                      <Eye className="h-3.5 w-3.5" /> Pré-visualizar
-                    </button>
-                  : <span className="text-text-muted text-xs">—</span> },
-                { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
-                  <div className="flex items-center gap-3 justify-end">
-                    <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
-                    <button onClick={() => openDecline(r)} className="text-sm text-danger hover:underline">Recusar</button>
                   </div>
                 ) : null },
               ]}
