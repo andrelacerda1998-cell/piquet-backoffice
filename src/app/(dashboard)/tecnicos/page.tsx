@@ -83,8 +83,20 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
       tom: "bg-warning", destaque: false },
     { rotulo: "IBAN em falta", n: d.semIban, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
     { rotulo: "Morada fiscal em falta", n: d.semMoradaFiscal, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
+    // O quinto degrau: fizeram 3 serviços e a AT passou a ser exigida.
+    { rotulo: "AT por entregar", n: d.semAT,
+      nota: "já fizeram 3 serviços — a AT passou a ser obrigatória", tom: "bg-warning", destaque: false },
     { rotulo: "Nada em falta", n: d.nadaEmFalta, nota: "passaram todos os degraus", tom: "bg-success", destaque: false },
-  ];
+  ].concat(
+    // Um código de bloqueio que este ecrã não conhece aparece à parte em vez
+    // de se esconder dentro do "nada em falta" — foi assim que o
+    // `at_user_missing` passou despercebido.
+    d.desconhecido > 0
+      ? [{ rotulo: "Motivo desconhecido", n: d.desconhecido,
+           nota: "o backend devolveu um bloqueio que este ecrã não sabe ler",
+           tom: "bg-danger", destaque: true }]
+      : [],
+  );
 
   // O que depende de NÓS vai à parte, e só aparece quando existe. Nenhum dos
   // degraus acima é trabalho nosso: todos dependem do técnico.
@@ -207,7 +219,16 @@ export default function TechniciansPage() {
     pessoa resolve uma pessoa -- ao contrário dos 337 que nunca submeteram,
     que se resolvem no funil de inscrição e não aqui.
   */
-  const { data: docs, refetch: refetchDocs } = useAsyncData(() => getResumoDocumentos(), []);
+  /*
+    SÓ NA ABA QUE PRECISA. Este endpoint agrega os 460 técnicos e os seus
+    documentos no Laravel -- é o pedido mais lento do ecrã. Corria em cada
+    abertura da página, mesmo quem só queria ver a Visão geral, e era metade
+    da demora de que o André se queixou.
+  */
+  const { data: docs } = useAsyncData(
+    () => (tab === "aprovacoes" ? getResumoDocumentos() : Promise.resolve(null)),
+    [tab],
+  );
 
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
@@ -660,11 +681,28 @@ export default function TechniciansPage() {
                   <div className="space-y-6">
                     {metrics && (
                       <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
-                        <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
-                        <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
-                        <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
+                        {/*
+                          Cada cartão diz o que MEDE, não só o que se chama.
+                          Metade destes números foi mal lida hoje -- "Sem
+                          serviços" parecia ser sobre os 460 e é sobre os
+                          elegíveis; "Online agora" parece presença e é uma
+                          bandeira que o técnico deixa ligada.
+                        */}
+                        <MetricCard title="Registados" hideDelta
+                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
+                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
+                        <MetricCard title="Podem aceitar serviço" hideDelta
+                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
+                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
+                        <MetricCard title="Online agora" hideDelta
+                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
+                            "Têm o estado Online ligado. Não é presença: quem fecha a app sem desligar continua a contar — ver o Mapa ao vivo")} />
+                        <MetricCard title="Sem serviços" hideDelta
+                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
+                            "Dos que podem aceitar serviço, quantos ainda não fecharam nenhum — não é sobre os registados")} />
+                        <MetricCard title="Taxa de elegibilidade" hideDelta format="percent"
+                          metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate, false, undefined,
+                            "Quantos dos registados podem aceitar serviço. Inclui no denominador quem nunca confirmou um contacto")} />
                         {/*
                           Na MESMA fila dos outros, e não num bloco à parte.
 

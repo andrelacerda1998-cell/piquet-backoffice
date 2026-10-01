@@ -198,7 +198,11 @@ export interface ContagemWorkspaces {
     documentosPorAprovar: number;
     semIban: number;
     semMoradaFiscal: number;
+    /** Fizeram 3 serviços e não entregaram a AT (5.º código, desde 30/09). */
+    semAT: number;
     nadaEmFalta: number;
+    /** Códigos de bloqueio ainda desconhecidos — não se escondem num total. */
+    desconhecido: number;
   };
   /** `can_accept_service` do Laravel — a autoridade, não uma recontagem. */
   podemAceitar: number;
@@ -220,14 +224,52 @@ export interface ResumoDocumentos {
 }
 
 /** Porque é que a documentação está incompleta, e quem se resolve hoje. */
+const SEM_DOCUMENTOS: ResumoDocumentos = {
+  total: 0, completos: 0, com_expirado: 0, com_recusado: 0,
+  com_por_rever: 0, nunca_submeteram: 0, expirados: [], recusados: [],
+};
+
 export async function getResumoDocumentos(): Promise<ResumoDocumentos> {
-  return apiGet<ResumoDocumentos>("/technicians/documentos", () => ({
-    total: 0, completos: 0, com_expirado: 0, com_recusado: 0,
-    com_por_rever: 0, nunca_submeteram: 0, expirados: [], recusados: [],
-  })).then((r) => r.data);
+  /*
+    FALHA EM SILÊNCIO, de propósito.
+
+    Isto é um painel secundário da aba de Aprovações. Quando o endpoint do
+    Laravel ainda não existe -- foi exactamente o que aconteceu a 30/09, com o
+    backend por publicar -- um erro aqui rebentava a ABA INTEIRA e deixava o
+    ecrã com um "Tentar novamente". A fila de documentos, que é o trabalho
+    real daquela aba, deixava de se poder abrir por causa de um extra.
+
+    Um painex que não carrega deve desaparecer, não levar o ecrã com ele.
+  */
+  try {
+    return (await apiGet<ResumoDocumentos>("/technicians/documentos", () => SEM_DOCUMENTOS)).data;
+  } catch (e) {
+    console.error("[documentos] não foi possível ler o resumo:", e);
+    return SEM_DOCUMENTOS;
+  }
 }
 
 export async function getTecnicosSemWorkspace(): Promise<{
+  items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces;
+}> {
+  // Mesma razão do resumo dos documentos: alimenta um painel da Visão geral e
+  // não pode derrubar o ecrã se o backend tropeçar.
+  try {
+    return await lerFunil();
+  } catch (e) {
+    console.error("[funil] não foi possível ler:", e);
+    return {
+      items: [], total: 0,
+      contagem: {
+        total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0, perfilCompleto: 0,
+        podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
+        degraus: { semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0, semIban: 0, semMoradaFiscal: 0, semAT: 0, nadaEmFalta: 0, desconhecido: 0 },
+      },
+    };
+  }
+}
+
+async function lerFunil(): Promise<{
   items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces;
 }> {
   return apiGet<{ items: TecnicoSemWorkspace[]; total: number; contagem: ContagemWorkspaces }>(
@@ -235,7 +277,7 @@ export async function getTecnicosSemWorkspace(): Promise<{
     () => ({
       items: [], total: 0,
       contagem: { total: 0, comWorkspace: 0, aEspera: 0, bloqueados: 0, perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
-        degraus: { semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0, semIban: 0, semMoradaFiscal: 0, nadaEmFalta: 0 } },
+        degraus: { semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0, semIban: 0, semMoradaFiscal: 0, semAT: 0, nadaEmFalta: 0, desconhecido: 0 } },
     }),
   ).then((r) => r.data);
 }

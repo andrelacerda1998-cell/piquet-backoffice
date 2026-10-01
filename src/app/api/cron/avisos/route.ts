@@ -384,6 +384,10 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       ontem por verificar é normal, uma de há seis meses é um registo
       abandonado, e as duas coisas pedem respostas diferentes.
     */
+    // Agrupa pelo valor CRU do blocker, incluindo códigos que o ecrã ainda
+    // não conheça. É por aqui que um código novo do Laravel se vê primeiro --
+    // o `at_user_missing` apareceu a 30/09 e passou meses... não, passou um
+    // dia, mas passou, contado como "nada em falta" no ecrã.
     const porMotivo = new Map<string, number>();
     for (const t of todos) porMotivo.set(t.blocker ?? "nada", (porMotivo.get(t.blocker ?? "nada") ?? 0) + 1);
     const degraus = [...porMotivo.entries()].sort((a, b) => b[1] - a[1])

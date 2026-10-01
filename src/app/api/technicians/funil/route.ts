@@ -92,7 +92,17 @@ export interface ContagemWorkspaces {
     documentosPorAprovar: number;
     semIban: number;
     semMoradaFiscal: number;
+    /**
+     * Fizeram 3 serviços e não entregaram o subutilizador da AT.
+     *
+     * É o quinto código do `invoicingBlocker`, acrescentado com a regra de
+     * 30/09. Sem este braço caíam no `default` e eram contados como "nada em
+     * falta" -- apresentados como quem passou tudo quando estão travados.
+     */
+    semAT: number;
     nadaEmFalta: number;
+    /** Códigos de bloqueio que este ficheiro ainda não conhece. */
+    desconhecido: number;
   };
 }
 
@@ -128,7 +138,7 @@ export const GET = withStaff(async () => {
       perfilCompleto: 0, podemAceitar: 0, soFaltaAT: 0, contactoPorVerificar: 0,
       degraus: {
         semContacto: 0, semContactoRecentes: 0, documentosPorAprovar: 0,
-        semIban: 0, semMoradaFiscal: 0, nadaEmFalta: 0,
+        semIban: 0, semMoradaFiscal: 0, semAT: 0, nadaEmFalta: 0, desconhecido: 0,
       },
     };
     let pagina = 1;
@@ -184,7 +194,17 @@ export const GET = withStaff(async () => {
           case "documents_pending": contagem.degraus.documentosPorAprovar++; break;
           case "iban_missing": contagem.degraus.semIban++; break;
           case "fiscal_address_missing": contagem.degraus.semMoradaFiscal++; break;
-          default: contagem.degraus.nadaEmFalta++;
+          case "at_user_missing": contagem.degraus.semAT++; break;
+          default:
+            /*
+              Só deve chegar aqui o `null`. Um código novo do Laravel que não
+              tenha braço aqui seria contado como "nada em falta" -- que foi o
+              que aconteceu com o `at_user_missing`, acrescentado a 30/09 sem
+              que este switch soubesse. Agora conta à parte e aparece no
+              registo, em vez de desaparecer dentro de um número bonito.
+            */
+            if (v.account_blocker) contagem.degraus.desconhecido++;
+            else contagem.degraus.nadaEmFalta++;
         }
         if (docsValidados && v.invoice_workspace) contagem.perfilCompleto++;
 
