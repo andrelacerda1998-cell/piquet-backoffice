@@ -17,8 +17,9 @@ import {
   getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
-  createTestVendor, type RealVendor, type TopVendor, type NewTestVendor,
+  createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces,
   getTecnicosSemWorkspace, type TecnicoSemWorkspace,
+  getResumoDocumentos, type TecnicoComDocumento,
 } from "@/services/vendorsService";
 
 // Leaflet mexe em `window`/`document` na inicialização — sem ssr:false a
@@ -39,15 +40,144 @@ import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
-function Contagem({ rotulo, valor, nota, destaque }: {
-  rotulo: string; valor: number; nota: string; destaque?: boolean;
+
+
+/**
+ * Onde é que os técnicos estão travados, pela ordem em que os degraus se
+ * atravessam.
+ *
+ * NÃO é ordenado por tamanho, de propósito: é um caminho, e ver os degraus
+ * fora de ordem esconde que resolver o primeiro não liberta ninguém para o
+ * fim -- só o empurra para o segundo.
+ *
+ * Um total diz onde se está; isto diz o que fazer a seguir.
+ */
+function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
+  const d = contagem.degraus;
+  const antigos = d.semContacto - d.semContactoRecentes;
+
+  const passos = [
+    {
+      rotulo: "Contactos por verificar",
+      n: d.semContacto,
+      nota: antigos > 0
+        ? formatNumber(antigos) + " há mais de 90 dias — registos abandonados"
+        : "nem email nem telemóvel confirmados",
+      // O que está parado há meses não é trabalho pendente, é ruído no
+      // denominador -- e por isso não se pinta da cor de quem espera por nós.
+      tom: "bg-text-muted",
+      destaque: false,
+    },
+    /*
+      NÃO é "documentos na fila de revisão" -- essa fila está noutro sítio
+      (Aprovações) e pode estar a zero ao mesmo tempo que isto marca 158.
+
+      `all_documents_verified` exige, para CADA documento obrigatório, um
+      aprovado e não expirado. Falha para quem nunca submeteu, para quem foi
+      recusado e para quem tem um documento expirado -- e nenhum desses está
+      à espera de revisão. Chamar-lhe "por aprovar" mandava alguém procurar
+      trabalho que não existe.
+    */
+    { rotulo: "Documentação incompleta", n: d.documentosPorAprovar,
+      nota: "não submeteram, foram recusados ou expiraram — depende deles",
+      tom: "bg-warning", destaque: false },
+    { rotulo: "IBAN em falta", n: d.semIban, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
+    { rotulo: "Morada fiscal em falta", n: d.semMoradaFiscal, nota: "falta-lhes entregar", tom: "bg-warning", destaque: false },
+    // O quinto degrau: fizeram 3 serviços e a AT passou a ser exigida.
+    { rotulo: "AT por entregar", n: d.semAT,
+      nota: "já fizeram 3 serviços — a AT passou a ser obrigatória", tom: "bg-warning", destaque: false },
+    { rotulo: "Nada em falta", n: d.nadaEmFalta, nota: "passaram todos os degraus", tom: "bg-success", destaque: false },
+  ].concat(
+    // Um código de bloqueio que este ecrã não conhece aparece à parte em vez
+    // de se esconder dentro do "nada em falta" — foi assim que o
+    // `at_user_missing` passou despercebido.
+    d.desconhecido > 0
+      ? [{ rotulo: "Motivo desconhecido", n: d.desconhecido,
+           nota: "o backend devolveu um bloqueio que este ecrã não sabe ler",
+           tom: "bg-danger", destaque: true }]
+      : [],
+  );
+
+  // O que depende de NÓS vai à parte, e só aparece quando existe. Nenhum dos
+  // degraus acima é trabalho nosso: todos dependem do técnico.
+  const nossos = [
+    { rotulo: "À espera de nós", n: contagem.aEspera,
+      nota: "têm tudo — falta criar-lhes o workspace de faturação" },
+  ];
+
+  return (
+    <div className="card p-4 sm:p-5">
+      <p className="text-sm font-semibold text-text-primary">Onde estão travados</p>
+      <p className="text-xs text-text-secondary mt-0.5 mb-3">
+        Cada técnico conta no primeiro degrau que falha. Resolver um não leva ninguém ao fim — passa-o ao seguinte.
+      </p>
+      <ul className="space-y-2.5">
+        {passos.concat(nossos.filter((n) => n.n > 0).map((n) => ({ ...n, tom: "bg-piquet", destaque: true }))).map((passo) => (
+          <li key={passo.rotulo}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className={cn("text-sm", passo.destaque ? "font-semibold text-text-primary" : "text-text-secondary")}>
+                {passo.rotulo}
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-text-primary shrink-0">
+                {formatNumber(passo.n)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-surface-muted mt-1 overflow-hidden">
+              <div className={cn("h-full rounded-full", passo.tom)}
+                style={{ width: (contagem.total > 0 ? (passo.n / contagem.total) * 100 : 0) + "%" }} />
+            </div>
+            <p className="text-[11px] text-text-muted mt-0.5">{passo.nota}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Um grupo de técnicos com o mesmo problema de documentação.
+ *
+ * Cada linha diz QUEM, QUE documento e PORQUÊ — os três sem abrir nada. Uma
+ * lista que obriga a abrir cada perfil para saber o que falta não poupa
+ * trabalho a ninguém.
+ */
+function GrupoDeDocumentos({ titulo, nota, tecnicos, detalhe, onAbrir }: {
+  titulo: string;
+  nota: string;
+  tecnicos: TecnicoComDocumento[];
+  detalhe: (d: TecnicoComDocumento["documentos"][number]) => string;
+  /** Leva à Lista já filtrada por este técnico. */
+  onAbrir: (nome: string) => void;
 }) {
   return (
-    <div>
-      <p className="text-xs text-text-secondary">{rotulo}</p>
-      <p className={cn("text-2xl font-bold tabular-nums mt-0.5",
-        destaque ? "text-piquet" : "text-text-primary")}>{formatNumber(valor)}</p>
-      <p className="text-[11px] text-text-muted">{nota}</p>
+    <div className="border-b border-surface-border last:border-0">
+      <div className="px-4 sm:px-5 py-2 bg-surface-subtle">
+        <p className="text-xs font-semibold text-text-primary">
+          {titulo} <span className="font-normal text-text-muted">· {nota}</span>
+        </p>
+      </div>
+      <ul className="divide-y divide-surface-border">
+        {tecnicos.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">{t.name ?? `Técnico ${t.id}`}</p>
+              <p className="text-xs text-text-muted">
+                {t.documentos.map((d) => `${d.nome} — ${detalhe(d)}`).join(" · ")}
+              </p>
+            </div>
+            {/*
+              Leva à Lista filtrada pelo nome, e não ao perfil directamente: o
+              perfil abre com o objeto completo do técnico, que esta lista não
+              tem -- só id e nome. Filtrar a lista chega lá em dois cliques em
+              vez de um, e não obriga a ir buscar o técnico inteiro só para
+              ter um botão.
+            */}
+            <button onClick={() => onAbrir(t.name ?? String(t.id))} className="btn-secondary text-xs shrink-0">
+              Ver na lista
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -83,6 +213,22 @@ export default function TechniciansPage() {
     dispara a notificação (lib/avisosOperacao.ts), importada e não copiada.
   */
   const { data: semWorkspace, refetch: refetchSemWorkspace } = useAsyncData(() => getTecnicosSemWorkspace(), []);
+
+  /*
+    Quem tem documentos expirados ou recusados. São os dois grupos em que uma
+    pessoa resolve uma pessoa -- ao contrário dos 337 que nunca submeteram,
+    que se resolvem no funil de inscrição e não aqui.
+  */
+  /*
+    SÓ NA ABA QUE PRECISA. Este endpoint agrega os 460 técnicos e os seus
+    documentos no Laravel -- é o pedido mais lento do ecrã. Corria em cada
+    abertura da página, mesmo quem só queria ver a Visão geral, e era metade
+    da demora de que o André se queixou.
+  */
+  const { data: docs } = useAsyncData(
+    () => (tab === "aprovacoes" ? getResumoDocumentos() : Promise.resolve(null)),
+    [tab],
+  );
 
   const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
@@ -535,13 +681,75 @@ export default function TechniciansPage() {
                   <div className="space-y-6">
                     {metrics && (
                       <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        <MetricCard title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
-                        <MetricCard title="Online agora" metric={buildMetricValue(metrics.online, metrics.online)} hideDelta />
-                        <MetricCard title="Sem serviços" metric={buildMetricValue(metrics.noServices, metrics.noServices)} hideDelta />
-                        <MetricCard title="Taxa de elegibilidade" metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate)} hideDelta format="percent" />
+                        {/*
+                          Cada cartão diz o que MEDE, não só o que se chama.
+                          Metade destes números foi mal lida hoje -- "Sem
+                          serviços" parecia ser sobre os 460 e é sobre os
+                          elegíveis; "Online agora" parece presença e é uma
+                          bandeira que o técnico deixa ligada.
+                        */}
+                        <MetricCard title="Registados" hideDelta
+                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
+                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
+                        <MetricCard title="Podem aceitar serviço" hideDelta
+                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
+                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
+                        <MetricCard title="Online agora" hideDelta
+                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
+                            "Têm o estado Online ligado. Não é presença: quem fecha a app sem desligar continua a contar — ver o Mapa ao vivo")} />
+                        <MetricCard title="Sem serviços" hideDelta
+                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
+                            "Dos que podem aceitar serviço, quantos ainda não fecharam nenhum — não é sobre os registados")} />
+                        <MetricCard title="Taxa de elegibilidade" hideDelta format="percent"
+                          metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate, false, undefined,
+                            "Quantos dos registados podem aceitar serviço. Inclui no denominador quem nunca confirmou um contacto")} />
+                        {/*
+                          Na MESMA fila dos outros, e não num bloco à parte.
+
+                          Esteve num bloco próprio enquanto o "Podem aceitar
+                          serviço" ao lado estava errado (dizia 41 onde eram
+                          69, por o backend filtrar pela regra antiga da AT).
+                          Dois blocos a dizer a mesma coisa com números
+                          diferentes é pior do que um número a menos —
+                          corrigida a origem (backend #124), o duplicado sai.
+                        */}
+                        {semWorkspace && semWorkspace.contagem.total > 0 && (
+                          <MetricCard
+                            title="Perfil completo"
+                            hideDelta
+                            metric={buildMetricValue(
+                              semWorkspace.contagem.perfilCompleto,
+                              semWorkspace.contagem.perfilCompleto,
+                              false,
+                              undefined,
+                              `${((semWorkspace.contagem.perfilCompleto / semWorkspace.contagem.total) * 100)
+                                .toFixed(1).replace(".", ",")}% — documentos validados e workspace criado`,
+                            )}
+                          />
+                        )}
                       </div>
                     )}
+
+                    {semWorkspace && semWorkspace.contagem.total > 0 && (
+                      <Degraus contagem={semWorkspace.contagem} />
+                    )}
+
+                    {/*
+                      O `perfilCompleto` é DERIVADO, não medido: o Laravel não
+                      expõe `all_documents_verified` por técnico, e o código de
+                      bloqueio só revela o primeiro problema. Quem tem os dois
+                      contactos por verificar fica por classificar — e isso
+                      diz-se, em vez de se apresentar o número como exacto.
+                    */}
+                    {(semWorkspace?.contagem.contactoPorVerificar ?? 0) > 0 && (
+                      <p className="text-xs text-text-muted -mt-3">
+                        O «perfil completo» pode estar até{" "}
+                        <b className="text-warning">{formatNumber(semWorkspace!.contagem.contactoPorVerificar)}</b>{" "}
+                        abaixo do real: esses técnicos têm ambos os contactos por verificar, o que tapa o estado dos
+                        documentos.
+                      </p>
+                    )}
+
                     <div>
                       <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
                       <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
@@ -722,29 +930,62 @@ export default function TechniciansPage() {
 
         {tab === "aprovacoes" && (
           <div className="space-y-4">
-            {/*
-              O retrato da faturação, sempre visível.
-
-              A lista de quem falta some quando está vazia -- e é assim que
-              deve ser. Mas "quantos técnicos podem mesmo faturar?" não é
-              trabalho por fazer, é contexto, e não tinha resposta em lado
-              nenhum: via-se quem faltava, nunca quem já estava feito.
-            */}
-            {semWorkspace && semWorkspace.contagem.total > 0 && (
-              <div className="card p-4 sm:p-5">
-                <p className="text-sm font-semibold text-text-primary">Workspaces de faturação</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                  <Contagem rotulo="Podem faturar" valor={semWorkspace.contagem.comWorkspace}
-                    nota={`de ${formatNumber(semWorkspace.contagem.total)} técnicos`} destaque />
-                  <Contagem rotulo="À espera de nós" valor={semWorkspace.contagem.aEspera}
-                    nota="AT entregue, nada em falta" />
-                  <Contagem rotulo="Falta-lhes algo" valor={semWorkspace.contagem.bloqueados}
-                    nota="documento, IBAN ou morada" />
-                  <Contagem rotulo="Sem AT" valor={Math.max(0, semWorkspace.contagem.total
-                    - semWorkspace.contagem.comWorkspace - semWorkspace.contagem.aEspera
-                    - semWorkspace.contagem.bloqueados)}
-                    nota="ainda não entregaram" />
+            {docs && (docs.expirados.length > 0 || docs.recusados.length > 0) && (
+              <div className="card overflow-hidden">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <p className="font-semibold text-text-primary">Documentação a tratar</p>
+                  {/*
+                    Porque é que só estes dois aparecem em lista: são os únicos
+                    em que uma pessoa resolve uma pessoa. Os que nunca
+                    submeteram são 337 -- isso não é uma lista de trabalho, é
+                    um relatório, e resolve-se no funil de inscrição.
+                  */}
+                  <p className="text-sm text-text-secondary mt-1">
+                    {docs.com_expirado > 0 && <><b className="text-text-primary">{docs.com_expirado}</b> com documentos caducados</>}
+                    {docs.com_expirado > 0 && docs.com_recusado > 0 && " · "}
+                    {docs.com_recusado > 0 && <><b className="text-text-primary">{docs.com_recusado}</b> com documentos recusados</>}
+                    {". "}
+                    Os outros {formatNumber(docs.nunca_submeteram)} nunca submeteram — esses resolvem-se na inscrição.
+                  </p>
                 </div>
+
+                {docs.expirados.length > 0 && (
+                  <GrupoDeDocumentos
+                    titulo="Caducados"
+                    // Já tiveram tudo aprovado: provavelmente já trabalharam e
+                    // pararam sem dar por isso. É o grupo com melhor retorno.
+                    nota="já tiveram tudo aprovado — basta reenviarem"
+                    tecnicos={docs.expirados}
+                    detalhe={(d) => (d.em ? `caducou ${formatDate(d.em)}` : "caducado")}
+                    onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
+                  />
+                )}
+
+                {docs.recusados.length > 0 && (
+                  <GrupoDeDocumentos
+                    titulo="Recusados"
+                    nota="submeteram e foi-lhes dito que não"
+                    tecnicos={docs.recusados}
+                    detalhe={(d) => d.motivo || "sem motivo registado"}
+                    onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
+                  />
+                )}
+              </div>
+            )}
+
+            {/*
+              Quem entregou a AT mas tem algo por resolver do lado dele.
+
+              Uma frase e não um cartão com um número grande: não é uma
+              métrica para acompanhar, é uma lista de pessoas para contactar.
+            */}
+            {(semWorkspace?.contagem.bloqueados ?? 0) > 0 && (
+              <div className="card border-l-[3px] border-l-warning p-4">
+                <p className="text-sm text-text-secondary">
+                  <b className="text-text-primary">{semWorkspace!.contagem.bloqueados} técnicos</b> entregaram o acesso
+                  à AT mas têm um documento, o IBAN ou a morada fiscal por resolver — não lhes conseguimos criar o
+                  workspace até isso ficar feito.
+                </p>
               </div>
             )}
 
@@ -790,10 +1031,15 @@ export default function TechniciansPage() {
 
             {metrics && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/*
+                  Só o que é de KYC. A "Taxa de conclusão de perfil" e os
+                  "Podem aceitar serviço" saíram daqui: vivem na Visão geral,
+                  e tê-los nos dois sítios dava oito números no mesmo ecrã,
+                  dois deles a dizer a mesma coisa com valores diferentes por
+                  virem de fontes distintas.
+                */}
                 <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
                 <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
-                <MetricCard title="Taxa conclusão perfil" metric={buildMetricValue(metrics.profileCompletionRate, metrics.profileCompletionRate)} hideDelta format="percent" />
-                <MetricCard title="Podem aceitar serviço" metric={buildMetricValue(metrics.eligible, metrics.eligible)} hideDelta />
               </div>
             )}
             {docsIncompletos > 0 && (

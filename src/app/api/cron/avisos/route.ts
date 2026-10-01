@@ -275,6 +275,12 @@ function avisoDeExemplo(): Aviso | null {
   return { titulo: p.titulo, corpo: `${p.corpo} · exemplo`, url: "/servicos", tag: "exemplo" };
 }
 
+/** Percentagem com uma casa, à portuguesa. */
+function pct(n: number, total: number): string {
+  if (total <= 0) return "—";
+  return `${(Math.round((n / total) * 1000) / 10).toString().replace(".", ",")}%`;
+}
+
 /**
  * Técnicos que já entregaram o acesso à AT e esperam pelo workspace.
  *
@@ -294,6 +300,9 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
     items: Array<{
       id: number; name: string | null; at_user?: string | null;
       invoice_workspace?: string | null; account_blocker?: string | null;
+      can_accept_service?: boolean;
+      all_documents_verified?: boolean;
+      created_at?: string | null;
     }>;
     meta?: { last_page?: number };
   }
@@ -312,6 +321,9 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
         atUser: v.at_user,
         invoiceWorkspace: v.invoice_workspace,
         blocker: v.account_blocker,
+        podeAceitar: v.can_accept_service,
+        criadoEm: v.created_at,
+        documentosValidados: v.all_documents_verified,
       })));
       ultima = r.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
       pagina++;
@@ -323,16 +335,98 @@ async function recolherWorkspaces(): Promise<{ avisos: Pendente[]; retrato: stri
       em lado nenhum sem abrir o backoffice com sessão iniciada. Esta linha
       responde a cada corrida, e fica visível em Integrações.
     */
+    const temAT = (t: TecnicoParaAviso) => (t.atUser ?? "").includes("/");
+
     const comWorkspace = todos.filter((t) => t.invoiceWorkspace).length;
-    const bloqueados = todos.filter(
-      (t) => !t.invoiceWorkspace && (t.atUser ?? "").includes("/") && t.blocker,
+    const bloqueados = todos.filter((t) => !t.invoiceWorkspace && temAT(t) && t.blocker).length;
+    /*
+      As mesmas contagens que a rota /technicians/funil mostra no ecrã, e
+      calculadas da mesma maneira de propósito: se divergissem, o registo e o
+      ecrã diziam números diferentes sobre a mesma coisa e ninguém saberia
+      qual acreditar.
+
+      `podemAceitar` vem do Laravel (`can_accept_service`) e não é recontado
+      aqui -- a autoridade é de lá.
+    */
+    /*
+      Perfil completo = documentos validados E workspace criado.
+
+      O Laravel não expõe `all_documents_verified` por técnico. Deriva-se do
+      código de bloqueio, que devolve o PRIMEIRO problema pela ordem
+      contactos → documentos → IBAN → morada: se chegou a `iban_missing` ou a
+      `fiscal_address_missing`, os documentos já passaram. O `contact_unverified`
+      tapa o resto, e esses contam-se à parte para a margem ficar à vista.
+    */
+    // O campo verdadeiro quando existe; a dedução só como recurso. Mesma
+    // regra da rota /technicians/funil, de propósito -- se divergissem, o
+    // registo e o ecrã voltavam a dizer números diferentes.
+    const docsValidados = (t: TecnicoParaAviso) =>
+      typeof t.documentosValidados === "boolean"
+        ? t.documentosValidados
+        : (!t.blocker || t.blocker === "iban_missing" || t.blocker === "fiscal_address_missing");
+
+    const perfilCompleto = todos.filter((t) => docsValidados(t) && t.invoiceWorkspace).length;
+    const porClassificar = todos.filter(
+      (t) => typeof t.documentosValidados !== "boolean" && t.blocker === "contact_unverified",
     ).length;
+    const soFaltaAT = todos.filter((t) => !t.blocker && !temAT(t)).length;
+    const podemAceitar = todos.filter((t) => t.podeAceitar).length;
     const avisos = avisosDeWorkspace(todos);
+
+    /*
+      Onde é que os técnicos estão presos, repartido pelo motivo.
+
+      O `account_blocker` devolve só o PRIMEIRO problema, por isso isto não é
+      "quantos têm cada problema" -- é "quantos estão travados naquele degrau".
+      Serve para saber onde atacar, que é diferente de saber quantos faltam.
+
+      Para os contactos por verificar vai também a idade: uma inscrição de
+      ontem por verificar é normal, uma de há seis meses é um registo
+      abandonado, e as duas coisas pedem respostas diferentes.
+    */
+    // Agrupa pelo valor CRU do blocker, incluindo códigos que o ecrã ainda
+    // não conheça. É por aqui que um código novo do Laravel se vê primeiro --
+    // o `at_user_missing` apareceu a 30/09 e passou meses... não, passou um
+    // dia, mas passou, contado como "nada em falta" no ecrã.
+    const porMotivo = new Map<string, number>();
+    for (const t of todos) porMotivo.set(t.blocker ?? "nada", (porMotivo.get(t.blocker ?? "nada") ?? 0) + 1);
+    const degraus = [...porMotivo.entries()].sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k}:${n}`).join(" ");
+
+    /*
+      Porque é que a documentação está incompleta, do endpoint agregado do
+      Laravel (#128). "158 incompletos" não diz o que fazer: os EXPIRADOS são
+      técnicos que já trabalharam e pararam sem dar por isso, e estavam
+      indistinguíveis de quem nunca submeteu.
+
+      Falha em silêncio de propósito: é informação a mais no registo, não pode
+      derrubar os avisos se o endpoint ainda não existir num backend antigo.
+    */
+    let documentos = "";
+    try {
+      const d = await laravelAdminRequest<Record<string, number>>("/v1/admin/vendors/documents-summary");
+      documentos = ` · documentos: ${d.com_expirado} expirados, ${d.com_recusado} recusados,`
+                 + ` ${d.com_por_rever} por rever, ${d.nunca_submeteram} nunca submeteram`;
+    } catch (e) {
+      console.error("[cron avisos] documents-summary:", e instanceof Error ? e.message : e);
+    }
+
+    const HA_90_DIAS = Date.now() - 90 * 864e5;
+    const semContactoRecentes = todos.filter(
+      (t) => t.blocker === "contact_unverified" && t.criadoEm && new Date(t.criadoEm).getTime() >= HA_90_DIAS,
+    ).length;
 
     return {
       avisos,
-      retrato: `${todos.length} técnicos · ${comWorkspace} podem faturar`
-             + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`,
+      retrato: `${todos.length} registados`
+             + ` · ${podemAceitar} podem aceitar (${pct(podemAceitar, todos.length)})`
+             + ` · ${perfilCompleto} perfil completo (${pct(perfilCompleto, todos.length)})`
+             + ` · ${comWorkspace} podem faturar · ${soFaltaAT} só falta a AT`
+             + ` · ${avisos.length} à espera · ${bloqueados} com algo em falta`
+             + (porClassificar > 0 ? ` · ${porClassificar} por classificar` : "")
+      + ` · degraus ${degraus}`
+      + documentos
+      + (porClassificar > 0 ? ` · ${semContactoRecentes} destes dos últimos 90 dias` : ""),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

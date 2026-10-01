@@ -378,14 +378,21 @@ export function SupportInbox() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-text-secondary">
-                          <span
-                            className="inline-flex text-text-muted"
-                            title={`${CHANNEL_LABEL[t.channel]} · ${t.requesterType === "tecnico" ? "Técnico" : "Cliente"}`}
-                          >
+                          <span className="inline-flex text-text-muted" title={CHANNEL_LABEL[t.channel]}>
                             <Icon className="h-3.5 w-3.5" />
                           </span>
                           {t.requesterName}
                         </span>
+                        {/*
+                          Quem escreveu, por palavras.
+
+                          Estava só no `title` do ícone: era preciso passar o
+                          rato por cima para saber se o ticket vinha de um
+                          cliente ou de um técnico -- e num telemóvel não há
+                          rato nenhum. É a informação que muda a resposta que
+                          se escreve, por isso lê-se sem interagir.
+                        */}
+                        <div className="mt-0.5"><Origem tipo={t.requesterType} /></div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", meta.tone)}>
@@ -435,7 +442,9 @@ export function SupportInbox() {
         onClose={() => setSelectedId(null)}
         title={selected?.subject ?? ""}
         subtitle={selected
-          ? `${selected.requesterName} · ${selected.requesterEmail} · ${CHANNEL_LABEL[selected.channel]}${selected.category ? ` · ${selected.category}` : ""}`
+          ? `${selected.requesterType === "tecnico" ? "Técnico" : "Cliente"} · ${selected.requesterName}`
+            + ` · ${selected.requesterEmail} · ${CHANNEL_LABEL[selected.channel]}`
+            + (selected.category ? ` · ${selected.category}` : "")
           : undefined}
         size="xl"
       >
@@ -557,6 +566,34 @@ export function SupportInbox() {
 /* --------------------------- Seletor de estado --------------------------- */
 
 /** Graus de importância, do mais grave para o menos. */
+/**
+ * De quem veio o ticket, escrito.
+ *
+ * Um cliente pergunta pelo serviço que pediu; um técnico pergunta pelo
+ * pagamento, pelos documentos ou por uma falta que lhe marcaram. São
+ * conversas diferentes, e saber qual é antes de abrir muda a ordem por que se
+ * responde -- por isso não pode viver num tooltip.
+ *
+ * Cores diferentes e não só texto: numa lista de trinta linhas, a cor é o que
+ * deixa ver o equilíbrio entre os dois sem ler nada.
+ */
+function Origem({ tipo }: { tipo: string }) {
+  const tecnico = tipo === "tecnico";
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+      /*
+        Os mesmos pares de `bg-*-light` + `text-*` dos selos de importância,
+        que são variáveis de tema. Um `bg-piquet-100` fixo daria fundo creme
+        com texto claro no modo escuro -- ilegível, e o escuro é o defeito.
+      */
+      tecnico ? "bg-info-light text-info" : "bg-warning-light text-warning",
+    )}>
+      {tecnico ? "Técnico" : "Cliente"}
+    </span>
+  );
+}
+
 const PRIORIDADES: { id: TicketPriority; label: string; tone: string; dot: string }[] = [
   { id: "critica", label: "Crítica", tone: "bg-danger-light text-danger", dot: "bg-danger" },
   { id: "alta", label: "Alta", tone: "bg-warning-light text-warning", dot: "bg-warning" },
