@@ -156,9 +156,18 @@ export async function POST(req: Request) {
   const imagePaths = imagens.length > 0 ? await subirImagens(imagens) : [];
 
   const now = new Date().toISOString();
+  /*
+    A ORIGEM decide-se UMA vez, e tudo o resto lê daqui.
+    Estava escrita duas vezes (canal e tipo) e uma terceira, por omissão, no
+    nome do autor -- que dizia "Cliente" a toda a gente. Um técnico sem nome
+    preenchido aparecia no backoffice com o selo «Técnico» e a mensagem
+    assinada por «Cliente», na mesma linha.
+  */
+  const daAppDosTecnicos = clip(body.channel, 30) === "app_tecnico";
+  const tratamento = daAppDosTecnicos ? "Técnico" : "Cliente";
   const ticket = {
-    channel: clip(body.channel, 30) === "app_tecnico" ? "app_tecnico" : "app_cliente",
-    requester_type: clip(body.channel, 30) === "app_tecnico" ? "tecnico" : "cliente",
+    channel: daAppDosTecnicos ? "app_tecnico" : "app_cliente",
+    requester_type: daAppDosTecnicos ? "tecnico" : "cliente",
     requester_name: name,
     requester_email: email,
     requester_phone: phone,
@@ -169,7 +178,7 @@ export async function POST(req: Request) {
       {
         id: `im_${Date.now()}`,
         from: "requester",
-        authorName: name || "Cliente",
+        authorName: name || tratamento,
         body: message,
         at: now,
         // Só aparece quando há fotos: uma lista vazia em todas as mensagens

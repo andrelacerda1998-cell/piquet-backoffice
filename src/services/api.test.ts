@@ -288,3 +288,63 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     expect(isDemoEndpoint("/endpoint/que/nao/existe")).toBe(true); // por defeito, demo
   });
 });
+
+/**
+ * A ARMADILHA QUE JÁ APANHOU TRÊS ENDPOINTS.
+ *
+ * São precisas DUAS entradas por endpoint: `LIVE_EXACT` («vai ao backend») e
+ * `REAL_DATA` («o que de lá vem é verdade»). Quem põe na primeira e esquece a
+ * segunda não vê erro: vê o `deepZero` a pôr os números a zero, o cartão a
+ * mostrar «—» e o painel a desaparecer sem uma linha de log.
+ *
+ * Foi assim com `/product/cost-per-download` (custo por instalação a zero), e
+ * outra vez com `/technicians/funil` e `/technicians/documentos`. Três vezes é
+ * padrão, não azar — e um padrão silencioso é o que um teste serve para
+ * tornar barulhento.
+ */
+describe("LIVE_EXACT × REAL_DATA — nenhuma lista pode divergir em silêncio", () => {
+  /**
+   * As excepções LEGÍTIMAS: endpoints que vão ao backend e cujos dados NÃO são
+   * verdadeiros, ou que não são dados de todo. Cada um com a razão à frente,
+   * porque uma lista de excepções sem razões vira um sítio onde se despeja o
+   * que não se percebe.
+   */
+  const EXCECOES: Record<string, string> = {
+    "/tax/summary": "vem do seed — é ficção, e o selo de demonstração está certo",
+    "/tax/vat": "idem",
+    "/support/inbox/seed": "é uma ação de semear, não devolve números",
+    "/technicians/test-account": "é uma ação sobre a conta de teste, não devolve números",
+  };
+
+  it("todo o endpoint ligado ao backend está classificado quanto à origem dos dados", async () => {
+    const { _LISTAS } = await import("@/services/api");
+    const porClassificar = [..._LISTAS.LIVE_EXACT]
+      .filter((p) => !_LISTAS.REAL_DATA.has(p) && !(p in EXCECOES));
+
+    expect(
+      porClassificar,
+      `Endpoint(s) em LIVE_EXACT sem entrada em REAL_DATA. Ou os dados são reais `
+      + `(acrescenta a REAL_DATA) ou são ficção (acrescenta às EXCECOES deste teste, `
+      + `com a razão). Sem isto, o deepZero põe os números a zero em silêncio.`,
+    ).toEqual([]);
+  });
+
+  it("a lista de excepções não envelhece sozinha", async () => {
+    const { _LISTAS } = await import("@/services/api");
+    const chaves = Object.keys(EXCECOES);
+
+    // Uma excepção que entretanto entrou em REAL_DATA deixou de ser excepção.
+    expect(chaves.filter((p) => _LISTAS.REAL_DATA.has(p))).toEqual([]);
+    // E uma que já nem vá ao backend não tem nada que fazer aqui.
+    expect(chaves.filter((p) => !_LISTAS.LIVE_EXACT.has(p))).toEqual([]);
+  });
+
+  /** Os três que custaram caro, nomeados para nunca mais escorregarem. */
+  it("os endpoints que já falharam estão nas duas listas", async () => {
+    const { _LISTAS } = await import("@/services/api");
+    for (const ep of ["/product/cost-per-download", "/technicians/funil", "/technicians/documentos"]) {
+      expect(_LISTAS.LIVE_EXACT.has(ep), `${ep} tem de ir ao backend`).toBe(true);
+      expect(_LISTAS.REAL_DATA.has(ep), `${ep} tem de contar como dados reais`).toBe(true);
+    }
+  });
+});

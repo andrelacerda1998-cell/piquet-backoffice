@@ -516,6 +516,23 @@ export function deepZero<T>(value: T): T {
   return value;
 }
 
+/**
+ * As duas listas, expostas SÓ para o teste de invariante.
+ *
+ * Um endpoint tem de estar classificado nas DUAS: `LIVE_EXACT` diz «vai ao
+ * backend», `REAL_DATA` diz «os números que de lá vêm são verdadeiros». Quem
+ * acrescenta à primeira e esquece a segunda não vê erro nenhum -- vê o
+ * `deepZero` a pôr tudo a zero, o cartão a mostrar «—» e o painel a
+ * desaparecer. Aconteceu com `/product/cost-per-download`, e outra vez com
+ * `/technicians/funil` e `/technicians/documentos`.
+ *
+ * O teste em `api.test.ts` compara-as e falha quando aparece um endpoint novo
+ * por classificar. Não há forma de o deduzir automaticamente -- há endpoints
+ * ligados ao backend cujos dados SÃO ficção (os do seed) -- por isso o que se
+ * automatiza é a pergunta, não a resposta.
+ */
+export const _LISTAS = { LIVE_EXACT, REAL_DATA } as const;
+
 export function isLiveEndpoint(endpoint: string): boolean {
   const path = endpoint.split("?")[0];
   if (LIVE_DENY.has(path)) return false;

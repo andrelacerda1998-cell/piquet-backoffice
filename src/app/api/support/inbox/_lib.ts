@@ -69,7 +69,11 @@ export function toInboxTicket(r: TicketRow) {
     id: r.id,
     channel: r.channel,
     requesterType: r.requester_type,
-    requesterName: r.requester_name || r.requester_phone || "Cliente",
+    // O mesmo tratamento que o POST /api/tickets grava no autor da mensagem:
+    // quem não deu nome é «Técnico» ou «Cliente» conforme a app de onde veio,
+    // nunca «Cliente» por omissão ao lado de um selo que diz «Técnico».
+    requesterName: r.requester_name || r.requester_phone
+      || (r.requester_type === "tecnico" ? "Técnico" : "Cliente"),
     requesterEmail: r.requester_email,
     subject: r.subject,
     category: r.category || undefined,
