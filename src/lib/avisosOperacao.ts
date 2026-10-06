@@ -50,6 +50,9 @@ export interface DocumentoParaAviso {
  */
 const ESTADOS_MORTOS = new Set([
   "concluido", "cancelado_cliente", "cancelado_tecnico", "reembolsado", "sem_tecnico_disponivel",
+  // O trabalho já foi feito (os dois primeiros) ou o pedido foi arrumado por
+  // um administrador sem nunca ter sido feito (o terceiro).
+  "a_aguardar_confirmacao", "pagamento_por_capturar", "arquivado",
 ]);
 
 /**

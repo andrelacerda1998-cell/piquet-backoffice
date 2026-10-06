@@ -348,3 +348,85 @@ describe("LIVE_EXACT × REAL_DATA — nenhuma lista pode divergir em silêncio",
     }
   });
 });
+
+/**
+ * O BURACO DO TESTE ANTERIOR, e porque é que este lê o código em vez de listas.
+ *
+ * O teste acima compara `LIVE_EXACT` com `REAL_DATA`. Não via os caminhos que
+ * vão ao backend por expressão regular -- e foi por aí que entraram quatro
+ * leituras zeradas: os volumes da Visão Geral (`/services/counts`, apanhado
+ * pelo padrão `/services/:id`), as fotos do cliente e a cronologia de um
+ * pedido. Encontradas numa auditoria, não por este teste.
+ *
+ * Este não pergunta às listas: lê os `apiGet` que o código faz de facto em
+ * src/services/, troca cada `${…}` por um id de exemplo, e verifica que nenhum
+ * pedido que vai ao backend volta zerado, salvo a ficção declarada abaixo. Um
+ * GET novo, por qualquer caminho, entra na verificação sem ninguém se lembrar.
+ *
+ * Não apanha um `apiGet(variavel)` cujo caminho não está escrito ali. Hoje não
+ * há nenhum.
+ */
+describe("todo o GET que vai ao backend chega ao ecrã sem ser zerado", () => {
+  /** Ficção declarada: vai ao backend e os números SÃO inventados, ou não é usado. */
+  const FICCAO: Record<string, string> = {
+    "/tax/summary": "vem do seed",
+    "/tax/vat": "vem do seed",
+    "/services/x": "getServiceById lê os serviços manuais do Supabase e nenhum ecrã o chama",
+  };
+
+  async function load() {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://exemplo.test/api");
+    return import("@/services/api");
+  }
+  afterEach(() => vi.unstubAllEnvs());
+
+  function getsDoCodigo(): string[] {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("node:fs") as typeof import("node:fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require("node:path") as typeof import("node:path");
+    const dir = path.join(process.cwd(), "src/services");
+    const caminhos = new Set<string>();
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
+      const t = fs.readFileSync(path.join(dir, f), "utf8");
+      for (const m of t.matchAll(/apiGet\b/g)) {
+        const janela = t.slice(m.index! + 6, m.index! + 400);
+        const p = janela.match(/\(\s*["`](\/[^"`]+)["`]/);
+        if (!p) continue;
+        caminhos.add(p[1].replace(/\$\{[^}]+\}/g, "x").split("?")[0]);
+      }
+    }
+    return [...caminhos].sort();
+  }
+
+  it("encontra os pedidos do código (se isto falhar, o leitor partiu-se)", () => {
+    const gets = getsDoCodigo();
+    expect(gets.length).toBeGreaterThan(50);
+    expect(gets).toContain("/services/counts");
+    expect(gets).toContain("/services/x/fotos");
+  });
+
+  it("nenhum vai ao backend para depois ser zerado", async () => {
+    const { isLiveEndpoint: vaiAoBackend, isDemoEndpoint: eZerado } = await load();
+    const zerados = getsDoCodigo()
+      .filter((p) => vaiAoBackend(p) && eZerado(p) && !(p in FICCAO));
+
+    expect(
+      zerados,
+      `GET que vai ao backend e é ZERADO no browser antes de chegar ao ecrã. Se os `
+      + `dados são reais, acrescenta a REAL_DATA (caminho exato) ou REAL_PATTERNS (com id). `
+      + `Se são ficção, acrescenta a FICCAO neste teste, com a razão.`,
+    ).toEqual([]);
+  });
+
+  it("a ficção declarada continua a existir e a ir ao backend", async () => {
+    const { isLiveEndpoint: vaiAoBackend } = await load();
+    const gets = new Set(getsDoCodigo());
+    for (const p of Object.keys(FICCAO)) {
+      expect(gets.has(p), `${p} já não é pedido por ninguém: sai da FICCAO`).toBe(true);
+      expect(vaiAoBackend(p), `${p} já não vai ao backend: sai da FICCAO`).toBe(true);
+    }
+  });
+});

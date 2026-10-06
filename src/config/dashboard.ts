@@ -77,6 +77,9 @@ export const SERVICE_STATUS_LABELS: Record<string, string> = {
   sem_tecnico_disponivel: "Sem técnico disponível",
   reembolsado: "Reembolsado",
   em_reclamacao: "Em reclamação",
+  a_aguardar_confirmacao: "À espera de confirmação",
+  pagamento_por_capturar: "Pagamento por capturar",
+  arquivado: "Arquivado",
 };
 
 export const NAV_ITEMS = [
@@ -121,7 +124,7 @@ export const NAV_PRIMARY: string[] = [
   // coisas era o mesmo conteúdo em dois sítios.
   "/qualidade",
   "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/chat", "/desenvolvimento", "/configuracao",
+  "/marketing", "/leads", "/suporte", "/configuracao",
 ];
 // Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
 export const NAV_SECONDARY: string[] = [];
@@ -129,6 +132,13 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
 // Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
 export const NAV_DEEPLINKS: string[] = [
+  /*
+    Equipa e Desenvolvimento saíram do menu a 6/10/2026 (auditoria: um chat e
+    um kanban feitos à mão, ao lado do WhatsApp e do GitHub que a equipa já
+    usa). Continuam aqui, a um ⌘K, até se decidir se saem de vez -- tirar do
+    menu é reversível, apagar não é.
+  */
+  "/chat", "/desenvolvimento",
   "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados",

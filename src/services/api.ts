@@ -300,6 +300,13 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  /*
+    Volumes da Visão Geral (executados e agendados, mês e ano). Ia ao backend
+    pelo padrão /services/:id e voltava ZERADO por não estar aqui: os quatro
+    cartões mostravam 0. A contagem passou também a ser feita no Laravel, ver
+    app/api/services/counts/route.ts.
+  */
+  "/services/counts",
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
   // Pedidos personalizados: serviços com is_custom no Laravel (PR #83).
   // Antes disto o ecrã caía num fallback com seis pedidos escritos à mão.
@@ -468,6 +475,33 @@ const REAL_DATA = new Set<string>([
 ]);
 
 /**
+ * Caminhos com id cujos dados são REAIS: o par de `REAL_DATA` para o que não
+ * cabe num Set de caminhos exatos. Exportado para o teste de invariante.
+ */
+export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
+  /^\/dev-tasks\/[^/]+$/,
+  /^\/tasks\/[^/]+$/,
+  /^\/team\/tasks\/[^/]+\/status$/,
+  /^\/finance\/budget\/[^/]+$/,
+  /^\/employees\/emp_[^/]+$/,
+  // Métodos de pagamento do cliente — real (tabela payshop_payment_methods
+  // do Laravel), mas o path tem o id do cliente, não bate com REAL_DATA.
+  /^\/customers\/[^/]+\/payment-methods$/,
+  // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
+  /^\/marketing\/leads\/[^/]+\/messages$/,
+  // Conversa com o técnico — real (whatsapp_messages.technician_id).
+  /^\/technicians\/[^/]+\/messages$/,
+  /*
+    Estavam a ser ZERADAS. Os dois caminhos iam ao backend (LIVE_PATTERNS) e
+    voltavam com dados reais, mas não estavam aqui -- e o deepZero de uma
+    lista devolve `[]`. As fotos que o cliente anexou nunca apareciam no
+    detalhe do serviço, e a cronologia de um pedido aparecia sempre vazia.
+  */
+  /^\/services\/[^/]+\/fotos$/, // media do Laravel, com URL assinado
+  /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
+];
+
+/**
  * `true` quando o número mostrado é fictício. Usado pelo selo `<DemoBadge>`.
  * Por defeito assume-se demo: um endpoint só conta como real depois de se
  * confirmar a origem dos dados, e não por estar ligado a uma rota.
@@ -476,19 +510,7 @@ export function isDemoEndpoint(endpoint: string): boolean {
   if (!USE_REAL_API) return true;
   const path = endpoint.split("?")[0];
   if (REAL_DATA.has(path)) return false;
-  if (/^\/dev-tasks\/[^/]+$/.test(path)) return false;
-  if (/^\/tasks\/[^/]+$/.test(path)) return false;
-  if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return false;
-  if (/^\/finance\/budget\/[^/]+$/.test(path)) return false;
-  if (/^\/employees\/emp_[^/]+$/.test(path)) return false;
-  // Métodos de pagamento do cliente — real (tabela payshop_payment_methods
-  // do Laravel), mas o path tem o id do cliente, não bate com REAL_DATA.
-  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return false;
-  // Conversa de WhatsApp da lead — real (webhook → whatsapp_messages).
-  if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return false;
-  // Conversa com o técnico — real (whatsapp_messages.technician_id).
-  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return false;
-  return true;
+  return !REAL_PATTERNS.some((r) => r.test(path));
 }
 
 /**
@@ -533,37 +555,38 @@ export function deepZero<T>(value: T): T {
  */
 export const _LISTAS = { LIVE_EXACT, REAL_DATA } as const;
 
-export function isLiveEndpoint(endpoint: string): boolean {
-  const path = endpoint.split("?")[0];
-  if (LIVE_DENY.has(path)) return false;
-  if (LIVE_EXACT.has(path)) return true;
-  if (/^\/services\/[^/]+\/fotos$/.test(path)) return true; // fotos que o cliente anexou
-  if (/^\/services\/[^/]+$/.test(path)) return true; // /services/:id (detalhe/write-back)
-  if (/^\/tax\/obligations\/[^/]+\/pay$/.test(path)) return true; // marcar obrigação paga
-  if (/^\/finance\/payouts\/[^/]+\/process$/.test(path)) return true; // processar pagamento
-  if (/^\/team\/tasks\/[^/]+\/status$/.test(path)) return true; // mudar estado de tarefa
-  if (/^\/dev-tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa de dev
-  if (/^\/tasks\/[^/]+$/.test(path)) return true; // update/delete de tarefa pessoal
-  if (/^\/goals\/[^/]+$/.test(path)) return true; // editar/apagar objetivo
-  if (/^\/finance\/company-invoices\/[^/]+$/.test(path)) return true; // pagar/editar fatura
-  if (/^\/finance\/budget\/[^/]+$/.test(path)) return true; // editar/apagar linha do orçamento
+/**
+ * Caminhos com id que vão ao backend. Exportados para o teste de invariante
+ * em api.test.ts, que verifica que nenhum GET destes chega ao ecrã zerado.
+ */
+export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
+  /^\/services\/[^/]+\/fotos$/, // fotos que o cliente anexou
+  /^\/services\/[^/]+$/, // /services/:id (detalhe/write-back)
+  /^\/tax\/obligations\/[^/]+\/pay$/, // marcar obrigação paga
+  /^\/finance\/payouts\/[^/]+\/process$/, // processar pagamento
+  /^\/team\/tasks\/[^/]+\/status$/, // mudar estado de tarefa
+  /^\/dev-tasks\/[^/]+$/, // update/delete de tarefa de dev
+  /^\/tasks\/[^/]+$/, // update/delete de tarefa pessoal
+  /^\/goals\/[^/]+$/, // editar/apagar objetivo
+  /^\/finance\/company-invoices\/[^/]+$/, // pagar/editar fatura
+  /^\/finance\/budget\/[^/]+$/, // editar/apagar linha do orçamento
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
-  if (/^\/employees\/emp_[^/]+$/.test(path)) return true; // editar/desativar colaborador
-  if (/^\/marketing\/push-campaigns\/[^/]+\/active$/.test(path)) return true; // ligar/desligar campanha
-  if (/^\/marketing\/leads\/[^/]+\/messages$/.test(path)) return true; // ler/enviar mensagens de WhatsApp da lead
-  if (/^\/marketing\/leads\/[^/]+\/timeline$/.test(path)) return true; // cronologia do pedido
-  if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // mudar estado de lead no CRM
-  if (/^\/support\/inbox\/[^/]+\/(reply|status|priority)$/.test(path)) return true; // responder / mudar estado / etiquetar
+  /^\/employees\/emp_[^/]+$/, // editar/desativar colaborador
+  /^\/marketing\/push-campaigns\/[^/]+\/active$/, // ligar/desligar campanha
+  /^\/marketing\/leads\/[^/]+\/messages$/, // ler/enviar mensagens de WhatsApp da lead
+  /^\/marketing\/leads\/[^/]+\/timeline$/, // cronologia do pedido
+  /^\/marketing\/leads\/[^/]+$/, // mudar estado de lead no CRM
+  /^\/support\/inbox\/[^/]+\/(reply|status|priority)$/, // responder / mudar estado / etiquetar
   // DELETE de um ticket (inclui os de exemplo). Tem de vir DEPOIS do regex
   // acima para não apanhar os subcaminhos.
-  if (/^\/support\/inbox\/[^/]+$/.test(path)) return true;
-  if (/^\/vouchers\/[^/]+$/.test(path)) return true; // editar/apagar voucher
-  if (/^\/vendor-documents\/[^/]+\/(approve|decline)$/.test(path)) return true; // rever documento KYC
-  if (/^\/vendor-payments\/[^/]+\/pay$/.test(path)) return true; // pagar vendor
-  if (/^\/customers\/[^/]+\/(block|restore)$/.test(path)) return true; // bloquear/reativar cliente
-  if (/^\/customers\/[^/]+\/payment-methods$/.test(path)) return true; // listar métodos de pagamento
-  if (/^\/customers\/[^/]+\/payment-methods\/[^/]+$/.test(path)) return true; // apagar método de pagamento
-  if (/^\/technicians\/[^/]+\/(suspend|restore)$/.test(path)) return true; // suspender/reativar técnico
+  /^\/support\/inbox\/[^/]+$/,
+  /^\/vouchers\/[^/]+$/, // editar/apagar voucher
+  /^\/vendor-documents\/[^/]+\/(approve|decline)$/, // rever documento KYC
+  /^\/vendor-payments\/[^/]+\/pay$/, // pagar vendor
+  /^\/customers\/[^/]+\/(block|restore)$/, // bloquear/reativar cliente
+  /^\/customers\/[^/]+\/payment-methods$/, // listar métodos de pagamento
+  /^\/customers\/[^/]+\/payment-methods\/[^/]+$/, // apagar método de pagamento
+  /^\/technicians\/[^/]+\/(suspend|restore)$/, // suspender/reativar técnico
   /*
     Validar o subutilizador da AT e criar o workspace de faturação.
 
@@ -572,14 +595,20 @@ export function isLiveEndpoint(endpoint: string): boolean {
     demonstração, que lança "precisa da API de admin do Laravel configurada".
     A mensagem culpava a configuração do servidor, que estava certa.
   */
-  if (/^\/technicians\/[^/]+\/(at-validation|invoice-workspace|permanent)$/.test(path)) return true;
-  if (/^\/technicians\/[^/]+\/messages$/.test(path)) return true; // conversa de WhatsApp do técnico
-  if (/^\/services-types\/[^/]+$/.test(path)) return true; // editar tipo de serviço
-  if (/^\/operation-areas\/[^/]+$/.test(path)) return true; // editar categoria
-  if (/^\/allowed-zones\/[^/]+$/.test(path)) return true; // editar zona
-  if (/^\/documents\/[^/]+$/.test(path)) return true; // editar documento
-  if (/^\/marketing\/leads\/[^/]+$/.test(path)) return true; // editar valor/fase de um lead
-  return false;
+  /^\/technicians\/[^/]+\/(at-validation|invoice-workspace|permanent)$/,
+  /^\/technicians\/[^/]+\/messages$/, // conversa de WhatsApp do técnico
+  /^\/services-types\/[^/]+$/, // editar tipo de serviço
+  /^\/operation-areas\/[^/]+$/, // editar categoria
+  /^\/allowed-zones\/[^/]+$/, // editar zona
+  /^\/documents\/[^/]+$/, // editar documento
+  /^\/marketing\/leads\/[^/]+$/, // editar valor/fase de um lead
+];
+
+export function isLiveEndpoint(endpoint: string): boolean {
+  const path = endpoint.split("?")[0];
+  if (LIVE_DENY.has(path)) return false;
+  if (LIVE_EXACT.has(path)) return true;
+  return LIVE_PATTERNS.some((r) => r.test(path));
 }
 
 async function request<T>(endpoint: string, options: RequestOptions<T>): Promise<ApiResponse<T>> {

@@ -27,9 +27,14 @@ const STATUS_GROUPS: { id: string; label: string; statuses?: ServiceStatus[] }[]
   { id: "todos", label: "Todos" },
   { id: "pendentes", label: "Pendentes", statuses: ["pedido_recebido", "a_procurar_tecnico", "a_aguardar_orcamento", "orcamento_enviado", "a_aguardar_pagamento"] },
   { id: "agendamentos", label: "Agendamentos", statuses: ["pago", "agendado", "tecnico_encontrado"] },
-  { id: "curso", label: "Em curso", statuses: ["em_execucao"] },
+  // "Em curso" esteve sempre vazio: dependia só de `em_execucao`, que o Laravel
+  // nunca produzia. Passa a ter o técnico em casa e o trabalho por confirmar.
+  { id: "curso", label: "Em curso", statuses: ["em_execucao", "a_aguardar_confirmacao"] },
   { id: "concluidos", label: "Concluídos", statuses: ["concluido"] },
-  { id: "cancelados", label: "Cancelados", statuses: ["cancelado_cliente", "cancelado_tecnico", "reembolsado"] },
+  // Trabalho feito e dinheiro por entrar: separado de propósito, porque é uma
+  // lista de coisas a resolver e não um estado para ler.
+  { id: "captura", label: "Pagamento por capturar", statuses: ["pagamento_por_capturar"] },
+  { id: "cancelados", label: "Cancelados", statuses: ["cancelado_cliente", "cancelado_tecnico", "reembolsado", "arquivado"] },
   { id: "recusados", label: "Recusados / Sem técnico", statuses: ["sem_tecnico_disponivel", "em_reclamacao"] },
 ];
 

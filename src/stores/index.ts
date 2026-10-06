@@ -76,14 +76,30 @@ export const useFilterStore = create<FilterState>()(
       },
       loadView: (viewId) => {
         const view = get().savedViews.find((v) => v.id === viewId);
-        if (view) set({ filters: view.filters });
+        // Uma vista guardada antes de 6/10/2026 pode trazer o texto da antiga
+        // caixa "Pesquisa global": sem a caixa, seria um filtro invisível.
+        if (view) set({ filters: { ...view.filters, search: undefined } });
       },
       deleteView: (viewId) =>
         set((s) => ({ savedViews: s.savedViews.filter((v) => v.id !== viewId) })),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
     }),
-    { name: "piquet-filters" }
+    {
+      name: "piquet-filters",
+      /*
+        Versão 1 (6/10/2026): a caixa "Pesquisa global" saiu da barra de topo,
+        e com ela a única forma de ver e apagar `filters.search`. Um texto que
+        lá tivesse ficado escrito continuava guardado no browser, a contar como
+        filtro ativo e a filtrar sem que ninguém o visse. Apaga-se ao carregar.
+      */
+      version: 1,
+      migrate: (guardado) => {
+        const s = guardado as { filters?: { search?: string } };
+        if (s?.filters) delete s.filters.search;
+        return s as never;
+      },
+    }
   )
 );
 
