@@ -165,7 +165,7 @@ function Resumo({ service }: { service: ServiceRequest }) {
       <Row label="Valor total" value={formatCurrency(service.totalCustomerValue)} />
       <Row label="Valor técnico" value={formatCurrency(service.technicianValue)} />
       <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
-      <Row label="IVA" value={formatCurrency(service.vatValue)} />
+      {service.vatValue != null && <Row label="IVA" value={formatCurrency(service.vatValue)} />}
     </div>
   );
 }
@@ -300,7 +300,7 @@ function Pagamento({ service }: { service: ServiceRequest }) {
     <div className="space-y-1">
       <Row label="Estado do pagamento" value={<StatusBadge status={service.paymentStatus} />} />
       <Row label="Valor cobrado" value={formatCurrency(service.totalCustomerValue)} />
-      <Row label="IVA" value={formatCurrency(service.vatValue)} />
+      {service.vatValue != null && <Row label="IVA" value={formatCurrency(service.vatValue)} />}
       <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
       <Row label="A pagar ao técnico" value={formatCurrency(service.technicianValue)} />
     </div>
@@ -310,7 +310,9 @@ function Pagamento({ service }: { service: ServiceRequest }) {
 function Faturas({ service }: { service: ServiceRequest }) {
   return (
     <div className="space-y-1">
-      <Row label="Estado da fatura" value={<StatusBadge status={service.invoiceStatus} />} />
+      {/* O Laravel ainda não envia o estado da fatura: sem ele não há linha, em
+          vez de um "Não emitida" que ninguém afirmou. */}
+      {service.invoiceStatus && <Row label="Estado da fatura" value={<StatusBadge status={service.invoiceStatus} />} />}
       <Row label="Data do pedido" value={formatDate(service.requestedAt)} />
       <Row label="Total" value={formatCurrency(service.totalCustomerValue)} />
       {/*

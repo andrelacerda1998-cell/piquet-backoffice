@@ -121,6 +121,8 @@ const STATUS_TONE: Record<string, StatusTone> = {
   pago: "success", agendado: "info", em_execucao: "active", concluido: "success",
   cancelado_cliente: "danger", cancelado_tecnico: "danger", sem_tecnico_disponivel: "warning",
   reembolsado: "warning", em_reclamacao: "warning",
+  // Trabalho feito e dinheiro por entrar: é a cor de quem tem de agir.
+  a_aguardar_confirmacao: "active", pagamento_por_capturar: "danger", arquivado: "neutral",
   /*
     Pedidos. "À procura de técnico" é amarelo porque está parado à espera de
     alguém responder; "Com técnico" é azul (a andar, ainda não fechado) e só

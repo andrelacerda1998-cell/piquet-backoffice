@@ -63,7 +63,12 @@ export type ServiceStatus =
   | "cancelado_tecnico"
   | "sem_tecnico_disponivel"
   | "reembolsado"
-  | "em_reclamacao";
+  | "em_reclamacao"
+  /* Três estados que o Laravel produz e que o backoffice não tinha onde pôr --
+     caíam em "pedido_recebido". Ver LARAVEL_STATUS_MAP. */
+  | "a_aguardar_confirmacao"
+  | "pagamento_por_capturar"
+  | "arquivado";
 
 export type PaymentStatus = "pendente" | "pago" | "parcial" | "reembolsado" | "falhado";
 export type InvoiceStatus = "nao_emitida" | "emitida" | "com_erro" | "anulada";
@@ -88,9 +93,14 @@ export interface ServiceRequest {
   totalCustomerValue: number;
   technicianValue: number;
   piquetRevenue: number;
-  vatValue: number;
+  /*
+    Opcionais desde 6/10/2026: o Laravel não envia nenhum dos dois, e o mapa
+    preenchia "não emitida" e 0 € -- duas afirmações que ninguém fez. Sem
+    valor, o detalhe do serviço não mostra a linha.
+  */
+  vatValue?: number;
   paymentStatus: PaymentStatus;
-  invoiceStatus: InvoiceStatus;
+  invoiceStatus?: InvoiceStatus;
   rating?: number;
   hasComplaint: boolean;
   cancellationReason?: string;

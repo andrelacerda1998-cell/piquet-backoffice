@@ -84,29 +84,30 @@ export function Topbar() {
 
         <span className="sm:hidden flex-1 truncate font-semibold text-text-primary">{nomeDoEcra}</span>
 
-        <div className="flex-1 max-w-md relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-          <input
-            type="search"
-            placeholder="Pesquisa global..."
-            value={filters.search ?? ""}
-            onChange={(e) => setFilter("search", e.target.value || undefined)}
-            className="input-field pl-9 text-sm"
-            aria-label="Pesquisa global"
-          />
-        </div>
+        {/*
+          A PESQUISA GLOBAL É O ⌘K, e esta caixa passa a abri-lo.
+
+          Era um <input> chamado "Pesquisa global" que afinal escrevia num
+          filtro da lista aberta -- e nem isso em produção, porque Serviços e
+          Configurações usam a sua própria pesquisa. Quem escrevia um telefone
+          aqui não encontrava nada e concluía que o cliente não existia. A
+          pesquisa que procura de facto clientes, técnicos e serviços no
+          Laravel estava ao lado, num botão com um K. Ficou uma só.
+        */}
+        <button
+          type="button"
+          onClick={() => setCommandOpen(true)}
+          className="flex-1 max-w-md hidden sm:flex items-center gap-2 input-field text-sm text-text-muted text-left hover:bg-surface-muted transition-colors"
+          aria-label="Pesquisar clientes, técnicos, serviços e tickets"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate">Pesquisar clientes, técnicos, serviços…</span>
+          <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-surface-border px-1.5 py-0.5 font-sans text-[11px] text-text-secondary">
+            <Command className="h-3 w-3" />K
+          </kbd>
+        </button>
 
         <div className="flex items-center gap-2 ml-auto">
-          {/* Command palette */}
-          <button
-            onClick={() => setCommandOpen(true)}
-            className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-surface-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:bg-surface-muted transition-colors"
-            aria-label="Abrir comandos"
-            title="Comandos (⌘K)"
-          >
-            <Command className="h-3.5 w-3.5" />
-            <kbd className="font-sans">K</kbd>
-          </button>
 
           {/* Período e filtros — só nos ecrãs que os aplicam (ver ECRAS_COM_FILTROS). */}
           {filtrosValem && (<>

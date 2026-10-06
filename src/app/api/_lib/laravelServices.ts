@@ -75,6 +75,7 @@ const DASHBOARD_STATUSES = new Set<ServiceStatus>([
   "orcamento_enviado", "a_aguardar_pagamento", "pago", "agendado", "em_execucao",
   "concluido", "cancelado_cliente", "cancelado_tecnico", "sem_tecnico_disponivel",
   "reembolsado", "em_reclamacao",
+  "a_aguardar_confirmacao", "pagamento_por_capturar", "arquivado",
 ]);
 
 /*
@@ -89,18 +90,58 @@ const DASHBOARD_STATUSES = new Set<ServiceStatus>([
     olha; a autenticação do cartão é detalhe do meio de pagamento, não um estado
     do serviço.
 */
+/*
+  OS 19 ESTADOS DO LARAVEL, todos. Ver app/Enums/Services/ServiceStatus.php.
+
+  Faltavam oito, e caíam todos no `pedido_recebido` do fim de `mapStatus`: um
+  técnico já em casa do cliente (`Arrived`) aparecia como pedido novo, um
+  serviço marcado (`Scheduled`) não aparecia em Agendamentos, e as perdas no
+  pagamento (MB WAY e 3DS) pareciam pedidos à espera de alguém.
+
+  Dois dos que lá estavam estavam no sítio errado:
+
+  - `Finished` contava como concluído. Quer dizer que o TÉCNICO diz que acabou;
+    o cliente ainda não confirmou e o pagamento ainda não foi capturado. Contá-lo
+    como concluído punha no GMV dinheiro que pode não entrar.
+  - `ClosedPendingPayment` aparecia como "a aguardar pagamento", no meio dos
+    pedidos novos. Quer dizer o contrário: o trabalho está FEITO e a captura
+    falhou. É dinheiro de trabalho entregue por cobrar, e tem de se ver.
+*/
 const LARAVEL_STATUS_MAP: Record<string, ServiceStatus> = {
   Pending: "pedido_recebido",
+  // Pedido personalizado à espera de o backoffice definir tempo e categorias.
+  PendingReview: "a_aguardar_orcamento",
   Matching: "a_procurar_tecnico",
   MatchingFailed: "sem_tecnico_disponivel",
   Accepted: "tecnico_encontrado",
   AwaitingPayment: "a_aguardar_pagamento",
   Pending3DS: "a_aguardar_pagamento",
-  ClosedPendingPayment: "a_aguardar_pagamento",
+  Scheduled: "agendado",
+  Arrived: "em_execucao",
+  Finished: "a_aguardar_confirmacao",
+  ClosedPendingPayment: "pagamento_por_capturar",
   Closed: "concluido",
-  Finished: "concluido",
+  // O Laravel não regista quem cancelou: "cliente" é a leitura mais comum, não
+  // um facto. Quem cancelou e porquê é a tabela `service_events` da auditoria.
   Canceled: "cancelado_cliente",
   Refused: "cancelado_tecnico",
+  /*
+    As quatro maneiras de o pagamento do cliente não chegar a acontecer: recusou
+    o MB WAY, não o confirmou a tempo, cancelou no ecrã de espera, ou não fez o
+    3DS. Terminais e sem dinheiro cobrado. Ficam como canceladas pelo cliente
+    porque não há estado melhor no backoffice; são o funil do checkout, e um
+    dia merecem um estado próprio.
+  */
+  RefusedMbway: "cancelado_cliente",
+  ExpiredMbway: "cancelado_cliente",
+  CanceledMbway: "cancelado_cliente",
+  Expired3DS: "cancelado_cliente",
+  /*
+    NÃO é concluído. O único sítio que arquiva é a ação do Filament, e só a
+    permite a partir de Pending, Pending3DS e Scheduled -- pedidos que nunca
+    foram executados. Arquivar é tirar da frente um pedido que morreu.
+  */
+  Archived: "arquivado",
 };
 
 function mapStatus(raw: string | null | undefined): ServiceStatus {
@@ -150,9 +191,10 @@ export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
     technicianValue: techValue,
     // Se o Laravel não mandar a comissão, deriva-se (total − técnico).
     piquetRevenue: r.piquet_revenue != null ? num(r.piquet_revenue) : Math.max(0, total - techValue),
-    vatValue: num(r.vat_value),
+    vatValue: r.vat_value != null ? num(r.vat_value) : undefined,
     paymentStatus: (PAYMENT_STATUSES.has(payment) ? payment : "pendente") as PaymentStatus,
-    invoiceStatus: (INVOICE_STATUSES.has(invoice) ? invoice : "nao_emitida") as InvoiceStatus,
+    // Sem fatura enviada é "não se sabe", e não "não emitida".
+    invoiceStatus: INVOICE_STATUSES.has(invoice) ? (invoice as InvoiceStatus) : undefined,
     rating: r.rating ?? undefined,
     hasComplaint: !!r.has_complaint,
     cancellationReason: r.cancellation_reason ?? undefined,

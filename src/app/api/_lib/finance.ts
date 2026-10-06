@@ -96,7 +96,10 @@ export async function servicosConcluidos(f: FinanceFilters): Promise<ServicoConc
         piquet_revenue: Number(s.piquetRevenue) || 0,
         total_customer_value: Number(s.totalCustomerValue) || 0,
         technician_value: Number(s.technicianValue) || 0,
-        invoice_status: String(s.invoiceStatus ?? ""),
+        // O comportamento de sempre: o mapa preenchia "nao_emitida" quando o
+        // Laravel não mandava estado. Deixou de o inventar; o Financeiro
+        // continua a ler o mesmo que lia.
+        invoice_status: String(s.invoiceStatus ?? "nao_emitida"),
         payment_status: String(s.paymentStatus ?? ""),
         service_name: s.serviceName ?? "",
         vat_value: Number(s.vatValue) || 0,

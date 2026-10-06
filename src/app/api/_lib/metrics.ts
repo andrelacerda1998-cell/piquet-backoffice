@@ -1,4 +1,5 @@
 import "server-only";
+import { ESTADOS_AGENDADOS } from "@/lib/contagemServicos";
 import { inicioDoMesLisboa, inicioDoAnoLisboa } from "@/lib/periodo";
 import { fetchAll } from "@/lib/fetchAll";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -228,7 +229,6 @@ export function projectEndOfPeriod(current: number, period: MetricPeriod, now = 
  * execução; um serviço já concluído deixa de contar como agendado, senão o
  * mesmo serviço aparecia nas duas contas.
  */
-const ESTADOS_AGENDADOS = ["pago", "agendado", "tecnico_encontrado", "em_execucao"];
 
 export async function serviceCountsForPeriod(
   startIso: string,
@@ -239,7 +239,7 @@ export async function serviceCountsForPeriod(
     admin.from("services").select("id", { count: "exact", head: true })
       .eq("status", "concluido").gte("completed_at", startIso).lt("completed_at", endIso),
     admin.from("services").select("id", { count: "exact", head: true })
-      .in("status", ESTADOS_AGENDADOS).gte("scheduled_at", startIso).lt("scheduled_at", endIso),
+      .in("status", [...ESTADOS_AGENDADOS]).gte("scheduled_at", startIso).lt("scheduled_at", endIso),
   ]);
   if (exec.error) throw new Error(exec.error.message);
   if (agend.error) throw new Error(agend.error.message);
