@@ -151,6 +151,11 @@ const LARAVEL_STATUS_MAP: Record<string, ServiceStatus> = {
   Archived: "arquivado",
 };
 
+/** O estado do Laravel no vocabulário do backoffice. */
+export function estadoDoBackoffice(raw: string | null | undefined): ServiceStatus {
+  return mapStatus(raw);
+}
+
 function mapStatus(raw: string | null | undefined): ServiceStatus {
   const s = str(raw).trim();
   if (DASHBOARD_STATUSES.has(s as ServiceStatus)) return s as ServiceStatus;
