@@ -22,3 +22,18 @@ describe("fichaHref — o ⌘K leva à ficha, não à lista", () => {
     expect(new URL(href, "http://x").searchParams.get("q")).toBe("Silva & Filhos");
   });
 });
+
+import { resultadosVisiveis } from "./search";
+
+describe("resultadosVisiveis — a pesquisa mostra o que o perfil pode ver", () => {
+  const todos = (["service", "customer", "technician", "invoice", "lead", "ticket"] as const).map((type) => ({ type }));
+
+  it("marketing vê clientes e leads, não faturas nem tickets", () => {
+    expect(resultadosVisiveis("marketing", todos).map((r) => r.type)).toEqual(["customer", "lead"]);
+  });
+
+  it("o CEO vê tudo; um perfil desconhecido não vê nada", () => {
+    expect(resultadosVisiveis("ceo", todos)).toHaveLength(6);
+    expect(resultadosVisiveis("estagiario", todos)).toEqual([]);
+  });
+});

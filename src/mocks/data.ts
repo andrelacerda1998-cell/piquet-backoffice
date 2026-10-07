@@ -11,7 +11,8 @@ const rand = seededRandom(42);
 
 // Margem da Piquet: 25% fixos em TODOS os tipos de serviço (comissão sobre o
 // valor do serviço). O técnico recebe os restantes 75% (TECH_SHARE).
-export const PIQUET_COMMISSION = 0.25;
+import { COMISSAO_PIQUET } from "@/lib/comissao";
+export const PIQUET_COMMISSION = COMISSAO_PIQUET;
 const TECH_SHARE = 1 - PIQUET_COMMISSION;
 
 function pick<T>(arr: readonly T[] | T[]): T {

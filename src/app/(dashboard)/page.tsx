@@ -13,6 +13,9 @@ import { getServiceCounts } from "@/services/dashboardService";
 import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
+import { useAuthStore } from "@/stores";
+import { hasAnyPermission } from "@/lib/permissions";
+import type { Permission } from "@/types";
 import type { MetricValue } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -149,14 +152,17 @@ export default function OverviewPage() {
   const { data: svcCounts } = useAsyncData(() => getServiceCounts(), []);
   const { data: growth } = useAsyncData(() => getAppGrowth(), []);
   const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
-  const { data: leads } = useAsyncData(() => getLeads(), []);
-  const { data: pendingDocs } = useAsyncData(() => getVendorDocuments("pending", 1, 1), []);
+  // Leads e documentos só para quem os pode ver (a API recusa o resto).
+  const role = useAuthStore((s) => s.user?.role);
+  const pode = (...p: Permission[]) => !!role && hasAnyPermission(role, p);
+  const { data: leads } = useAsyncData(() => (pode("view_marketing", "view_customers") ? getLeads() : Promise.resolve([])), [role]);
+  const { data: pendingDocs } = useAsyncData(() => (pode("view_technicians") ? getVendorDocuments("pending", 1, 1) : Promise.resolve(null)), [role]);
   const [tab, setTab] = useTabParam("resumo");
 
   if (loading && !gmvData) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
-  // GMV e comissão reais (Payshop cobrado + serviços concluídos).
+  // GMV e comissão: o cobrado no Payshop (ver api/_lib/gmv.ts).
   const gmvMonth = gmvData?.month.gmv ?? 0;
   const gmvPrevMonth = gmvData?.prevMonth.gmv ?? 0;
   const commissionMonth = gmvData?.month.commission ?? 0;

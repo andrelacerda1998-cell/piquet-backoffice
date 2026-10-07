@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
+import { podeChamar } from "@/lib/acessoApi";
 
 /**
  * Utilitários das Route Handlers.
@@ -67,9 +68,10 @@ export async function getStaff(req: Request): Promise<StaffContext | null> {
 }
 
 /**
- * Envolve um handler exigindo staff autenticado. Responde:
+ * Envolve um handler exigindo staff autenticado E com permissão. Responde:
  * - 503 se o Supabase não estiver configurado (ainda sem chaves),
- * - 401 se não houver sessão de staff válida.
+ * - 401 se não houver sessão de staff válida,
+ * - 403 se o perfil não puder chamar esta rota (ver src/lib/acessoApi.ts).
  */
 export function withStaff(
   handler: (req: Request, ctx: { staff: StaffContext; params: Record<string, string> }) => Promise<Response>
@@ -78,6 +80,11 @@ export function withStaff(
     if (!SUPABASE_ENABLED) return apiErr("Backend Supabase não configurado.", 503);
     const staff = await getStaff(req);
     if (!staff) return apiErr("Não autenticado.", 401);
+    // A permissão decide-se pelo método e pelo caminho do pedido, numa tabela
+    // só, em vez de em cada uma das 139 rotas.
+    if (!podeChamar(staff.role, req.method, new URL(req.url).pathname)) {
+      return apiErr("Sem permissão para esta ação.", 403);
+    }
     const params = route?.params ? await route.params : {};
     try {
       return await handler(req, { staff, params });

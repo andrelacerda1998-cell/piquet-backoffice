@@ -470,8 +470,8 @@ export default function FinancePage() {
           {/* ---------------------------------- RESUMO ---------------------------------- */}
           {tab === "resumo" && (
             <div className="space-y-6">
-              {/* GMV real (Payshop + serviços concluídos) — reflete de imediato
-                  um serviço registado em Operações. */}
+              {/* GMV: o cobrado no Payshop (ver api/_lib/gmv.ts) — o mesmo da
+                  Visão Geral e de todo o Financeiro. */}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -544,10 +544,17 @@ export default function FinancePage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
                   <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                    <MetricCard title="Valor total serviços" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
-                    <MetricCard title="Receita Piquet" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
+                    {/* Do GMV do período (Payshop), como os cartões de cima. Eram a
+                        soma dos serviços concluídos do Laravel: outro total. */}
+                    <MetricCard title="GMV do período" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
+                    <MetricCard title="Comissão Piquet do período" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
                     <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
                   </div>
+                  {summary.gmvIgnoraFiltros && (
+                    <p className="mt-2 text-xs text-text-secondary">
+                      O GMV e a comissão são do período inteiro: o Payshop não sabe a categoria nem a cidade de um pagamento.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -856,7 +856,7 @@ function LeadsPageInner() {
         title="Editar pedido"
         subtitle={
           editForm.stage === "concluido"
-            ? "Ao guardar como “Concluído”, cria-se o serviço em Operações (conta no GMV, Técnicos e Clientes)."
+            ? "Ao guardar como “Concluído”, o pedido fica registado como serviço feito fora da app. Não entra no GMV, que é só o que o Payshop cobrou."
             : "Atualiza os dados e o estado do pedido."
         }
         size="lg"

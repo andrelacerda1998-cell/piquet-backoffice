@@ -206,7 +206,7 @@ const LIVE_EXACT = new Set<string>([
   "/tax/vat",
   // Pagamentos da app (Payshop Online Payments / Paylands)
   "/finance/app-payments",
-  // GMV real (Payshop cobrado + serviços concluídos)
+  // GMV: o cobrado no Payshop (ver api/_lib/gmv.ts)
   "/finance/gmv",
   // Unit economics (LTV/CAC) — vai ao backend; 0 + selo até haver clientes reais
   "/finance/unit-economics",

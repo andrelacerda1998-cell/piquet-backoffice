@@ -253,7 +253,7 @@ export default function ReportsPage() {
           title: "Financeiro — receita",
           headers: ["Indicador", "Período", "Valor (€)"],
           rows: [
-            ["GMV (Payshop + serviços concluídos)", "mês", eur(gmv.month.gmv)],
+            ["GMV (cobrado no Payshop)", "mês", eur(gmv.month.gmv)],
             ["Comissão da Piquet", "mês", eur(gmv.month.commission)],
             ["GMV acumulado", "ano", eur(gmv.year.gmv)],
             ["Comissão acumulada", "ano", eur(gmv.year.commission)],
@@ -441,7 +441,7 @@ export default function ReportsPage() {
             </ReportSection>
 
             <ReportSection title="Financeiro" subtitle="Receita da Piquet e compromissos" icon={Wallet} accent="bg-success-light text-success">
-              <Stat label="GMV do mês" value={formatCurrency(s.financeiro.gmv)} hint="Payshop + serviços" />
+              <Stat label="GMV do mês" value={formatCurrency(s.financeiro.gmv)} hint="cobrado no Payshop" />
               <Stat label="Comissão Piquet" value={formatCurrency(s.financeiro.comissao)} tone="good" />
               <Stat label="Faturas por pagar" value={formatCurrency(s.financeiro.porPagar)} tone={s.financeiro.porPagar > 0 ? "bad" : undefined} />
               <Stat label="A pagar a técnicos" value={formatCurrency(s.financeiro.aTecnicos)} hint="saldo em aberto" />

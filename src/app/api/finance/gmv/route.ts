@@ -1,32 +1,29 @@
 import { apiOk, withStaff } from "../../_lib/handler";
-import { gmvForPeriod } from "../../_lib/metrics";
+import { gmvDe, lerPagamentos } from "../../_lib/gmv";
+import { inicioDoAnoLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa } from "@/lib/periodo";
 
 /**
- * GET /api/finance/gmv — GMV e comissão REAIS do negócio (Payshop cobrado +
- * serviços concluídos registados), do mês e do ano, com o período homólogo
- * anterior para comparação. É a fonte única do GMV na Visão Geral e no
- * Financeiro — registar um serviço concluído reflete-se aqui de imediato.
+ * GET /api/finance/gmv — GMV e comissão do mês e do ano, com o período
+ * anterior para comparação. O GMV é o cobrado no Payshop (ver _lib/gmv.ts).
+ *
+ * Meses e anos de Lisboa, como o resto do Financeiro. Eram de UTC: um
+ * pagamento das 00:30 de dia 1 (hora de Lisboa) caía no mês anterior.
  */
 export const GET = withStaff(async () => {
-  const now = new Date();
-  const y = now.getUTCFullYear(), m = now.getUTCMonth();
-  const iso = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 1)).toISOString();
+  const agora = new Date();
+  const pagamentos = await lerPagamentos();
 
-  const monthStart = iso(y, m);
-  const nextMonth = iso(y, m + 1);
-  const prevMonthStart = iso(y, m - 1);
-  const yearStart = iso(y, 0);
-  const nextYear = iso(y + 1, 0);
-  const prevYearStart = iso(y - 1, 0);
-  // Homólogo do ano: mesmo período (1 jan → hoje) do ano passado.
-  const prevYearSameEnd = new Date(Date.UTC(y - 1, m, now.getUTCDate())).toISOString();
+  const inicioMes = inicioDoMesLisboa(agora);
+  const inicioMesAnterior = inicioDoMesLisboa(new Date(inicioMes.getTime() - 1));
+  const inicioAno = inicioDoAnoLisboa(agora);
+  // Homólogo: de 1 de janeiro do ano passado até este mesmo dia, há um ano.
+  const haUmAno = new Date(agora);
+  haUmAno.setFullYear(agora.getFullYear() - 1);
 
-  const [month, prevMonth, prevYearSame, year] = await Promise.all([
-    gmvForPeriod(monthStart, nextMonth),
-    gmvForPeriod(prevMonthStart, monthStart),
-    gmvForPeriod(prevYearStart, prevYearSameEnd),
-    gmvForPeriod(yearStart, nextYear),
-  ]);
-
-  return apiOk({ month, prevMonth, prevYearSame, year });
+  return apiOk({
+    month: gmvDe(pagamentos, inicioMes, inicioDoMesSeguinteLisboa(agora)),
+    prevMonth: gmvDe(pagamentos, inicioMesAnterior, inicioMes),
+    year: gmvDe(pagamentos, inicioAno),
+    prevYearSame: gmvDe(pagamentos, inicioDoAnoLisboa(haUmAno), haUmAno),
+  });
 });

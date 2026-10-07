@@ -3,19 +3,19 @@ import { custosFixosMensais } from "@/lib/custosFixos";
 import { rowToEmployee, type EmployeeRow } from "@/lib/supabase/adapters";
 import { computeEmployeeCost } from "@/services/employeesService";
 import { apiOk, withStaff } from "../../_lib/handler";
-import { servicosConcluidos } from "../../_lib/finance";
+import { gmvPorMes, lerPagamentos } from "../../_lib/gmv";
 
 /**
  * GET /api/finance/operational-result — resultado operacional por mês
- * (receita Piquet do mês − opex de equipa − custos fixos). Derivação real,
- * substitui o mock sintético (usa a nova tabela `employees`).
+ * (receita Piquet do mês − opex de equipa − custos fixos). A receita é a
+ * comissão do GMV do mês (ver _lib/gmv.ts), a mesma do resto do Financeiro.
  */
 export const GET = withStaff(async () => {
   const admin = supabaseAdmin();
   // Paginado: o PostgREST corta em 1000 linhas, e sem `.order()` as que
   // sobravam eram arbitrárias — o gráfico perdia meses inteiros sem avisar.
-  const [servicos, empRes, custosRes] = await Promise.all([
-    servicosConcluidos({ period: null }),
+  const [pagamentos, empRes, custosRes] = await Promise.all([
+    lerPagamentos(),
     admin.from("employees").select("*"),
     admin.from("company_invoices").select("amount, issue_date"),
   ]);
@@ -31,14 +31,7 @@ export const GET = withStaff(async () => {
   );
   const fixedOpex = monthlyTeamCost + custos.mediaMensal;
 
-  const byMonth: Record<string, number> = {};
-  for (const s of servicos) {
-    const m = (s.completed_at ?? s.requested_at).slice(0, 7);
-    byMonth[m] = (byMonth[m] ?? 0) + Number(s.piquet_revenue);
-  }
   return apiOk(
-    Object.entries(byMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, revenue]) => ({ name, value: Math.round(revenue - fixedOpex) }))
+    gmvPorMes(pagamentos).map((m) => ({ name: m.mes, value: Math.round(m.commission - fixedOpex) })),
   );
 });

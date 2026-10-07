@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check, LifeBuoy, Info, MessageSquare, ListChecks, Calendar, Megaphone } from "lucide-react";
-import { useNotificationStore, toast } from "@/stores";
+import { useNotificationStore, useAuthStore, toast } from "@/stores";
+import { hasAnyPermission } from "@/lib/permissions";
+import type { Permission } from "@/types";
 import { getInboxTickets, CHANNEL_LABEL } from "@/services/supportInboxService";
 import { getCustomRequests, getLeads } from "@/services/extrasService";
 import { useLiveNotifications } from "@/hooks/useLiveNotifications";
@@ -54,8 +56,14 @@ export function NotificationBell() {
   useEffect(() => {
     let alive = true;
     const poll = async () => {
+      /*
+        Só se pede o que o perfil pode ver: desde 07/10 a API recusa o resto
+        com 403, e o primeiro pedido recusado parava este ciclo inteiro.
+      */
+      const role = useAuthStore.getState().user?.role;
+      const pode = (...p: Permission[]) => !!role && hasAnyPermission(role, p);
       try {
-        const { tickets } = await getInboxTickets();
+        const { tickets } = pode("view_support") ? await getInboxTickets() : { tickets: [] };
         if (!alive) return;
         const novos = tickets.filter((t) => t.status === "novo").slice(0, 8);
         const known = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
@@ -73,7 +81,7 @@ export function NotificationBell() {
         }
 
         // Pedidos personalizados novos (à espera de estimativa + escolha de técnicos).
-        const reqs = await getCustomRequests();
+        const reqs = pode("view_services") ? await getCustomRequests() : [];
         if (!alive) return;
         const novosReq = reqs.filter((r) => r.status === "novo");
         const knownReq = new Set(useNotificationStore.getState().notifications.map((n) => n.dedupeKey ?? n.ticketId));
@@ -91,7 +99,7 @@ export function NotificationBell() {
 
         // Leads novas do formulário da landing (piquetapp.com) — só as ainda
         // "não iniciado" e recentes (7 dias), para não ressuscitar histórico.
-        const leads = await getLeads();
+        const leads = pode("view_marketing", "view_customers") ? await getLeads() : [];
         if (!alive) return;
         const weekAgo = Date.now() - 7 * 864e5;
         const novasLeads = leads

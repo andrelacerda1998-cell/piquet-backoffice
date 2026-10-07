@@ -1,19 +1,20 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { inicioDoMesLisboa, partesLisboa } from "@/lib/periodo";
+import { COMISSAO_PIQUET } from "@/lib/comissao";
 import { apiOk, withStaff } from "../../_lib/handler";
-import { servicosConcluidos } from "../../_lib/finance";
+import { cobrados, lerPagamentos } from "../../_lib/gmv";
 import { calcularUnitEconomics } from "../../_lib/unitEconomics";
 
 /**
- * GET /api/finance/unit-economics — LTV, CAC e serviços por cliente.
+ * GET /api/finance/unit-economics — LTV, CAC e compras por cliente.
  *
  *   - CAC = investimento em anúncios (mês) ÷ clientes cuja PRIMEIRA compra foi
  *     este mês
- *   - Serviços/cliente = serviços do mês ÷ clientes servidos no mês
- *   - LTV = comissão da Piquet de todo o histórico ÷ clientes
+ *   - Compras/cliente = compras do mês ÷ clientes que compraram no mês
+ *   - LTV = comissão de todo o histórico ÷ clientes
  *
- * O cliente é o `customer_id` do Laravel (ver _lib/unitEconomics.ts). O mês é
- * o de Lisboa, como no resto do Financeiro.
+ * Tudo sobre os pagamentos que formam o GMV (ver _lib/gmv.ts e
+ * _lib/unitEconomics.ts). O mês é o de Lisboa.
  */
 export const GET = withStaff(async () => {
   const agora = new Date();
@@ -21,11 +22,15 @@ export const GET = withStaff(async () => {
   const { ano, mes0 } = partesLisboa(agora);
   const primeiroDia = `${ano}-${String(mes0 + 1).padStart(2, "0")}-01`;
 
-  const [services, adRes] = await Promise.all([
-    servicosConcluidos({ period: null }),
+  const [pagamentos, adRes] = await Promise.all([
+    lerPagamentos(),
     supabaseAdmin().from("ad_metrics").select("spend").gte("date", primeiroDia),
   ]);
   const adSpendMonth = (adRes.data ?? []).reduce((s, r) => s + (Number((r as { spend: number }).spend) || 0), 0);
 
-  return apiOk(calcularUnitEconomics(services, adSpendMonth, inicio.toISOString()));
+  const compras = cobrados(pagamentos)
+    .filter((p) => p.quando)
+    .map((p) => ({ id: p.id, cliente: p.cliente, quando: p.quando!, comissao: (p.valorCents / 100) * COMISSAO_PIQUET }));
+
+  return apiOk(calcularUnitEconomics(compras, adSpendMonth, inicio.toISOString()));
 });
