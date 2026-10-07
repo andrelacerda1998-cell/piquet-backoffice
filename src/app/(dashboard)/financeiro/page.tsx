@@ -10,11 +10,11 @@ import { useTabParam } from "@/hooks/useTabParam";
 import ImpostosRhPage from "../impostos-rh/page";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ChartCard, BarChartComponent, AreaChartComponent, CashFlowChart, DonutChartComponent } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent, AreaChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
 import {
-  getFinanceSummary, getRevenueVsCosts, getCashFlowForecast,
+  getFinanceSummary, getRevenueVsCosts,
   getOperationalResult,
   getAppPayments, getFinanceGmv,
   getCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, deleteCompanyInvoice,
@@ -85,12 +85,10 @@ function walletTypeLabel(type: string): string {
 
 export default function FinancePage() {
   const filters = useFilters();
-  const [cashFlowScenario, setCashFlowScenario] = useState<"conservador" | "base" | "otimista">("base");
   const [tab, setTab] = useTabParam("resumo");
 
   const { data: summary, loading, error, refetch } = useAsyncData(() => getFinanceSummary(filters), [filters]);
   const { data: revenueVsCosts } = useAsyncData(() => getRevenueVsCosts(filters), [filters]);
-  const { data: cashFlow } = useAsyncData(() => getCashFlowForecast(cashFlowScenario), [cashFlowScenario]);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
   const { data: appPay, refetch: refetchAppPay } = useAsyncData(() => getAppPayments(), []);
@@ -631,33 +629,13 @@ export default function FinancePage() {
                     )}
                   </>
                 )}
-                <div className="mt-4">
-                  <ChartCard
-                    title="Previsão de tesouraria — 90 dias"
-                    subtitle="Valores estimados"
-                    action={
-                      <div className="flex gap-1">
-                        {(["conservador", "base", "otimista"] as const).map((s) => (
-                          <button key={s} onClick={() => setCashFlowScenario(s)}
-                            className={`text-xs px-2 py-1 rounded ${cashFlowScenario === s ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary"}`}>
-                            {s.charAt(0).toUpperCase() + s.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    }
-                  >
-                    {cashFlow && (
-                      <>
-                        {cashFlow.negativePeriods.length > 0 && (
-                          <div className="mb-3 p-2 bg-danger-light text-danger text-sm rounded-lg">
-                            ⚠️ Saldo previsto negativo em {cashFlow.negativePeriods.length} período(s)
-                          </div>
-                        )}
-                        <CashFlowChart data={cashFlow.projectedBalance} />
-                      </>
-                    )}
-                  </ChartCard>
-                </div>
+                {/*
+                  Saiu a "Previsão de tesouraria — 90 dias". Partia de um saldo
+                  de 185 000 € escrito no código e somava receita sorteada
+                  (Math.random) todos os dias; em produção não havia rota e o
+                  gráfico ficava a zeros. Uma previsão a sério parte do saldo
+                  registado acima e das faturas por pagar em Custos.
+                */}
               </div>
             </div>
           )}

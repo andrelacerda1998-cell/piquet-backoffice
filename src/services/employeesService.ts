@@ -1,14 +1,11 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
 import { paginateArray, sortArray } from "@/lib/filters";
-import {
-  calculateEmployeeAnnualCost, calculateContractorCost,
-  calculateEstimatedVat, calculateHiringScenarioImpact,
-} from "@/lib/calculations";
+import { calculateEmployeeAnnualCost, calculateContractorCost } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import type {
   Employee, EmployeeCost, TaxObligation, HiringScenario,
-  PaginatedResult, SortParams, BudgetCategory,
+  PaginatedResult, SortParams,
 } from "@/types";
 
 const employeesCache: Employee[] = [...mockData.employees];
@@ -106,14 +103,6 @@ export async function getEmployees(page = 1, pageSize = 20, sort?: SortParams, s
     },
     { page, pageSize, search, sort: sort?.field, dir: sort?.direction }
   ).then((r) => r.data);
-}
-
-export async function getEmployeeById(id: string) {
-  return apiGet(`/employees/${id}`, () => {
-    const emp = employeesCache.find((e) => e.id === id);
-    if (!emp) throw new Error("Colaborador não encontrado");
-    return { ...emp, cost: computeEmployeeCost(emp) };
-  }).then((r) => r.data);
 }
 
 /** Campos do formulário "Adicionar colaborador"; o resto tem defaults PT na tabela. */
@@ -215,40 +204,44 @@ export async function getTeamDashboard() {
   }).then((r) => r.data);
 }
 
-export async function simulateHiring(input: Omit<HiringScenario, "id" | "monthlyCost" | "annualCost" | "firstYearCost" | "impactOnBurnRate" | "impactOnRunway">): Promise<HiringScenario> {
-  return apiGet("/employees/simulate", () => {
-    const calc = calculateEmployeeAnnualCost({
-      grossMonthlySalary: input.grossMonthlySalary,
-      annualSalaryPayments: input.annualSalaryPayments,
-      mealAllowanceMonthly: 6,
-      mealAllowanceMonths: 11,
-      fixedAllowancesMonthly: 0,
-      variableCompensationMonthly: 0,
-      annualBonus: input.annualBonus,
-      employerSocialSecurityRate: input.employerSocialSecurityRate,
-      workersCompensationInsuranceMonthly: input.workersCompensationInsuranceMonthly,
-      healthInsuranceMonthly: input.healthInsuranceMonthly,
-      equipmentAnnualCost: input.equipmentAnnualCost,
-      softwareAnnualCost: input.softwareAnnualCost,
-      trainingAnnualCost: input.trainingAnnualCost,
-      recruitmentCost: input.recruitmentCost,
-      otherMonthlyCosts: input.otherMonthlyCosts,
-      otherAnnualCosts: 0,
-    });
+/**
+ * Quanto custa contratar alguém, calculado aqui mesmo.
+ *
+ * Ia antes a `/employees/simulate`, uma rota que nunca existiu: em produção a
+ * resposta chegava zerada e o simulador dizia que contratar custava 0 €. Saíram
+ * também o "impacto no burn rate" e no "runway", que partiam de uma receita de
+ * 5 000 € e de um saldo de 185 000 € escritos no código.
+ */
+export function simulateHiring(input: Omit<HiringScenario, "id" | "monthlyCost" | "annualCost" | "firstYearCost" | "impactOnBurnRate" | "impactOnRunway">): HiringScenario {
+  const calc = calculateEmployeeAnnualCost({
+    grossMonthlySalary: input.grossMonthlySalary,
+    annualSalaryPayments: input.annualSalaryPayments,
+    mealAllowanceMonthly: input.mealAllowanceMonthly,
+    mealAllowanceMonths: 11,
+    fixedAllowancesMonthly: 0,
+    variableCompensationMonthly: 0,
+    annualBonus: input.annualBonus,
+    employerSocialSecurityRate: input.employerSocialSecurityRate,
+    workersCompensationInsuranceMonthly: input.workersCompensationInsuranceMonthly,
+    healthInsuranceMonthly: input.healthInsuranceMonthly,
+    equipmentAnnualCost: input.equipmentAnnualCost,
+    softwareAnnualCost: input.softwareAnnualCost,
+    trainingAnnualCost: input.trainingAnnualCost,
+    recruitmentCost: input.recruitmentCost,
+    otherMonthlyCosts: input.otherMonthlyCosts,
+    otherAnnualCosts: 0,
+  });
 
-    const teamDashboard = employeesCache.reduce((s, e) => s + computeEmployeeCost(e).averageMonthlyCost, 0);
-    const impact = calculateHiringScenarioImpact(calc.averageEmployeeMonthlyCost, teamDashboard, 5000, 185000);
-
-    return {
-      ...input,
-      id: `scenario_${Date.now()}`,
-      monthlyCost: calc.averageEmployeeMonthlyCost,
-      annualCost: calc.totalEmployeeAnnualCost,
-      firstYearCost: calc.totalEmployeeAnnualCost + input.recruitmentCost,
-      impactOnBurnRate: impact.impactOnBurnRate,
-      impactOnRunway: impact.impactOnRunway ?? 0,
-    };
-  }).then((r) => r.data);
+  return {
+    ...input,
+    id: "simulacao",
+    monthlyCost: calc.averageEmployeeMonthlyCost,
+    annualCost: calc.totalEmployeeAnnualCost,
+    firstYearCost: calc.totalEmployeeAnnualCost + input.recruitmentCost,
+    // Mais uma pessoa aumenta o que sai por mês exatamente no seu custo.
+    impactOnBurnRate: calc.averageEmployeeMonthlyCost,
+    impactOnRunway: 0,
+  };
 }
 
 export async function getTaxObligations(filters?: { status?: string; category?: string }) {
@@ -300,10 +293,6 @@ export async function getTaxSummary() {
     });
     const nextObligation = pending.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
 
-    const ivaLiquidado = 18500;
-    const ivaDedutivel = 8200;
-    const ivaEstimado = calculateEstimatedVat(ivaLiquidado, ivaDedutivel);
-
     return {
       estimatedThisMonth: thisMonthObs.reduce((s, o) => s + o.amountEstimated, 0),
       paidThisMonth: paid.filter((o) => o.paymentDate?.startsWith(thisMonth)).reduce((s, o) => s + (o.amountConfirmed ?? 0), 0),
@@ -311,100 +300,17 @@ export async function getTaxSummary() {
       nextObligation: nextObligation?.name ?? "—",
       nextObligationAmount: nextObligation?.amountEstimated ?? 0,
       nextObligationDue: nextObligation?.dueDate,
-      estimatedVat: ivaEstimado,
-      estimatedSocialSecurity: 12400,
-      estimatedWithholdings: 3200,
       accumulatedYear: obligations.reduce((s, o) => s + (o.amountConfirmed ?? o.amountEstimated), 0),
       overdueCount: overdue.length,
       upcoming7Count: upcoming7.length,
       upcoming30Count: upcoming30.length,
-      ivaLiquidado,
-      ivaDedutivel,
-      ivaEstimado,
-      ivaLabel: ivaEstimado > 0 ? "IVA estimado a pagar" : "IVA estimado a recuperar ou reportar",
     };
-  }).then((r) => r.data);
-}
-
-export async function getBudgetComparison(): Promise<BudgetCategory[]> {
-  return apiGet("/tax/budget", () => {
-    const categories = [
-      { name: "Salários", planned: 38500, actual: 39200 },
-      { name: "Segurança Social", planned: 9200, actual: 9450 },
-      { name: "Seguros", planned: 1800, actual: 1750 },
-      { name: "Benefícios", planned: 2400, actual: 2600 },
-      { name: "Prestadores de serviços", planned: 2200, actual: 2200 },
-      { name: "IVA", planned: 12000, actual: 10300 },
-      { name: "Retenções", planned: 3500, actual: 3200 },
-      { name: "IRC", planned: 8000, actual: 0 },
-      { name: "Software", planned: 800, actual: 950 },
-      { name: "Equipamentos", planned: 500, actual: 1200 },
-      { name: "Formação", planned: 1000, actual: 800 },
-      { name: "Outros impostos", planned: 2000, actual: 1800 },
-      { name: "Outros custos", planned: 1500, actual: 1350 },
-    ];
-    return categories.map((c) => ({
-      id: c.name.toLowerCase().replace(/\s+/g, "_"),
-      name: c.name,
-      planned: c.planned,
-      actual: c.actual,
-      variance: c.actual - c.planned,
-      variancePercent: c.planned ? ((c.actual - c.planned) / c.planned) * 100 : 0,
-    }));
-  }).then((r) => r.data);
-}
-
-export async function getTeamCostEvolution() {
-  return apiGet("/employees/cost-evolution", () => {
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    const base = employeesCache.reduce((s, e) => s + computeEmployeeCost(e).averageMonthlyCost, 0);
-    return months.map((date, i) => ({
-      date,
-      value: Math.round(base * (0.95 + i * 0.01)),
-    }));
   }).then((r) => r.data);
 }
 
 export async function getCostByDepartmentChart() {
   const dashboard = await getTeamDashboard();
   return dashboard.costByDepartment;
-}
-
-export async function getCostByRoleChart() {
-  return apiGet("/employees/cost-by-role", () => {
-    const byRole: Record<string, number> = {};
-    employeesCache.forEach((e) => {
-      byRole[e.jobTitle] = (byRole[e.jobTitle] ?? 0) + computeEmployeeCost(e).averageMonthlyCost;
-    });
-    return Object.entries(byRole).map(([name, value]) => ({ name, value: Math.round(value) }));
-  }).then((r) => r.data);
-}
-
-export async function getSalaryVsTotalCost() {
-  return apiGet("/employees/salary-vs-cost", () => {
-    return employeesCache.slice(0, 10).map((e) => {
-      const cost = computeEmployeeCost(e);
-      return { name: e.fullName.split(" ")[0], salario: e.grossMonthlySalary, custoTotal: Math.round(cost.averageMonthlyCost) };
-    });
-  }).then((r) => r.data);
-}
-
-export async function getInternalVsContractors() {
-  return apiGet("/employees/internal-vs-contractors", () => {
-    const internal = employeesCache.filter((e) => e.contractType !== "prestacao_servicos");
-    const contractors = employeesCache.filter((e) => e.contractType === "prestacao_servicos");
-    return [
-      { name: "Internos", value: internal.length },
-      { name: "Prestadores", value: contractors.length },
-    ];
-  }).then((r) => r.data);
-}
-
-export async function getEmployeeCountEvolution() {
-  return apiGet("/employees/count-evolution", () => {
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    return months.map((name, i) => ({ name, value: 12 + i }));
-  }).then((r) => r.data);
 }
 
 export { employeesCache, taxCache };

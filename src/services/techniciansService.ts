@@ -71,31 +71,3 @@ export const REQUIRED_DOCS = [
   "Certificado profissional",
   "Registo criminal",
 ];
-
-export async function getPendingTechnicians(limit = 12): Promise<PendingTechnician[]> {
-  return apiGet("/technicians/pending", () => {
-    return mockData.technicians
-      .filter((t) => ["em_validacao", "perfil_incompleto", "registado"].includes(t.status))
-      .slice(0, limit)
-      .map((t, i) => {
-        const documents: TechDocument[] = REQUIRED_DOCS.map((name, di) => {
-          if (t.documentationComplete) return { name, status: "verificado" as DocStatus };
-          const roll = (i + di) % 3;
-          return { name, status: (roll === 0 ? "em_falta" : roll === 1 ? "submetido" : "verificado") as DocStatus };
-        });
-        return {
-          id: t.id,
-          name: t.name,
-          email: t.email,
-          phone: t.phone,
-          categories: t.categories,
-          specializations: t.specializations,
-          city: t.city,
-          status: t.status,
-          documentationComplete: t.documentationComplete,
-          registeredAt: t.registeredAt,
-          documents,
-        };
-      });
-  }).then((r) => r.data);
-}

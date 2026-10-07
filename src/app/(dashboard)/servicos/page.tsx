@@ -7,18 +7,16 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
+import { ouvirPedidosDeAbertura } from "@/hooks/useAbrirPeloEndereco";
 import ServicosPersonalizadosPage from "../servicos-personalizados/page";
-import { Modal, Field } from "@/components/ui/Modal";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { getServices, createCompletedService, updateCompletedService } from "@/services/dashboardService";
-import { getOperacao } from "@/services/dashboardService";
+import { getServices, getOperacao, getDetalheDoServico } from "@/services/dashboardService";
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import { SERVICE_STATUS_LABELS, DEFAULT_SETTINGS } from "@/config/dashboard";
-import { downloadCsv, cn } from "@/lib/utils";
-import { toast } from "@/stores";
-import { Plus, ClipboardList } from "lucide-react";
+import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
+import { downloadCsv } from "@/lib/utils";
+import { ClipboardList } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import type { ServiceRequest, ServiceStatus } from "@/types";
 
@@ -44,44 +42,38 @@ export default function ServicesPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [selectedService, setSelectedService] = useState<ServiceRequest | null>(null);
   const [tab, setTab] = useTabParam("pedidos");
-  const [showCreate, setShowCreate] = useState(false);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const emptyForm = {
-    customer: "", categoryId: DEFAULT_SETTINGS.categories[0].id, service: "",
-    city: DEFAULT_SETTINGS.locations[0].name, technician: "", completedAt: todayStr,
-    amountPaid: "", commissionMode: "normal" as "normal" | "custom", technicianValue: "",
-    rating: "5", hasComplaint: false,
-  };
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  // null = registar novo; id = editar serviço existente.
-  const [editingId, setEditingId] = useState<string | null>(null);
+  /*
+    Saiu daqui o "Registar serviço concluído" (e o "Editar" do painel).
 
-  const openEditService = (s: ServiceRequest) => {
-    const custom = s.totalCustomerValue > 0 && Math.abs(s.technicianValue - s.totalCustomerValue * 0.75) > 0.01;
-    setForm({
-      customer: s.customerName ?? "",
-      categoryId: s.categoryId || DEFAULT_SETTINGS.categories[0].id,
-      service: s.serviceName,
-      city: s.city || DEFAULT_SETTINGS.locations[0].name,
-      technician: s.technicianName ?? "",
-      completedAt: (s.completedAt ?? s.requestedAt ?? "").slice(0, 10) || todayStr,
-      amountPaid: String(s.totalCustomerValue).replace(".", ","),
-      commissionMode: custom ? "custom" : "normal",
-      technicianValue: custom ? String(s.technicianValue).replace(".", ",") : "",
-      rating: String(s.rating ?? 5),
-      hasComplaint: s.hasComplaint,
-    });
-    setEditingId(s.id);
-    setSelectedService(null);
-    setShowCreate(true);
-  };
-  const openNewService = () => { setForm(emptyForm); setEditingId(null); setShowCreate(true); };
-  // Valores tolerantes a vírgula (PT) para a pré-visualização e a submissão.
-  const parseAmount = (s: string) => Number((s || "").replace(",", ".").trim());
-  const amountNum = parseAmount(form.amountPaid);
-  const techNum = form.commissionMode === "custom" ? parseAmount(form.technicianValue) : amountNum * 0.75;
-  const piquetNum = Math.max(0, amountNum - techNum);
+    Escrevia no Supabase, e a lista lê do Laravel: quem registasse um serviço
+    via a mensagem "registado" e não o encontrava em lado nenhum. Pior, o
+    valor entrava nas contas do Supabase e não nas do Payshop, que é o GMV.
+    Um trabalho combinado por telefone faz-se como pedido na app, para haver
+    pagamento, fatura e técnico a sério.
+  */
+
+  /*
+    Abrir um serviço pelo endereço: `/servicos?servico=282`. É para onde a
+    pesquisa global (⌘K) manda. A lista é paginada e o 282 pode não estar na
+    página aberta, por isso lê-se o serviço diretamente.
+  */
+  useEffect(() => {
+    let vivo = true;
+    const abrir = (search: string) => {
+      const id = new URLSearchParams(search).get("servico");
+      if (!id) return;
+      getDetalheDoServico(id)
+        .then((d) => { if (vivo && d) setSelectedService(d.servico); })
+        .catch(() => { /* o painel não abre; a lista continua lá */ });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("servico");
+      window.history.replaceState(null, "", url.toString());
+    };
+    abrir(window.location.search);
+    // Já em Operações: o ⌘K muda o endereço sem voltar a montar a página.
+    const parar = ouvirPedidosDeAbertura((url) => abrir(url.search));
+    return () => { vivo = false; parar(); };
+  }, []);
 
   const [statusGroup, setStatusGroup] = useState("todos");
   const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
@@ -104,54 +96,6 @@ export default function ServicesPage() {
     { id: "desempenho", label: "Desempenho (SLA)" },
     { id: "personalizados", label: "Pedidos personalizados" },
   ];
-
-  const createService = async () => {
-    if (!form.service.trim()) { toast("Indica o tipo de serviço.", "error"); return; }
-    if (!form.technician.trim()) { toast("Indica o técnico que executou.", "error"); return; }
-    if (!(amountNum > 0)) { toast("Indica um valor pago válido.", "error"); return; }
-    if (form.commissionMode === "custom" && !(techNum >= 0 && techNum <= amountNum)) {
-      toast("O valor do técnico tem de estar entre 0 e o valor pago.", "error"); return;
-    }
-    setSaving(true);
-    try {
-      // technicianValue vai SEMPRE (a Piquet fica com o resto): em modo normal
-      // é 75%, e ao editar de custom→normal isto recompõe a comissão certa.
-      const common = {
-        technicianName: form.technician.trim(),
-        categoryId: form.categoryId,
-        serviceName: form.service.trim(),
-        city: form.city,
-        technicianValue: techNum,
-        rating: Number(form.rating),
-        completedAt: form.completedAt,
-        hasComplaint: form.hasComplaint,
-      };
-      if (editingId) {
-        await updateCompletedService(editingId, {
-          ...common,
-          customerName: form.customer.trim(),
-          totalCustomerValue: amountNum,
-          currentTotal: amountNum,
-        });
-        toast(`Serviço atualizado · ${formatCurrency(amountNum)}.`);
-      } else {
-        await createCompletedService({
-          ...common,
-          customerName: form.customer.trim() || undefined,
-          amountPaid: amountNum,
-        });
-        toast(`Serviço concluído registado · técnico ${form.technician} · ${formatCurrency(amountNum)}.`);
-      }
-      setShowCreate(false);
-      setForm(emptyForm);
-      setEditingId(null);
-      refetch();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível registar.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   /**
    * Mudar o período/filtro global repõe a página 1. Sem isto, quem estivesse
@@ -182,6 +126,12 @@ export default function ServicesPage() {
     { key: "categoryName", label: "Categoria" },
     { key: "serviceName", label: "Serviço" },
     { key: "city", label: "Localização", sortable: true },
+    /*
+      Quantos técnicos disseram que sim, de quantos se convidaram. É a
+      primeira pergunta quando um pedido fica parado: "0 de 12" é falta de
+      resposta, "0 de 0" é não haver ninguém por perto para convidar.
+    */
+    { key: "matching", label: "Técnicos", render: (r) => <ColunaMatching matching={r.matching} /> },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} label={SERVICE_STATUS_LABELS[r.status]} /> },
     { key: "rating", label: "Avaliação", render: (r) => r.rating
       ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
@@ -207,12 +157,7 @@ export default function ServicesPage() {
           title="Operações"
           subtitle="Serviços, agendamentos e desempenho da operação"
           actions={
-            <>
-              <button onClick={openNewService} className="btn-primary text-sm">
-                <Plus className="h-4 w-4" /> Registar serviço concluído
-              </button>
-              <ExportButton onExport={handleExport} />
-            </>
+            <ExportButton onExport={handleExport} />
           }
         />
 
@@ -377,90 +322,25 @@ export default function ServicesPage() {
 
         {tab === "personalizados" && <ServicosPersonalizadosPage />}
 
-        {/* Modal — registar / editar serviço concluído */}
-        <Modal
-          open={showCreate}
-          onClose={() => setShowCreate(false)}
-          title={editingId ? "Editar serviço concluído" : "Registar serviço concluído"}
-          subtitle={editingId ? "Corrige os dados deste serviço registado." : "Um trabalho já feito (ex.: marcação por telefone). Regista quem, o quê e quanto foi pago."}
-          size="lg"
-          footer={
-            <>
-              <button onClick={() => setShowCreate(false)} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={createService} disabled={saving} className="btn-primary text-sm disabled:opacity-60">
-                {saving ? (editingId ? "A guardar…" : "A registar…") : (editingId ? "Guardar alterações" : "Registar serviço")}
-              </button>
-            </>
-          }
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Técnico que executou">
-              <input value={form.technician} onChange={(e) => setForm({ ...form, technician: e.target.value })} placeholder="Nome do técnico" className="input-field" />
-            </Field>
-            <Field label="Cliente (opcional)">
-              <input value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} placeholder="Nome do cliente" className="input-field" />
-            </Field>
-            <Field label="Categoria">
-              <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="input-field">
-                {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Tipo de serviço">
-              <input value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })} placeholder="Ex.: Desentupimento" className="input-field" />
-            </Field>
-            <Field label="Localização">
-              <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="input-field">
-                {DEFAULT_SETTINGS.locations.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Data de conclusão">
-              <input type="date" value={form.completedAt} onChange={(e) => setForm({ ...form, completedAt: e.target.value })} className="input-field" />
-            </Field>
-            <Field label="Valor pago pelo cliente (€)">
-              <input inputMode="decimal" value={form.amountPaid} onChange={(e) => setForm({ ...form, amountPaid: e.target.value })} placeholder="Ex.: 104,55" className="input-field" />
-            </Field>
-            <Field label="Avaliação do técnico">
-              <select value={form.rating} onChange={(e) => setForm({ ...form, rating: e.target.value })} className="input-field">
-                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}{"☆".repeat(5 - n)} · {n}</option>)}
-              </select>
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label="Comissão da Piquet">
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setForm({ ...form, commissionMode: "normal" })}
-                    className={cn("px-3 py-1.5 rounded-lg text-sm border", form.commissionMode === "normal" ? "border-piquet bg-piquet/10 text-piquet-700 font-medium" : "border-surface-border text-text-secondary")}>
-                    Normal (25%)
-                  </button>
-                  <button type="button" onClick={() => setForm({ ...form, commissionMode: "custom" })}
-                    className={cn("px-3 py-1.5 rounded-lg text-sm border", form.commissionMode === "custom" ? "border-piquet bg-piquet/10 text-piquet-700 font-medium" : "border-surface-border text-text-secondary")}>
-                    Personalizada
-                  </button>
-                </div>
-              </Field>
-            </div>
-            {form.commissionMode === "custom" && (
-              <Field label="Valor que o técnico recebe (€)" hint="A Piquet fica com o restante">
-                <input inputMode="decimal" value={form.technicianValue} onChange={(e) => setForm({ ...form, technicianValue: e.target.value })} placeholder="Ex.: 60,00" className="input-field" />
-              </Field>
-            )}
-            <label className="sm:col-span-2 flex items-center gap-2 text-sm text-text-secondary">
-              <input type="checkbox" checked={form.hasComplaint} onChange={(e) => setForm({ ...form, hasComplaint: e.target.checked })} className="rounded border-surface-border" />
-              Houve reclamação neste serviço
-            </label>
-          </div>
-          {amountNum > 0 && (
-            <div className="mt-4 flex items-center gap-4 text-xs bg-surface-subtle rounded-lg px-3 py-2 text-text-secondary">
-              <span>Receita Piquet: <b className="text-text-primary">{formatCurrency(piquetNum)}</b>{amountNum > 0 && <span className="text-text-muted"> ({Math.round((piquetNum / amountNum) * 100)}%)</span>}</span>
-              <span>Valor do técnico: <b className="text-text-primary">{formatCurrency(techNum)}</b></span>
-            </div>
-          )}
-        </Modal>
-
         {/* Service detail drawer (com separadores) */}
         {selectedService && (
-          <ServiceDetailDrawer service={selectedService} onClose={() => setSelectedService(null)} onEdit={openEditService} />
+          <ServiceDetailDrawer service={selectedService} onClose={() => setSelectedService(null)} />
         )}
       </div>
     </RouteGuard>
+  );
+}
+
+/** "2 de 5": aceitaram, de quantos se convidaram; e os que ainda não responderam. */
+function ColunaMatching({ matching }: { matching: ServiceRequest["matching"] }) {
+  if (!matching) return <span className="text-text-muted">—</span>;
+  const { invited, accepted, notified } = matching;
+  if (invited === 0) return <span className="text-text-muted whitespace-nowrap">ninguém convidado</span>;
+  return (
+    <span className="whitespace-nowrap tabular-nums" title={`${accepted} aceitaram de ${invited} convidados`}>
+      <span className={accepted > 0 ? "font-medium text-text-primary" : "text-danger"}>{accepted}</span>
+      <span className="text-text-secondary"> de {invited}</span>
+      {notified > 0 && <span className="ml-1 text-[11px] text-text-muted">· {notified} por responder</span>}
+    </span>
   );
 }

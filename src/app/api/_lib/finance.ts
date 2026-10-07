@@ -84,7 +84,11 @@ export async function servicosConcluidos(f: FinanceFilters): Promise<ServicoConc
     const intervalo = f.period && f.period !== "personalizado" ? getDateRangeFromPreset(f.period) : null;
     return todos
       .filter((s) => s.status === "concluido")
-      .filter((s) => (f.categoryId ? s.categoryId === f.categoryId : true))
+      // A categoria do filtro é a ÁREA de operação (o painel lê as reais).
+      // Comparava com o tipo de serviço e com as 8 categorias fixas da
+      // configuração, que não existem no Laravel: escolher uma deixava o
+      // Financeiro vazio.
+      .filter((s) => (f.categoryId ? (s.operationAreaId ?? s.categoryId) === f.categoryId : true))
       .filter((s) => (f.city ? s.city === f.city : true))
       .filter((s) => {
         if (!intervalo) return true;

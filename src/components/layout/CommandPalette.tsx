@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { pedirAbertura } from "@/hooks/useAbrirPeloEndereco";
 import { NAV_ITEMS, NAV_VISIBLE, NAV_DEEPLINKS } from "@/config/dashboard";
 import { useUiStore, useAuthStore, useThemeStore } from "@/stores";
 import { canAccessRoute } from "@/lib/permissions";
@@ -115,7 +116,8 @@ export function CommandPalette() {
           sublabel: r.subtitle,
           hint: r.typeLabel,
           Icon: TYPE_ICON[r.type] ?? Search,
-          run: () => router.push(r.href),
+          // Avisa a página: se já estiver aberta, não volta a montar.
+          run: () => { router.push(r.href); pedirAbertura(r.href); },
         })));
       } catch { if (alive) setEntityCmds([]); }
       finally { if (alive) setSearching(false); }

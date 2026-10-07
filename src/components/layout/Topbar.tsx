@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getOperationAreas } from "@/services/catalogService";
 import { usePathname } from "next/navigation";
 import { useFilterStore, useAuthStore, useUiStore } from "@/stores";
 import { getActiveFilterCount } from "@/lib/filters";
@@ -54,6 +55,27 @@ export function Topbar() {
 
   const pathname = usePathname();
   const filtrosValem = ECRAS_COM_FILTROS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+
+  /*
+    AS CATEGORIAS REAIS do catálogo (áreas de operação do Laravel).
+
+    O filtro oferecia as 8 categorias fixas da configuração ("cat_canalizacao"),
+    que não existem no Laravel: em Operações não filtrava nada, e no Financeiro
+    não coincidia com serviço nenhum e deixava o ecrã vazio. Carregam-se só
+    quando servem — painel aberto ou uma categoria escolhida — e, sem backend
+    (modo de demonstração), ficam as fixas, que são as dos dados de exemplo.
+  */
+  const [areas, setAreas] = useState<{ value: string; label: string }[] | null>(null);
+  const precisaDasAreas = filtrosValem && (showFilters || !!filters.categoryId);
+  useEffect(() => {
+    if (!precisaDasAreas || areas) return;
+    getOperationAreas()
+      .then((d) => setAreas(d.items.map((a) => ({ value: String(a.id), label: a.name }))))
+      .catch(() => setAreas([]));
+  }, [precisaDasAreas, areas]);
+  const opcoesCategoria = areas && areas.length > 0
+    ? areas
+    : DEFAULT_SETTINGS.categories.map((c) => ({ value: c.id, label: c.name }));
 
   /*
     O nome do ecrã, só em telemóvel.
@@ -187,7 +209,7 @@ export function Topbar() {
               label="Categoria"
               value={filters.categoryId ?? ""}
               onChange={(v) => setFilter("categoryId", v || undefined)}
-              options={DEFAULT_SETTINGS.categories.map((c) => ({ value: c.id, label: c.name }))}
+              options={opcoesCategoria}
             />
             <FilterSelect
               label="Cidade"
@@ -224,7 +246,7 @@ export function Topbar() {
                 <FilterChip label={getPeriodLabel(filters.period)} onRemove={() => setFilter("period", "ultimos_30_dias")} />
               )}
               {filters.categoryId && (
-                <FilterChip label={DEFAULT_SETTINGS.categories.find((c) => c.id === filters.categoryId)?.name ?? filters.categoryId} onRemove={() => setFilter("categoryId", undefined)} />
+                <FilterChip label={opcoesCategoria.find((c) => c.value === filters.categoryId)?.label ?? filters.categoryId} onRemove={() => setFilter("categoryId", undefined)} />
               )}
               {filters.city && <FilterChip label={filters.city} onRemove={() => setFilter("city", undefined)} />}
               {filters.serviceStatus && <FilterChip label={SERVICE_STATUS_LABELS[filters.serviceStatus] ?? filters.serviceStatus} onRemove={() => setFilter("serviceStatus", undefined)} />}

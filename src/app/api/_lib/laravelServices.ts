@@ -53,7 +53,14 @@ export interface LaravelServiceRow {
   scheduled_time?: string | null;
   on_the_way_at?: string | null;
   /** Estado do matching: a quantos se perguntou e quantos responderam o quê. */
-  candidates?: { notified?: number; accepted?: number; declined?: number; expired?: number } | null;
+  /** A categoria (área de operação) do tipo de serviço. Desde o backend #151. */
+  operation_area_id?: number | string | null;
+  /**
+   * Estado do matching. `invited` são todos os convidados; `notified` os que
+   * ainda podem responder; `accepted` quem aceitou ALGUMA VEZ (desde o
+   * backend #151, inclui quem foi escolhido e quem perdeu).
+   */
+  candidates?: { invited?: number; notified?: number; accepted?: number; declined?: number; expired?: number } | null;
   has_complaint?: boolean | null;
   cancellation_reason?: string | null;
   response_time_minutes?: number | null;
@@ -162,6 +169,44 @@ const LARAVEL_PAYMENT_MAP: Record<string, PaymentStatus> = {
 const PAYMENT_STATUSES = new Set(["pendente", "pago", "parcial", "reembolsado", "falhado"]);
 const INVOICE_STATUSES = new Set(["nao_emitida", "emitida", "com_erro", "anulada"]);
 
+/**
+ * O matching de um serviço, como o backoffice o mostra.
+ *
+ * Um backend anterior ao #151 não manda `invited`: soma-se o que vem, que é o
+ * melhor que se consegue dizer sem ele.
+ */
+function matchingDe(c: LaravelServiceRow["candidates"]): ServiceRequest["matching"] {
+  if (!c) return undefined;
+  const notified = num(c.notified);
+  const accepted = num(c.accepted);
+  const declined = num(c.declined);
+  const expired = num(c.expired);
+  return {
+    invited: c.invited != null ? num(c.invited) : notified + accepted + declined + expired,
+    notified, accepted, declined, expired,
+  };
+}
+
+/**
+ * Os estados do Laravel que correspondem a estes estados do backoffice.
+ *
+ * O inverso do LARAVEL_STATUS_MAP, para os separadores de Operações chegarem
+ * ao Laravel. Um estado do backoffice que o Laravel nunca produz (por exemplo
+ * `orcamento_enviado`) não tem correspondência e não contribui com nada.
+ */
+export function estadosDoLaravel(estados: readonly ServiceStatus[]): string[] {
+  const pedidos = new Set<string>(estados);
+  return Object.entries(LARAVEL_STATUS_MAP)
+    .filter(([, nosso]) => pedidos.has(nosso))
+    .map(([deles]) => deles);
+}
+
+/**
+ * Valor que não corresponde a estado nenhum. Um separador cujos estados o
+ * Laravel não produz tem de devolver NADA — sem filtro devolvia tudo.
+ */
+export const NENHUM_ESTADO = "__nenhum__";
+
 /** Linha do Laravel → forma `ServiceRequest` que os ecrãs consomem. */
 export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
   const total = num(r.total_customer_value);
@@ -197,6 +242,8 @@ export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
     invoiceStatus: INVOICE_STATUSES.has(invoice) ? (invoice as InvoiceStatus) : undefined,
     rating: r.rating ?? undefined,
     hasComplaint: !!r.has_complaint,
+    matching: matchingDe(r.candidates),
+    operationAreaId: r.operation_area_id != null ? str(r.operation_area_id) : undefined,
     cancellationReason: r.cancellation_reason ?? undefined,
     responseTimeMinutes: r.response_time_minutes ?? undefined,
     technicianAssignmentTimeMinutes: r.technician_assignment_time_min ?? undefined,
@@ -207,6 +254,12 @@ export interface ServicesQuery {
   page?: number;
   pageSize?: number;
   status?: string;
+  /** Estados do BACKOFFICE (os grupos dos separadores); traduzem-se aqui. */
+  statuses?: ServiceStatus[];
+  /** O tipo de serviço (é o que o Laravel devolve como `category_id`). */
+  categoryId?: string;
+  /** A categoria que a equipa escolhe no filtro: a área de operação. */
+  operationAreaId?: string;
   city?: string;
   search?: string;
   from?: string;
@@ -249,7 +302,24 @@ export async function fetchLaravelServices(query: ServicesQuery) {
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));
   params.set("per_page", String(query.pageSize ?? 20));
-  if (query.status) params.set("status", query.status);
+  /*
+    Os separadores de Operações mandam GRUPOS de estados do backoffice. Iam
+    para lado nenhum: esta função só passava `status`, e em produção cada
+    separador mostrava a lista inteira.
+  */
+  if (query.statuses?.length) {
+    const deles = estadosDoLaravel(query.statuses);
+    params.set("statuses", deles.length ? deles.join(",") : NENHUM_ESTADO);
+  } else if (query.status) {
+    const deles = estadosDoLaravel([query.status as ServiceStatus]);
+    params.set("statuses", deles.length ? deles.join(",") : NENHUM_ESTADO);
+  }
+  if (query.categoryId) params.set("category_id", query.categoryId);
+  // Só ids do Laravel: um filtro antigo com as categorias fixas da
+  // configuração ("cat_canalizacao") não pode virar "nenhum resultado".
+  if (query.operationAreaId && /^\d+$/.test(query.operationAreaId)) {
+    params.set("operation_area_id", query.operationAreaId);
+  }
   if (query.city) params.set("city", query.city);
   if (query.search) params.set("search", query.search);
   if (query.from) params.set("from", query.from);

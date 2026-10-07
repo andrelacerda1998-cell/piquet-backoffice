@@ -73,19 +73,6 @@ export interface Promotion {
   validUntil: string;
 }
 
-export async function getPromotions(): Promise<Promotion[]> {
-  return apiGet("/promotions", () => {
-    const data: Promotion[] = [
-      { id: "p1", code: "BEMVINDO10", description: "10% na primeira marcação", discount: "-10%", status: "ativa", uses: 342, validUntil: "2026-12-31" },
-      { id: "p2", code: "VERAO25", description: "25€ em serviços de AVAC", discount: "-25€", status: "ativa", uses: 88, validUntil: "2026-09-30" },
-      { id: "p3", code: "URGENCIA0", description: "Sem taxa de urgência (fim de semana)", discount: "Taxa 0€", status: "agendada", uses: 0, validUntil: "2026-08-15" },
-      { id: "p4", code: "FIDELIDADE15", description: "15% para clientes recorrentes", discount: "-15%", status: "ativa", uses: 210, validUntil: "2026-12-31" },
-      { id: "p5", code: "PRIMAVERA20", description: "20% em limpezas", discount: "-20%", status: "expirada", uses: 156, validUntil: "2026-05-31" },
-    ];
-    return data;
-  }).then((r) => r.data);
-}
-
 /* ============================ ZONAS DE OPERAÇÃO ============================ */
 
 export interface ZoneRow {
@@ -327,19 +314,6 @@ export interface CustomServiceRequest {
   estimate?: number;
 }
 
-export async function getCustomServices(): Promise<CustomServiceRequest[]> {
-  return apiGet("/custom-services", () => {
-    const data: CustomServiceRequest[] = [
-      { id: "cs_1", customerName: "Helena Marques", phone: "+351 912 345 678", description: "Instalação de painéis solares em moradia", city: "Cascais", urgency: "media", status: "em_analise", createdAt: "2026-06-28", estimate: 3200 },
-      { id: "cs_2", customerName: "Bruno Tavares", phone: "+351 934 111 222", description: "Remodelação de casa de banho completa", city: "Lisboa", urgency: "baixa", status: "orcamento_enviado", createdAt: "2026-06-25", estimate: 5400 },
-      { id: "cs_3", customerName: "Condomínio Estrela", phone: "+351 210 998 877", description: "Manutenção de elevador e zonas comuns", city: "Lisboa", urgency: "alta", status: "novo", createdAt: "2026-07-01" },
-      { id: "cs_4", customerName: "Rita Nunes", phone: "+351 961 555 444", description: "Domótica — automação de estores e luzes", city: "Sintra", urgency: "media", status: "aprovado", createdAt: "2026-06-20", estimate: 2100 },
-      { id: "cs_5", customerName: "Miguel Antunes", phone: "+351 926 777 000", description: "Reparação de telhado após tempestade", city: "Loures", urgency: "alta", status: "orcamento_enviado", createdAt: "2026-06-30", estimate: 1750 },
-    ];
-    return data;
-  }).then((r) => r.data);
-}
-
 /* ============================ OBJETIVOS DO ANO ============================ */
 
 export interface AnnualGoal {
@@ -404,27 +378,6 @@ export interface TeamTask {
   due: string;
 }
 
-export async function getTasksBoard(): Promise<{ tasks: TeamTask[]; workload: { name: string; department: string; open: number; cost: number }[] }> {
-  return apiGet("/tasks", () => {
-    const tasks: TeamTask[] = [
-      { id: "t1", title: "Rever contratos de técnicos a termo", assignee: "Sofia Ferreira", department: "Recursos Humanos", priority: "alta", status: "em_curso", due: "2026-07-05" },
-      { id: "t2", title: "Auto-despacho para zona de Sintra", assignee: "Mariana Quintela", department: "Operações", priority: "critica", status: "aberta", due: "2026-07-03" },
-      { id: "t3", title: "Fechar campanha de verão", assignee: "Beatriz Lemos", department: "Marketing", priority: "media", status: "aberta", due: "2026-07-10" },
-      { id: "t4", title: "Migrar faturação para novo fornecedor", assignee: "Ricardo Sousa", department: "Financeiro", priority: "alta", status: "em_curso", due: "2026-07-15" },
-      { id: "t5", title: "Corrigir bug de pagamentos MB Way", assignee: "Tiago Nogueira", department: "Tecnologia", priority: "critica", status: "aberta", due: "2026-07-02" },
-      { id: "t6", title: "Onboarding de 12 técnicos novos", assignee: "Mariana Quintela", department: "Operações", priority: "media", status: "concluida", due: "2026-06-28" },
-    ];
-    const workload = [
-      { name: "Mariana Quintela", department: "Operações", open: 3, cost: 11224 },
-      { name: "Tiago Nogueira", department: "Tecnologia", open: 4, cost: 13246 },
-      { name: "Beatriz Lemos", department: "Marketing", open: 2, cost: 3886 },
-      { name: "Ricardo Sousa", department: "Financeiro", open: 2, cost: 4319 },
-      { name: "Sofia Ferreira", department: "Recursos Humanos", open: 1, cost: 3500 },
-    ];
-    return { tasks, workload };
-  }).then((r) => r.data);
-}
-
 export interface Complaint {
   id: string;
   customerName: string;
@@ -433,23 +386,6 @@ export interface Complaint {
   city: string;
   status: "aberta" | "em_analise" | "resolvida";
   openedAt: string;
-}
-
-export async function getComplaints(): Promise<Complaint[]> {
-  return apiGet("/complaints", () => {
-    return mockData.services
-      .filter((s) => s.hasComplaint)
-      .slice(0, 20)
-      .map((s, i) => ({
-        id: s.id,
-        customerName: s.customerName,
-        serviceName: s.serviceName,
-        category: s.categoryName,
-        city: s.city,
-        status: (["aberta", "em_analise", "resolvida"][i % 3]) as "aberta" | "em_analise" | "resolvida",
-        openedAt: s.requestedAt,
-      }));
-  }).then((r) => r.data);
 }
 
 /* ============================ MARKETING — CRM & GUIÕES ============================ */
@@ -608,19 +544,6 @@ export interface MessageScript {
   channel: "WhatsApp" | "Email" | "SMS" | "Push";
   purpose: string;
   content: string;
-}
-
-export async function getScripts(): Promise<MessageScript[]> {
-  return apiGet("/marketing/scripts", () => {
-    const data: MessageScript[] = [
-      { id: "s1", title: "Boas-vindas", channel: "WhatsApp", purpose: "Primeiro contacto", content: "Olá {nome}! Bem-vindo à Piquet 👋 Precisa de ajuda em casa? Encontramos o técnico certo em minutos." },
-      { id: "s2", title: "Recuperar carrinho", channel: "Push", purpose: "Reativação", content: "{nome}, o seu pedido está quase pronto. Conclua a marcação e tenha o técnico à porta hoje." },
-      { id: "s3", title: "Pós-serviço", channel: "Email", purpose: "Avaliação", content: "Como correu o serviço, {nome}? Avalie o técnico e ajude-nos a melhorar. Leva 30 segundos." },
-      { id: "s4", title: "Promoção sazonal", channel: "SMS", purpose: "Campanha", content: "Piquet: 20% em limpezas esta semana com o código PRIMAVERA. Marque já na app." },
-      { id: "s5", title: "Reativação 30 dias", channel: "WhatsApp", purpose: "Win-back", content: "{nome}, sentimos a sua falta! Volte à Piquet e receba 10€ no próximo serviço." },
-    ];
-    return data;
-  }).then((r) => r.data);
 }
 
 /* ==================== PEDIDOS PERSONALIZADOS (serviços complexos) ==================== */

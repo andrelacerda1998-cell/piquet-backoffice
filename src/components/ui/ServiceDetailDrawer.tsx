@@ -7,8 +7,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Pencil, Lock } from "lucide-react";
-import { getFotosDoCliente, type FotoDoCliente } from "@/services/dashboardService";
+import { X, Star, Lock } from "lucide-react";
+import { getFotosDoCliente, getDetalheDoServico, type FotoDoCliente } from "@/services/dashboardService";
+import type { CandidatoLaravel } from "@/app/api/services/[id]/detalhe/route";
 
 /*
   ——— O que saiu deste painel, e porquê ———
@@ -37,7 +38,7 @@ import { getFotosDoCliente, type FotoDoCliente } from "@/services/dashboardServi
 */
 
 
-export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: ServiceRequest; onClose: () => void; onEdit?: (s: ServiceRequest) => void }) {
+export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequest; onClose: () => void }) {
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
 
   return (
@@ -64,11 +65,6 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
           </div>
           <div className="mx-auto max-w-[1400px] mt-3 flex items-center gap-2">
             <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
-            {onEdit && (service.status === "concluido" || service.source === "manual") && (
-              <button onClick={() => onEdit(service)} className="btn-secondary text-xs py-1">
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </button>
-            )}
           </div>
 
           {/*
@@ -103,6 +99,7 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
         */}
         <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 columns-1 lg:columns-2 xl:columns-3 gap-5">
           <Seccao titulo="Resumo"><Resumo service={service} /></Seccao>
+          <Seccao titulo="Técnicos convidados"><Matching service={service} /></Seccao>
           <Seccao titulo="Cronologia"><Cronologia service={service} /></Seccao>
           <Seccao titulo="Pagamento"><Pagamento service={service} /></Seccao>
           <Seccao titulo="Faturas"><Faturas service={service} /></Seccao>
@@ -125,7 +122,6 @@ export function ServiceDetailDrawer({ service, onClose, onEdit }: { service: Ser
               </div>
             </div>
           </Seccao>
-          <Seccao titulo="Notas internas"><Notas service={service} /></Seccao>
           <Seccao titulo="Histórico"><Historico service={service} /></Seccao>
           <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
         </div>
@@ -166,6 +162,92 @@ function Resumo({ service }: { service: ServiceRequest }) {
       <Row label="Valor técnico" value={formatCurrency(service.technicianValue)} />
       <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
       {service.vatValue != null && <Row label="IVA" value={formatCurrency(service.vatValue)} />}
+    </div>
+  );
+}
+
+const ESTADO_DO_CANDIDATO: Record<string, { label: string; cor: string }> = {
+  shortlisted: { label: "Na fila", cor: "text-text-muted" },
+  notified: { label: "Por responder", cor: "text-warning" },
+  accepted: { label: "Aceitou", cor: "text-success" },
+  selected: { label: "Escolhido", cor: "text-success" },
+  lost: { label: "Aceitou, outro foi escolhido", cor: "text-text-secondary" },
+  declined: { label: "Recusou", cor: "text-danger" },
+  expired: { label: "Não respondeu", cor: "text-danger" },
+};
+
+/** Minutos entre o convite e a resposta, ou nada se não respondeu. */
+function tempoDeResposta(c: CandidatoLaravel): string | null {
+  if (!c.notified_at || !c.responded_at) return null;
+  const min = Math.round((Date.parse(c.responded_at) - Date.parse(c.notified_at)) / 60000);
+  if (!Number.isFinite(min) || min < 0) return null;
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
+}
+
+/**
+ * A quem se perguntou e o que cada um respondeu.
+ *
+ * O Laravel guarda cada convite (onda, distância, preço cotado, resposta) e o
+ * backoffice não o mostrava em lado nenhum. É o que se quer ver quando um
+ * cliente diz "ninguém pegou no meu pedido": se ninguém foi convidado, falta
+ * gente na zona; se foram doze e nenhum respondeu, o problema é outro.
+ */
+function Matching({ service }: { service: ServiceRequest }) {
+  const [lista, setLista] = useState<CandidatoLaravel[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    setLista(null);
+    setErro(null);
+    getDetalheDoServico(service.id)
+      .then((d) => vivo && setLista(d?.candidatos ?? []))
+      .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Não foi possível ler os convites."));
+    return () => { vivo = false; };
+  }, [service.id]);
+
+  if (erro) return <p className="text-sm text-danger">{erro}</p>;
+  if (lista === null) return <p className="text-sm text-text-muted">A carregar…</p>;
+  if (lista.length === 0) {
+    return (
+      <p className="text-sm text-text-muted">
+        Nenhum técnico foi convidado para este pedido — não havia ninguém disponível para esta categoria por perto,
+        ou o pedido não chegou a procurar.
+      </p>
+    );
+  }
+
+  const aceitaram = lista.filter((c) => ["accepted", "selected", "lost"].includes(c.status)).length;
+  const ordenada = [...lista].sort((a, b) => (a.wave ?? 0) - (b.wave ?? 0) || (a.rank ?? 0) - (b.rank ?? 0));
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-text-secondary">
+        {aceitaram} {aceitaram === 1 ? "aceitou" : "aceitaram"} de {lista.length} {lista.length === 1 ? "convidado" : "convidados"}.
+      </p>
+      <ul className="divide-y divide-surface-border">
+        {ordenada.map((c) => {
+          const estado = ESTADO_DO_CANDIDATO[c.status] ?? { label: c.status, cor: "text-text-secondary" };
+          const tempo = tempoDeResposta(c);
+          return (
+            <li key={c.vendor_id} className="py-2 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-medium text-text-primary truncate">{c.vendor_name ?? `Técnico ${c.vendor_id}`}</span>
+                <span className={cn("text-xs font-medium whitespace-nowrap", estado.cor)}>{estado.label}</span>
+              </div>
+              <p className="text-[11px] text-text-muted tabular-nums">
+                {[
+                  c.wave != null && `onda ${c.wave}`,
+                  c.quoted_distance != null && `${c.quoted_distance.toLocaleString("pt-PT", { maximumFractionDigits: 1 })} km`,
+                  c.rating_average != null && `★ ${c.rating_average.toFixed(1).replace(".", ",")}`,
+                  c.quoted_amount != null && formatCurrency(c.quoted_amount),
+                  tempo && `respondeu em ${tempo}`,
+                ].filter(Boolean).join(" · ")}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -366,25 +448,6 @@ function Reclamacao({ service }: { service: ServiceRequest }) {
       <p className="mt-1 text-sm text-text-secondary">
         Este serviço está marcado como tendo reclamação. O que o cliente disse chega como ticket em Suporte, com o
         número do serviço no assunto.
-      </p>
-    </div>
-  );
-}
-
-function Notas({ service }: { service: ServiceRequest }) {
-  const notes = service.internalNotes?.length ? service.internalNotes : ["Sem notas internas registadas."];
-  return (
-    <div className="space-y-2">
-      {notes.map((n, i) => (
-        <div key={i} className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">{n}</div>
-      ))}
-      {/*
-        Aqui estava uma caixa com um botão "Guardar" que não guardava. As
-        notas internas escrevem-se ao editar o serviço, onde há write-back a
-        sério (`internalNotes` em PATCH /api/services/:id).
-      */}
-      <p className="pt-2 text-xs text-text-secondary">
-        Para acrescentar uma nota, usa <strong className="text-text-primary">Editar</strong> no topo do painel.
       </p>
     </div>
   );

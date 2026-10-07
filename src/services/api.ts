@@ -115,7 +115,6 @@ const LIVE_EXACT = new Set<string>([
   "/custom-requests",
   // Fase 1 — Serviços/Reservas
   "/services",
-  "/dashboard/recent-services",
   // Produto — evolução de downloads (lojas) e registos reais
   "/product/growth",
   "/product/ratings",
@@ -127,7 +126,6 @@ const LIVE_EXACT = new Set<string>([
   "/customers",
   "/customers/metrics",
   "/customers/by-location",
-  "/customers/by-source",
   "/customers/trend",
   "/customers/retention",
   // Fase 2 — Técnicos
@@ -150,17 +148,10 @@ const LIVE_EXACT = new Set<string>([
   // Criar conta de técnico de teste, já elegível para ficar Online
   "/technicians/test-account",
   // Fase 3a — Financeiro derivável dos serviços
-  "/finance/by-service",
-  "/finance/daily-revenue",
-  "/finance/revenue-by-technician",
   "/finance/revenue-vs-costs",
-  "/dashboard/revenue-by-category",
   // Fase 4 — Impostos e RH (employees)
   "/employees",
   "/employees/dashboard",
-  "/employees/cost-by-role",
-  "/employees/salary-vs-cost",
-  "/employees/internal-vs-contractors",
   // Fase 4 — Financeiro desbloqueado por employees
   "/finance/summary",
   "/finance/operational-result",
@@ -289,9 +280,8 @@ const LIVE_DENY = new Set<string>([
  *
  * Nota sobre `/customers` e derivados: passaram a vir do Laravel (tabela
  * `users` + `services` reais da produção), não do seed do Supabase — ver
- * CustomerController no backend. `/customers/by-source` e `/customers/
- * retention` devolvem sempre vazio (sem tracking de origem nem análise de
- * coortes no Laravel) — "vazio" aqui é a verdade, não ficção, por isso contam
+ * CustomerController no backend. `/customers/retention`
+ * devolve sempre vazio (sem análise de coortes no Laravel) — "vazio" aqui é a verdade, não ficção, por isso contam
  * como REAL_DATA na mesma.
  *
  * Nota sobre `/technicians`: idem, passou a vir do Laravel (tabela `vendors`
@@ -336,12 +326,7 @@ const REAL_DATA = new Set<string>([
     demonstração, porque somam `tax_obligations` -- 27 linhas escritas todas no
     mesmo dia por um seed.
   */
-  "/dashboard/recent-services",
-  "/dashboard/revenue-by-category",
-  "/finance/by-service",
-  "/finance/daily-revenue",
   "/finance/operational-result",
-  "/finance/revenue-by-technician",
   "/finance/revenue-vs-costs",
   // Tickets de suporte: chegam das apps por POST /api/tickets e ficam na tabela
   // support_tickets. São mensagens de pessoas reais — nunca foram semeados.
@@ -357,7 +342,6 @@ const REAL_DATA = new Set<string>([
   "/customers",
   "/customers/metrics",
   "/customers/by-location",
-  "/customers/by-source",
   "/technicians/documentos", // agregado real do Laravel (#128/#129)
   "/technicians/funil", // vendors reais do Laravel, filtrados no servidor
   "/technicians",
@@ -417,9 +401,6 @@ const REAL_DATA = new Set<string>([
   // a tabela só tem colaboradores registados à mão em Impostos e RH.
   "/employees",
   "/employees/dashboard",
-  "/employees/cost-by-role",
-  "/employees/salary-vs-cost",
-  "/employees/internal-vs-contractors",
   // Equipa: o seed foi apagado da BD a 2026-07-16 (backup em _seed_backup_*);
   // o que resta foi escrito por pessoas, como o dev-tasks.
   "/team/messages",
@@ -497,7 +478,9 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
     lista devolve `[]`. As fotos que o cliente anexou nunca apareciam no
     detalhe do serviço, e a cronologia de um pedido aparecia sempre vazia.
   */
+  /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/services\/[^/]+\/fotos$/, // media do Laravel, com URL assinado
+  /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
 ];
 

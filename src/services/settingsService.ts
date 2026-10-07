@@ -1,12 +1,8 @@
-import { apiGet, apiPut } from "./api";
+import { apiPut } from "./api";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 import type { DashboardSettings } from "@/types";
 
 let settingsCache: DashboardSettings = { ...DEFAULT_SETTINGS };
-
-export async function getSettings(): Promise<DashboardSettings> {
-  return apiGet("/settings", () => settingsCache).then((r) => r.data);
-}
 
 export async function updateSettings(partial: Partial<DashboardSettings>): Promise<DashboardSettings> {
   return apiPut("/settings", partial, () => {

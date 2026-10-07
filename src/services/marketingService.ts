@@ -1,68 +1,8 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
-import { applyFiltersToServices } from "@/lib/filters";
-import type { DashboardFilter } from "@/types";
 
 export async function getCampaigns() {
   return apiGet("/marketing/campaigns", () => mockData.campaigns).then((r) => r.data);
-}
-
-export async function getCategoryZoneMetrics(filters: DashboardFilter) {
-  return apiGet("/categories-zones/metrics", () => {
-    const services = applyFiltersToServices(mockData.services, filters);
-    const completed = services.filter((s) => s.status === "concluido");
-
-    const byCategory: Record<string, { orders: number; completed: number; revenue: number; total: number }> = {};
-    completed.forEach((s) => {
-      if (!byCategory[s.categoryName]) byCategory[s.categoryName] = { orders: 0, completed: 0, revenue: 0, total: 0 };
-      byCategory[s.categoryName].completed++;
-      byCategory[s.categoryName].revenue += s.piquetRevenue;
-    });
-    services.forEach((s) => {
-      if (!byCategory[s.categoryName]) byCategory[s.categoryName] = { orders: 0, completed: 0, revenue: 0, total: 0 };
-      byCategory[s.categoryName].orders++;
-      byCategory[s.categoryName].total += s.totalCustomerValue;
-    });
-
-    const categoryMetrics = Object.entries(byCategory).map(([name, d]) => ({
-      name,
-      orders: d.orders,
-      completed: d.completed,
-      conversionRate: d.orders ? (d.completed / d.orders) * 100 : 0,
-      avgTicket: d.completed ? d.total / d.completed : 0,
-      revenue: Math.round(d.revenue),
-      availableTechnicians: mockData.technicians.filter((t) => t.categories.includes(name)).length,
-      avgFindTime: Math.round(45 + Math.random() * 60),
-      cancellations: services.filter((s) => s.categoryName === name && s.status.startsWith("cancelado")).length,
-      complaints: services.filter((s) => s.categoryName === name && s.hasComplaint).length,
-      avgRating: 4.2 + Math.random() * 0.6,
-    }));
-
-    const byZone: Record<string, { orders: number; completed: number; revenue: number }> = {};
-    services.forEach((s) => {
-      if (!byZone[s.city]) byZone[s.city] = { orders: 0, completed: 0, revenue: 0 };
-      byZone[s.city].orders++;
-      if (s.status === "concluido") {
-        byZone[s.city].completed++;
-        byZone[s.city].revenue += s.piquetRevenue;
-      }
-    });
-
-    const zoneMetrics = Object.entries(byZone).map(([name, d]) => ({
-      name,
-      orders: d.orders,
-      completed: d.completed,
-      revenue: Math.round(d.revenue),
-      conversionRate: d.orders ? (d.completed / d.orders) * 100 : 0,
-      availableTechnicians: mockData.technicians.filter((t) => t.city === name).length,
-      noTechnician: services.filter((s) => s.city === name && s.status === "sem_tecnico_disponivel").length,
-      avgResponseTime: Math.round(15 + Math.random() * 30),
-      avgTicket: d.completed ? d.revenue / d.completed * 2.5 : 0,
-      avgRating: 4.1 + Math.random() * 0.7,
-    }));
-
-    return { categoryMetrics, zoneMetrics };
-  }).then((r) => r.data);
 }
 
 /* ===================== Investimento real em anúncios ===================== */

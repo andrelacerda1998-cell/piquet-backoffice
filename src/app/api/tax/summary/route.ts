@@ -1,10 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { rowToTaxObligation, type TaxObligationRow } from "@/lib/supabase/adapters";
-import { calculateEstimatedVat } from "@/lib/calculations";
 import { TODAY } from "@/lib/today";
 import { apiOk, withStaff } from "../../_lib/handler";
 
-/** GET /api/tax/summary — resumo fiscal (mesma lógica do mock, sobre a BD). */
+/**
+ * GET /api/tax/summary — resumo das obrigações fiscais registadas.
+ *
+ * Saíram daqui o IVA (18 500 € liquidado, 8 200 € dedutível), a Segurança
+ * Social (12 400 €) e as retenções (3 200 €): eram constantes escritas no
+ * código. O IVA verdadeiro está em /api/tax/vat; os outros contam-se pelas
+ * obrigações que se registarem.
+ */
 export const GET = withStaff(async () => {
   const { data, error } = await supabaseAdmin().from("tax_obligations").select("*");
   if (error) throw new Error(error.message);
@@ -22,10 +28,6 @@ export const GET = withStaff(async () => {
   const upcoming30 = obligations.filter((o) => o.status !== "pago" && daysTo(o.dueDate) >= 0 && daysTo(o.dueDate) <= 30);
   const nextObligation = [...pending].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
 
-  const ivaLiquidado = 18500;
-  const ivaDedutivel = 8200;
-  const ivaEstimado = calculateEstimatedVat(ivaLiquidado, ivaDedutivel);
-
   return apiOk({
     estimatedThisMonth: thisMonthObs.reduce((s, o) => s + o.amountEstimated, 0),
     paidThisMonth: paid.filter((o) => o.paymentDate?.startsWith(thisMonth)).reduce((s, o) => s + (o.amountConfirmed ?? 0), 0),
@@ -33,16 +35,9 @@ export const GET = withStaff(async () => {
     nextObligation: nextObligation?.name ?? "—",
     nextObligationAmount: nextObligation?.amountEstimated ?? 0,
     nextObligationDue: nextObligation?.dueDate,
-    estimatedVat: ivaEstimado,
-    estimatedSocialSecurity: 12400,
-    estimatedWithholdings: 3200,
     accumulatedYear: obligations.reduce((s, o) => s + (o.amountConfirmed ?? o.amountEstimated), 0),
     overdueCount: overdue.length,
     upcoming7Count: upcoming7.length,
     upcoming30Count: upcoming30.length,
-    ivaLiquidado,
-    ivaDedutivel,
-    ivaEstimado,
-    ivaLabel: ivaEstimado > 0 ? "IVA estimado a pagar" : "IVA estimado a recuperar ou reportar",
   });
 });

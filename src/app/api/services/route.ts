@@ -5,7 +5,7 @@ import { apiOk, apiErr, withStaff } from "../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../_lib/entities";
 import { servicesFromLaravel, fetchLaravelServices } from "../_lib/laravelServices";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
-import type { PeriodPreset } from "@/types";
+import type { PeriodPreset, ServiceStatus } from "@/types";
 
 const COMMISSION = 0.25; // margem fixa da Piquet (o técnico fica com 75%)
 
@@ -50,7 +50,17 @@ export const GET = withStaff(async (req) => {
   if (servicesFromLaravel()) {
     const from = period && period !== "personalizado" ? getDateRangeFromPreset(period).start.toISOString().slice(0, 10) : undefined;
     const to = period && period !== "personalizado" ? getDateRangeFromPreset(period).end.toISOString().slice(0, 10) : undefined;
-    return apiOk(await fetchLaravelServices({ page, pageSize, status, city, search, from, to }));
+    /*
+      Os estados dos separadores e a categoria iam para lado nenhum: só
+      `status` passava, e em produção cada separador mostrava a lista inteira.
+      A categoria do filtro global é a área de operação (o painel de filtros lê
+      as categorias reais do catálogo).
+    */
+    return apiOk(await fetchLaravelServices({
+      page, pageSize, status, city, search, from, to,
+      statuses: statuses as ServiceStatus[],
+      operationAreaId: categoryId,
+    }));
   }
 
   const admin = supabaseAdmin();
