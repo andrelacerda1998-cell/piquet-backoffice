@@ -13,6 +13,7 @@ import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
+import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import {
   getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
   getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
@@ -396,6 +397,8 @@ export default function TechniciansPage() {
 
   // Perfil do técnico (documentos entregues, em falta e por validar).
   const [profileVendor, setProfileVendor] = useState<RealVendor | null>(null);
+  // Vindo da pesquisa global (⌘K): `?tecnico=7&q=Rui` abre o perfil.
+  useAbrirPeloEndereco("tecnico", vendors?.data, (v) => v.id, setProfileVendor, setSearch);
 
   // Subutilizador AT: o backend pode enviá-lo com nomes diferentes (ou ainda
   // não o enviar de todo) — aceitamos qualquer um.

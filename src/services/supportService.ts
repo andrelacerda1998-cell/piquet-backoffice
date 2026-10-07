@@ -45,24 +45,3 @@ export async function updateAlertStatus(id: string, status: DashboardAlert["stat
   }).then((r) => r.data);
 }
 
-export async function getAlertCounts() {
-  return apiGet("/alerts/counts", () => {
-    const open = alertsCache.filter((a) => !["resolvido", "ignorado"].includes(a.status));
-    return {
-      total: open.length,
-      critica: open.filter((a) => a.priority === "critica").length,
-      alta: open.filter((a) => a.priority === "alta").length,
-      operacional: open.filter((a) => a.type === "operacional").length,
-      financeiro: open.filter((a) => a.type === "financeiro").length,
-      fiscal: open.filter((a) => a.type === "fiscal").length,
-    };
-  }).then((r) => r.data);
-}
-
-export async function getSupportTickets(page = 1, pageSize = 20) {
-  return apiGet("/support/tickets", () => {
-    return paginateArray(sortArray(mockData.supportTickets, "openedAt", "desc"), page, pageSize);
-  }).then((r) => r.data);
-}
-
-

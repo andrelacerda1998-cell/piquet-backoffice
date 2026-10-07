@@ -93,10 +93,20 @@ export const useFilterStore = create<FilterState>()(
         lá tivesse ficado escrito continuava guardado no browser, a contar como
         filtro ativo e a filtrar sem que ninguém o visse. Apaga-se ao carregar.
       */
-      version: 1,
+      /*
+        Versão 2 (07/10/2026): o filtro de categoria passou a usar as
+        categorias reais do Laravel (ids numéricos). Uma categoria fixa da
+        configuração ("cat_canalizacao") guardada no browser não coincidia com
+        nada e deixava o Financeiro vazio. Com backend, apaga-se ao carregar;
+        no modo de demonstração continua a ser válida.
+      */
+      version: 2,
       migrate: (guardado) => {
-        const s = guardado as { filters?: { search?: string } };
+        const s = guardado as { filters?: { search?: string; categoryId?: string } };
         if (s?.filters) delete s.filters.search;
+        if (s?.filters?.categoryId?.startsWith("cat_") && process.env.NEXT_PUBLIC_API_URL) {
+          delete s.filters.categoryId;
+        }
         return s as never;
       },
     }

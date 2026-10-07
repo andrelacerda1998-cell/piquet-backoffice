@@ -158,14 +158,6 @@ export async function getCustomersByLocation() {
 }
 
 /**
- * Sem tracking de canal/origem de aquisição no Laravel -- devolve sempre
- * vazio (o gráfico mostra "Sem dados" em vez de uma distribuição inventada).
- */
-export async function getCustomersBySource() {
-  return apiGet<Array<{ name: string; value: number }>>("/customers/by-source", () => []).then((r) => r.data);
-}
-
-/**
  * Retenção por coorte: sem análise de coortes no Laravel -- devolve sempre
  * vazio (antes eram barras fictícias fixas 42/35/28%).
  */

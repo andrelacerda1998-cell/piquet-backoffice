@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal, Field } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
+import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -177,6 +178,8 @@ export default function CustomersPage() {
   // modal com os cartões/MBWay do cliente; sem criar/editar (só o Filament
   // já não permitia isso na prática — o form estava comentado).
   const [selectedCustomer, setSelectedCustomer] = useState<RealCustomer | null>(null);
+  // Vindo da pesquisa global (⌘K): `?cliente=42&q=Ana` abre a ficha.
+  useAbrirPeloEndereco("cliente", allCustomers, (c) => c.id, setSelectedCustomer, setSearch);
   // Histórico de serviços do cliente. Os clientes vêm do Laravel (id numérico)
   // e os serviços do Supabase (customer_id uuid) — os ids não correspondem, por
   // isso a ligação possível hoje é pelo nome. Assinalado no ecrã.

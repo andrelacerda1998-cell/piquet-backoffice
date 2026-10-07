@@ -241,24 +241,7 @@ export interface MediationCase {
   owner: string;
 }
 
-export async function getMediationCases(): Promise<MediationCase[]> {
-  return apiGet("/support/mediation", () => [
-    { id: "med_1", serviceId: "srv_0203", customerName: "Rita Antunes", technicianName: "Carlos Gomes", issue: "Dano no chão — divergência sobre responsabilidade", status: "em_mediacao", openedAt: "2026-07-04", owner: "Inês Rodrigues" },
-    { id: "med_2", serviceId: "srv_0195", customerName: "João Melo", technicianName: "Rui Ferreira", issue: "Valor final diferente do orçamento", status: "acordado", openedAt: "2026-07-01", owner: "Inês Rodrigues" },
-    { id: "med_3", serviceId: "srv_0171", customerName: "Ana Beja", technicianName: "Pedro Nunes", issue: "Cliente contesta horas faturadas", status: "aberto", openedAt: "2026-07-06", owner: "—" },
-  ] as MediationCase[]).then((r) => r.data);
-}
-
 export interface FaqEntry { id: string; question: string; answer: string; category: string }
-
-export async function getInternalFaq(): Promise<FaqEntry[]> {
-  return apiGet("/support/faq", () => [
-    { id: "faq_1", question: "Cliente pede reembolso — qual é o prazo?", answer: "Cancelamentos até 24h antes: reembolso total em 3-5 dias úteis. Depois disso, aplica-se a taxa de cancelamento configurada.", category: "Pagamentos" },
-    { id: "faq_2", question: "Técnico não apareceu — o que fazer?", answer: "1) Abrir incidente em Operações; 2) contactar o técnico; 3) oferecer remarcação prioritária ou reembolso total; 4) registar na ficha do técnico.", category: "Operações" },
-    { id: "faq_3", question: "Como se altera o IBAN de um técnico?", answer: "Só com novo comprovativo. Pedir documento na ficha do técnico → Documentos → Pedir novo documento.", category: "Técnicos" },
-    { id: "faq_4", question: "Cliente quer fatura com outro NIF", answer: "Editável até 5 dias após emissão via InvoiceXpress. Depois disso é preciso nota de crédito + nova fatura.", category: "Faturação" },
-  ] as FaqEntry[]).then((r) => r.data);
-}
 
 /* ---------------------------- Configurações ---------------------------- */
 
@@ -291,17 +274,6 @@ export interface ActivityEntry {
   oldValue?: string;
   newValue?: string;
   at: string;
-}
-
-export async function getActivityLog(): Promise<ActivityEntry[]> {
-  return apiGet("/settings/activity", () => [
-    { id: "act_1", who: "André Lacerda", action: "Processou pagamento a técnico", entity: "payout_2 (Maria Ferreira)", oldValue: "pendente", newValue: "processado", at: "2026-07-06T11:22:00" },
-    { id: "act_2", who: "Inês Rodrigues", action: "Respondeu a ticket", entity: "ticket_014", at: "2026-07-06T10:48:00" },
-    { id: "act_3", who: "Maria Santos", action: "Reatribuiu técnico", entity: "srv_0301", oldValue: "Pedro Nunes", newValue: "Rui Ferreira", at: "2026-07-06T10:12:00" },
-    { id: "act_4", who: "Rodrigo Pacheco", action: "Ativou acréscimo de urgência", entity: "Assistência emergencial", oldValue: "15%", newValue: "20%", at: "2026-07-05T17:40:00" },
-    { id: "act_5", who: "Pedro Oliveira", action: "Marcou obrigação fiscal paga", entity: "IVA 2026-05", oldValue: "pendente", newValue: "pago", at: "2026-07-05T15:02:00" },
-    { id: "act_6", who: "André Lacerda", action: "Aprovou técnico", entity: "Nuno Bernardes", oldValue: "em_validacao", newValue: "aprovado", at: "2026-07-05T11:30:00" },
-  ] as ActivityEntry[]).then((r) => r.data);
 }
 
 /** Taxas e comissões configuráveis (persistidas via usePersistentList no UI). */

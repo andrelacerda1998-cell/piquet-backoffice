@@ -6,13 +6,13 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, AreaChartComponent } from "@/components/charts/Charts";
+import { ChartCard, BarChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import {
   getEmployees, getTeamDashboard, getTaxObligations, getTaxSummary,
   markTaxObligationPaid, simulateHiring,
   computeEmployeeCost, deactivateEmployee, deleteEmployee, createEmployee, updateEmployee, effectiveMonthlyCost, getVatSummary,
-  getTeamCostEvolution, getCostByDepartmentChart,
+  getCostByDepartmentChart,
 } from "@/services/employeesService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -140,7 +140,6 @@ export default function TaxHRPage() {
       toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
     }
   };
-  const { data: teamCostEvolution } = useAsyncData(() => getTeamCostEvolution(), []);
   const { data: costByDept } = useAsyncData(() => getCostByDepartmentChart(), []);
 
   const [simInput, setSimInput] = useState({
@@ -162,17 +161,14 @@ export default function TaxHRPage() {
     annualBonus: 0,
     otherMonthlyCosts: 0,
   });
-  const [simResult, setSimResult] = useState<Awaited<ReturnType<typeof simulateHiring>> | null>(null);
+  const [simResult, setSimResult] = useState<ReturnType<typeof simulateHiring> | null>(null);
 
   const handleMarkPaid = async (id: string) => {
     await markTaxObligationPaid(id, new Date().toISOString());
     refetch();
   };
 
-  const handleSimulate = async () => {
-    const result = await simulateHiring(simInput);
-    setSimResult(result);
-  };
+  const handleSimulate = () => setSimResult(simulateHiring(simInput));
 
   const taxColumns: Column<TaxObligation>[] = [
     { key: "name", label: "Obrigação" },
@@ -332,14 +328,14 @@ export default function TaxHRPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Evolução custo mensal">
-                <AreaChartComponent data={(teamCostEvolution ?? []).map((d) => ({ name: d.date, value: d.value }))} currency />
-              </ChartCard>
-              <ChartCard title="Custo por departamento">
-                <BarChartComponent data={costByDept ?? []} currency />
-              </ChartCard>
-            </div>
+            {/*
+              Saiu a "Evolução custo mensal": não havia rota, e a curva era o
+              custo de hoje multiplicado por 0,95, 0,96, 0,97… — uma subida
+              desenhada à mão. Sem histórico de salários não há evolução.
+            */}
+            <ChartCard title="Custo por departamento">
+              <BarChartComponent data={costByDept ?? []} currency />
+            </ChartCard>
 
             <div className="flex justify-between items-center">
               <SearchInput value={search} onChange={setSearch} className="max-w-sm" placeholder="Pesquisar colaboradores..." />
@@ -373,8 +369,6 @@ export default function TaxHRPage() {
                 <ResultRow label="Custo mensal" value={formatCurrency(simResult.monthlyCost)} />
                 <ResultRow label="Custo anual" value={formatCurrency(simResult.annualCost)} />
                 <ResultRow label="Custo 1.º ano (c/ recrutamento)" value={formatCurrency(simResult.firstYearCost)} />
-                <ResultRow label="Impacto burn rate" value={formatCurrency(simResult.impactOnBurnRate)} />
-                <ResultRow label="Impacto runway" value={simResult.impactOnRunway ? `${simResult.impactOnRunway.toFixed(1)} meses` : "N/A"} />
               </div>
             )}
           </div>

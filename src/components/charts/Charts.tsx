@@ -303,39 +303,6 @@ export function FunnelChartComponent({ data }: {
   );
 }
 
-export function CashFlowChart({ data, height = 300 }: {
-  data: number[];
-  height?: number;
-}) {
-  const chartData = data.map((value, i) => ({ name: `D${i + 1}`, value }));
-  const hasNegative = data.some((v) => v < 0);
-  const stroke = hasNegative ? "#D6503B" : "#FAB347";
-
-  return (
-    <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={chartData}>
-        <defs>
-          <linearGradient id="cashflow-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={stroke} stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--surface-border))" />
-        <XAxis dataKey="name" tick={{ fontSize: 10, fill: "rgb(var(--text-muted))" }} interval={Math.floor(data.length / 6)} />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-        <Tooltip content={<ChartTooltip formatter={formatCurrency} />} />
-        <Area
-          type="monotone"
-          dataKey="value"
-          stroke={stroke}
-          fill="url(#cashflow-grad)"
-          strokeWidth={2.5}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
 export function HeatMapGrid({ data }: { data: Array<{ name: string; value: number; ratio?: number }> }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (

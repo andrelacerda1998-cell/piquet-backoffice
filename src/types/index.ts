@@ -101,6 +101,13 @@ export interface ServiceRequest {
   vatValue?: number;
   paymentStatus: PaymentStatus;
   invoiceStatus?: InvoiceStatus;
+  /**
+   * Quantos técnicos foram convidados e o que responderam. Só nos serviços que
+   * vêm do Laravel; `accepted` conta quem aceitou alguma vez.
+   */
+  matching?: { invited: number; notified: number; accepted: number; declined: number; expired: number };
+  /** A categoria (área de operação do Laravel). É por ela que o filtro global pergunta. */
+  operationAreaId?: string;
   rating?: number;
   hasComplaint: boolean;
   cancellationReason?: string;

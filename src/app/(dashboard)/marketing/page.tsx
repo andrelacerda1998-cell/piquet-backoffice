@@ -6,11 +6,10 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getCampaigns, getAdSpend, refreshAdSpend, type SpendMonth } from "@/services/marketingService";
-import { getScripts } from "@/services/extrasService";
 import { toast } from "@/stores";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Megaphone, MessageSquare, RefreshCw } from "lucide-react";
+import { Megaphone, RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
@@ -60,7 +59,6 @@ export default function MarketingPage() {
   const [recarga, setRecarga] = useState(0);
   const { data: campaigns } = useAsyncData(() => getCampaigns(), [recarga]);
   const { data: spend } = useAsyncData(() => getAdSpend(), [recarga]);
-  const { data: scripts } = useAsyncData(() => getScripts(), []);
   const [aAtualizar, setAAtualizar] = useState(false);
   const [estadoCampanhas, setEstadoCampanhas] = useState<"ativas" | "paradas" | "todas">("todas");
 
@@ -398,27 +396,12 @@ export default function MarketingPage() {
               <SectionHeader title="Vouchers" />
               <Vouchers />
             </div>
-            <details className="card p-4">
-              <summary className="cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary">
-                Guiões de mensagens ({(scripts ?? []).length})
-              </summary>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(scripts ?? []).map((s) => (
-                  <div key={s.id} className="rounded-xl border border-surface-border p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-text-primary">{s.title}</p>
-                        <p className="text-xs text-text-secondary">{s.purpose}</p>
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-piquet/15 text-piquet-700 shrink-0">
-                        <MessageSquare className="h-3 w-3" />{s.channel}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm text-text-secondary rounded-lg bg-surface-subtle px-3 py-2">{s.content}</p>
-                  </div>
-                ))}
-              </div>
-            </details>
+            {/*
+              Saíram os "Guiões de mensagens": cinco textos escritos no código,
+              dois deles com promessas que não existem (20% com o código
+              PRIMAVERA, 10 € no próximo serviço). Quem os copiasse estaria a
+              oferecer descontos que a app não reconhece.
+            */}
           </div>
         )}
 

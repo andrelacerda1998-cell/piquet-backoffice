@@ -338,15 +338,15 @@ export default function OverviewPage() {
         <div>
           <SectionHeader
             title="Unit economics"
-            aside={<>{unit?.newCustomersMonth ?? 0} clientes · {formatCurrency(unit?.adSpendMonth ?? 0)} em anúncios (mês)</>}
+            aside={<>{unit?.newCustomersMonth ?? 0} clientes novos · {formatCurrency(unit?.adSpendMonth ?? 0)} em anúncios (mês)</>}
           />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <MetricCard title="CAC" format="currency" hideDelta
-              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, true, undefined, "Custo de aquisição por cliente = investimento em anúncios (mês) ÷ clientes novos (mês). Menor é melhor.")} />
+              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, true, undefined, "Custo de aquisição = investimento em anúncios (mês) ÷ clientes cuja primeira compra foi este mês. Quem já era cliente e voltou não conta. Menor é melhor.")} />
             <MetricCard title="Serviços / cliente" hideDelta
-              metric={buildMetricValue(unit?.servicesPerCustomer ?? 0, unit?.servicesPerCustomer ?? 0, false, undefined, "Serviços concluídos por cliente novo este mês.")} />
+              metric={buildMetricValue(unit?.servicesPerCustomer ?? 0, unit?.servicesPerCustomer ?? 0, false, undefined, "Serviços concluídos este mês ÷ clientes servidos este mês (novos e antigos).")} />
             <MetricCard title="LTV" format="currency" hideDelta
-              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Comissão média da Piquet por cliente (todo o histórico de serviços).")} />
+              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Comissão da Piquet de todo o histórico ÷ número de clientes. Cada cliente é contado pela conta na app, não pelo nome.")} />
             <MetricCard title="Rácio LTV/CAC" hideDelta
               metric={buildMetricValue(unit && unit.cac > 0 ? Math.round((unit.ltv / unit.cac) * 100) / 100 : 0, 0, false, undefined, "LTV ÷ CAC. Saudável acima de 3×.")} />
           </div>

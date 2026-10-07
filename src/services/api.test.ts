@@ -6,13 +6,11 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
     expect(isLiveEndpoint("/services")).toBe(true);
     expect(isLiveEndpoint("/services?page=2&status=concluido")).toBe(true);
     expect(isLiveEndpoint("/services/srv_123")).toBe(true);
-    expect(isLiveEndpoint("/dashboard/recent-services")).toBe(true);
   });
 
   it("marca como migrados os endpoints da Fase 2 (Clientes & Técnicos)", () => {
     expect(isLiveEndpoint("/customers")).toBe(true);
     expect(isLiveEndpoint("/customers/metrics")).toBe(true);
-    expect(isLiveEndpoint("/customers/by-source")).toBe(true);
     expect(isLiveEndpoint("/customers/by-location")).toBe(true);
     expect(isLiveEndpoint("/customers/trend")).toBe(true);
     expect(isLiveEndpoint("/customers/retention")).toBe(true);
@@ -41,17 +39,12 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
   });
 
   it("marca como migrados os endpoints da Fase 3a (Financeiro derivável)", () => {
-    expect(isLiveEndpoint("/finance/by-service?page=1")).toBe(true);
-    expect(isLiveEndpoint("/finance/daily-revenue")).toBe(true);
-    expect(isLiveEndpoint("/finance/revenue-by-technician")).toBe(true);
     expect(isLiveEndpoint("/finance/revenue-vs-costs")).toBe(true);
-    expect(isLiveEndpoint("/dashboard/revenue-by-category")).toBe(true);
   });
 
   it("marca como migrados os endpoints da Fase 4 (Impostos e RH + Marketing)", () => {
     expect(isLiveEndpoint("/employees?page=1")).toBe(true);
     expect(isLiveEndpoint("/employees/dashboard")).toBe(true);
-    expect(isLiveEndpoint("/employees/internal-vs-contractors")).toBe(true);
     expect(isLiveEndpoint("/finance/summary")).toBe(true); // desbloqueado por employees
     expect(isLiveEndpoint("/finance/operational-result")).toBe(true);
     expect(isLiveEndpoint("/marketing/metrics")).toBe(true);
@@ -197,9 +190,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
   it("um gráfico derivado de dados reais também é real", async () => {
     const { isDemoEndpoint } = await load();
     for (const ep of [
-      "/finance/by-service", "/finance/daily-revenue", "/finance/revenue-vs-costs",
-      "/finance/revenue-by-technician", "/finance/operational-result",
-      "/dashboard/revenue-by-category", "/dashboard/recent-services",
+      "/finance/revenue-vs-costs", "/finance/operational-result",
     ]) {
       expect(isDemoEndpoint(ep), `${ep} deriva de /services, que é real`).toBe(false);
     }
@@ -220,7 +211,7 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
                       "/product/integrations-status", "/product/funnel", "/dev-tasks", "/tasks",
                       "/team/messages", "/team/tasks", "/team/agenda", "/team/meetings", "/team/channels",
                       "/finance/budget", "/employees", "/employees/dashboard",
-                      "/customers", "/customers/metrics", "/customers/by-location", "/customers/by-source",
+                      "/customers", "/customers/metrics", "/customers/by-location",
                       "/customers/trend", "/customers/retention", "/technicians",
                       "/technicians/metrics", "/technicians/by-category", "/technicians/by-location",
                       "/technicians/top", "/technicians/coverage", "/technicians/live-locations",
@@ -371,7 +362,6 @@ describe("todo o GET que vai ao backend chega ao ecrã sem ser zerado", () => {
   const FICCAO: Record<string, string> = {
     "/tax/summary": "vem do seed",
     "/tax/vat": "vem do seed",
-    "/services/x": "getServiceById lê os serviços manuais do Supabase e nenhum ecrã o chama",
   };
 
   async function load() {

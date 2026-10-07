@@ -28,6 +28,19 @@ export interface SearchResult {
 }
 
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
+/**
+ * O endereço que abre a ficha de um registo (ver useAbrirPeloEndereco). O
+ * nome vai junto porque a página só tem a lista com pesquisa: procura por ele
+ * e abre a ficha quando o registo aparece.
+ */
+export function fichaHref(base: string, chave: string, id: unknown, nome: unknown): string {
+  const url = new URL(base, "http://x");
+  url.searchParams.set(chave, String(id));
+  const q = typeof nome === "string" ? nome.trim() : "";
+  if (q) url.searchParams.set("q", q);
+  return url.pathname + url.search;
+}
+
 async function safe(fn: () => Promise<void>) { try { await fn(); } catch { /* fonte indisponível — ignora */ } }
 
 export async function searchEntities(raw: string): Promise<{ results: SearchResult[] }> {
@@ -46,9 +59,10 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
         );
         for (const s of r.items ?? []) out.push({
           type: "service", typeLabel: "Serviço", id: String(s.id),
-          title: String(s.service_name || s.customer_name || s.id),
+          // O número à frente: é o que o cliente diz ao telefone.
+          title: `#${s.id} · ${String(s.service_name || s.customer_name || "Serviço")}`,
           subtitle: join([s.customer_name as string, s.technician_name as string, s.city as string]),
-          href: "/servicos",
+          href: `/servicos?servico=${encodeURIComponent(String(s.id))}`,
         });
         return;
       }
@@ -59,7 +73,8 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       for (const s of data ?? []) out.push({
         type: "service", typeLabel: "Serviço", id: String(s.id),
         title: s.service_name || s.customer_name || String(s.id),
-        subtitle: join([s.customer_name, s.technician_name, s.city]), href: "/servicos",
+        subtitle: join([s.customer_name, s.technician_name, s.city]),
+        href: `/servicos?servico=${encodeURIComponent(String(s.id))}`,
       });
     }),
     safe(async () => {
@@ -71,7 +86,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
           type: "customer", typeLabel: "Cliente", id: String(c.id),
           title: String(c.name || "(sem nome)"),
           subtitle: join([c.phone_number as string, c.email as string]),
-          href: "/clientes",
+          href: fichaHref("/clientes?tab=lista", "cliente", c.id, c.name),
         });
         return;
       }
@@ -79,7 +94,8 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
         .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
       for (const c of data ?? []) out.push({
         type: "customer", typeLabel: "Cliente", id: String(c.id),
-        title: c.name || "(sem nome)", subtitle: join([c.phone, c.email]), href: "/clientes",
+        title: c.name || "(sem nome)", subtitle: join([c.phone, c.email]),
+        href: fichaHref("/clientes?tab=lista", "cliente", c.id, c.name),
       });
     }),
     safe(async () => {
@@ -91,7 +107,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
           type: "technician", typeLabel: "Técnico", id: String(t.id),
           title: String(t.name || "(sem nome)"),
           subtitle: join([t.phone_number as string, t.nif as string]),
-          href: "/tecnicos",
+          href: fichaHref("/tecnicos?tab=lista", "tecnico", t.id, t.name),
         });
         return;
       }
@@ -99,7 +115,8 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
         .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(6);
       for (const t of data ?? []) out.push({
         type: "technician", typeLabel: "Técnico", id: String(t.id),
-        title: t.name || "(sem nome)", subtitle: join([t.phone, t.email]), href: "/tecnicos",
+        title: t.name || "(sem nome)", subtitle: join([t.phone, t.email]),
+        href: fichaHref("/tecnicos?tab=lista", "tecnico", t.id, t.name),
       });
     }),
     safe(async () => {

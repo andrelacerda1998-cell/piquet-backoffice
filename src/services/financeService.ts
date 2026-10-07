@@ -1,12 +1,12 @@
 import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import { mockData } from "@/mocks/data";
-import { applyFiltersToServices, paginateArray, sortArray } from "@/lib/filters";
+import { applyFiltersToServices } from "@/lib/filters";
 import {
   calculateBurnRate, calculateRunway, calculatePiquetRevenueWithoutVat,
   calculateEmployeeAnnualCost,
 } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
-import type { DashboardFilter, FinanceSummary, ChartDataPoint, PaginatedResult, SortParams } from "@/types";
+import type { DashboardFilter, FinanceSummary, ChartDataPoint } from "@/types";
 
 function getCompletedServices(filters: DashboardFilter) {
   return applyFiltersToServices(mockData.services, filters).filter((s) => s.status === "concluido");
@@ -72,66 +72,6 @@ export async function getFinanceSummary(filters: DashboardFilter): Promise<Finan
   }, { period: filters.period, categoryId: filters.categoryId, city: filters.city }).then((r) => r.data);
 }
 
-export async function getFinanceByService(
-  filters: DashboardFilter,
-  page = 1,
-  pageSize = 20,
-  sort?: SortParams
-): Promise<PaginatedResult<Record<string, unknown>>> {
-  return apiGet(
-    "/finance/by-service",
-    () => {
-      let items = getCompletedServices(filters).map((s) => ({
-        id: s.id,
-        serviceName: s.serviceName,
-        customerName: s.customerName,
-        technicianName: s.technicianName ?? "—",
-        totalCustomerValue: s.totalCustomerValue,
-        technicianValue: s.technicianValue,
-        piquetRevenue: s.piquetRevenue,
-        vat: s.vatValue,
-        paymentStatus: s.paymentStatus,
-        invoiceStatus: s.invoiceStatus,
-        completedAt: s.completedAt,
-      }));
-      if (sort) items = sortArray(items, sort.field as keyof typeof items[0], sort.direction);
-      return paginateArray(items, page, pageSize);
-    },
-    { page, pageSize, period: filters.period, categoryId: filters.categoryId, city: filters.city, sort: sort?.field, dir: sort?.direction }
-  ).then((r) => r.data);
-}
-
-export async function getDailyRevenue(filters: DashboardFilter): Promise<ChartDataPoint[]> {
-  return apiGet(
-    "/finance/daily-revenue",
-    () => {
-      const completed = getCompletedServices(filters);
-      const byDate: Record<string, number> = {};
-      completed.forEach((s) => {
-        const d = s.completedAt?.slice(0, 10) ?? s.requestedAt.slice(0, 10);
-        byDate[d] = (byDate[d] ?? 0) + s.piquetRevenue;
-      });
-      return Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([name, value]) => ({ name, value: Math.round(value) }));
-    },
-    { period: filters.period, categoryId: filters.categoryId, city: filters.city }
-  ).then((r) => r.data);
-}
-
-export async function getRevenueByTechnician(filters: DashboardFilter): Promise<ChartDataPoint[]> {
-  return apiGet(
-    "/finance/revenue-by-technician",
-    () => {
-      const completed = getCompletedServices(filters).filter((s) => s.technicianName);
-      const byTech: Record<string, number> = {};
-      completed.forEach((s) => {
-        byTech[s.technicianName!] = (byTech[s.technicianName!] ?? 0) + s.piquetRevenue;
-      });
-      return Object.entries(byTech).sort(([, a], [, b]) => b - a).slice(0, 10).map(([name, value]) => ({ name, value: Math.round(value) }));
-    },
-    { period: filters.period, categoryId: filters.categoryId, city: filters.city }
-  ).then((r) => r.data);
-}
-
 export async function getRevenueVsCosts(filters: DashboardFilter): Promise<ChartDataPoint[]> {
   return apiGet(
     "/finance/revenue-vs-costs",
@@ -151,66 +91,6 @@ export async function getRevenueVsCosts(filters: DashboardFilter): Promise<Chart
   ).then((r) => r.data);
 }
 
-export async function getCashFlowForecast(scenario: "conservador" | "base" | "otimista" = "base") {
-  return apiGet(`/finance/cashflow?scenario=${scenario}`, () => {
-    const multiplier = scenario === "conservador" ? 0.8 : scenario === "otimista" ? 1.2 : 1;
-    const startingBalance = 185000;
-    const items = [];
-    let balance = startingBalance;
-    const projectedBalance: number[] = [];
-    const negativePeriods: string[] = [];
-
-    for (let i = 0; i < 90; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
-      const revenue = (800 + Math.random() * 400) * multiplier;
-      const techPayments = revenue * 0.65;
-      const teamCost = i % 30 === 0 ? 38500 : 0;
-      const tax = i % 30 === 15 ? 12000 : 0;
-      balance += revenue - techPayments - teamCost - tax;
-      projectedBalance.push(Math.round(balance));
-      if (balance < 0) negativePeriods.push(dateStr);
-      items.push({ date: dateStr, label: dateStr, type: "entrada" as const, category: "Receita", amount: revenue, isEstimated: true });
-    }
-
-    return {
-      scenario,
-      periodDays: 90,
-      startingBalance,
-      items,
-      projectedBalance,
-      negativePeriods,
-    };
-  }).then((r) => r.data);
-}
-
-export async function getFixedVsVariableCosts(): Promise<ChartDataPoint[]> {
-  return apiGet("/finance/fixed-vs-variable", () => [
-    { name: "Salários", value: 38500, type: "fixo" },
-    { name: "Seguros", value: 1200, type: "fixo" },
-    { name: "Software", value: 800, type: "fixo" },
-    { name: "Renda", value: 2500, type: "fixo" },
-    { name: "Pagamentos técnicos", value: 42000, type: "variável" },
-    { name: "Marketing", value: 8500, type: "variável" },
-    { name: "Impostos", value: 12000, type: "variável" },
-  ]).then((r) => r.data);
-}
-
-export async function getPendingPayments(): Promise<ChartDataPoint[]> {
-  return apiGet("/finance/pending-payments", () => {
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    return months.map((name) => ({ name, value: Math.round(2000 + Math.random() * 5000) }));
-  }).then((r) => r.data);
-}
-
-export async function getRefundsOverTime(): Promise<ChartDataPoint[]> {
-  return apiGet("/finance/refunds", () => {
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
-    return months.map((name) => ({ name, value: Math.round(500 + Math.random() * 2000) }));
-  }).then((r) => r.data);
-}
-
 export async function getOperationalResult(): Promise<ChartDataPoint[]> {
   return apiGet("/finance/operational-result", () => {
     const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"];
@@ -227,19 +107,6 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   status: "paga" | "pendente" | "vencida";
-}
-
-export async function getInvoices(): Promise<Invoice[]> {
-  return apiGet("/finance/invoices", () => {
-    const data: Invoice[] = [
-      { id: "inv_1", number: "FT 2026/0142", entity: "EDP Comercial", description: "Eletricidade — escritório", amount: 184.5, issueDate: "2026-06-10", dueDate: "2026-07-10", status: "pendente" },
-      { id: "inv_2", number: "FT 2026/0138", entity: "NOS Comunicações", description: "Internet e telefone", amount: 79.9, issueDate: "2026-06-05", dueDate: "2026-06-25", status: "vencida" },
-      { id: "inv_3", number: "FT 2026/0130", entity: "Contas & Cia (contabilidade)", description: "Avença mensal", amount: 350, issueDate: "2026-06-01", dueDate: "2026-06-30", status: "paga" },
-      { id: "inv_4", number: "FT 2026/0125", entity: "Google Ireland", description: "Google Ads — Junho", amount: 1240, issueDate: "2026-07-01", dueDate: "2026-07-15", status: "pendente" },
-      { id: "inv_5", number: "FT 2026/0121", entity: "Seguros Fidelidade", description: "Seguro de responsabilidade civil", amount: 620, issueDate: "2026-06-15", dueDate: "2026-07-05", status: "pendente" },
-    ];
-    return data;
-  }).then((r) => r.data);
 }
 
 /* ==================== PAGAMENTOS DA APP (Payshop Online Payments) ==================== */
@@ -333,7 +200,10 @@ export interface UnitEconomics {
   cac: number;
   servicesPerCustomer: number;
   adSpendMonth: number;
+  /** Clientes cuja primeira compra foi este mês. */
   newCustomersMonth: number;
+  /** Clientes servidos este mês, novos e antigos. */
+  customersMonth: number;
   servicesMonth: number;
   totalCustomers: number;
 }
@@ -341,7 +211,7 @@ export interface UnitEconomics {
 /** LTV, CAC e serviços/cliente reais (dos serviços concluídos + investimento). */
 export async function getUnitEconomics(): Promise<UnitEconomics> {
   return apiGet<UnitEconomics>("/finance/unit-economics", () => ({
-    ltv: 0, cac: 0, servicesPerCustomer: 0, adSpendMonth: 0, newCustomersMonth: 0, servicesMonth: 0, totalCustomers: 0,
+    ltv: 0, cac: 0, servicesPerCustomer: 0, adSpendMonth: 0, newCustomersMonth: 0, customersMonth: 0, servicesMonth: 0, totalCustomers: 0,
   })).then((r) => r.data);
 }
 
