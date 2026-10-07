@@ -35,8 +35,10 @@ interface LeadRow {
 
 /**
  * Cria um serviço CONCLUÍDO em Operações a partir do pedido (quando este é
- * marcado "Concluído"). Liga cliente e técnico (reutilizando os registos),
- * para o serviço contar no GMV, Técnicos e Clientes. Devolve o id do serviço.
+ * marcado "Concluído"). Liga cliente e técnico (reutilizando os registos).
+ * Devolve o id do serviço. Desde 07/10/2026 NÃO conta no GMV: o GMV é só o
+ * cobrado no Payshop (ver _lib/gmv.ts), e um trabalho combinado fora da app
+ * não passa por lá.
  * `piquet_revenue` é coluna GERADA — não se insere.
  */
 async function createServiceFromLead(admin: ReturnType<typeof supabaseAdmin>, lead: LeadRow): Promise<string> {

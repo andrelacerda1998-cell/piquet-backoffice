@@ -16,7 +16,7 @@
  *  - as páginas são todas percorridas (a lista do Laravel trava em 100).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { makeSupabaseMock } from "@/test/supabaseMock";
+import { makeSupabaseMock, resetMock } from "@/test/supabaseMock";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => makeSupabaseMock());
@@ -61,7 +61,8 @@ async function correr(lista: Array<Record<string, unknown>>[]) {
   };
 }
 
-beforeEach(() => { pedidos.length = 0; _clearStaffCache(); });
+// O staff simulado com um perfil: desde 07/10 a API verifica-o (src/lib/acessoApi.ts).
+beforeEach(() => { pedidos.length = 0; _clearStaffCache(); resetMock(); });
 
 describe("funil dos técnicos — invariantes das contas", () => {
   /**

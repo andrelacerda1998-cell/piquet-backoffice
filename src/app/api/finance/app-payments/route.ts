@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { paymentMethodOf, derivePaymentState, isTestAmount, type PaymentState } from "../../_lib/paylands";
+import { paymentMethodOf, type PaymentState } from "../../_lib/paylands";
+import { agruparPagamentos, mesDe } from "../../_lib/gmv";
 import { apiOk, withStaff } from "../../_lib/handler";
 
 /**
@@ -18,9 +19,6 @@ interface Row {
   source_type: string; created: string | null;
 }
 
-const CHARGE_TYPES = ["CONFIRMATION", "PURCHASE", "CAPTURE", "PAYMENT"];
-const HOLD_TYPES = ["DEFERRED", "AUTHORIZATION"];
-
 export const GET = withStaff(async () => {
   const { data, error } = await supabaseAdmin()
     .from("pop_transactions")
@@ -30,36 +28,27 @@ export const GET = withStaff(async () => {
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Row[];
 
-  // Agrupa por encomenda (fallback: a própria transação, se não houver order).
-  const byOrder = new Map<string, Row[]>();
-  for (const r of rows) {
-    const k = r.order_uuid || r.transaction_uuid;
-    (byOrder.get(k) ?? byOrder.set(k, []).get(k)!).push(r);
-  }
-
-  const payments = [...byOrder.entries()].map(([orderId, txs]) => {
-    const state = derivePaymentState(txs);
-    const pick = (types: string[]) =>
-      txs.find((t) => t.status === "SUCCESS" && types.includes(t.type)) ??
-      txs.find((t) => types.includes(t.type));
-    // Valor do pagamento: o confirmado manda; senão o cativado; senão o 1.º.
-    const main = pick(CHARGE_TYPES) ?? pick(HOLD_TYPES) ?? txs[0];
-    const withBrand = txs.find((t) => t.source_type) ?? main;
+  /*
+    O agrupamento, o valor, o estado e a data são os do GMV (_lib/gmv.ts):
+    o "cobrado" deste ecrã é, por construção, o mesmo GMV da Visão Geral.
+  */
+  const payments = agruparPagamentos(rows).map((p) => {
+    const txs = p.transacoes;
+    const withBrand = txs.find((t) => t.source_type) ?? txs[0];
     const method = paymentMethodOf(withBrand.service, withBrand.source_type);
-    const created = txs.map((t) => t.created).filter(Boolean).sort()[0] ?? null;
     const refunded = txs.filter((t) => t.status === "SUCCESS" && (t.type === "REFUND" || t.type === "REVERSAL"))
       .reduce((s, t) => s + t.amount_cents, 0);
     return {
-      id: orderId,
-      customer: main.customer_ext_id,
-      amountCents: main.amount_cents,
+      id: p.id,
+      customer: p.cliente,
+      amountCents: p.valorCents,
       refundedCents: refunded,
-      state,
+      state: p.estado,
       method: method.label,
       methodKind: method.kind,
-      created,
+      created: p.quando,
       attempts: txs.length,
-      isTest: isTestAmount(main.amount_cents),
+      isTest: p.teste,
     };
   }).sort((a, b) => (b.created ?? "").localeCompare(a.created ?? ""));
 
@@ -80,7 +69,8 @@ export const GET = withStaff(async () => {
   const byMonth = new Map<string, { cobrado: number; cativado: number }>();
   for (const p of real) {
     if (p.state !== "pago" && p.state !== "cativado") continue;
-    const key = (p.created ?? "").slice(0, 7);
+    // Mês de Lisboa, como o GMV.
+    const key = p.created ? mesDe(p.created) : "";
     if (!key) continue;
     const m = byMonth.get(key) ?? { cobrado: 0, cativado: 0 };
     if (p.state === "pago") m.cobrado += p.amountCents; else m.cativado += p.amountCents;

@@ -1,25 +1,18 @@
 import { apiOk, withStaff } from "../../_lib/handler";
-import { servicosConcluidos, parseFinanceFilters } from "../../_lib/finance";
-
-interface Row { completed_at: string | null; requested_at: string; piquet_revenue: number; technician_value: number }
+import { gmvPorMes, lerPagamentos } from "../../_lib/gmv";
 
 /**
- * GET /api/finance/revenue-vs-costs — por mês: receita Piquet vs custo com técnicos.
- * (Derivação real dos serviços — substitui o mock sintético.)
+ * GET /api/finance/revenue-vs-costs — por mês: receita da Piquet contra o que
+ * vai para os técnicos.
+ *
+ * Do GMV (Payshop cobrado, ver _lib/gmv.ts): a receita é a comissão e o resto
+ * é dos técnicos. Somava antes os serviços concluídos do Laravel, que davam
+ * outro total para os mesmos meses. Não se divide por categoria nem cidade —
+ * o Payshop não as conhece.
  */
-export const GET = withStaff(async (req) => {
-  const f = parseFinanceFilters(new URL(req.url));
-  const data = await servicosConcluidos(f);
-  const byMonth: Record<string, { receita: number; custos: number }> = {};
-  for (const s of (data ?? []) as Row[]) {
-    const m = (s.completed_at ?? s.requested_at).slice(0, 7); // YYYY-MM
-    if (!byMonth[m]) byMonth[m] = { receita: 0, custos: 0 };
-    byMonth[m].receita += Number(s.piquet_revenue);
-    byMonth[m].custos += Number(s.technician_value);
-  }
+export const GET = withStaff(async () => {
+  const meses = gmvPorMes(await lerPagamentos());
   return apiOk(
-    Object.entries(byMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, d]) => ({ name, receita: Math.round(d.receita), custos: Math.round(d.custos) }))
+    meses.map((m) => ({ name: m.mes, receita: Math.round(m.commission), custos: Math.round(m.gmv - m.commission) })),
   );
 });

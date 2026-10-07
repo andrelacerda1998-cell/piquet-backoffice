@@ -9,13 +9,19 @@ import { calculateBurnRate, calculateRunway, calculatePiquetRevenueWithoutVat } 
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { apiOk, withStaff } from "../../_lib/handler";
 import { servicosConcluidos, parseFinanceFilters } from "../../_lib/finance";
+import { gmvEntre } from "../../_lib/gmv";
 
 /** GET /api/finance/summary — resumo financeiro (serviços + opex de equipa + impostos). */
 export const GET = withStaff(async (req) => {
   const f = parseFinanceFilters(new URL(req.url));
   const admin = supabaseAdmin();
+  const { start, end } = getDateRangeFromPreset(f.period ?? "ultimos_30_dias");
 
-  const [completed, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes, saldoRes] = await Promise.all([
+  const [gmv, completed, empRes, taxRes, cancelRes, refundRes, custosRes, pagoRes, saldoRes] = await Promise.all([
+    // O dinheiro vem do GMV (Payshop cobrado), o mesmo da Visão Geral. Os
+    // serviços concluídos ficam para o que é deles: o que se deve aos
+    // técnicos e as faturas emitidas.
+    gmvEntre(start, end),
     servicosConcluidos(f),
     admin.from("employees").select("*"),
     admin.from("tax_obligations").select("amount_estimated, status"),
@@ -30,8 +36,8 @@ export const GET = withStaff(async (req) => {
   ]);
   if (empRes.error) throw new Error(empRes.error.message);
 
-  const piquetRevenue = completed.reduce((s, r) => s + Number(r.piquet_revenue), 0);
-  const totalServiceValue = completed.reduce((s, r) => s + Number(r.total_customer_value), 0);
+  const piquetRevenue = gmv.commission;
+  const totalServiceValue = gmv.gmv;
   const technicianOwed = completed.reduce((s, r) => s + Number(r.technician_value), 0);
 
   const teamCosts = ((empRes.data ?? []) as EmployeeRow[]).reduce((s, r) => s + computeEmployeeCost(rowToEmployee(r)).averageMonthlyCost, 0);
@@ -72,7 +78,6 @@ export const GET = withStaff(async (req) => {
    * com o sinal a poder inverter-se. Agora repartem-se os custos pelos meses
    * que o período tem de facto. Ver src/lib/resultado.ts.
    */
-  const { start, end } = getDateRangeFromPreset(f.period ?? "ultimos_30_dias");
   const meses = mesesNoIntervalo(start, end);
   const opexMensal = operatingCosts;
   const res = calcularResultado(piquetRevenue, opexMensal, meses);
@@ -105,7 +110,13 @@ export const GET = withStaff(async (req) => {
     /** Resultado do período escolhido (sem normalizar) e quantos meses tem. */
     periodResult: res.resultadoDoPeriodo,
     periodMonths: res.meses,
-    averageMarginPerService: completed.length ? piquetRevenue / completed.length : 0,
+    averageMarginPerService: gmv.pagamentos ? piquetRevenue / gmv.pagamentos : 0,
+    /**
+     * O GMV vem do Payshop, que não sabe a categoria nem a cidade de um
+     * pagamento: com esses filtros ligados, o GMV e a receita são os do
+     * período inteiro. O ecrã di-lo.
+     */
+    gmvIgnoraFiltros: !!(f.categoryId || f.city),
     burnRate,
     runwayMonths: currentBalance === null ? null : calculateRunway(currentBalance, burnRate),
     currentBalance,

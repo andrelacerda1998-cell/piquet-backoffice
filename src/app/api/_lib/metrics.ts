@@ -1,9 +1,8 @@
 import "server-only";
 import { ESTADOS_AGENDADOS } from "@/lib/contagemServicos";
 import { inicioDoMesLisboa, inicioDoAnoLisboa } from "@/lib/periodo";
-import { fetchAll } from "@/lib/fetchAll";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { derivePaymentState, isTestAmount, paymentKey, chargedCents } from "./paylands";
+import { gmvEntre } from "./gmv";
 
 /**
  * Métricas de negócio a que um objetivo pode ser associado, e como cada valor
@@ -47,8 +46,6 @@ const BY_KEY = new Map(METRIC_DEFS.map((m) => [m.key, m]));
 export const isKnownMetric = (key: string): boolean => BY_KEY.has(key);
 export const metricDef = (key: string): MetricDef | undefined => BY_KEY.get(key);
 
-const COMMISSION = 0.25; // margem fixa da Piquet (25%)
-
 // Fronteiras no fuso do negócio (Lisboa) — as mesmas do IVA e dos filtros,
 // para os números baterem certo entre ecrãs.
 function monthBounds(now: Date) {
@@ -56,68 +53,6 @@ function monthBounds(now: Date) {
 }
 function yearBounds(now: Date) {
   return { start: inicioDoAnoLisboa(now).toISOString() };
-}
-
-/** Total COBRADO no Payshop (pagamentos reais, sem testes) num intervalo. */
-async function cobradoBetween(startIso: string, endIso?: string): Promise<number> {
-  const admin = supabaseAdmin();
-  let q = admin
-    .from("pop_transactions")
-    .select("order_uuid, transaction_uuid, amount_cents, status, type, created")
-    .gte("created", startIso);
-  if (endIso) q = q.lt("created", endIso);
-  // Paginado: `.limit(10000)` NÃO vence o teto de 1000 linhas do PostgREST —
-  // a partir daí o GMV e a comissão apareciam abaixo do real, sem erro.
-  type Tx = { order_uuid: string; transaction_uuid: string; amount_cents: number; status: string; type: string };
-  const rows = await fetchAll<Tx>(q);
-
-  // Mesma chave e mesmo critério de valor que /api/finance/app-payments — os
-  // dois ecrãs mostravam GMVs diferentes para os mesmos dados.
-  const byOrder = new Map<string, Tx[]>();
-  for (const r of rows) {
-    const k = paymentKey(r);
-    (byOrder.get(k) ?? byOrder.set(k, []).get(k)!).push(r);
-  }
-  let cents = 0;
-  for (const txs of byOrder.values()) {
-    if (derivePaymentState(txs) !== "pago") continue;
-    const amount = chargedCents(txs);
-    if (isTestAmount(amount)) continue; // exclui tráfego de teste do programador
-    cents += amount;
-  }
-  return cents / 100;
-}
-
-/**
- * Volume e comissão dos serviços CONCLUÍDOS num intervalo (registados à mão em
- * Operações). `gmv` = valor pago pelos clientes; `piquet` = receita da Piquet
- * (respeita a comissão personalizada de cada serviço).
- */
-async function servicesBetween(startIso: string, endIso?: string): Promise<{ gmv: number; piquet: number }> {
-  const admin = supabaseAdmin();
-  let q = admin
-    .from("services")
-    .select("total_customer_value, piquet_revenue")
-    .eq("status", "concluido")
-    .gte("completed_at", startIso);
-  if (endIso) q = q.lt("completed_at", endIso);
-  const linhas = await fetchAll<{ total_customer_value: number; piquet_revenue: number }>(q);
-  let gmv = 0, piquet = 0;
-  for (const r of linhas) {
-    gmv += Number(r.total_customer_value) || 0;
-    piquet += Number(r.piquet_revenue) || 0;
-  }
-  return { gmv, piquet };
-}
-
-/**
- * GMV e comissão REAIS de um intervalo = Payshop cobrado + serviços concluídos.
- * O GMV do negócio soma os dois canais (app e off-app); a comissão respeita os
- * 25% do Payshop e a comissão (normal ou personalizada) de cada serviço.
- */
-export async function gmvForPeriod(startIso: string, endIso?: string): Promise<{ gmv: number; commission: number }> {
-  const [cobrado, svc] = await Promise.all([cobradoBetween(startIso, endIso), servicesBetween(startIso, endIso)]);
-  return { gmv: cobrado + svc.gmv, commission: cobrado * COMMISSION + svc.piquet };
 }
 
 /**
@@ -170,13 +105,13 @@ export async function computeMetric(key: string): Promise<number> {
   const now = new Date();
   switch (key) {
     case "gmv_mes":
-      return (await gmvForPeriod(monthBounds(now).start)).gmv;
+      return (await gmvEntre(monthBounds(now).start)).gmv;
     case "gmv_ano":
-      return (await gmvForPeriod(yearBounds(now).start)).gmv;
+      return (await gmvEntre(yearBounds(now).start)).gmv;
     case "comissao_mes":
-      return (await gmvForPeriod(monthBounds(now).start)).commission;
+      return (await gmvEntre(monthBounds(now).start)).commission;
     case "comissao_ano":
-      return (await gmvForPeriod(yearBounds(now).start)).commission;
+      return (await gmvEntre(yearBounds(now).start)).commission;
     case "downloads_total":
       return downloadsTotal();
     case "downloads_mes":

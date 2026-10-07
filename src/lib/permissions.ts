@@ -8,6 +8,7 @@ const FULL_ACCESS: Permission[] = [
   "change_status", "view_personal_data", "destructive_actions",
   "view_customers", "view_technicians", "view_marketing", "view_support",
   "view_alerts", "manage_settings", "view_employees", "manage_employees",
+  "manage_technicians", "pay_technicians", "refund_payments",
 ];
 
 /**
@@ -16,6 +17,9 @@ const FULL_ACCESS: Permission[] = [
  * quem já usa o backoffice). Perfis atribuídos na coluna `role` da tabela
  * `staff` do Supabase; o menu (Sidebar) e as rotas (RouteGuard) adaptam-se
  * automaticamente via `canAccessRoute` / `hasPermission`.
+ *
+ * Desde 07/10/2026 valem também no SERVIDOR: cada rota da API exige uma
+ * destas permissões (ver src/lib/acessoApi.ts). Antes só escondiam botões.
  */
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ceo: FULL_ACCESS,
@@ -26,13 +30,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   operacoes: [
     "view_dashboard", "view_services", "edit_services", "change_status",
     "destructive_actions", "view_customers", "view_technicians", "view_support",
-    "view_alerts", "export_data",
+    "view_alerts", "export_data", "manage_technicians",
   ],
 
   // Financeiro: finanças, impostos, folha e RH. Vê custos e salários.
   financeiro: [
     "view_dashboard", "view_finance", "view_aggregated_costs", "view_individual_costs",
     "view_salaries", "manage_taxes", "mark_taxes_paid", "view_employees", "export_data",
+    "pay_technicians", "refund_payments",
   ],
 
   // Marketing/Growth: aquisição e CRM/leads. Sem finanças nem salários.
@@ -49,7 +54,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Gestão de técnicos: KYC, aprovações, performance, documentos.
   gestao_tecnicos: [
     "view_dashboard", "view_technicians", "view_services", "view_customers",
-    "upload_documents", "view_alerts", "export_data",
+    "upload_documents", "view_alerts", "export_data", "manage_technicians",
   ],
 
   // Developer: quadro de dev, produto/integrações (gated em view_dashboard).

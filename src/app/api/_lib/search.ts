@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import { servicesFromLaravel } from "./laravelServices";
+import { cumpre, type Requisito } from "@/lib/acessoApi";
 
 /**
  * Pesquisa global de ENTIDADES (não navegação): serviços, clientes, técnicos,
@@ -17,6 +18,25 @@ import { servicesFromLaravel } from "./laravelServices";
  * Laravel não estiver ligado.
  */
 export type SearchType = "service" | "customer" | "technician" | "invoice" | "lead" | "ticket";
+
+/**
+ * O que cada perfil pode ver nos resultados. A pesquisa está aberta a todo o
+ * staff, e sem isto devolvia a qualquer conta clientes, faturas e tickets
+ * que o próprio ecrã lhe esconde.
+ */
+export const PERMISSAO_DO_RESULTADO: Record<SearchType, Requisito> = {
+  service: { qualquer: ["view_services"] },
+  customer: { qualquer: ["view_customers"] },
+  technician: { qualquer: ["view_technicians"] },
+  invoice: { qualquer: ["view_finance"] },
+  lead: { qualquer: ["view_marketing", "view_customers"] },
+  ticket: { qualquer: ["view_support"] },
+};
+
+/** Só os resultados que este perfil pode ver. */
+export function resultadosVisiveis<T extends { type: SearchType }>(role: string, resultados: T[]): T[] {
+  return resultados.filter((r) => cumpre(role, PERMISSAO_DO_RESULTADO[r.type]));
+}
 
 export interface SearchResult {
   type: SearchType;

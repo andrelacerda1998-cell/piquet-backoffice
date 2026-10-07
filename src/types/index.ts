@@ -37,7 +37,12 @@ export type Permission =
   | "view_alerts"
   | "manage_settings"
   | "view_employees"
-  | "manage_employees";
+  | "manage_employees"
+  // Mexer em técnicos: suspender, validar a AT, aprovar documentos, faltas.
+  | "manage_technicians"
+  // Dinheiro que SAI: pagar técnicos, reembolsar e cancelar pagamentos.
+  | "pay_technicians"
+  | "refund_payments";
 
 export interface User {
   id: string;
@@ -560,6 +565,8 @@ export interface FinanceSummary {
   estimatedMonthlyResult: number;
   estimatedAnnualResult: number;
   averageMarginPerService: number;
+  /** O GMV não se divide por categoria nem cidade: com esses filtros é o do período inteiro. */
+  gmvIgnoraFiltros?: boolean;
   burnRate: number;
   runwayMonths: number | null;
   /** `null` quando não há fonte de saldo bancário — não se inventa um valor. */

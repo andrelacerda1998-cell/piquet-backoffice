@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { partesLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa, inicioDoTrimestreLisboa, inicioDoTrimestreSeguinteLisboa } from "@/lib/periodo";
-import { gmvForPeriod } from "../../_lib/metrics";
+import { gmvEntre } from "../../_lib/gmv";
 import { apiOk, withStaff } from "../../_lib/handler";
 
 /**
@@ -60,7 +60,7 @@ async function costsBetween(startIso: string, endIso: string): Promise<{ total: 
 
 async function vatForPeriod(startIso: string, endIso: string) {
   const [{ commission }, costs] = await Promise.all([
-    gmvForPeriod(startIso, endIso),
+    gmvEntre(startIso, endIso),
     costsBetween(startIso, endIso),
   ]);
   const liquidado = vatInside(commission);
