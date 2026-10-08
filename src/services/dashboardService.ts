@@ -34,7 +34,7 @@ export async function getServices(
       period: filters.period,
       categoryId: filters.categoryId,
       city: filters.city,
-      status: filters.serviceStatus,
+      // O estado vem só do filtro da própria lista (`statuses`).
       statuses: statuses?.join(","),
       sort: sort?.field,
       dir: sort?.direction,
