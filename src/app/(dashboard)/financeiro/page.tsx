@@ -7,9 +7,10 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
-import ImpostosRhPage from "../impostos-rh/page";
+import ImpostosRhPage from "../impostos-rh/ImpostosRh";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ChartCard, BarChartComponent, AreaChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
@@ -102,8 +103,8 @@ export default function FinancePage() {
   */
   const [payToRefund, setPayToRefund] = useState<AppPayment | null>(null);
   const [payToRelease, setPayToRelease] = useState<AppPayment | null>(null);
-  const doRefund = async (p: AppPayment) => {
-    try { await refundAppPayment(p.id); toast(`Reembolso de ${formatCurrency(p.amount)} enviado ao Payshop.`); refetchAppPay(); }
+  const doRefund = async (p: AppPayment, motivo: string) => {
+    try { await refundAppPayment(p.id, motivo); toast(`Reembolso de ${formatCurrency(p.amount)} enviado ao Payshop.`); refetchAppPay(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error"); }
   };
   const doRelease = async (p: AppPayment) => {
@@ -528,7 +529,7 @@ export default function FinancePage() {
               */}
               {summary && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">No período <DemoBadge endpoint="/finance/summary" /></p>
                   <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                     {/* Do GMV do período (Payshop), como os cartões de cima. Eram a
                         soma dos serviços concluídos do Laravel: outro total. */}
@@ -1133,10 +1134,14 @@ export default function FinancePage() {
         <ConfirmDialog
           open={!!payToRefund}
           onClose={() => setPayToRefund(null)}
-          onConfirm={async () => { if (payToRefund) { await doRefund(payToRefund); setPayToRefund(null); } }}
+          onConfirm={async (motivo) => { if (payToRefund && motivo) { await doRefund(payToRefund, motivo); setPayToRefund(null); } }}
           title="Reembolsar pagamento"
           tone="danger"
           confirmLabel="Reembolsar"
+          requireReason
+          minReason={MOTIVO_MINIMO}
+          reasonLabel="Porque é que estás a reembolsar?"
+          reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do técnico"
           description={payToRefund && (
             <>
               Vais devolver <b className="text-text-primary">{formatCurrency(payToRefund.amount)}</b> ao cliente

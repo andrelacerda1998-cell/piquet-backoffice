@@ -8,7 +8,7 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
 import { ouvirPedidosDeAbertura } from "@/hooks/useAbrirPeloEndereco";
-import ServicosPersonalizadosPage from "../servicos-personalizados/page";
+import PedidosPersonalizados from "./PedidosPersonalizados";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
@@ -21,21 +21,19 @@ import { toast } from "@/stores";
 import { ClipboardList } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import type { ServiceRequest, ServiceStatus } from "@/types";
+import { ESTADOS_SIMPLES, PRECISA_DE_ATENCAO, atencaoPrimeiro, precisaDeAtencao } from "@/lib/estados";
 
-// Grupos de estado do fluxo operacional (mapeados nos ServiceStatus existentes).
+/*
+  O filtro de estado são os seis estados simples (ver lib/estados.ts) e, à
+  cabeça, "Precisa de atenção". Eram oito grupos com mistura: "Em
+  reclamação" estava dentro de "Recusados / Sem técnico", e "Pagamento por
+  capturar" era um grupo à parte quando é um serviço feito com dinheiro por
+  entrar.
+*/
 const STATUS_GROUPS: { id: string; label: string; statuses?: ServiceStatus[] }[] = [
-  { id: "todos", label: "Todos" },
-  { id: "pendentes", label: "Pendentes", statuses: ["pedido_recebido", "a_procurar_tecnico", "a_aguardar_orcamento", "orcamento_enviado", "a_aguardar_pagamento"] },
-  { id: "agendamentos", label: "Agendamentos", statuses: ["pago", "agendado", "tecnico_encontrado"] },
-  // "Em curso" esteve sempre vazio: dependia só de `em_execucao`, que o Laravel
-  // nunca produzia. Passa a ter o técnico em casa e o trabalho por confirmar.
-  { id: "curso", label: "Em curso", statuses: ["em_execucao", "a_aguardar_confirmacao"] },
-  { id: "concluidos", label: "Concluídos", statuses: ["concluido"] },
-  // Trabalho feito e dinheiro por entrar: separado de propósito, porque é uma
-  // lista de coisas a resolver e não um estado para ler.
-  { id: "captura", label: "Pagamento por capturar", statuses: ["pagamento_por_capturar"] },
-  { id: "cancelados", label: "Cancelados", statuses: ["cancelado_cliente", "cancelado_tecnico", "reembolsado", "arquivado"] },
-  { id: "recusados", label: "Recusados / Sem técnico", statuses: ["sem_tecnico_disponivel", "em_reclamacao"] },
+  { id: "todos", label: "Todos os estados" },
+  { id: "atencao", label: "Precisa de atenção", statuses: PRECISA_DE_ATENCAO },
+  ...ESTADOS_SIMPLES,
 ];
 
 export default function ServicesPage() {
@@ -115,6 +113,14 @@ export default function ServicesPage() {
     () => getServices(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch, activeStatuses),
     [filters, page, pageSize, sortField, sortDirection, debouncedSearch, statusGroup]
   );
+  // Quantos precisam de alguém, para o aviso por cima da lista (uma linha só).
+  const { data: comAtencao } = useAsyncData(
+    () => getServices(filters, 1, 1, undefined, undefined, PRECISA_DE_ATENCAO),
+    [chaveFiltros]
+  );
+  const quantosComAtencao = comAtencao?.total ?? 0;
+  // Sem ordenação escolhida, os que precisam de atenção sobem ao topo da página.
+  const linhas = sortField ? (data?.data ?? []) : atencaoPrimeiro(data?.data ?? []);
 
   /*
     Funil, estados e tempos numa só leitura: as três saem da MESMA lista de
@@ -137,7 +143,12 @@ export default function ServicesPage() {
       resposta, "0 de 0" é não haver ninguém por perto para convidar.
     */
     { key: "matching", label: "Técnicos", render: (r) => <ColunaMatching matching={r.matching} /> },
-    { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} label={SERVICE_STATUS_LABELS[r.status]} /> },
+    { key: "status", label: "Estado", render: (r) => (
+      <span className="inline-flex items-center gap-1.5">
+        {precisaDeAtencao(r.status) && <span className="h-2 w-2 rounded-full bg-danger shrink-0" title="Precisa de atenção" aria-label="Precisa de atenção" />}
+        <StatusBadge status={r.status} label={SERVICE_STATUS_LABELS[r.status]} />
+      </span>
+    ) },
     { key: "rating", label: "Avaliação", render: (r) => r.rating
       ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
       : <span className="text-text-muted">—</span> },
@@ -195,16 +206,27 @@ export default function ServicesPage() {
                 aria-label="Filtrar por estado"
               >
                 {STATUS_GROUPS.map((g) => (
-                  <option key={g.id} value={g.id}>{g.id === "todos" ? "Todos os estados" : g.label}</option>
+                  <option key={g.id} value={g.id}>{g.label}{g.id === "atencao" && quantosComAtencao ? ` (${quantosComAtencao})` : ""}</option>
                 ))}
               </select>
               <FilterBar className="flex-1 min-w-[240px]" />
             </div>
+            {quantosComAtencao > 0 && statusGroup !== "atencao" && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-4 py-2.5">
+                <p className="text-sm text-text-primary">
+                  <b>{quantosComAtencao}</b> {quantosComAtencao === 1 ? "pedido precisa" : "pedidos precisam"} de atenção:
+                  pagamento por capturar ou reclamação.
+                </p>
+                <button onClick={() => { setStatusGroup("atencao"); setPage(1); }} className="text-sm font-medium text-danger hover:underline">
+                  Ver só esses
+                </button>
+              </div>
+            )}
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
               <>
                 <DataTable
                   columns={columns}
-                  data={data?.data ?? []}
+                  data={linhas}
                   keyField="id"
                   sortField={sortField}
                   sortDirection={sortDirection}
@@ -336,7 +358,7 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {tab === "personalizados" && <ServicosPersonalizadosPage />}
+        {tab === "personalizados" && <PedidosPersonalizados />}
 
         {/* Service detail drawer (com separadores) */}
         {selectedService && (

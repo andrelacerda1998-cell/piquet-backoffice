@@ -7,8 +7,9 @@ import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui
 import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { SEED_ADMINS, ADMIN_ROLES, type Admin } from "@/services/backofficeService";
+import { getEquipa, type PessoaDaEquipa } from "@/services/equipaService";
+import { ROLE_LABELS } from "@/lib/permissions";
+import type { UserRole } from "@/types";
 import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
 import {
   getDocuments, createDocument, updateDocument, type RequiredDocument,
@@ -17,11 +18,10 @@ import { getAudits, type AuditEntry } from "@/services/auditsService";
 import {
   getSentNotifications, getSentNotificationTypes, type SentNotification,
 } from "@/services/sentNotificationsService";
-import { getSmsCodes, type SmsCode } from "@/services/smsCodesService";
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, ShieldCheck, FileCheck2, Settings, Pencil } from "lucide-react";
+import { Plus, FileCheck2, Settings, Pencil } from "lucide-react";
 import { Notificacoes } from "@/components/layout/Notificacoes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import CatalogPage from "./_tabs/catalogo";
@@ -46,7 +46,7 @@ export default function ConfiguracaoPage() {
           icon={Settings}
           eyebrow="Sistema"
           title={<>Configurações <DemoBadge endpoint="/settings" /></>}
-          subtitle="Catálogo, preços, zonas, taxas, documentos e administradores"
+          subtitle="Catálogo, preços, zonas, taxas, documentos e equipa"
         />
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -71,11 +71,10 @@ export default function ConfiguracaoPage() {
         {tab === "administracao" && (
           <SubTabs tabs={[
             { id: "documentos", label: "Documentos" },
-            { id: "admins", label: "Administradores" },
+            { id: "admins", label: "Equipa e acessos" },
             { id: "atividade", label: "Atividade" },
             { id: "este-dispositivo", label: "Avisos neste dispositivo" },
             { id: "notificacoes", label: "Notificações enviadas" },
-            { id: "sms", label: "Códigos SMS" },
           ]}>
             {(sub) => (
               <>
@@ -95,7 +94,6 @@ export default function ConfiguracaoPage() {
                   </div>
                 )}
                 {sub === "notificacoes" && <NotificacoesTab />}
-                {sub === "sms" && <SmsCodesTab />}
               </>
             )}
           </SubTabs>
@@ -334,71 +332,28 @@ function DocumentosTab() {
 
 /* ----------------------------- Administradores ----------------------------- */
 
+/*
+  Era uma lista guardada no browser, semeada com nomes de exemplo: "Novo
+  administrador" e "Suspender" diziam que tinham feito alguma coisa e o
+  acesso de ninguém mudava. Agora mostra a tabela `staff` do Supabase, que é
+  o que o login consulta.
+*/
 function AdminsTab() {
-  const [admins, setAdmins] = usePersistentList<Admin>("admins", SEED_ADMINS);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", role: ADMIN_ROLES[1] as Admin["role"] });
-
-  const create = () => {
-    if (!form.name.trim() || !form.email.trim()) { toast("Indica o nome e o email.", "error"); return; }
-    setAdmins((prev) => [{ id: `adm_${Date.now()}`, name: form.name.trim(), email: form.email.trim(), role: form.role, status: "ativo", lastAccess: "—" }, ...prev]);
-    setOpen(false);
-    setForm({ name: "", email: "", role: ADMIN_ROLES[1] });
-    toast(`Administrador ${form.name} adicionado com o perfil ${form.role}.`);
-  };
-
-  const toggle = (id: string) => {
-    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, status: a.status === "ativo" ? "suspenso" : "ativo" } : a)));
-    const a = admins.find((x) => x.id === id);
-    toast(`${a?.name} ${a?.status === "ativo" ? "suspenso" : "reativado"}.`, a?.status === "ativo" ? "error" : "success");
-  };
-
-  const columns: Column<Admin>[] = [
-    { key: "name", label: "Administrador", render: (r) => <div><p className="font-medium">{r.name}</p><p className="text-xs text-text-muted">{r.email}</p></div> },
-    { key: "role", label: "Perfil", render: (r) => (
-      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-        r.role === "Super Admin" ? "bg-piquet/15 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
-        {r.role === "Super Admin" && <ShieldCheck className="h-3 w-3" />}{r.role}
-      </span>
-    ) },
-    { key: "lastAccess", label: "Último acesso", render: (r) => r.lastAccess === "—" ? "—" : formatDateTime(r.lastAccess) },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "ativo" ? "bg-success-light text-success" : "bg-danger-light text-danger")}>
-        {r.status === "ativo" ? "Ativo" : "Suspenso"}
-      </span>
-    ) },
-    { key: "acao", label: "", render: (r) => (
-      <button onClick={() => toggle(r.id)} className={cn("text-xs hover:underline", r.status === "ativo" ? "text-danger" : "text-success")}>
-        {r.status === "ativo" ? "Suspender" : "Reativar"}
-      </button>
-    ) },
+  const { data, loading, error, refetch } = useAsyncData(() => getEquipa(), []);
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  const columns: Column<PessoaDaEquipa>[] = [
+    { key: "name", label: "Pessoa", render: (r) => <div><p className="font-medium">{r.name}</p><p className="text-xs text-text-muted">{r.email}</p></div> },
+    { key: "role", label: "Perfil", render: (r) => ROLE_LABELS[r.role as UserRole] ?? r.role },
+    { key: "last_sign_in_at", label: "Último acesso", render: (r) => r.last_sign_in_at ? formatDateTime(r.last_sign_in_at) : "Nunca entrou" },
+    { key: "created_at", label: "Acesso desde", render: (r) => formatDateTime(r.created_at) },
   ];
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary">Equipa com acesso ao backoffice e respetivos perfis de permissão.</p>
-        <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo administrador</button>
-      </div>
-      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-xs text-text-secondary">
-        Nota: o login está atualmente limitado à liderança (CEO/CTO). Esta gestão de perfis fica preparada para quando a autenticação multi-utilizador (Supabase) for ativada.
-      </div>
-      <DataTable columns={columns} data={admins} keyField="id" />
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Novo administrador" subtitle="Acesso ao backoffice"
-        footer={<>
-          <button onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={create} className="btn-primary text-sm">Adicionar</button>
-        </>}>
-        <div className="space-y-3">
-          <Field label="Nome"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" /></Field>
-          <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" placeholder="nome@piquet.pt" /></Field>
-          <Field label="Perfil de permissões"><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Admin["role"] })} className="input-field">
-            {ADMIN_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select></Field>
-        </div>
-      </Modal>
+      <p className="text-sm text-text-secondary">
+        Quem consegue entrar no backoffice e com que perfil. Para dar ou tirar acesso, fala com o CTO: hoje faz-se no Supabase.
+      </p>
+      <DataTable columns={columns} data={data ?? []} keyField="id" emptyMessage="Ninguém com acesso registado" />
     </div>
   );
 }
@@ -563,69 +518,10 @@ function NotificacoesTab() {
   );
 }
 
-/* ------------------------------- Códigos SMS ------------------------------- */
-
-const SMS_TYPE_LABELS: Record<string, string> = {
-  verification: "Verificação",
-  login: "Login",
-};
-
-/**
- * Códigos SMS — migrado do Filament (SmsCodeResource). Só leitura, usado pelo
- * suporte para confirmar o código enviado a um número (ex: "não recebi o
- * SMS"). Um código já não aparece aqui assim que é validado com sucesso —
- * fica apenas o histórico do que foi emitido até ser consumido.
- */
-function SmsCodesTab() {
-  const { page, setPage, pageSize, search, setSearch } = usePagination();
-  const debouncedSearch = useDebouncedValue(search);
-  const [type, setType] = useState<"" | "verification" | "login">("");
-
-  const { data, loading, error, refetch } = useAsyncData(
-    () => getSmsCodes(page, pageSize, {
-      search: debouncedSearch || undefined,
-      type: type || undefined,
-    }),
-    [page, pageSize, debouncedSearch, type]
-  );
-
-  const columns: Column<SmsCode>[] = [
-    { key: "phone_number", label: "Número", render: (r) => r.phone_number ?? "—" },
-    { key: "code", label: "Código", render: (r) => <span className="font-mono font-medium">{r.code}</span> },
-    { key: "type", label: "Tipo", render: (r) => (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-subtle text-text-secondary">
-        {SMS_TYPE_LABELS[r.type] ?? r.type}
-      </span>
-    ) },
-    { key: "user", label: "Utilizador", render: (r) => r.user?.name ?? "—" },
-    { key: "created_at", label: "Criado", render: (r) => (r.created_at ? formatDateTime(r.created_at) : "—") },
-  ];
-
-  if (loading && !data) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold">Códigos SMS</h3>
-        <DemoBadge endpoint="/sms-codes" />
-      </div>
-      <p className="text-sm text-text-secondary">
-        Códigos de verificação enviados por SMS — útil para confirmar o que foi enviado a um cliente que diz não o ter recebido.
-        Um código desaparece daqui assim que é validado com sucesso.
-      </p>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar número ou nome..." />
-        <select value={type} onChange={(e) => { setType(e.target.value as typeof type); setPage(1); }} className="input-field text-sm max-w-[200px]">
-          <option value="">Todos os tipos</option>
-          <option value="verification">Verificação</option>
-          <option value="login">Login</option>
-        </select>
-      </div>
-
-      <DataTable columns={columns} data={data?.data ?? []} keyField="id" emptyMessage="Sem códigos SMS" />
-      {data && <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />}
-    </div>
-  );
-}
+/*
+  Aqui esteve "Códigos SMS": a lista dos códigos de verificação e de LOGIN
+  emitidos e ainda por validar. Um código por validar é exatamente o que
+  falta para entrar na conta de outra pessoa -- quem visse este separador
+  entrava como qualquer cliente ou técnico. Saiu (08/10/2026), com a rota
+  /api/sms-codes. Para "não recebi o SMS", o suporte pede para reenviar.
+*/

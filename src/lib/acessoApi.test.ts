@@ -52,10 +52,9 @@ describe("a política cobre a API inteira", () => {
 });
 
 describe("o que cada perfil pode fazer", () => {
-  it("marketing não lê pagamentos, salários nem códigos SMS", () => {
+  it("marketing não lê pagamentos nem salários", () => {
     expect(podeChamar("marketing", "GET", "/api/finance/app-payments")).toBe(false);
     expect(podeChamar("marketing", "GET", "/api/employees")).toBe(false);
-    expect(podeChamar("marketing", "GET", "/api/sms-codes")).toBe(false);
     expect(podeChamar("marketing", "GET", "/api/marketing/campaigns")).toBe(true);
   });
 
@@ -75,9 +74,9 @@ describe("o que cada perfil pode fazer", () => {
     expect(podeChamar("gestao_tecnicos", "PUT", "/api/technicians/3/suspend")).toBe(true);
   });
 
-  it("os códigos SMS só para o suporte, que também vê dados pessoais", () => {
-    expect(podeChamar("suporte", "GET", "/api/sms-codes")).toBe(true);
-    expect(podeChamar("operacoes", "GET", "/api/sms-codes")).toBe(false);
+  it("os códigos SMS de login não se leem no backoffice, nem por quem pode tudo", () => {
+    expect(podeChamar("ceo", "GET", "/api/sms-codes")).toBe(false);
+    expect(podeChamar("suporte", "GET", "/api/sms-codes")).toBe(false);
   });
 
   it("ler um serviço não chega para o alterar", () => {

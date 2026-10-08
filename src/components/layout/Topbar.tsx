@@ -13,10 +13,9 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import {
   Menu, Search, Filter,
-  ChevronDown, X, Bookmark, Command,
+  ChevronDown, X, Command,
 } from "lucide-react";
-import type { PeriodPreset, ServiceStatus } from "@/types";
-import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
+import type { PeriodPreset } from "@/types";
 
 /*
   Os ecrãs que aplicam MESMO os filtros globais.
@@ -44,13 +43,21 @@ const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
 ];
 
 export function Topbar() {
-  const { filters, setFilter, clearFilters, savedViews, saveView, loadView, setMobileSidebarOpen } = useFilterStore();
+  const { filters, setFilter, clearFilters, setMobileSidebarOpen } = useFilterStore();
+  /*
+    Saíram do painel o "Estado" (os 18 estados técnicos, a competir com o
+    filtro de estado da própria lista), a "Origem" (não filtrava nada em
+    lado nenhum) e as "vistas guardadas" (só no browser de quem as criava).
+    Quem os tinha escolhido ficava preso a eles sem os ver: limpam-se aqui.
+  */
+  useEffect(() => {
+    if (filters.serviceStatus) setFilter("serviceStatus", undefined);
+    if (filters.customerSource) setFilter("customerSource", undefined);
+  }, [filters.serviceStatus, filters.customerSource, setFilter]);
   const { user, logout } = useAuthStore();
   const setCommandOpen = useUiStore((s) => s.setCommandOpen);
   const [showFilters, setShowFilters] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showSaveView, setShowSaveView] = useState(false);
-  const [viewName, setViewName] = useState("");
   const activeCount = getActiveFilterCount(filters);
 
   const pathname = usePathname();
@@ -217,24 +224,9 @@ export function Topbar() {
               onChange={(v) => setFilter("city", v || undefined)}
               options={DEFAULT_SETTINGS.locations.map((l) => ({ value: l.name, label: l.name }))}
             />
-            <FilterSelect
-              label="Estado"
-              value={filters.serviceStatus ?? ""}
-              onChange={(v) => setFilter("serviceStatus", (v || undefined) as ServiceStatus | undefined)}
-              options={Object.entries(SERVICE_STATUS_LABELS).map(([value, label]) => ({ value, label }))}
-            />
-            <FilterSelect
-              label="Origem"
-              value={filters.customerSource ?? ""}
-              onChange={(v) => setFilter("customerSource", v || undefined)}
-              options={["Website", "App", "Meta Ads", "Google Ads", "Referências", "WhatsApp"].map((s) => ({ value: s, label: s }))}
-            />
             <div className="flex gap-2">
               <button onClick={clearFilters} className="btn-secondary text-sm py-1.5">
                 <X className="h-3.5 w-3.5" /> Limpar
-              </button>
-              <button onClick={() => setShowSaveView(true)} className="btn-secondary text-sm py-1.5">
-                <Bookmark className="h-3.5 w-3.5" /> Guardar vista
               </button>
             </div>
           </div>
@@ -249,40 +241,12 @@ export function Topbar() {
                 <FilterChip label={opcoesCategoria.find((c) => c.value === filters.categoryId)?.label ?? filters.categoryId} onRemove={() => setFilter("categoryId", undefined)} />
               )}
               {filters.city && <FilterChip label={filters.city} onRemove={() => setFilter("city", undefined)} />}
-              {filters.serviceStatus && <FilterChip label={SERVICE_STATUS_LABELS[filters.serviceStatus] ?? filters.serviceStatus} onRemove={() => setFilter("serviceStatus", undefined)} />}
             </div>
           )}
 
-          {savedViews.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <span className="text-xs text-text-muted self-center">Vistas guardadas:</span>
-              {savedViews.map((v) => (
-                <button key={v.id} onClick={() => loadView(v.id)} className="text-xs px-2 py-1 bg-piquet/10 rounded-full hover:bg-piquet/20">
-                  {v.name}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
-      {showSaveView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-surface rounded-lg shadow-elevated p-6 w-full max-w-sm mx-4">
-            <h3 className="font-semibold mb-3">Guardar vista de filtros</h3>
-            <input
-              value={viewName}
-              onChange={(e) => setViewName(e.target.value)}
-              placeholder="Nome da vista"
-              className="input-field mb-4"
-            />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowSaveView(false)} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={() => { saveView(viewName); setViewName(""); setShowSaveView(false); }} className="btn-primary text-sm" disabled={!viewName.trim()}>Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

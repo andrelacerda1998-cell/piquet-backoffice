@@ -19,7 +19,7 @@ const DEPT_ROUTES: Record<string, string> = {
   marketing: "/marketing",
   tecnologia: "/produto",
   financeiro: "/financeiro",
-  gestao: "/relatorios",
+  gestao: "/?tab=relatorios",
 };
 
 const STATUS: Record<DepartmentStatus, { label: string; dot: string; text: string; bg: string }> = {

@@ -39,12 +39,34 @@ const ESTADO: Record<string, string> = {
     antes de o pedido existir.
   */
   PendingReview: "novo",
-  Pending: "novo",
+  /*
+    Depois de a Piquet o despachar, é um pedido como os outros. Os nomes dos
+    estados são os do ecrã antigo (que inventava um fluxo de "3 opções"); o
+    ecrã mostra-os com o que querem dizer de verdade.
+  */
+  Pending: "em_analise",
   Matching: "em_analise",
   Accepted: "opcoes_enviadas",
   AwaitingPayment: "opcoes_enviadas",
+  Pending3DS: "opcoes_enviadas",
+  Scheduled: "opcoes_enviadas",
+  Arrived: "opcoes_enviadas",
+  ClosedPendingPayment: "opcoes_enviadas",
   Closed: "agendado",
   Finished: "agendado",
+  /*
+    Os que acabaram sem serviço caíam no ramo de omissão, "novo": um pedido
+    que expirou ao fim do prazo de análise voltava a aparecer como novo, e o
+    sino avisava dele.
+  */
+  MatchingFailed: "recusado",
+  Canceled: "recusado",
+  Refused: "recusado",
+  Archived: "recusado",
+  RefusedMbway: "recusado",
+  ExpiredMbway: "recusado",
+  CanceledMbway: "recusado",
+  Expired3DS: "recusado",
 };
 
 export const GET = withStaff(async () => {
@@ -79,7 +101,8 @@ export const GET = withStaff(async () => {
     description: s.custom_description || "",
     // O Laravel não guarda urgência num pedido personalizado; não se inventa.
     urgency: null,
-    status: ESTADO[String(s.status ?? "")] ?? "novo",
+    // Um estado que não se conhece não é "novo": não pede ação a ninguém.
+    status: ESTADO[String(s.status ?? "")] ?? "em_analise",
     createdAt: s.requested_at || "",
     estimatedHours: s.custom_duration_minutes != null ? s.custom_duration_minutes / 60 : null,
     photosCount: s.customer_photos_count ?? 0,

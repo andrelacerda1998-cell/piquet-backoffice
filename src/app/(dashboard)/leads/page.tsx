@@ -161,7 +161,7 @@ function LeadsPageInner() {
 
   /** Exporta as leads visíveis (respeita os filtros) para CSV. */
   const exportLeads = () => {
-    if (filteredLeads.length === 0) { toast("Sem pedidos para exportar.", "error"); return; }
+    if (filteredLeads.length === 0) { toast("Sem contactos para exportar.", "error"); return; }
     downloadCsv(
       `crm-leads-${leadMonth || "todos"}.csv`,
       ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Observações", "Estado", "Motivo da perda", "Detalhe do motivo", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
@@ -180,7 +180,7 @@ function LeadsPageInner() {
         l.source || "",
       ]),
     );
-    toast(`${filteredLeads.length} pedido(s) exportado(s).`);
+    toast(`${filteredLeads.length} contacto(s) exportado(s).`);
   };
 
   const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -263,7 +263,7 @@ function LeadsPageInner() {
       const { serviceId } = await updateLead(editing.id, patch);
       setLeadRows(await getLeads());
       setEditing(null);
-      toast(serviceId ? "Concluído — serviço criado em Operações." : "Pedido atualizado.");
+      toast(serviceId ? "Concluído — serviço criado em Operações." : "Contacto atualizado.");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
     }
@@ -324,17 +324,17 @@ function LeadsPageInner() {
 
   // Eliminar um pedido (com confirmação; o serviço em Operações não é afetado).
   const removeLead = async (lead: Lead) => {
-    const label = lead.name || lead.phone || "este pedido";
+    const label = lead.name || lead.phone || "este contacto";
     const aviso = lead.serviceId ? "\n\nO serviço já criado em Operações NÃO é afetado." : "";
-    if (!window.confirm(`Eliminar o pedido de "${label}"?${aviso}`)) return;
+    if (!window.confirm(`Eliminar o contacto de "${label}"?${aviso}`)) return;
     const prev = leadRows;
     setLeadRows((rows) => rows.filter((l) => l.id !== lead.id));
     try {
       await deleteLead(lead.id);
-      toast("Pedido eliminado.");
+      toast("Contacto eliminado.");
     } catch {
       setLeadRows(prev);
-      toast("Não foi possível eliminar o pedido.", "error");
+      toast("Não foi possível eliminar o contacto.", "error");
     }
   };
 
@@ -348,9 +348,9 @@ function LeadsPageInner() {
       setLeadRows((prev) => [created, ...prev]);
       setLeadForm({ name: "", phone: "", city: "", message: "" });
       setShowLead(false);
-      toast("Pedido registado no CRM.");
+      toast("Contacto registado.");
     } catch {
-      toast("Não foi possível registar o pedido.", "error");
+      toast("Não foi possível registar o contacto.", "error");
     }
   };
 
@@ -396,7 +396,7 @@ function LeadsPageInner() {
         )}
       </span>
     ) },
-    { key: "message", label: "Pedido", render: (r) => {
+    { key: "message", label: "O que pediu", render: (r) => {
       const { service, urgency, description, urgent } = parseLeadMessage(r.message || "");
       const catName = categoryName(r.categoryId);
       // Descrição livre; senão o serviço (só se a categoria não ficou preenchida, p/ não repetir).
@@ -434,7 +434,7 @@ function LeadsPageInner() {
       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
         {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1">✓ serviço</span>}
         <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
-        <button onClick={() => removeLead(r)} title="Eliminar pedido"
+        <button onClick={() => removeLead(r)} title="Eliminar contacto"
           className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
           <Trash2 className="h-4 w-4" />
         </button>
@@ -448,7 +448,7 @@ function LeadsPageInner() {
         <PageHeader
           icon={Headphones}
           eyebrow="Operação"
-          title="Pedidos"
+          title="Contactos"
           subtitle="Tudo o que entrou, e em que ponto está: à procura de técnico, com técnico, ou fechado."
         />
 
@@ -458,7 +458,7 @@ function LeadsPageInner() {
             <div className="flex items-center justify-end gap-3">
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={exportLeads} className="btn-secondary text-sm">Exportar CSV</button>
-                <button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar pedido</button>
+                <button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar contacto</button>
               </div>
             </div>
 
@@ -504,7 +504,7 @@ function LeadsPageInner() {
                     Porque se perderam
                   </p>
                   <p className="text-[11px] text-text-muted">
-                    {motivosPerda.reduce((n, m) => n + m.total, 0)} pedidos perdidos no período
+                    {motivosPerda.reduce((n, m) => n + m.total, 0)} contactos perdidos no período
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -513,7 +513,7 @@ function LeadsPageInner() {
                       key={m.id}
                       onClick={() => setLeadStage(leadStage === "perdido" ? "" : "perdido")}
                       className="w-full flex items-center gap-3 group"
-                      title="Ver os pedidos perdidos"
+                      title="Ver os contactos perdidos"
                     >
                       <span className={cn("text-xs w-44 shrink-0 text-left truncate",
                         m.id === "sem_motivo" ? "text-text-muted italic" : "text-text-secondary")}>
@@ -534,7 +534,7 @@ function LeadsPageInner() {
                 </div>
                 {motivosPerda.some((m) => m.id === "sem_motivo") && (
                   <p className="mt-2.5 text-[11px] text-text-muted">
-                    Os pedidos sem motivo são de antes de este campo existir. A partir de agora, marcar
+                    Os contactos sem motivo são de antes de este campo existir. A partir de agora, marcar
                     como recusado pergunta porquê.
                   </p>
                 )}
@@ -546,7 +546,7 @@ function LeadsPageInner() {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, pedido…" className="input-field pl-9" aria-label="Pesquisar pedidos" />
+                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, pedido…" className="input-field pl-9" aria-label="Pesquisar contactos" />
                 </div>
                 <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto" aria-label="Filtrar por mês">
                   <option value="">Todos os meses</option>
@@ -616,7 +616,7 @@ function LeadsPageInner() {
             </div>
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
               onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
-              emptyMessage={hasActiveFilters ? "Nenhum pedido corresponde aos filtros." : "Sem pedidos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
+              emptyMessage={hasActiveFilters ? "Nenhum contacto corresponde aos filtros." : "Sem contactos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
             </>
           </div>
       </div>
@@ -633,7 +633,7 @@ function LeadsPageInner() {
       <Modal
         open={viewing !== null}
         onClose={() => setViewing(null)}
-        title={viewing ? (viewing.name || viewing.phone || "Pedido") : ""}
+        title={viewing ? (viewing.name || viewing.phone || "Contacto") : ""}
         subtitle={viewing
           ? `Recebido a ${formatDate(viewing.createdAt)} · via ${viewing.source === "whatsapp" ? "WhatsApp" : viewing.source === "landing" || viewing.source === "website" ? "landing page" : viewing.source}`
           : undefined}
@@ -822,8 +822,8 @@ function LeadsPageInner() {
       <Modal
         open={showLead}
         onClose={() => setShowLead(false)}
-        title="Registar pedido"
-        subtitle="Um pedido recebido por WhatsApp ou telefone. Entra como “Novo”."
+        title="Registar contacto"
+        subtitle="Um contacto recebido por WhatsApp ou telefone. Entra como “Novo”."
         footer={
           <>
             <button onClick={() => setShowLead(false)} className="btn-secondary text-sm">Cancelar</button>
@@ -842,7 +842,7 @@ function LeadsPageInner() {
             <input value={leadForm.city} onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })} placeholder="Ex.: Almada" className="input-field" />
           </Field>
           <div className="sm:col-span-2">
-            <Field label="Pedido">
+            <Field label="O que pede">
               <textarea value={leadForm.message} onChange={(e) => setLeadForm({ ...leadForm, message: e.target.value })} rows={3} placeholder="O que o cliente precisa" className="input-field" />
             </Field>
           </div>
@@ -853,7 +853,7 @@ function LeadsPageInner() {
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}
-        title="Editar pedido"
+        title="Editar contacto"
         subtitle={
           editForm.stage === "concluido"
             ? "Ao guardar como “Concluído”, o pedido fica registado como serviço feito fora da app. Não entra no GMV, que é só o que o Payshop cobrou."

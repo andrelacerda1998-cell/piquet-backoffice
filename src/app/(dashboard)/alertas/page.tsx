@@ -31,9 +31,9 @@ function destino(a: DashboardAlert): { href: string; label: string } {
   // abria a página no separador por omissão, como se não tivesse funcionado.
   switch (a.entityType) {
     // Com o id, o CRM abre o pedido em vez de deixar o utilizador à procura.
-    case "lead": return { href: `/leads?lead=${a.entityId ?? ""}`, label: "Abrir pedido" };
+    case "lead": return { href: `/leads?lead=${a.entityId ?? ""}`, label: "Abrir contacto" };
     // Os alertas agrupados apontam para a lista: são vários registos, não um.
-    case "leads": return { href: "/leads", label: "Ver pedidos" };
+    case "leads": return { href: "/leads", label: "Ver contactos" };
     case "tickets": return { href: "/suporte", label: "Ver tickets" };
     case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
     case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };

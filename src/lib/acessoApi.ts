@@ -69,6 +69,8 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /customers/[id]/payment-methods": todas("view_customers", "view_personal_data"),
   "DELETE /customers/[id]/payment-methods/[methodId]": qualquer("destructive_actions"),
   "PUT /customers/[id]/block": qualquer("destructive_actions"),
+  "GET /acoes-da-equipa": qualquer("view_customers", "view_technicians"),
+  "GET /staff": qualquer("manage_settings"),
   "PUT /customers/[id]/restore": qualquer("destructive_actions"),
 
   // ---------------------------------------------------------- serviços
@@ -204,7 +206,6 @@ export const POLITICA: Record<string, Requisito> = {
   "DELETE /support/inbox/seed": qualquer("manage_settings"),
   "GET /quality": qualquer("view_support"),
   // Códigos de entrada: quem os lê entra na conta do cliente.
-  "GET /sms-codes": todas("view_support", "view_personal_data"),
 
   // ------------------------------------------- produto, pesquisa, equipa
   "GET /product/growth": STAFF,
