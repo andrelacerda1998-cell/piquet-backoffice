@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
+import { UnitEconomics } from "@/components/crescimento/UnitEconomics";
 import { DataTable } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -174,6 +175,7 @@ export default function MarketingPage() {
 
         {tab === "campanhas" && (
           <div className="space-y-6">
+            <UnitEconomics />
             {/* Investimento real (ad_metrics: Meta + Google), com período à escolha. */}
             <div className="card p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

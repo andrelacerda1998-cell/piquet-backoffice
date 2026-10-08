@@ -7,10 +7,10 @@ import { MetricCard, TrendIndicator } from "@/components/ui/MetricCard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getFinanceGmv, getUnitEconomics, getFinanceSummary } from "@/services/financeService";
+import { getFinanceGmv, getFinanceSummary } from "@/services/financeService";
 import { getGoals, getLeads } from "@/services/extrasService";
-import { getServiceCounts } from "@/services/dashboardService";
-import { getAppGrowth, getStoreRatings } from "@/services/backofficeService";
+import { getOperacoesAoVivo } from "@/services/dashboardService";
+import { pct } from "@/lib/aoVivo";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
 import { useAuthStore } from "@/stores";
@@ -144,17 +144,18 @@ function ResultadoDoMes({ resultado, receita, custos }: {
 
 export default function OverviewPage() {
   const { data: gmvData, loading, error, refetch } = useAsyncData(() => getFinanceGmv(), []);
-  const { data: unit } = useAsyncData(() => getUnitEconomics(), []);
   // Resultado do mês: é a pergunta que traz um CEO a este ecrã ("ganhámos ou
   // perdemos dinheiro?") e a resposta estava só no Financeiro.
   const { data: fin } = useAsyncData(() => getFinanceSummary({ period: "este_mes" }), []);
   const { data: goalsData } = useAsyncData(() => getGoals(), []);
-  const { data: svcCounts } = useAsyncData(() => getServiceCounts(), []);
-  const { data: growth } = useAsyncData(() => getAppGrowth(), []);
-  const { data: ratings } = useAsyncData(() => getStoreRatings(), []);
   // Leads e documentos só para quem os pode ver (a API recusa o resto).
   const role = useAuthStore((s) => s.user?.role);
   const pode = (...p: Permission[]) => !!role && hasAnyPermission(role, p);
+  // O marketplace agora: os mesmos números de Operações › Ao vivo.
+  const { data: aoVivo } = useAsyncData(
+    () => (pode("view_services") ? getOperacoesAoVivo() : Promise.resolve(null)).catch(() => null),
+    [role],
+  );
   const { data: leads } = useAsyncData(() => (pode("view_marketing", "view_customers") ? getLeads() : Promise.resolve([])), [role]);
   const { data: pendingDocs } = useAsyncData(() => (pode("view_technicians") ? getVendorDocuments("pending", 1, 1) : Promise.resolve(null)), [role]);
   const [tab, setTab] = useTabParam("resumo");
@@ -175,20 +176,6 @@ export default function OverviewPage() {
   const commissionPrevYear = gmvData?.prevYearSame.commission ?? 0;
 
   // Downloads da App Cliente (acumulados das lojas): total e crescimento do mês.
-  const dl = growth?.downloads ?? [];
-  const dlLast = dl[dl.length - 1];
-  const dlPrev = dl[dl.length - 2];
-  const clienteTotal = dlLast ? dlLast.Cliente : 0;
-  const clientePrev = dlPrev ? dlPrev.Cliente : clienteTotal;
-
-  // Avaliação média da app cliente nas lojas.
-  const cliRatings = [ratings?.cliente.appStore, ratings?.cliente.googlePlay].filter(Boolean) as { rating: number }[];
-  const storeRating = cliRatings.length
-    ? Math.round((cliRatings.reduce((s, r) => s + r.rating, 0) / cliRatings.length) * 10) / 10
-    : 0;
-
-  // O que está à espera de alguém: leads por responder (e quantas urgentes) e
-  // documentos KYC por validar. É o primeiro que se quer ver ao abrir o dia.
   const leadsPorResponder = (leads ?? []).filter((l) => l.stage === "novo");
   const leadsUrgentes = leadsPorResponder.filter((l) => /urg[êe]ncia:\s*(urgente|hoje|emerg|imediat|agora)/i.test(l.message || "")).length;
   const kycPendentes = pendingDocs?.meta.total ?? 0;
@@ -319,44 +306,37 @@ export default function OverviewPage() {
             agendado para dezembro é volume de dezembro, não deste mês. Por
             isso o "agendados no ano" olha para o ano inteiro, futuro incluído.
           */}
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-2">Serviços</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-            <MetricCard compact title="Executados no mês" hideDelta
-              metric={buildMetricValue(svcCounts?.mes.executados ?? 0, svcCounts?.mes.executados ?? 0, false, undefined, "Serviços concluídos com data de conclusão dentro do mês corrente.")} />
-            <MetricCard compact title="Agendados no mês" hideDelta
-              metric={buildMetricValue(svcCounts?.mes.agendados ?? 0, svcCounts?.mes.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do mês corrente e ainda por concluir.")} />
-            <MetricCard compact title="Executados no ano" hideDelta
-              metric={buildMetricValue(svcCounts?.ano.executados ?? 0, svcCounts?.ano.executados ?? 0, false, undefined, "Serviços concluídos desde 1 de janeiro.")} />
-            <MetricCard compact title="Agendados no ano" hideDelta
-              metric={buildMetricValue(svcCounts?.ano.agendados ?? 0, svcCounts?.ano.agendados ?? 0, false, undefined, "Serviços com data marcada dentro do ano corrente e ainda por concluir — inclui os que estão no futuro.")} />
-          </div>
-
-          {/* Sinais da app — outra natureza, por isso separados do dinheiro. */}
-          <div className="grid grid-cols-2 gap-3">
-            <MetricCard title="Downloads App Cliente" format="number" hideDelta
-              metric={buildMetricValue(clienteTotal, clientePrev, false, undefined, "Instalações acumuladas da app cliente (App Store + Google Play).")} />
-            <MetricCard title="Avaliação nas lojas" hideDelta
-              metric={buildMetricValue(storeRating, storeRating, false, undefined, "Média da app cliente (App Store + Google Play).")} />
-          </div>
+          {aoVivo && (
+            <>
+              <p className="mt-6 mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                Agora <Link href="/servicos" className="ml-2 normal-case tracking-normal font-normal text-piquet-600 hover:underline">Operações ao vivo →</Link>
+              </p>
+              {/*
+                Eram quatro contagens (executados e agendados, do mês e do ano)
+                para uma ideia só. O que a operação precisa de saber ao entrar é
+                se há pedidos à espera, se há quem os aceite e se os pedidos
+                estão a ser servidos.
+              */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <AgoraCard titulo="À procura de técnico" valor={String(aoVivo.a_procura.length)} alerta={aoVivo.a_procura.length > 0 && aoVivo.oferta.prontos === 0} />
+                <AgoraCard titulo="Em curso" valor={String(aoVivo.em_curso.length)} />
+                <AgoraCard titulo="Técnicos prontos" valor={String(aoVivo.oferta.prontos)} nota={`${aoVivo.oferta.online} Online`} alerta={aoVivo.oferta.prontos === 0} />
+                <AgoraCard
+                  titulo="Pedidos servidos (30 dias)"
+                  valor={pct(aoVivo.liquidez["30d"].taxa_servidos)}
+                  nota={`${aoVivo.liquidez["30d"].servidos} de ${aoVivo.liquidez["30d"].terminados} terminados`}
+                  alerta={aoVivo.liquidez["30d"].terminados > 0 && aoVivo.liquidez["30d"].servidos === 0}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* ---------- Unit economics (LTV · CAC) ---------- */}
-        <div>
-          <SectionHeader
-            title="Unit economics"
-            aside={<>{unit?.newCustomersMonth ?? 0} clientes novos · {formatCurrency(unit?.adSpendMonth ?? 0)} em anúncios (mês)</>}
-          />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <MetricCard title="CAC" format="currency" hideDelta
-              metric={buildMetricValue(unit?.cac ?? 0, unit?.cac ?? 0, true, undefined, "Custo de aquisição = investimento em anúncios (mês) ÷ clientes cuja primeira compra foi este mês. Quem já era cliente e voltou não conta. Menor é melhor.")} />
-            <MetricCard title="Serviços / cliente" hideDelta
-              metric={buildMetricValue(unit?.servicesPerCustomer ?? 0, unit?.servicesPerCustomer ?? 0, false, undefined, "Serviços concluídos este mês ÷ clientes servidos este mês (novos e antigos).")} />
-            <MetricCard title="LTV" format="currency" hideDelta
-              metric={buildMetricValue(unit?.ltv ?? 0, unit?.ltv ?? 0, false, undefined, "Comissão da Piquet de todo o histórico ÷ número de clientes. Cada cliente é contado pela conta na app, não pelo nome.")} />
-            <MetricCard title="Rácio LTV/CAC" hideDelta
-              metric={buildMetricValue(unit && unit.cac > 0 ? Math.round((unit.ltv / unit.cac) * 100) / 100 : 0, 0, false, undefined, "LTV ÷ CAC. Saudável acima de 3×.")} />
-          </div>
-        </div>
+        <p className="text-sm text-text-secondary">
+          CAC, LTV, downloads e avaliação nas lojas estão em{" "}
+          <Link href="/marketing" className="text-piquet-600 font-medium hover:underline">Marketing</Link>.
+        </p>
 
         {/* ---------- Objetivos do ano ---------- */}
         <div>
@@ -434,5 +414,16 @@ export default function OverviewPage() {
         {tab === "relatorios" && <RelatoriosPage />}
       </div>
     </RouteGuard>
+  );
+}
+
+/** Um número do bloco "Agora": vermelho quando pede ação. */
+function AgoraCard({ titulo, valor, nota, alerta = false }: { titulo: string; valor: string; nota?: string; alerta?: boolean }) {
+  return (
+    <div className={cn("card p-3", alerta && "border-l-[3px] border-l-danger")}>
+      <p className="text-xs text-text-secondary">{titulo}</p>
+      <p className={cn("text-2xl font-bold tabular-nums", alerta ? "text-danger" : "text-text-primary")}>{valor}</p>
+      {nota && <p className="text-[11px] text-text-muted">{nota}</p>}
+    </div>
   );
 }
