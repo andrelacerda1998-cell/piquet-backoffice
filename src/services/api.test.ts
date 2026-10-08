@@ -70,7 +70,8 @@ describe("isLiveEndpoint — allowlist da migração incremental", () => {
 
   it("marca como migrados os endpoints da Fase 7 (Pagamentos a técnicos)", () => {
     expect(isLiveEndpoint("/vendor-payments")).toBe(true);
-    expect(isLiveEndpoint("/vendor-payments/7/pay")).toBe(true);
+    expect(isLiveEndpoint("/vendor-payments/7/pay")).toBe(false); // saiu: só por lote
+    expect(isLiveEndpoint("/finance/payout-lotes/ab-12/aprovar")).toBe(true);
     expect(isLiveEndpoint("/finance/pending-payments")).toBe(false); // sintético
     expect(isLiveEndpoint("/finance/refunds")).toBe(false); // sintético
   });

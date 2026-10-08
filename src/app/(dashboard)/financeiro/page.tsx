@@ -32,15 +32,16 @@ import { getEmployees, effectiveMonthlyCost } from "@/services/employeesService"
 import { getLeads } from "@/services/extrasService";
 import { getSystemProfit, type SystemProfitTransaction } from "@/services/systemProfitService";
 import { PIQUET_COMMISSION } from "@/mocks/data";
-import { getVendorPayments, payVendor, type VendorPayment } from "@/services/vendorPaymentsService";
+import { getVendorPayments } from "@/services/vendorPaymentsService";
+import { LotesDePagamento } from "./LotesDePagamento";
 import { buildMetricValue, semIVA } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
-import { cn, copiarParaAreaDeTransferencia } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet, Copy } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS: TabDef[] = [
@@ -112,21 +113,6 @@ export default function FinancePage() {
   const { data: gmvData } = useAsyncData(() => getFinanceGmv(), []);
 
   const { data: vendorPayments, loading: vendorPaymentsLoading, refetch: refetchVendorPayments } = useAsyncData(() => getVendorPayments(), []);
-  const [payingId, setPayingId] = useState<number | null>(null);
-  const payVendorNow = async (v: VendorPayment) => {
-    if (!confirm(`Marcar ${formatCurrency(v.balance)} como pago a ${v.vendor_name ?? "este vendor"}? Isto envia-lhe uma notificação e zera o saldo — a transferência bancária tens de a fazer tu, com o IBAN acima.`)) return;
-    setPayingId(v.id);
-    try {
-      await payVendor(v.id);
-      toast(`${formatCurrency(v.balance)} marcados como pagos a ${v.vendor_name ?? "vendor"}.`);
-      refetchVendorPayments();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível processar o pagamento.", "error");
-    } finally {
-      setPayingId(null);
-    }
-  };
-
   // Lucro do sistema (wallet) — filtros de data próprios, não os globais do resto da página.
   const [profitPage, setProfitPage] = useState(1);
 
@@ -872,73 +858,17 @@ export default function FinancePage() {
                     {comComissao.length > 0 && stat("Comissão Piquet", comissao, true)}
                     {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
                     <p className="text-[11px] text-text-muted max-w-xs ml-auto">
-                      &ldquo;Pagar&rdquo; zera o saldo e avisa o técnico;
-                      a transferência é feita à mão com o IBAN. <DemoBadge endpoint="/vendor-payments" />
+                      Paga-se por lotes: uma pessoa cria, outra aprova, a
+                      transferência sai do banco e só então se debita a carteira. <DemoBadge endpoint="/vendor-payments" />
                     </p>
                   </div>
                 );
               })()}
-              <div>
-                <h2 className="font-semibold mb-3">Pagamentos a vendors</h2>
-                <DataTable
-                  columns={[
-                    { key: "vendor_name", label: "Vendor", render: (r: VendorPayment) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
-                    { key: "iban", label: "IBAN", render: (r: VendorPayment) => r.iban
-                      ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="font-mono text-xs">{r.iban}</span>
-                          {/* Copia sem os espaços de formatação — é assim que o
-                              homebanking o quer, e reescrevê-lo à mão é onde se
-                              engana um dígito. */}
-                          <button
-                            onClick={async () => {
-                              const ok = await copiarParaAreaDeTransferencia((r.iban ?? "").replace(/\s/g, ""));
-                              toast(ok ? "IBAN copiado." : "Não foi possível copiar o IBAN.", ok ? "success" : "error");
-                            }}
-                            title="Copiar IBAN"
-                            aria-label={`Copiar IBAN de ${r.vendor_name ?? "técnico"}`}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-primary transition-colors shrink-0"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </span>
-                      )
-                      : <span className="text-text-muted text-xs">Sem IBAN</span> },
-                    { key: "balance", label: "A pagar (c/ IVA)", render: (r: VendorPayment) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
-                    { key: "balance_sem_iva", label: "A pagar (s/ IVA)", render: (r: VendorPayment) => (
-                      <span className="whitespace-nowrap">{formatCurrency(semIVA(r.balance, DEFAULT_TAX_CONFIG.vatRate))}</span>
-                    ) },
-                    /* Faturado e comissão em colunas separadas para c/ e s/ IVA,
-                       tal como o "A pagar" acima — mesma leitura em toda a tabela. */
-                    { key: "total_invoiced", label: "Faturado (c/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
-                      ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap">{formatCurrency(r.total_invoiced)}</span> },
-                    { key: "total_invoiced_sem_iva", label: "Faturado (s/ IVA)", render: (r: VendorPayment) => r.total_invoiced == null
-                      ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap">{formatCurrency(semIVA(r.total_invoiced, DEFAULT_TAX_CONFIG.vatRate))}</span> },
-                    { key: "commission", label: "Comissão Piquet (c/ IVA)", render: (r: VendorPayment) => r.commission == null
-                      ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap font-medium">{formatCurrency(r.commission)}</span> },
-                    { key: "commission_sem_iva", label: "Comissão Piquet (s/ IVA)", render: (r: VendorPayment) => r.commission == null
-                      ? <span className="text-text-muted">—</span>
-                      : <span className="whitespace-nowrap font-medium">{formatCurrency(semIVA(r.commission, DEFAULT_TAX_CONFIG.vatRate))}</span> },
-                    { key: "acao", label: "", render: (r: VendorPayment) => (
-                      <button
-                        disabled={!r.iban || payingId === r.id}
-                        onClick={() => payVendorNow(r)}
-                        className="btn-primary text-xs py-1 disabled:opacity-50"
-                        title={r.iban ? undefined : "Sem IBAN registado — não é possível transferir."}
-                      >
-                        {payingId === r.id ? "A pagar…" : "Pagar"}
-                      </button>
-                    ) },
-                  ]}
-                  data={vendorPayments?.items ?? []}
-                  keyField="id"
-                  loading={vendorPaymentsLoading}
-                  emptyMessage="Sem vendors com saldo por pagar 🎉"
-                />
-              </div>
+              <LotesDePagamento
+                saldos={vendorPayments?.items ?? []}
+                aCarregar={vendorPaymentsLoading}
+                recarregarSaldos={refetchVendorPayments}
+              />
             </div>
           )}
 
