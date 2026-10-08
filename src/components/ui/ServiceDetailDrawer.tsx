@@ -312,7 +312,7 @@ function Resumo({ service }: { service: ServiceRequest }) {
       <Row label="Morada" value={local || "—"} />
       {service.scheduledAt && <Row label="Marcado para" value={service.scheduledAt.length > 10 ? formatDateTime(service.scheduledAt) : formatDate(service.scheduledAt)} />}
       {service.cancellationReason && <Row label="Motivo do cancelamento" value={service.cancellationReason} />}
-      {service.source && service.source !== "app" && <Row label="Origem" value={service.source} />}
+      {service.source && service.source.toLowerCase() !== "app" && <Row label="Origem" value={service.source} />}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export default function PedidosPersonalizados() {
             </div>
           </button>
         ))}
-        {visiveis.length === 0 && <p className="text-sm text-text-muted">Sem pedidos personalizados {tab === "todos" ? "" : "neste estado"}.</p>}
+        {visiveis.length === 0 && <p className="text-sm text-text-muted">{tab === "todos" ? "Ainda não há pedidos personalizados." : "Nenhum pedido personalizado neste estado."}</p>}
       </div>
 
       {aberto && (

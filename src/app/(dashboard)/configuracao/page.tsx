@@ -21,7 +21,7 @@ import {
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, ShieldCheck, FileCheck2, Settings, Pencil } from "lucide-react";
+import { Plus, FileCheck2, Settings, Pencil } from "lucide-react";
 import { Notificacoes } from "@/components/layout/Notificacoes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import CatalogPage from "./_tabs/catalogo";
@@ -46,7 +46,7 @@ export default function ConfiguracaoPage() {
           icon={Settings}
           eyebrow="Sistema"
           title={<>Configurações <DemoBadge endpoint="/settings" /></>}
-          subtitle="Catálogo, preços, zonas, taxas, documentos e administradores"
+          subtitle="Catálogo, preços, zonas, taxas, documentos e equipa"
         />
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
