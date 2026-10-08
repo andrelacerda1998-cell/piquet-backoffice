@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "./api";
+import { apiGet, apiPost } from "./api";
 
 /**
  * Pagamentos a vendors — migrado do Filament (App\Filament\Pages\VendorPayments)
@@ -6,9 +6,9 @@ import { apiGet, apiPut } from "./api";
  * src/app/api/vendor-payments/*.
  *
  * Isto NÃO move dinheiro a sério: o saldo é ledger interno
- * (bavix/laravel-wallet). "Pagar" aqui notifica o vendor (email + push) e
- * zera o saldo — a transferência bancária é feita manualmente pelo admin
- * fora do sistema, por isso a lista mostra o IBAN.
+ * (bavix/laravel-wallet). Paga-se por LOTES (ver src/lib/lotesPagamento.ts):
+ * uma pessoa cria, outra aprova, as transferências saem do banco à mão, e só
+ * então o Laravel debita cada carteira pelo valor do lote.
  */
 export interface VendorPayment {
   id: number;
@@ -28,6 +28,8 @@ export interface VendorPayment {
    */
   total_invoiced?: number | null;
   commission?: number | null;
+  /** Porque é que este saldo não se pode pagar (sem IBAN, sem morada fiscal, sem AT). */
+  payout_blocker?: string | null;
 }
 
 export interface VendorPaymentsData {
@@ -43,8 +45,42 @@ export async function getVendorPayments(page = 1, perPage = 50): Promise<VendorP
   ).then((r) => r.data);
 }
 
-export async function payVendor(id: number): Promise<{ vendor_id: number; amount_paid: number }> {
-  return apiPut<{ vendor_id: number; amount_paid: number }>(`/vendor-payments/${id}/pay`, {}, () => {
-    throw new Error("Pagamentos a vendors precisam da API de admin do Laravel configurada.");
-  }).then((r) => r.data);
+/* ------------------------------ lotes ------------------------------ */
+
+export type { Lote, LinhaDoLote } from "@/lib/lotesPagamento";
+import type { Lote as LoteDTO } from "@/lib/lotesPagamento";
+
+const SO_COM_BACKEND = () => { throw new Error("Os lotes de pagamento precisam do backend (Supabase e Laravel) configurado."); };
+
+/** Os lotes de pagamento. `ativo: false` quando a migração ainda não correu. */
+export async function getLotes(): Promise<{ ativo: boolean; lotes: LoteDTO[] }> {
+  return apiGet<{ ativo: boolean; lotes: LoteDTO[] }>("/finance/payout-lotes", () => ({ ativo: false, lotes: [] })).then((r) => r.data);
+}
+
+export async function criarLote(linhas: Array<{ vendor_id: number; valor: number }>, notas?: string): Promise<LoteDTO> {
+  return apiPost<LoteDTO>("/finance/payout-lotes", { linhas, notas }, SO_COM_BACKEND).then((r) => r.data);
+}
+
+export async function aprovarLote(id: string): Promise<LoteDTO> {
+  return apiPost<LoteDTO>(`/finance/payout-lotes/${id}/aprovar`, {}, SO_COM_BACKEND).then((r) => r.data);
+}
+
+/** Depois das transferências: debita cada carteira pelo valor do lote. */
+export async function pagarLote(id: string): Promise<LoteDTO> {
+  return apiPost<LoteDTO>(`/finance/payout-lotes/${id}/pagar`, {}, SO_COM_BACKEND).then((r) => r.data);
+}
+
+export async function cancelarLote(id: string): Promise<LoteDTO> {
+  return apiPost<LoteDTO>(`/finance/payout-lotes/${id}/cancelar`, {}, SO_COM_BACKEND).then((r) => r.data);
+}
+
+export interface ResultadoDaConferencia {
+  movimentos: number;
+  conferidas: number;
+  porConferir: Array<{ id: string; vendor_name: string | null; valor: number; pago_em: string | null }>;
+}
+
+/** Casa as linhas pagas com as saídas do extrato (CSV do homebanking). */
+export async function conferirExtrato(extrato: string): Promise<ResultadoDaConferencia> {
+  return apiPost<ResultadoDaConferencia>("/finance/payout-lotes/conferir", { extrato }, SO_COM_BACKEND).then((r) => r.data);
 }

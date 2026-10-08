@@ -34,12 +34,12 @@ beforeEach(() => _clearStaffCache());
 describe("withStaff aplica as permissões no servidor", () => {
   it("quem pode, passa", async () => {
     perfil = "financeiro";
-    expect(await chamar("PUT", "/api/vendor-payments/7/pay")).toEqual({ status: 200, correu: true });
+    expect(await chamar("POST", "/api/finance/payout-lotes/7/pagar")).toEqual({ status: 200, correu: true });
   });
 
   it("quem não pode recebe 403 e o handler nem corre", async () => {
     perfil = "marketing";
-    expect(await chamar("PUT", "/api/vendor-payments/7/pay")).toEqual({ status: 403, correu: false });
+    expect(await chamar("POST", "/api/finance/payout-lotes/7/pagar")).toEqual({ status: 403, correu: false });
   });
 
   it("sem sessão de staff continua a ser 401", async () => {

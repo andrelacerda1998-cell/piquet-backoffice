@@ -3,8 +3,6 @@ import type { LeadStageId } from "@/lib/leadStages";
 import { mockData } from "@/mocks/data";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
 
-/* ============================ DESPACHO AO VIVO ============================ */
-
 /* ============================ CATÁLOGO ============================ */
 
 export interface CatalogCategory {

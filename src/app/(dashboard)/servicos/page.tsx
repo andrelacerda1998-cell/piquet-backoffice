@@ -10,12 +10,14 @@ import { useTabParam } from "@/hooks/useTabParam";
 import { ouvirPedidosDeAbertura } from "@/hooks/useAbrirPeloEndereco";
 import ServicosPersonalizadosPage from "../servicos-personalizados/page";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
+import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getServices, getOperacao, getDetalheDoServico } from "@/services/dashboardService";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { downloadCsv } from "@/lib/utils";
+import { toast } from "@/stores";
 import { ClipboardList } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import type { ServiceRequest, ServiceStatus } from "@/types";
@@ -41,7 +43,9 @@ export default function ServicesPage() {
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [selectedService, setSelectedService] = useState<ServiceRequest | null>(null);
-  const [tab, setTab] = useTabParam("pedidos");
+  // "Ao vivo" é o primeiro: é o que se abre para saber se os pedidos de agora
+  // vão ser servidos. A lista completa fica no separador ao lado.
+  const [tab, setTab] = useTabParam("ao-vivo");
   /*
     Saiu daqui o "Registar serviço concluído" (e o "Editar" do painel).
 
@@ -79,6 +83,7 @@ export default function ServicesPage() {
   const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
 
   const TABS: TabDef[] = [
+    { id: "ao-vivo", label: "Ao vivo" },
     { id: "pedidos", label: "Serviços" },
     /*
       "Reservas da app" saiu a 22/09/2026.
@@ -162,6 +167,16 @@ export default function ServicesPage() {
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+        {tab === "ao-vivo" && (
+          <OperacoesAoVivo
+            onAbrir={(id) => {
+              getDetalheDoServico(id)
+                .then((d) => { if (d) setSelectedService(d.servico); })
+                .catch((e) => toast(e instanceof Error ? e.message : "Não foi possível abrir o serviço.", "error"));
+            }}
+          />
+        )}
 
         {tab === "pedidos" && (
           <div className="space-y-4">
@@ -312,8 +327,9 @@ export default function ServicesPage() {
 
                 <p className="card p-4 text-sm text-text-secondary">
                   Tudo aqui sai dos serviços reais. Onde não há como medir — o tempo até responder, por exemplo, se o
-                  Laravel não o registar — aparece um traço em vez de um número. Usa o{" "}
-                  <span className="font-medium text-text-primary">Despacho ao vivo</span> para agir sobre os pedidos por atribuir.
+                  Laravel não o registar — aparece um traço em vez de um número. Para agir sobre os pedidos de agora, usa o
+                  separador{" "}
+                  <button onClick={() => setTab("ao-vivo")} className="font-medium text-piquet-700 hover:underline">Ao vivo</button>.
                 </p>
               </>
             )}

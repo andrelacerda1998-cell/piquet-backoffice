@@ -100,6 +100,22 @@ export async function getOperacao(): Promise<OperacaoDTO> {
   }).then((r) => r.data);
 }
 
+/* ----------------------------- Operações ao vivo ----------------------------- */
+
+export type { AoVivo } from "@/lib/aoVivo";
+import type { AoVivo as AoVivoDTO } from "@/lib/aoVivo";
+
+/**
+ * O estado do marketplace agora (ver /api/operacoes/ao-vivo). Sem mock: um
+ * ecrã de operações com pedidos inventados é pior do que um erro a dizer que
+ * falta a ligação ao Laravel.
+ */
+export async function getOperacoesAoVivo(incluirTestes = false): Promise<AoVivoDTO> {
+  return apiGet<AoVivoDTO>(`/operacoes/ao-vivo${incluirTestes ? "?incluir_testes=1" : ""}`, () => {
+    throw new Error("As Operações ao vivo precisam da ligação ao Laravel.");
+  }).then((r) => r.data);
+}
+
 /* ------------------- Fotografias que o cliente anexou ------------------- */
 
 /**

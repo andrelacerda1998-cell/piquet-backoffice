@@ -81,6 +81,7 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),
   "GET /custom-requests": qualquer("view_services"),
+  "GET /operacoes/ao-vivo": qualquer("view_services"),
 
   // ---------------------------------------------------------- técnicos
   "GET /technicians": qualquer("view_technicians"),
@@ -131,7 +132,14 @@ export const POLITICA: Record<string, Requisito> = {
   "POST /finance/treasury": qualquer("view_finance"),
   "GET /system-profit": qualquer("view_finance"),
   "GET /vendor-payments": qualquer("view_finance"),
-  "PUT /vendor-payments/[id]/pay": qualquer("pay_technicians"),
+  // Lotes: quem paga cria, OUTRA pessoa aprova (a rota verifica), e só
+  // depois se paga. O "pagar" direto, técnico a técnico, saiu.
+  "GET /finance/payout-lotes": qualquer("view_finance"),
+  "POST /finance/payout-lotes": qualquer("pay_technicians"),
+  "POST /finance/payout-lotes/[id]/aprovar": qualquer("pay_technicians"),
+  "POST /finance/payout-lotes/[id]/pagar": qualquer("pay_technicians"),
+  "POST /finance/payout-lotes/[id]/cancelar": qualquer("pay_technicians"),
+  "POST /finance/payout-lotes/conferir": qualquer("pay_technicians"),
   "GET /tax/obligations": qualquer("view_finance"),
   "GET /tax/summary": qualquer("view_finance"),
   "GET /tax/vat": qualquer("view_finance"),
