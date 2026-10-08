@@ -10,8 +10,8 @@ import type { StaffContext } from "./handler";
  * ação e retirado se ela falhar (o mesmo padrão dos lotes): assim nunca há
  * uma ação feita sem motivo guardado.
  */
-export type AcaoDaEquipa = "bloquear_cliente" | "suspender_tecnico";
-export type Entidade = "cliente" | "tecnico";
+export type AcaoDaEquipa = "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento";
+export type Entidade = "cliente" | "tecnico" | "pagamento";
 
 export interface RegistoDeAcao {
   id: string;
@@ -34,9 +34,11 @@ export async function registarAcao(
   entidade: Entidade,
   entidadeId: string,
   motivo: string,
+  detalhe?: Record<string, unknown>,
 ): Promise<Resultado> {
   const { data, error } = await supabaseAdmin().from("acoes_da_equipa").insert({
     staff_id: staff.userId, staff_email: staff.email, acao, entidade, entidade_id: entidadeId, motivo,
+    detalhe: detalhe ?? null,
   }).select("id").single();
   if (error) {
     return isMissingTable(error, "acoes_da_equipa")

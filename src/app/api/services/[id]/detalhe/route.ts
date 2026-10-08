@@ -3,7 +3,8 @@ import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import { ApiError } from "@/services/http";
 import { estadoDoBackoffice, mapLaravelService, type LaravelServiceRow } from "../../../_lib/laravelServices";
 import type { EventoDoPedido } from "@/lib/historicoPedido";
-import type { ServiceRequest } from "@/types";
+import type { ServiceRequest, UserRole } from "@/types";
+import { hasPermission } from "@/lib/permissions";
 
 /**
  * GET /api/services/:id/detalhe — um serviço do Laravel, com os técnicos que
@@ -38,12 +39,22 @@ export interface DetalheDoServico {
   candidatos: CandidatoLaravel[];
   /** O histórico (service_events, backend #160). Vazio antes de 08/10/2026. */
   eventos: EventoDoPedido[];
+  /**
+   * Telefones do cliente e do técnico, para ligar sem sair do pedido. `null`
+   * para quem não pode ver dados pessoais. O do técnico só existe com o
+   * backend que o envia no detalhe.
+   */
+  contactos: { cliente: string | null; tecnico: string | null } | null;
+  /** O pagamento (Payshop) do pedido, que é o que o reembolso precisa. */
+  pagamentoUuid: string | null;
 }
 
 type RespostaLaravel = LaravelServiceRow & {
   candidates?: CandidatoLaravel[] | LaravelServiceRow["candidates"];
   candidate_counts?: LaravelServiceRow["candidates"];
   events?: EventoDoPedido[];
+  technician_phone?: string | null;
+  payment_order_uuid?: string | null;
 };
 
 /** As colunas `decimal` do Laravel chegam como texto ("3.00"). */
@@ -62,7 +73,7 @@ function numeros(c: CandidatoLaravel): CandidatoLaravel {
   };
 }
 
-export const GET = withStaff(async (_req, { params }) => {
+export const GET = withStaff(async (_req, { params, staff }) => {
   if (!LARAVEL_ADMIN_ENABLED) {
     return apiErr("API de admin do Laravel não configurada.", 503);
   }
@@ -87,7 +98,14 @@ export const GET = withStaff(async (_req, { params }) => {
       paraBackoffice: e.para ? estadoDoBackoffice(e.para) : null,
     }));
 
-    return apiOk<DetalheDoServico>({ servico, candidatos: lista, eventos });
+    const podeVerContactos = hasPermission(staff.role as UserRole, "view_personal_data");
+    const contactos = podeVerContactos
+      ? { cliente: d.customer_phone || null, tecnico: d.technician_phone || null }
+      : null;
+
+    return apiOk<DetalheDoServico>({
+      servico, candidatos: lista, eventos, contactos, pagamentoUuid: d.payment_order_uuid || null,
+    });
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return apiErr("Serviço não encontrado.", 404);
     return apiErr(e instanceof ApiError ? e.message : "Erro ao ler o serviço.", e instanceof ApiError ? e.status : 500);

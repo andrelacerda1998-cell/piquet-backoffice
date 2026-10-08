@@ -137,7 +137,7 @@ import type { DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 export async function getDetalheDoServico(id: string): Promise<DetalheDoServico | null> {
   return apiGet<DetalheDoServico | null>(`/services/${id}/detalhe`, () => {
     const servico = mockData.services.find((s) => s.id === id);
-    return servico ? { servico, candidatos: [], eventos: [] } : null;
+    return servico ? { servico, candidatos: [], eventos: [], contactos: null, pagamentoUuid: null } : null;
   }).then((r) => r.data);
 }
 

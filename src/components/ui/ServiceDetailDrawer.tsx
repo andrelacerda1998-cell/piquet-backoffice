@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Lock } from "lucide-react";
+import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2 } from "lucide-react";
+import { useAuthStore, toast } from "@/stores";
+import { hasPermission } from "@/lib/permissions";
+import { refundAppPayment } from "@/services/financeService";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { getFotosDoCliente, getDetalheDoServico, type FotoDoCliente } from "@/services/dashboardService";
 import type { CandidatoLaravel, DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 import { comIntervalos, textoDoEvento } from "@/lib/historicoPedido";
@@ -56,28 +62,44 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
     */
     <div className="fixed inset-0 z-50 bg-black/40 !mt-0" onClick={onClose}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Serviço ${service.id}`} className="w-full bg-surface h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        {/* Cabeçalho */}
+        {/* Cabeçalho: o pedido, as duas pessoas e o que se pode fazer. */}
         <div className="sticky top-0 bg-surface border-b border-surface-border px-6 py-4 z-10">
-          <div className="mx-auto max-w-[1400px] flex items-start justify-between">
-            <div>
-              <p className="font-mono text-xs text-text-muted">{service.id}</p>
+          <div className="mx-auto max-w-[1400px] flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-text-muted">#{service.id}</p>
               <h2 className="text-lg font-bold mt-0.5">{service.serviceName}</h2>
-              <p className="text-sm text-text-secondary">{service.customerName} · {service.city}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+                <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
+                <span>{[service.city, service.requestedAt && `pedido ${formatDateTime(service.requestedAt)}`].filter(Boolean).join(" · ")}</span>
+              </div>
             </div>
-            <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
+            <div className="flex items-center gap-2 shrink-0">
+              <AcoesDoPedido service={service} detalhe={detalhe.detalhe} />
+              <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
+            </div>
           </div>
-          <div className="mx-auto max-w-[1400px] mt-3 flex items-center gap-2">
-            <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
+          <div className="mx-auto max-w-[1400px] mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Pessoa
+              papel="Cliente"
+              nome={service.customerName || "(sem nome)"}
+              telefone={detalhe.detalhe?.contactos?.cliente}
+              semAcesso={!!detalhe.detalhe && detalhe.detalhe.contactos === null}
+              ficha={service.customerId ? fichaHref("/clientes?tab=lista", "cliente", service.customerId, service.customerName) : undefined}
+            />
+            <Pessoa
+              papel="Técnico"
+              nome={service.technicianName ?? "Ainda sem técnico"}
+              telefone={service.technicianId ? detalhe.detalhe?.contactos?.tecnico : undefined}
+              semAcesso={!!service.technicianId && !!detalhe.detalhe && detalhe.detalhe.contactos === null}
+              ficha={service.technicianId ? fichaHref("/tecnicos?tab=lista", "tecnico", service.technicianId, service.technicianName) : undefined}
+            />
           </div>
-
           {/*
-            Aqui estavam quatro botões que só mostravam mensagens. Não se
-            substituem por outros: as ações que existem de facto sobre um
-            serviço vivem no Filament e são duas, ambas para pagamentos que
-            ficaram por capturar. Declarar falta de técnico faz-se em
-            Qualidade › Faltas, que é real e cobra mesmo.
+            Os quatro botões antigos (Avançar estado, Agendar, Cancelar,
+            Reembolsar) só mostravam mensagens. Os que estão agora acima fazem
+            o que dizem: ligar, abrir a ficha, reembolsar pelo Payshop.
           */}
-          </div>
+        </div>
 
         {/*
           Tudo à vista, em colunas, em vez de dez separadores.
@@ -101,11 +123,11 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
           `break-inside-avoid` impede que um cartão seja cortado ao meio.
         */}
         <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 columns-1 lg:columns-2 xl:columns-3 gap-5">
-          <Seccao titulo="Resumo"><Resumo service={service} /></Seccao>
-          <Seccao titulo="Técnicos convidados"><Matching detalhe={detalhe} /></Seccao>
+          <Seccao titulo="Pedido"><Resumo service={service} /></Seccao>
+          {/* Os convites importam enquanto não há técnico; depois ficam fechados. */}
+          <Seccao titulo="Técnicos convidados" fechada={!!service.technicianId}><Matching detalhe={detalhe} /></Seccao>
           <Seccao titulo="Cronologia"><Cronologia service={service} detalhe={detalhe} /></Seccao>
-          <Seccao titulo="Pagamento"><Pagamento service={service} /></Seccao>
-          <Seccao titulo="Faturas"><Faturas service={service} /></Seccao>
+          <Seccao titulo="Dinheiro"><Pagamento service={service} /></Seccao>
           <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
           {/*
             Avaliação e reclamação num cartão só: são as duas o que o cliente
@@ -114,6 +136,9 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
             desperdício mais visível deste ecrã.
           */}
           <Seccao titulo="O que o cliente achou">
+            {!service.rating && !service.hasComplaint ? (
+              <p className="text-sm text-text-muted">Sem avaliação nem reclamação.</p>
+            ) : (
             <div className="space-y-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Avaliação</p>
@@ -124,21 +149,142 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
                 <Reclamacao service={service} />
               </div>
             </div>
+            )}
           </Seccao>
-          <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
+          <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
         </div>
       </div>
     </div>
   );
 }
 
-/** Um bloco do ecrã, com título. Substitui um separador. */
-function Seccao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+/**
+ * Um bloco do ecrã, com título. Substitui um separador. `fechada` mostra só
+ * o título até alguém o abrir: para o que raramente interessa naquele pedido.
+ */
+function Seccao({ titulo, children, fechada = false }: { titulo: string; children: React.ReactNode; fechada?: boolean }) {
+  const h3 = "text-xs font-semibold uppercase tracking-[0.14em] text-text-muted";
+  if (fechada) {
+    return (
+      <details className="card p-4 mb-5 break-inside-avoid group">
+        <summary className={cn(h3, "cursor-pointer select-none list-none flex items-center justify-between")}>
+          {titulo}<span className="normal-case tracking-normal font-normal text-text-secondary group-open:hidden">Mostrar</span>
+        </summary>
+        <div className="mt-3">{children}</div>
+      </details>
+    );
+  }
   return (
     <section className="card p-4 mb-5 break-inside-avoid">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted mb-3">{titulo}</h3>
+      <h3 className={cn(h3, "mb-3")}>{titulo}</h3>
       {children}
     </section>
+  );
+}
+
+/** O endereço que abre a ficha de um cliente ou técnico na sua página. */
+function fichaHref(base: string, chave: string, id: string, nome?: string): string {
+  const url = new URL(base, "http://x");
+  url.searchParams.set(chave, id);
+  if (nome?.trim()) url.searchParams.set("q", nome.trim());
+  return url.pathname + url.search;
+}
+
+/** Só os dígitos, com o indicativo de Portugal quando o número vem sem ele. */
+function paraWhatsApp(telefone: string): string {
+  const d = telefone.replace(/\D/g, "");
+  return d.length === 9 ? `351${d}` : d;
+}
+
+/** Uma das duas pessoas do pedido: nome, telefone e como lhe chegar. */
+function Pessoa({ papel, nome, telefone, semAcesso, ficha }: {
+  papel: string; nome: string; telefone?: string | null; semAcesso?: boolean; ficha?: string;
+}) {
+  const botao = "inline-flex items-center gap-1 rounded-md border border-surface-border px-2 py-1 text-xs font-medium hover:bg-surface-muted";
+  return (
+    <div className="rounded-lg border border-surface-border px-3 py-2 min-w-0">
+      <p className="text-[11px] uppercase tracking-wide text-text-muted">{papel}</p>
+      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium text-text-primary truncate">{nome}</p>
+          {telefone
+            ? <p className="text-sm text-text-secondary select-all tabular-nums">{telefone}</p>
+            : semAcesso
+              ? <p className="text-xs text-text-muted">O teu perfil não vê contactos.</p>
+              : null}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {telefone && <a href={`tel:${telefone.replace(/\s/g, "")}`} className={botao}><Phone className="h-3.5 w-3.5" /> Ligar</a>}
+          {telefone && (
+            <a href={`https://wa.me/${paraWhatsApp(telefone)}`} target="_blank" rel="noreferrer" className={botao}>
+              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+            </a>
+          )}
+          {ficha && <Link href={ficha} className={botao}>Ficha <ArrowUpRight className="h-3.5 w-3.5" /></Link>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Reembolsar (pelo Payshop, com motivo registado) e copiar a ligação do
+ * pedido. O reembolso só aparece a quem gere dinheiro, num pedido cobrado e
+ * ligado a um pagamento; o Laravel recusa na mesma se o serviço ainda estiver
+ * vivo, e a mensagem dele diz porquê.
+ */
+function AcoesDoPedido({ service, detalhe }: { service: ServiceRequest; detalhe: DetalheDoServico | null }) {
+  const role = useAuthStore((s) => s.user?.role);
+  const [aReembolsar, setAReembolsar] = useState(false);
+  const uuid = detalhe?.pagamentoUuid;
+  const podeReembolsar = !!uuid && !!role && hasPermission(role, "refund_payments") && service.paymentStatus === "pago";
+
+  const copiar = async () => {
+    const url = `${window.location.origin}/servicos?servico=${encodeURIComponent(service.id)}`;
+    try { await navigator.clipboard.writeText(url); toast("Ligação do pedido copiada."); }
+    catch { toast(url, "info"); }
+  };
+
+  return (
+    <>
+      <button onClick={copiar} className="btn-secondary text-xs py-1.5" title="Copiar a ligação deste pedido">
+        <Link2 className="h-3.5 w-3.5" /> Copiar ligação
+      </button>
+      {podeReembolsar && (
+        <button onClick={() => setAReembolsar(true)} className="btn-secondary text-xs py-1.5 text-danger">
+          <Undo2 className="h-3.5 w-3.5" /> Reembolsar
+        </button>
+      )}
+      <ConfirmDialog
+        open={aReembolsar}
+        onClose={() => setAReembolsar(false)}
+        onConfirm={async (motivo) => {
+          if (!uuid || !motivo) return;
+          try {
+            await refundAppPayment(uuid, motivo, { servicoId: service.id });
+            toast(`Reembolso de ${formatCurrency(service.totalCustomerValue)} enviado ao Payshop.`);
+            setAReembolsar(false);
+          } catch (e) {
+            toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error");
+          }
+        }}
+        title={`Reembolsar o pedido #${service.id}?`}
+        tone="danger"
+        confirmLabel="Reembolsar"
+        description={
+          <>
+            Vais devolver <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b> a{" "}
+            <b className="text-text-primary">{service.customerName || "este cliente"}</b>, pelo mesmo meio de pagamento.
+            O dinheiro sai da conta da Piquet e não se desfaz. Se o pedido ainda estiver a decorrer, o Payshop não deixa:
+            primeiro tem de ser cancelado na app.
+          </>
+        }
+        requireReason
+        minReason={MOTIVO_MINIMO}
+        reasonLabel="Porque é que estás a reembolsar?"
+        reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do profissional"
+      />
+    </>
   );
 }
 
@@ -151,19 +297,22 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/*
+  Cada valor aparece uma vez no painel. O cliente e o técnico estão no
+  cabeçalho; o dinheiro está em "Dinheiro". Saíram daqui a "Categoria" (o
+  Laravel manda o mesmo nome em categoria e serviço) e a "Origem", que é
+  sempre "app" -- só se mostra quando é outra.
+*/
 function Resumo({ service }: { service: ServiceRequest }) {
+  const local = [service.location, service.city].filter(Boolean).join(", ");
   return (
     <div className="space-y-1">
-      <Row label="Cliente" value={service.customerName} />
-      <Row label="Técnico" value={service.technicianName ?? "Não atribuído"} />
-      <Row label="Categoria" value={service.categoryName} />
       <Row label="Serviço" value={service.serviceName} />
-      <Row label="Localização" value={`${service.location}, ${service.city}`} />
-      <Row label="Origem" value={service.source} />
-      <Row label="Valor total" value={formatCurrency(service.totalCustomerValue)} />
-      <Row label="Valor técnico" value={formatCurrency(service.technicianValue)} />
-      <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
-      {service.vatValue != null && <Row label="IVA" value={formatCurrency(service.vatValue)} />}
+      {service.categoryName && service.categoryName !== service.serviceName && <Row label="Categoria" value={service.categoryName} />}
+      <Row label="Morada" value={local || "—"} />
+      {service.scheduledAt && <Row label="Marcado para" value={service.scheduledAt.length > 10 ? formatDateTime(service.scheduledAt) : formatDate(service.scheduledAt)} />}
+      {service.cancellationReason && <Row label="Motivo do cancelamento" value={service.cancellationReason} />}
+      {service.source && service.source !== "app" && <Row label="Origem" value={service.source} />}
     </div>
   );
 }
@@ -355,12 +504,7 @@ function Fotos({ service }: { service: ServiceRequest }) {
   if (fotos === null) return <p className="text-sm text-text-muted">A carregar…</p>;
   if (fotos.length === 0) {
     return (
-      <div className="space-y-2">
-        <p className="text-sm text-text-muted">Este pedido não tem fotografias.</p>
-        <p className="text-xs text-text-secondary">
-          O cliente anexa-as no checkout, e nem sempre anexa. Serviços registados à mão no backoffice nunca as têm.
-        </p>
-      </div>
+      <p className="text-sm text-text-muted">Sem fotografias (o cliente anexa-as no checkout, se quiser).</p>
     );
   }
 
@@ -430,36 +574,22 @@ function Conversa({ service }: { service: ServiceRequest }) {
 function Pagamento({ service }: { service: ServiceRequest }) {
   return (
     <div className="space-y-1">
-      <Row label="Estado do pagamento" value={<StatusBadge status={service.paymentStatus} />} />
-      <Row label="Valor cobrado" value={formatCurrency(service.totalCustomerValue)} />
+      <Row label="Pagamento" value={<StatusBadge status={service.paymentStatus} />} />
+      <Row label="Cobrado ao cliente" value={formatCurrency(service.totalCustomerValue)} />
+      <Row label="Comissão Piquet" value={formatCurrency(service.piquetRevenue)} />
+      <Row label="Para o técnico" value={formatCurrency(service.technicianValue)} />
       {service.vatValue != null && <Row label="IVA" value={formatCurrency(service.vatValue)} />}
-      <Row label="Receita Piquet" value={formatCurrency(service.piquetRevenue)} />
-      <Row label="A pagar ao técnico" value={formatCurrency(service.technicianValue)} />
+      {/* O Laravel ainda não envia o estado da fatura: sem ele não há linha. */}
+      {service.invoiceStatus && <Row label="Fatura" value={<StatusBadge status={service.invoiceStatus} />} />}
     </div>
   );
 }
 
-function Faturas({ service }: { service: ServiceRequest }) {
-  return (
-    <div className="space-y-1">
-      {/* O Laravel ainda não envia o estado da fatura: sem ele não há linha, em
-          vez de um "Não emitida" que ninguém afirmou. */}
-      {service.invoiceStatus && <Row label="Estado da fatura" value={<StatusBadge status={service.invoiceStatus} />} />}
-      <Row label="Data do pedido" value={formatDate(service.requestedAt)} />
-      <Row label="Total" value={formatCurrency(service.totalCustomerValue)} />
-      {/*
-        Saiu o "Nº fatura", que era inventado: `FT 2026/0282`, montado a
-        partir do ano e dos dígitos do id. O número verdadeiro é atribuído
-        pelo InvoiceXpress e não chega à API de admin. Saiu também o botão
-        "Descarregar fatura", que não descarregava nada.
-      */}
-      <p className="pt-3 text-xs text-text-secondary">
-        O número e o PDF da fatura são do InvoiceXpress e não chegam ao backoffice. Aqui fica o estado, que é o que
-        permite saber se já foi emitida.
-      </p>
-    </div>
-  );
-}
+/*
+  "Faturas" era um cartão próprio que repetia a data do pedido e o total, e
+  tinha um número de fatura inventado. O estado da fatura (quando vier) está
+  em "Dinheiro"; o número e o PDF são do InvoiceXpress e não chegam cá.
+*/
 
 function Avaliacoes({ service }: { service: ServiceRequest }) {
   if (!service.rating) return <p className="text-sm text-text-muted">Ainda sem avaliação.</p>;
@@ -496,9 +626,11 @@ function Reclamacao({ service }: { service: ServiceRequest }) {
         não vem na API.
       */}
       <p className="mt-1 text-sm text-text-secondary">
-        Este serviço está marcado como tendo reclamação. O que o cliente disse chega como ticket em Suporte, com o
-        número do serviço no assunto.
+        O que o cliente disse está no ticket, em Suporte, com o número do pedido no assunto.
       </p>
+      <Link href="/suporte" className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-danger hover:underline">
+        Abrir Suporte <ArrowUpRight className="h-3.5 w-3.5" />
+      </Link>
     </div>
   );
 }

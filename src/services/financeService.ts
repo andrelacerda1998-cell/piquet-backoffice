@@ -181,8 +181,12 @@ export interface PaymentActionResult {
   refunded: number;
 }
 
-export async function refundAppPayment(uuid: string, amountCents?: number): Promise<PaymentActionResult> {
-  return apiPost<PaymentActionResult>(`/finance/app-payments/${uuid}/refund`, { amountCents }, () => {
+export async function refundAppPayment(
+  uuid: string,
+  motivo: string,
+  opcoes: { amountCents?: number; servicoId?: string } = {},
+): Promise<PaymentActionResult> {
+  return apiPost<PaymentActionResult>(`/finance/app-payments/${uuid}/refund`, { motivo, ...opcoes }, () => {
     throw new Error("Reembolsos precisam da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }
