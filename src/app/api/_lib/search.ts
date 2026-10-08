@@ -151,7 +151,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       const { data } = await admin.from("leads").select("id, name, phone, city")
         .or(`name.ilike.${like},phone.ilike.${like},city.ilike.${like}`).limit(6);
       for (const l of data ?? []) out.push({
-        type: "lead", typeLabel: "Pedido", id: String(l.id),
+        type: "lead", typeLabel: "Contacto", id: String(l.id),
         title: l.name || "(sem nome)", subtitle: join([l.phone, l.city]), href: "/leads",
       });
     }),

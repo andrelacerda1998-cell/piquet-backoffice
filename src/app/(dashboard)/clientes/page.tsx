@@ -612,7 +612,7 @@ export default function CustomersPage() {
         requireReason
         minReason={MOTIVO_MINIMO}
         reasonLabel="Porque é que estás a bloquear?"
-        reasonPlaceholder="Ex.: pagamentos recusados repetidamente; comportamento abusivo com o profissional"
+        reasonPlaceholder="Ex.: pagamentos recusados repetidamente; comportamento abusivo com o técnico"
         confirmLabel="Bloquear"
         tone="danger"
       />

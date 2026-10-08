@@ -26,8 +26,8 @@ import { X, ArrowRight } from "lucide-react";
 
 const ESTADO: Record<CustomRequestStatus, { label: string; tone: string; nota: string }> = {
   novo: { label: "À espera da Piquet", tone: "bg-danger-light text-danger", nota: "Falta definir a duração e as áreas (no Filament). Até lá o cliente vê \"Pedido em análise\"." },
-  em_analise: { label: "À procura de profissional", tone: "bg-info-light text-info", nota: "Já foi despachado e está no matching normal." },
-  opcoes_enviadas: { label: "Em curso", tone: "bg-warning-light text-warning", nota: "Aceite por um profissional: à espera de pagamento, agendado ou a decorrer." },
+  em_analise: { label: "À procura de técnico", tone: "bg-info-light text-info", nota: "Já foi despachado e está no matching normal." },
+  opcoes_enviadas: { label: "Em curso", tone: "bg-warning-light text-warning", nota: "Aceite por um técnico: à espera de pagamento, agendado ou a decorrer." },
   agendado: { label: "Concluído", tone: "bg-success-light text-success", nota: "O serviço foi feito." },
   recusado: { label: "Sem serviço", tone: "bg-surface-subtle text-text-muted", nota: "Falhou, expirou ou foi cancelado." },
 };

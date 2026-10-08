@@ -240,14 +240,14 @@ export default function OverviewPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="font-semibold text-text-primary">
-                    {leadsPorResponder.length} lead{leadsPorResponder.length === 1 ? "" : "s"} por responder
+                    {leadsPorResponder.length} contacto{leadsPorResponder.length === 1 ? "" : "s"} por responder
                     {leadsUrgentes > 0 && (
                       <span className="ml-2 inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger align-middle">
                         {leadsUrgentes} urgente{leadsUrgentes === 1 ? "" : "s"}
                       </span>
                     )}
                   </p>
-                  <p className="text-sm text-text-secondary">Pedidos recebidos que ainda ninguém contactou.</p>
+                  <p className="text-sm text-text-secondary">Da landing e do WhatsApp, que ainda ninguém respondeu.</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-text-muted ml-auto shrink-0 group-hover:text-piquet-700 transition-colors" />
               </Link>

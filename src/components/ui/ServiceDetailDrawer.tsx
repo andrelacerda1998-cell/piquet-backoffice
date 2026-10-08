@@ -282,7 +282,7 @@ function AcoesDoPedido({ service, detalhe }: { service: ServiceRequest; detalhe:
         requireReason
         minReason={MOTIVO_MINIMO}
         reasonLabel="Porque é que estás a reembolsar?"
-        reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do profissional"
+        reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do técnico"
       />
     </>
   );

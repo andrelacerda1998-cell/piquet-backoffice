@@ -93,7 +93,7 @@ export const NAV_ITEMS = [
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
-  { href: "/leads", label: "Pedidos", icon: "Inbox" },
+  { href: "/leads", label: "Contactos", icon: "Inbox" },
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
   { href: "/chat", label: "Equipa", icon: "MessageSquare" },
   { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },

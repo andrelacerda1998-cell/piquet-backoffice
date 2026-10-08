@@ -1141,7 +1141,7 @@ export default function FinancePage() {
           requireReason
           minReason={MOTIVO_MINIMO}
           reasonLabel="Porque é que estás a reembolsar?"
-          reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do profissional"
+          reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do técnico"
           description={payToRefund && (
             <>
               Vais devolver <b className="text-text-primary">{formatCurrency(payToRefund.amount)}</b> ao cliente

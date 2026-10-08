@@ -15,7 +15,7 @@ export interface EstadoSimples {
 }
 
 export const ESTADOS_SIMPLES: EstadoSimples[] = [
-  { id: "procura", label: "À procura de profissional", statuses: ["pedido_recebido", "a_procurar_tecnico"] },
+  { id: "procura", label: "À procura de técnico", statuses: ["pedido_recebido", "a_procurar_tecnico"] },
   { id: "espera", label: "À espera", statuses: ["a_aguardar_orcamento", "orcamento_enviado", "a_aguardar_pagamento"] },
   { id: "agendado", label: "Agendado", statuses: ["tecnico_encontrado", "pago", "agendado"] },
   { id: "curso", label: "Em curso", statuses: ["em_execucao", "a_aguardar_confirmacao"] },

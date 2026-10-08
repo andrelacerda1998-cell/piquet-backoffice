@@ -102,7 +102,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       dias >= LIMITES.leadDiasCritico ? "critica" : "alta",
       dias === 0 ? "Lead nova por responder" : `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
       `${l.nome} pediu contacto e continua no estado "Novo".`,
-      "Abrir o pedido e responder, ou perguntar a técnicos.",
+      "Abrir o contacto e responder, ou perguntar a técnicos.",
       l.recebidaEm, "lead", l.id,
     ));
   }
