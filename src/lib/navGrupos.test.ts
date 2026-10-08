@@ -8,7 +8,8 @@ describe("o menu em seis grupos", () => {
   });
 
   it("nenhum ecrã do menu antigo se perdeu: cada um está num grupo (ou no rodapé), e num só", () => {
-    const antigos = ["/", "/alertas", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao", "/recrutamento"];
+    // /recrutamento juntou-se a Técnicos › Aprovações (o endereço redireciona).
+    const antigos = ["/", "/alertas", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
     const todos = [...NAV_GROUPS.flatMap((g) => g.filhos), ...NAV_RODAPE];
     for (const href of antigos) {
       expect(todos.filter((h) => h === href), href).toHaveLength(1);

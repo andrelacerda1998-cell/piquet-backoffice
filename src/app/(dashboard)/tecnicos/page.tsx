@@ -9,14 +9,13 @@ import { DocumentPreview } from "@/components/ui/DocumentPreview";
 import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import {
   getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  getTopVendors, getOnboardingTecnicos, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces,
   getTecnicosSemWorkspace, type TecnicoSemWorkspace,
@@ -34,6 +33,7 @@ import {
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
+import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
@@ -102,8 +102,10 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
   // O que depende de NÓS vai à parte, e só aparece quando existe. Nenhum dos
   // degraus acima é trabalho nosso: todos dependem do técnico.
   const nossos = [
-    { rotulo: "À espera de nós", n: contagem.aEspera,
-      nota: "têm tudo — falta criar-lhes o workspace de faturação" },
+    // O mesmo nome que em Aprovações: "à espera de nós" queria dizer
+    // documentos no ecrã de Onboarding e workspaces aqui.
+    { rotulo: "Workspace por criar", n: contagem.aEspera,
+      nota: "têm tudo — falta criarmos o workspace de faturação (em Aprovações)" },
   ];
 
   return (
@@ -209,7 +211,9 @@ export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   // ?tab=aprovacoes — deep-link vindo dos avisos da Visão executiva.
-  const [tab, setTab] = useTabParam("visao");
+  const [tab, setTab] = useTabParam("resumo");
+  // Endereços antigos: ?tab=visao era o Resumo.
+  useEffect(() => { if (tab === "visao") setTab("resumo"); }, [tab, setTab]);
 
   // Indicadores reais da Visão geral (App\Http\Controllers\Api\Admin\
   // VendorController::metrics() e derivados) -- substituem os "estados"
@@ -248,12 +252,17 @@ export default function TechniciansPage() {
     abertura da página, mesmo quem só queria ver a Visão geral, e era metade
     da demora de que o André se queixou.
   */
+  // As inscrições paradas (o que era o ecrã Onboarding): só na aba Aprovações.
+  const { data: inscricoes } = useAsyncData(
+    () => (tab === "aprovacoes" ? getOnboardingTecnicos().catch(() => null) : Promise.resolve(null)),
+    [tab],
+  );
+  const paradosPorEles = (inscricoes?.parados ?? []).filter((t) => !(t.etapa && ESPERA_POR_NOS[t.etapa as Etapa]));
   const { data: docs } = useAsyncData(
     () => (tab === "aprovacoes" ? getResumoDocumentos() : Promise.resolve(null)),
     [tab],
   );
 
-  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
@@ -358,16 +367,6 @@ export default function TechniciansPage() {
   // continuava a dizer que havia N por validar até se recarregar à mão.
   const [revisaoFeita, setRevisaoFeita] = useState(0);
   const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), [revisaoFeita]);
-  // Aviso por técnico: quais os técnicos com documentos por validar (não só o total).
-  const { data: pendingDocsList } = useAsyncData(() => getVendorDocuments("pending", 1, 100), [revisaoFeita]);
-  const pendingByVendor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const d of pendingDocsList?.items ?? []) {
-      const name = d.vendor_name?.trim() || "Técnico sem nome";
-      m.set(name, (m.get(name) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]); // mais pendentes primeiro
-  }, [pendingDocsList]);
   const [docStatus, setDocStatus] = useState<VendorDocumentStatus>("pending");
   const docsData = useAsyncData(() => getVendorDocuments(docStatus, 1, 50), [docStatus]);
 
@@ -393,9 +392,9 @@ export default function TechniciansPage() {
   // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
   // filtrar só a página daria contas erradas — com filtro ativo carregamos a
   // lista toda de uma vez e filtramos aqui.
-  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif">("");
+  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif" | "suspensos">("");
   const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
-    () => (atFilter ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
+    () => (atFilter && atFilter !== "suspensos" ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
     [atFilter, debouncedSearch]
   );
   const atFiltered = useMemo(() => {
@@ -579,10 +578,16 @@ export default function TechniciansPage() {
     }
   };
 
+  /*
+    Quatro separadores, sem sub-separadores. Eram três com seis
+    sub-separadores, mais um ecrã de Onboarding à parte que repetia o funil
+    do Resumo com outros nomes e outros totais.
+  */
   const TABS: TabDef[] = [
-    { id: "visao", label: "Visão geral" },
+    { id: "resumo", label: "Resumo" },
     { id: "lista", label: "Lista" },
-    { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
+    { id: "aprovacoes", label: "Aprovações", count: pendingDocsMeta?.meta.total ?? 0 },
+    { id: "cobertura", label: "Cobertura" },
   ];
 
   const topColumns: Column<TopVendor>[] = [
@@ -658,139 +663,50 @@ export default function TechniciansPage() {
           icon={HardHat}
           eyebrow="Pessoas"
           title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
-          subtitle={`${metrics?.registered ?? 0} técnicos registados`}
+          subtitle="Quem trabalha com a Piquet, quem está a meio da inscrição e onde há cobertura"
         />
 
-        {/* Aviso: quais os técnicos com documentos por validar (não só o total).
-            Dentro de Aprovações não aparece: o resumo da própria aba já o diz. */}
-        {pendingByVendor.length > 0 && tab !== "aprovacoes" && (
-          <div className="card border-l-4 border-l-warning bg-warning-light/40 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-text-primary">
-                  ⚠️ {pendingByVendor.length} técnico(s) com documentos por validar
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {pendingByVendor.slice(0, 12).map(([name, n]) => (
-                    <button
-                      key={name}
-                      onClick={() => setTab("aprovacoes")}
-                      title="Abrir a fila de aprovações KYC"
-                      className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-medium border border-surface-border hover:border-warning"
-                    >
-                      {name}
-                      <span className="text-warning font-bold">{n}</span>
-                    </button>
-                  ))}
-                  {pendingByVendor.length > 12 && (
-                    <span className="text-xs text-text-muted self-center">+{pendingByVendor.length - 12} …</span>
-                  )}
-                </div>
+        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+        {tab === "resumo" && (
+          <div className="space-y-6">
+            {/*
+              Um número por pergunta, de uma só fonte. Havia quatro para
+              "quantos estão prontos" (Podem aceitar serviço, Perfil completo,
+              Nada em falta, Prontos a trabalhar no Onboarding), três para
+              "quantos há" e duas percentagens. Ficam os do Laravel; o funil
+              abaixo diz onde estão os outros.
+            */}
+            {metrics && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <MetricCard title="Inscritos" hideDelta
+                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
+                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
+                        <MetricCard title="Prontos a trabalhar" hideDelta
+                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
+                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
+                        <MetricCard title="Online" hideDelta
+                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
+                            "Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo")} />
+                        <MetricCard title="Sem serviços" hideDelta
+                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
+                            "Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço")} />
               </div>
-              <button onClick={() => setTab("aprovacoes")} className="btn-primary text-sm shrink-0">Rever documentos</button>
+            )}
+
+            {semWorkspace && semWorkspace.contagem.total > 0 && (
+              <Degraus contagem={semWorkspace.contagem} />
+            )}
+
+            <div>
+              <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
+              <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
             </div>
           </div>
         )}
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
-
-        {tab === "visao" && (
-          <SubTabs tabs={[
-            { id: "resumo", label: "Resumo" },
-            { id: "categoria", label: "Por categoria" },
-            { id: "cobertura", label: "Cobertura" },
-            { id: "mapa", label: "Mapa ao vivo" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "resumo" && (
-                  <div className="space-y-6">
-                    {metrics && (
-                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        {/*
-                          Cada cartão diz o que MEDE, não só o que se chama.
-                          Metade destes números foi mal lida hoje -- "Sem
-                          serviços" parecia ser sobre os 460 e é sobre os
-                          elegíveis; "Online agora" parece presença e é uma
-                          bandeira que o técnico deixa ligada.
-                        */}
-                        <MetricCard title="Registados" hideDelta
-                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
-                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
-                        <MetricCard title="Podem aceitar serviço" hideDelta
-                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
-                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
-                        <MetricCard title="Online agora" hideDelta
-                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
-                            "Têm o estado Online ligado. Não é presença: quem fecha a app sem desligar continua a contar — ver o Mapa ao vivo")} />
-                        <MetricCard title="Sem serviços" hideDelta
-                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
-                            "Dos que podem aceitar serviço, quantos ainda não fecharam nenhum — não é sobre os registados")} />
-                        <MetricCard title="Taxa de elegibilidade" hideDelta format="percent"
-                          metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate, false, undefined,
-                            "Quantos dos registados podem aceitar serviço. Inclui no denominador quem nunca confirmou um contacto")} />
-                        {/*
-                          Na MESMA fila dos outros, e não num bloco à parte.
-
-                          Esteve num bloco próprio enquanto o "Podem aceitar
-                          serviço" ao lado estava errado (dizia 41 onde eram
-                          69, por o backend filtrar pela regra antiga da AT).
-                          Dois blocos a dizer a mesma coisa com números
-                          diferentes é pior do que um número a menos —
-                          corrigida a origem (backend #124), o duplicado sai.
-                        */}
-                        {semWorkspace && semWorkspace.contagem.total > 0 && (
-                          <MetricCard
-                            title="Perfil completo"
-                            hideDelta
-                            metric={buildMetricValue(
-                              semWorkspace.contagem.perfilCompleto,
-                              semWorkspace.contagem.perfilCompleto,
-                              false,
-                              undefined,
-                              `${((semWorkspace.contagem.perfilCompleto / semWorkspace.contagem.total) * 100)
-                                .toFixed(1).replace(".", ",")}% — documentos validados e workspace criado`,
-                            )}
-                          />
-                        )}
-                      </div>
-                    )}
-
-                    {semWorkspace && semWorkspace.contagem.total > 0 && (
-                      <Degraus contagem={semWorkspace.contagem} />
-                    )}
-
-                    {/*
-                      O `perfilCompleto` é DERIVADO, não medido: o Laravel não
-                      expõe `all_documents_verified` por técnico, e o código de
-                      bloqueio só revela o primeiro problema. Quem tem os dois
-                      contactos por verificar fica por classificar — e isso
-                      diz-se, em vez de se apresentar o número como exacto.
-                    */}
-                    {(semWorkspace?.contagem.contactoPorVerificar ?? 0) > 0 && (
-                      <p className="text-xs text-text-muted -mt-3">
-                        O «perfil completo» pode estar até{" "}
-                        <b className="text-warning">{formatNumber(semWorkspace!.contagem.contactoPorVerificar)}</b>{" "}
-                        abaixo do real: esses técnicos têm ambos os contactos por verificar, o que tapa o estado dos
-                        documentos.
-                      </p>
-                    )}
-
-                    <div>
-                      <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
-                      <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
-                    </div>
-                  </div>
-                )}
-                {/* Só o circular: as barras e o donut liam os MESMOS `byCategory`,
-                    lado a lado. Duas leituras do mesmo número não acrescentam
-                    nada — e a proporção é o que interessa aqui. */}
-                {sub === "categoria" && (
-                  <ChartCard title="Distribuição de técnicos por categoria" subtitle="Áreas de operação em que estão registados">
-                    <DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" />
-                  </ChartCard>
-                )}
-                {sub === "cobertura" && (
+        {tab === "cobertura" && (
+          <div className="space-y-6">
                   <div className="space-y-5">
                     {/* Sem cobertura declarada não se pode falar de oferta —
                         dizê-lo em vez de mostrar zeros que parecem factos. */}
@@ -914,15 +830,24 @@ export default function TechniciansPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                      <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
-                        <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                      </ChartCard>
-                    </div>
                   </div>
-                )}
-                {sub === "mapa" && (
+
+            {/* Por categoria: uma lista e não um gráfico circular num separador só para ele. */}
+            <div className="card p-4 space-y-2">
+              <h3 className="font-semibold text-text-primary">Técnicos por categoria</h3>
+              {(byCategory ?? []).length === 0 ? (
+                <p className="text-sm text-text-muted">Sem dados.</p>
+              ) : [...(byCategory ?? [])].sort((a, b) => b.value - a.value).map((c) => (
+                <div key={c.name} className="flex items-baseline justify-between text-sm">
+                  <span className="text-text-secondary">{c.name}</span>
+                  <span className="font-medium tabular-nums text-text-primary">{c.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* O mapa: onde estão, agora, os técnicos com localização recente. */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-text-primary">Mapa ao vivo</h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-text-secondary">
@@ -941,17 +866,14 @@ export default function TechniciansPage() {
                           />
                           Mostrar contas de teste
                         </label>
-                        <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1">Criar conta de teste</button>
                       </div>
                     </div>
                     <div className="card overflow-hidden">
                       <TechnicianMap locations={liveLocations ?? []} />
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </SubTabs>
+            </div>
+          </div>
         )}
 
         {tab === "aprovacoes" && (
@@ -1088,7 +1010,7 @@ export default function TechniciansPage() {
                   */}
                   <p className="text-sm text-text-secondary mt-1">
                     Técnicos a quem falta reenviar um documento. Os {formatNumber(docs.nunca_submeteram)} que nunca
-                    submeteram nada estão no funil de inscrição, na Visão geral.
+                    submeteram nada estão no funil de inscrição, no Resumo.
                   </p>
                 </div>
                 {docs.expirados.length > 0 && (
@@ -1112,20 +1034,54 @@ export default function TechniciansPage() {
                 )}
               </section>
             )}
+
+            {/* 4. Inscrições paradas — o que era o ecrã "Onboarding de técnicos". */}
+            {/*
+              Só quem está parado por algo que depende DELE. Quem espera por
+              nós (documentos por rever, workspace) já está nas secções 1 e 2:
+              aparecer aqui também era a mesma pessoa em dois sítios.
+            */}
+            {paradosPorEles.length > 0 && (
+              <section id="kyc-inscricoes" className="card overflow-hidden scroll-mt-20">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <h2 className="font-semibold text-text-primary">Inscrições paradas</h2>
+                  <p className="text-sm text-text-secondary mt-1">
+                    Inscreveram-se para trabalhar e ficaram a meio por algo que falta da parte deles. Os que esperam há
+                    mais tempo primeiro; o passo é o primeiro que lhes falta. Quantos estão em cada passo vê-se no Resumo.
+                  </p>
+                </div>
+                <ul className="divide-y divide-surface-border">
+                  {paradosPorEles.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 sm:px-5 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">{t.nome}</p>
+                        <p className="text-xs text-text-muted">
+                          {t.categorias.length > 0 ? t.categorias.join(" · ") : "sem categoria"}
+                          {t.criadoEm && ` · inscrito a ${formatDate(t.criadoEm)}`}
+                        </p>
+                      </div>
+                      {t.telefone && (
+                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-piquet-700">{t.telefone}</a>
+                      )}
+                      <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">
+                        {t.etapa ? ETAPA_LABEL[t.etapa as Etapa] : "—"}
+                      </span>
+                      <span className="text-xs tabular-nums text-text-muted w-24 text-right">
+                        {t.diasParado == null ? "sem data" : t.diasParado === 0 ? "hoje" : `há ${t.diasParado} dias`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         )}
 
         {tab === "lista" && (
-          <SubTabs tabs={[
-            { id: "todos", label: "Todos" },
-            { id: "suspensoes", label: "Suspensões", count: suspendedVendors?.total ?? 0 },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "todos" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
+                      <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1 ml-auto order-last">Criar conta de teste</button>
                       <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
@@ -1134,6 +1090,8 @@ export default function TechniciansPage() {
                           // Sem NIF não há como faturar em nome do técnico —
                           // são registos que nunca poderão receber.
                           { id: "sem_nif", label: "Sem NIF" },
+                          // Era um sub-separador à parte; é um filtro como os outros.
+                          { id: "suspensos", label: "Suspensos" },
                         ] as const).map((f) => (
                           <button key={f.id} onClick={() => setAtFilter(f.id)}
                             className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
@@ -1145,6 +1103,7 @@ export default function TechniciansPage() {
                               <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
                                 {f.id === "validada" ? atCounts.validada
                                   : f.id === "por_validar" ? atCounts.por_validar
+                                  : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
                                   : atCounts.sem_nif}
                               </span>
                             )}
@@ -1153,7 +1112,18 @@ export default function TechniciansPage() {
                       </div>
                     </div>
 
-                    {atFilter ? (
+                    {atFilter === "suspensos" ? (
+                      <>
+                        <p className="text-sm text-text-secondary">Suspensos: sem acesso a novos serviços até serem reativados.</p>
+                    <DataTable
+                      columns={suspendedColumns}
+                      data={suspendedVendors?.data ?? []}
+                      keyField="id"
+                      loading={suspendedLoading}
+                      emptyMessage="Sem técnicos suspensos 🎉"
+                    />
+                      </>
+                    ) : atFilter ? (
                       <>
                         <p className="text-sm text-text-secondary">
                           <b className="text-text-primary tabular-nums">{atFiltered.length}</b>{" "}
@@ -1172,22 +1142,6 @@ export default function TechniciansPage() {
                       </>
                     )}
                   </div>
-                )}
-                {sub === "suspensoes" && (
-                  <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Técnicos suspensos — sem acesso a novos serviços até reativação.</p>
-                    <DataTable
-                      columns={suspendedColumns}
-                      data={suspendedVendors?.data ?? []}
-                      keyField="id"
-                      loading={suspendedLoading}
-                      emptyMessage="Sem técnicos suspensos 🎉"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </SubTabs>
         )}
       </div>
 
