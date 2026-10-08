@@ -1,7 +1,9 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
-import { podeChamar } from "@/lib/acessoApi";
+import { podeChamar, chaveDaRota } from "@/lib/acessoApi";
+import { oQueRegistar } from "@/lib/registoDaEquipa";
+import { registarEscrita } from "./acoesDaEquipa";
 
 /**
  * Utilitários das Route Handlers.
@@ -87,7 +89,19 @@ export function withStaff(
     }
     const params = route?.params ? await route.params : {};
     try {
-      return await handler(req, { staff, params });
+      const res = await handler(req, { staff, params });
+      /*
+        Cada escrita que corre bem fica no histórico da equipa: quem, quando,
+        o quê e sobre que registo (ver src/lib/registoDaEquipa.ts). O Laravel
+        só vê o token partilhado do backoffice; isto é o único sítio que sabe
+        que foi a Ana.
+      */
+      if (req.method !== "GET" && req.method !== "HEAD" && res.status < 400) {
+        const caminho = new URL(req.url).pathname;
+        const r = oQueRegistar(chaveDaRota(req.method, caminho), params);
+        if (r) await registarEscrita(staff, r, { metodo: req.method, caminho, status: res.status });
+      }
+      return res;
     } catch (e) {
       return apiErr(e instanceof Error ? e.message : "Erro interno.", 500);
     }

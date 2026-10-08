@@ -69,7 +69,7 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /customers/[id]/payment-methods": todas("view_customers", "view_personal_data"),
   "DELETE /customers/[id]/payment-methods/[methodId]": qualquer("destructive_actions"),
   "PUT /customers/[id]/block": qualquer("destructive_actions"),
-  "GET /acoes-da-equipa": qualquer("view_customers", "view_technicians"),
+  "GET /acoes-da-equipa": qualquer("view_services", "view_customers", "view_technicians", "manage_settings"),
   "GET /staff": qualquer("manage_settings"),
   "PUT /customers/[id]/restore": qualquer("destructive_actions"),
 
@@ -238,6 +238,7 @@ export const POLITICA: Record<string, Requisito> = {
 };
 
 interface Regra {
+  chave: string;
   metodo: string;
   padrao: RegExp;
   dinamicos: number;
@@ -255,7 +256,7 @@ const REGRAS: Regra[] = Object.entries(POLITICA)
     const padrao = new RegExp(
       "^" + partes.map((p) => (/^\[.+\]$/.test(p) ? "[^/]+" : p.replace(/[.*+?^${}()|\\]/g, "\\$&"))).join("/") + "/?$",
     );
-    return { metodo, padrao, dinamicos: partes.filter((p) => p.startsWith("[")).length, requisito };
+    return { chave, metodo, padrao, dinamicos: partes.filter((p) => p.startsWith("[")).length, requisito };
   })
   .sort((a, b) => a.dinamicos - b.dinamicos);
 
@@ -266,6 +267,13 @@ export function requisitoDe(metodo: string, caminho: string): Requisito | null {
   const efetivo = m === "HEAD" ? "GET" : m;
   const limpo = caminho.replace(/^\/api(?=\/)/, "").split("?")[0];
   return REGRAS.find((r) => r.metodo === efetivo && r.padrao.test(limpo))?.requisito ?? null;
+}
+
+/** A chave da política que um pedido usa ("PUT /customers/[id]/block"), ou `null`. */
+export function chaveDaRota(metodo: string, caminho: string): string | null {
+  const m = metodo.toUpperCase() === "HEAD" ? "GET" : metodo.toUpperCase();
+  const limpo = caminho.replace(/^\/api(?=\/)/, "").split("?")[0];
+  return REGRAS.find((r) => r.metodo === m && r.padrao.test(limpo))?.chave ?? null;
 }
 
 /** O perfil satisfaz o requisito? Um perfil desconhecido não satisfaz nada. */

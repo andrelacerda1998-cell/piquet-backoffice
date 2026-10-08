@@ -15,3 +15,28 @@ export async function getMotivos(acao: "bloquear_cliente" | "suspender_tecnico")
   const r = await apiGet<{ ativo: boolean; registos: MotivoRegistado[] }>("/acoes-da-equipa", () => ({ ativo: false, registos: [] }), { acao });
   return new Map(r.data.registos.map((m) => [m.entidade_id, m]));
 }
+
+export interface EntradaDoHistorico {
+  id: string;
+  criado_em: string;
+  staff_email: string | null;
+  acao: string;
+  entidade: string;
+  entidade_id: string;
+  motivo: string | null;
+  detalhe: Record<string, unknown> | null;
+}
+
+/** O histórico da equipa de um registo (pedido, cliente, técnico…). `ativo: false` sem a tabela. */
+export async function getHistorico(entidade: string, id: string): Promise<{ ativo: boolean; registos: EntradaDoHistorico[] }> {
+  return apiGet<{ ativo: boolean; registos: EntradaDoHistorico[] }>(
+    "/acoes-da-equipa", () => ({ ativo: false, registos: [] }), { entidade, id },
+  ).then((r) => r.data);
+}
+
+/** As últimas ações de toda a equipa. */
+export async function getUltimasAcoes(): Promise<{ ativo: boolean; registos: EntradaDoHistorico[] }> {
+  return apiGet<{ ativo: boolean; registos: EntradaDoHistorico[] }>(
+    "/acoes-da-equipa", () => ({ ativo: false, registos: [] }),
+  ).then((r) => r.data);
+}

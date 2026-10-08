@@ -14,6 +14,7 @@ import { hasPermission } from "@/lib/permissions";
 import { refundAppPayment } from "@/services/financeService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
 import { getFotosDoCliente, getDetalheDoServico, type FotoDoCliente } from "@/services/dashboardService";
 import type { CandidatoLaravel, DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 import { comIntervalos, textoDoEvento } from "@/lib/historicoPedido";
@@ -151,6 +152,7 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
             </div>
             )}
           </Seccao>
+          <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa entidade="pedido" id={service.id} /></Seccao>
           <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
         </div>
       </div>

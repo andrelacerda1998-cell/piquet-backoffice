@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Users, UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
 import { getMotivos } from "@/services/acoesDaEquipaService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { Modal } from "@/components/ui/Modal";
@@ -593,6 +594,11 @@ export default function CustomersPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico da equipa</p>
+              <HistoricoDaEquipa entidade="cliente" id={String(selectedCustomer.id)} />
             </div>
           </div>
         )}

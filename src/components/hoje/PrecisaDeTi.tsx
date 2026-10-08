@@ -21,6 +21,8 @@ import type { AlertPriority, DashboardAlert } from "@/types";
  */
 const MAXIMO = 6;
 
+const URGENCIA: Record<AlertPriority, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+
 const COR: Record<AlertPriority, string> = {
   critica: "border-l-danger",
   alta: "border-l-warning",
@@ -42,7 +44,9 @@ export function PrecisaDeTi() {
   const { data, loading, error, refetch } = useAsyncData(() => getAlerts(1, 200), []);
   const [aAdiar, setAAdiar] = useState<string | null>(null);
 
-  const alertas = data?.data ?? [];
+  // O mais urgente primeiro e, dentro da mesma urgência, o mais antigo.
+  const alertas = [...(data?.data ?? [])].sort((a, b) =>
+    URGENCIA[a.priority] - URGENCIA[b.priority] || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
   const fila = alertas.slice(0, MAXIMO);
 
   const adiar = async (a: DashboardAlert) => {

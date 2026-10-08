@@ -32,6 +32,7 @@ import {
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
 import { getMotivos } from "@/services/acoesDaEquipaService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
@@ -1513,6 +1514,11 @@ export default function TechniciansPage() {
                     a uma lead, e por isso aparecia no CRM como um pedido de
                     serviço vindo de quem os executa.
                   */}
+                  <div className="pt-1">
+                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Histórico da equipa</p>
+                    <HistoricoDaEquipa entidade="tecnico" id={String(v.id)} />
+                  </div>
+
                   <div className="pt-1">
                     <WhatsappConversa
                       tecnicoId={String(v.id)}

@@ -13,13 +13,16 @@ export const mockState: {
   tables: Record<string, Result>;
   user: { id: string; email: string } | null;
   authError: boolean;
-} = { tables: {}, user: { id: "staff-1", email: "ana@piquet.pt" }, authError: false };
+  /** O que se inseriu, por tabela (para os testes verem o que ficou gravado). */
+  inserts: Array<{ table: string; row: unknown }>;
+} = { tables: {}, user: { id: "staff-1", email: "ana@piquet.pt" }, authError: false, inserts: [] };
 
-function builder(result: Result): any {
+function builder(result: Result, table = ""): any {
   const b: any = {};
-  for (const m of ["select", "eq", "or", "ilike", "gte", "lte", "gt", "order", "range", "limit", "insert", "update", "upsert", "delete"]) {
+  for (const m of ["select", "eq", "or", "ilike", "gte", "lte", "gt", "order", "range", "limit", "update", "upsert", "delete"]) {
     b[m] = () => b;
   }
+  b.insert = (row: unknown) => { mockState.inserts.push({ table, row }); return b; };
   b.single = () => Promise.resolve(result);
   b.then = (res: any, rej: any) => Promise.resolve(result).then(res, rej);
   return b;
@@ -30,7 +33,7 @@ export function makeSupabaseMock() {
   return {
     SUPABASE_ENABLED: true,
     supabaseAdmin: () => ({
-      from: (t: string) => builder(mockState.tables[t] ?? { data: [], error: null, count: 0 }),
+      from: (t: string) => builder(mockState.tables[t] ?? { data: [], error: null, count: 0 }, t),
       auth: {
         getUser: () =>
           Promise.resolve(
@@ -52,4 +55,5 @@ export function resetMock() {
   mockState.tables = { staff: { data: { role: "cto", email: "rodrigo@piquet.pt" } } };
   mockState.user = { id: "staff-1", email: "rodrigo@piquet.pt" };
   mockState.authError = false;
+  mockState.inserts = [];
 }
