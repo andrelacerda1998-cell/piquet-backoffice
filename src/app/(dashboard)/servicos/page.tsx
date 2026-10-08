@@ -8,7 +8,7 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
 import { ouvirPedidosDeAbertura } from "@/hooks/useAbrirPeloEndereco";
-import ServicosPersonalizadosPage from "../servicos-personalizados/page";
+import PedidosPersonalizados from "./PedidosPersonalizados";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
@@ -336,7 +336,7 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {tab === "personalizados" && <ServicosPersonalizadosPage />}
+        {tab === "personalizados" && <PedidosPersonalizados />}
 
         {/* Service detail drawer (com separadores) */}
         {selectedService && (

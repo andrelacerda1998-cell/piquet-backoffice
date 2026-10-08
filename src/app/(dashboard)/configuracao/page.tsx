@@ -7,8 +7,9 @@ import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui
 import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
-import { SEED_ADMINS, ADMIN_ROLES, type Admin } from "@/services/backofficeService";
+import { getEquipa, type PessoaDaEquipa } from "@/services/equipaService";
+import { ROLE_LABELS } from "@/lib/permissions";
+import type { UserRole } from "@/types";
 import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
 import {
   getDocuments, createDocument, updateDocument, type RequiredDocument,
@@ -70,7 +71,7 @@ export default function ConfiguracaoPage() {
         {tab === "administracao" && (
           <SubTabs tabs={[
             { id: "documentos", label: "Documentos" },
-            { id: "admins", label: "Administradores" },
+            { id: "admins", label: "Equipa e acessos" },
             { id: "atividade", label: "Atividade" },
             { id: "este-dispositivo", label: "Avisos neste dispositivo" },
             { id: "notificacoes", label: "Notificações enviadas" },
@@ -331,71 +332,28 @@ function DocumentosTab() {
 
 /* ----------------------------- Administradores ----------------------------- */
 
+/*
+  Era uma lista guardada no browser, semeada com nomes de exemplo: "Novo
+  administrador" e "Suspender" diziam que tinham feito alguma coisa e o
+  acesso de ninguém mudava. Agora mostra a tabela `staff` do Supabase, que é
+  o que o login consulta.
+*/
 function AdminsTab() {
-  const [admins, setAdmins] = usePersistentList<Admin>("admins", SEED_ADMINS);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", role: ADMIN_ROLES[1] as Admin["role"] });
-
-  const create = () => {
-    if (!form.name.trim() || !form.email.trim()) { toast("Indica o nome e o email.", "error"); return; }
-    setAdmins((prev) => [{ id: `adm_${Date.now()}`, name: form.name.trim(), email: form.email.trim(), role: form.role, status: "ativo", lastAccess: "—" }, ...prev]);
-    setOpen(false);
-    setForm({ name: "", email: "", role: ADMIN_ROLES[1] });
-    toast(`Administrador ${form.name} adicionado com o perfil ${form.role}.`);
-  };
-
-  const toggle = (id: string) => {
-    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, status: a.status === "ativo" ? "suspenso" : "ativo" } : a)));
-    const a = admins.find((x) => x.id === id);
-    toast(`${a?.name} ${a?.status === "ativo" ? "suspenso" : "reativado"}.`, a?.status === "ativo" ? "error" : "success");
-  };
-
-  const columns: Column<Admin>[] = [
-    { key: "name", label: "Administrador", render: (r) => <div><p className="font-medium">{r.name}</p><p className="text-xs text-text-muted">{r.email}</p></div> },
-    { key: "role", label: "Perfil", render: (r) => (
-      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-        r.role === "Super Admin" ? "bg-piquet/15 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
-        {r.role === "Super Admin" && <ShieldCheck className="h-3 w-3" />}{r.role}
-      </span>
-    ) },
-    { key: "lastAccess", label: "Último acesso", render: (r) => r.lastAccess === "—" ? "—" : formatDateTime(r.lastAccess) },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "ativo" ? "bg-success-light text-success" : "bg-danger-light text-danger")}>
-        {r.status === "ativo" ? "Ativo" : "Suspenso"}
-      </span>
-    ) },
-    { key: "acao", label: "", render: (r) => (
-      <button onClick={() => toggle(r.id)} className={cn("text-xs hover:underline", r.status === "ativo" ? "text-danger" : "text-success")}>
-        {r.status === "ativo" ? "Suspender" : "Reativar"}
-      </button>
-    ) },
+  const { data, loading, error, refetch } = useAsyncData(() => getEquipa(), []);
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  const columns: Column<PessoaDaEquipa>[] = [
+    { key: "name", label: "Pessoa", render: (r) => <div><p className="font-medium">{r.name}</p><p className="text-xs text-text-muted">{r.email}</p></div> },
+    { key: "role", label: "Perfil", render: (r) => ROLE_LABELS[r.role as UserRole] ?? r.role },
+    { key: "last_sign_in_at", label: "Último acesso", render: (r) => r.last_sign_in_at ? formatDateTime(r.last_sign_in_at) : "Nunca entrou" },
+    { key: "created_at", label: "Acesso desde", render: (r) => formatDateTime(r.created_at) },
   ];
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary">Equipa com acesso ao backoffice e respetivos perfis de permissão.</p>
-        <button onClick={() => setOpen(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo administrador</button>
-      </div>
-      <div className="rounded-lg bg-surface-subtle px-3 py-2 text-xs text-text-secondary">
-        Nota: o login está atualmente limitado à liderança (CEO/CTO). Esta gestão de perfis fica preparada para quando a autenticação multi-utilizador (Supabase) for ativada.
-      </div>
-      <DataTable columns={columns} data={admins} keyField="id" />
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Novo administrador" subtitle="Acesso ao backoffice"
-        footer={<>
-          <button onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={create} className="btn-primary text-sm">Adicionar</button>
-        </>}>
-        <div className="space-y-3">
-          <Field label="Nome"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" /></Field>
-          <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" placeholder="nome@piquet.pt" /></Field>
-          <Field label="Perfil de permissões"><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Admin["role"] })} className="input-field">
-            {ADMIN_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select></Field>
-        </div>
-      </Modal>
+      <p className="text-sm text-text-secondary">
+        Quem consegue entrar no backoffice e com que perfil. Para dar ou tirar acesso, fala com o CTO: hoje faz-se no Supabase.
+      </p>
+      <DataTable columns={columns} data={data ?? []} keyField="id" emptyMessage="Ninguém com acesso registado" />
     </div>
   );
 }

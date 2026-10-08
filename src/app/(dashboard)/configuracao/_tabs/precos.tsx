@@ -7,7 +7,6 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
 import { getCatalog, type ServiceType } from "@/services/extrasService";
 import {
   getVouchers, createVoucher, updateVoucher, deleteVoucher,
@@ -62,19 +61,15 @@ function PrecosContent() {
   const catalog = useAsyncData(() => getCatalog(), []);
   const vouchersData = useAsyncData(() => getVouchers(), []);
   const [tab, setTab] = useState("promocoes");
-  // Partilha o domínio "service-types" com o Catálogo — editar preço aqui reflete-se lá.
-  const [types, setTypes] = usePersistentList<ServiceType>("service-types", catalog.data?.serviceTypes);
+  /*
+    Só leitura. Havia aqui um "Editar" que guardava o preço e a comissão no
+    browser de quem carregava: dizia "Preço atualizado" e a app continuava a
+    cobrar o mesmo. Os valores são os do catálogo do Laravel.
+  */
+  const types: ServiceType[] = catalog.data?.serviceTypes ?? [];
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<VoucherInput>(EMPTY_FORM);
-  const [editing, setEditing] = useState<ServiceType | null>(null);
-
-  const saveEdit = () => {
-    if (!editing) return;
-    setTypes((prev) => prev.map((t) => t.id === editing.id ? editing : t));
-    toast(`Preço de "${editing.name}" atualizado: ${formatCurrency(editing.basePrice)} · ${editing.commission}% comissão.`);
-    setEditing(null);
-  };
 
   if (catalog.loading && !catalog.data) return <LoadingState />;
   if (catalog.error) return <ErrorState message={catalog.error} onRetry={catalog.refetch} />;
@@ -136,7 +131,6 @@ function PrecosContent() {
     { key: "basePrice", label: "Preço base", sortable: true, render: (r) => formatCurrency(r.basePrice) },
     { key: "commission", label: "Comissão Piquet", render: (r) => `${r.commission}%` },
     { key: "net", label: "Líquido técnico", render: (r) => formatCurrency(r.basePrice * (1 - r.commission / 100)) },
-    { key: "actions", label: "", render: (r) => <button onClick={() => setEditing(r)} className="text-xs text-piquet-600 hover:underline">Editar</button> },
   ];
 
   return (
@@ -201,39 +195,13 @@ function PrecosContent() {
         )}
 
         {tab === "precos" && (
-          <DataTable columns={priceColumns} data={types} keyField="id" />
+          <>
+            <p className="text-sm text-text-secondary">Só leitura: os valores vêm do catálogo da app. Para mudar um preço, fala com o CTO.</p>
+            <DataTable columns={priceColumns} data={types} keyField="id" />
+          </>
         )}
       </div>
 
-      {/* Modal — editar preço/comissão (Tabela de preços) */}
-      <Modal
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        title="Editar preço"
-        subtitle={editing?.name}
-        footer={
-          <>
-            <button onClick={() => setEditing(null)} className="btn-secondary text-sm">Cancelar</button>
-            <button onClick={saveEdit} className="btn-primary text-sm">Guardar</button>
-          </>
-        }
-      >
-        {editing && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Preço base (€)">
-                <input type="number" value={editing.basePrice} onChange={(e) => setEditing({ ...editing, basePrice: Number(e.target.value) })} className="input-field" />
-              </Field>
-              <Field label="Comissão Piquet (%)">
-                <input type="number" value={editing.commission} onChange={(e) => setEditing({ ...editing, commission: Number(e.target.value) })} className="input-field" />
-              </Field>
-            </div>
-            <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm text-text-secondary">
-              Líquido para o técnico: <b className="text-text-primary">{formatCurrency(editing.basePrice * (1 - editing.commission / 100))}</b>
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* Modal — novo voucher */}
       <Modal

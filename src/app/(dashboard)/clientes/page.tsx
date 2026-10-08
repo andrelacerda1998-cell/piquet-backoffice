@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -9,7 +10,7 @@ import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { getMotivos } from "@/services/acoesDaEquipaService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
-import { Modal, Field } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
@@ -59,30 +60,15 @@ export default function CustomersPage() {
   const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
   const { data: retention } = useAsyncData(() => getRetentionData(), []);
   const { data: trend } = useAsyncData(() => getNewVsRecurringTrend(), []);
-  // Sem sistema de reclamações no Laravel nem no Filament -- lista de notas
-  // manuais do staff, guardada só no browser (sem pré-popular com dados
-  // fictícios; começa vazia e cresce só com o que a equipa registar aqui).
-  const [complaints, setComplaints] = usePersistentList<Complaint>("reclamacoes", []);
+  /*
+    "Reclamações" era uma lista de notas guardada só no browser de quem as
+    escrevia: cada pessoa via as suas e mais ninguém. As reclamações a sério
+    chegam como tickets a Suporte, com o número do pedido. O separador só
+    aparece a quem tiver notas antigas neste computador, para não as perder,
+    e já não deixa criar novas.
+  */
+  const [complaints] = usePersistentList<Complaint>("reclamacoes", []);
 
-  const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
-
-  const [newComplaintOpen, setNewComplaintOpen] = useState(false);
-  const [newComplaint, setNewComplaint] = useState({ customerName: "", serviceName: "", category: "", city: "" });
-  const addComplaint = () => {
-    if (!newComplaint.customerName.trim()) { toast("Indica o nome do cliente.", "error"); return; }
-    setComplaints((prev) => [{
-      id: `c_${Date.now()}`,
-      customerName: newComplaint.customerName.trim(),
-      serviceName: newComplaint.serviceName.trim() || "—",
-      category: newComplaint.category.trim() || "—",
-      city: newComplaint.city.trim() || "—",
-      status: "aberta",
-      openedAt: new Date().toISOString().slice(0, 10),
-    }, ...prev]);
-    setNewComplaintOpen(false);
-    setNewComplaint({ customerName: "", serviceName: "", category: "", city: "" });
-    toast("Reclamação registada.");
-  };
 
   // Bloquear/Reativar = soft-delete real do User no Laravel (ver
   // customersService.ts) -- notifica ninguém (o Filament também não notifica
@@ -240,13 +226,9 @@ export default function CustomersPage() {
   const TABS: TabDef[] = [
     { id: "visao", label: "Visão geral" },
     { id: "lista", label: "Todos os registos" },
-    { id: "reclamacoes", label: "Reclamações", count: openComplaints },
+    ...(complaints.length > 0 ? [{ id: "reclamacoes", label: "Notas antigas" }] : []),
   ];
 
-  const resolveComplaint = (id: string) => {
-    setComplaints((prev) => prev.map((c) => c.id === id ? { ...c, status: "resolvida" } : c));
-    toast(`Reclamação ${id} marcada como resolvida.`);
-  };
 
   const complaintColumns: Column<Complaint>[] = [
     { key: "id", label: "Serviço", render: (r) => <span className="font-mono text-xs">{r.id}</span> },
@@ -260,9 +242,6 @@ export default function CustomersPage() {
         {r.status === "resolvida" ? "Resolvida" : r.status === "em_analise" ? "Em análise" : "Aberta"}
       </span>
     ) },
-    { key: "actions", label: "", render: (r) => r.status !== "resolvida" ? (
-      <button onClick={() => resolveComplaint(r.id)} className="text-xs text-success hover:underline">Resolver</button>
-    ) : <span className="text-text-muted text-xs">—</span> },
   ];
 
   const unifiedColumns: Column<UnifiedRow>[] = [
@@ -399,17 +378,11 @@ export default function CustomersPage() {
 
         {tab === "reclamacoes" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-text-secondary">Notas escritas à mão pela equipa. Ficam guardadas apenas neste computador — não são partilhadas nem sincronizadas.</p>
-              <button onClick={() => setNewComplaintOpen(true)} className="btn-primary text-sm py-2">Nova reclamação</button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard title="Total" metric={buildMetricValue(complaints.length, complaints.length)} />
-              <MetricCard title="Abertas" metric={buildMetricValue(complaints.filter((c) => c.status === "aberta").length, complaints.filter((c) => c.status === "aberta").length)} hideDelta />
-              <MetricCard title="Em análise" metric={buildMetricValue(complaints.filter((c) => c.status === "em_analise").length, complaints.filter((c) => c.status === "em_analise").length)} hideDelta />
-              <MetricCard title="Resolvidas" metric={buildMetricValue(complaints.filter((c) => c.status === "resolvida").length, complaints.filter((c) => c.status === "resolvida").length)} hideDelta />
-            </div>
-            <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem reclamações registadas." />
+            <p className="text-sm text-text-secondary">
+              Notas escritas antes de 08/10/2026 e guardadas só neste computador. As reclamações estão em{" "}
+              <Link href="/suporte" className="text-piquet-600 hover:underline">Suporte</Link>, ligadas ao pedido.
+            </p>
+            <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem notas." />
           </div>
         )}
 
@@ -478,32 +451,6 @@ export default function CustomersPage() {
 
       </div>
 
-      <Modal
-        open={newComplaintOpen}
-        onClose={() => setNewComplaintOpen(false)}
-        title="Nova reclamação"
-        subtitle="Nota manual — não fica ligada a nenhum serviço real."
-        size="sm"
-        footer={<>
-          <button onClick={() => setNewComplaintOpen(false)} className="btn-secondary text-sm py-2">Cancelar</button>
-          <button onClick={addComplaint} className="btn-primary text-sm py-2">Registar</button>
-        </>}
-      >
-        <div className="space-y-3">
-          <Field label="Cliente">
-            <input className="input-field" value={newComplaint.customerName} onChange={(e) => setNewComplaint((p) => ({ ...p, customerName: e.target.value }))} placeholder="Nome do cliente" />
-          </Field>
-          <Field label="Serviço">
-            <input className="input-field" value={newComplaint.serviceName} onChange={(e) => setNewComplaint((p) => ({ ...p, serviceName: e.target.value }))} placeholder="Ex.: Reparação de canalização" />
-          </Field>
-          <Field label="Categoria">
-            <input className="input-field" value={newComplaint.category} onChange={(e) => setNewComplaint((p) => ({ ...p, category: e.target.value }))} placeholder="Ex.: Canalização" />
-          </Field>
-          <Field label="Zona">
-            <input className="input-field" value={newComplaint.city} onChange={(e) => setNewComplaint((p) => ({ ...p, city: e.target.value }))} placeholder="Ex.: Lisboa" />
-          </Field>
-        </div>
-      </Modal>
 
       {/* Perfil do cliente: contactos, histórico de serviços e pagamentos. */}
       <Modal

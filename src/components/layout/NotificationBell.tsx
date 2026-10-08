@@ -80,7 +80,7 @@ export function NotificationBell() {
           toast(`${fresh.length} novo(s) ticket(s) de suporte`, "info");
         }
 
-        // Pedidos personalizados novos (à espera de estimativa + escolha de técnicos).
+        // Pedidos personalizados à espera da Piquet (falta definir duração e áreas).
         const reqs = pode("view_services") ? await getCustomRequests() : [];
         if (!alive) return;
         const novosReq = reqs.filter((r) => r.status === "novo");
@@ -90,7 +90,7 @@ export function NotificationBell() {
           kind: "ticket",
           title: "Novo pedido personalizado",
           body: `${r.customerName} · ${r.category} (${r.city})`,
-          href: "/servicos-personalizados",
+          href: "/servicos?tab=personalizados",
           dedupeKey: `custreq:${r.id}`,
         }));
         if (!firstRun.current && freshReq.length > 0) {

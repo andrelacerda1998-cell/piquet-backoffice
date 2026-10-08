@@ -70,6 +70,7 @@ export const POLITICA: Record<string, Requisito> = {
   "DELETE /customers/[id]/payment-methods/[methodId]": qualquer("destructive_actions"),
   "PUT /customers/[id]/block": qualquer("destructive_actions"),
   "GET /acoes-da-equipa": qualquer("view_customers", "view_technicians"),
+  "GET /staff": qualquer("manage_settings"),
   "PUT /customers/[id]/restore": qualquer("destructive_actions"),
 
   // ---------------------------------------------------------- serviços

@@ -238,6 +238,7 @@ const LIVE_EXACT = new Set<string>([
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
   "/acoes-da-equipa",
+  "/staff",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
@@ -425,6 +426,7 @@ const REAL_DATA = new Set<string>([
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
   "/acoes-da-equipa",
+  "/staff",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).

@@ -528,7 +528,7 @@ export default function FinancePage() {
               */}
               {summary && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Estimativas <DemoBadge endpoint="/finance/summary" /></p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">No período <DemoBadge endpoint="/finance/summary" /></p>
                   <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                     {/* Do GMV do período (Payshop), como os cartões de cima. Eram a
                         soma dos serviços concluídos do Laravel: outro total. */}

@@ -42,4 +42,19 @@ describe("GET /api/custom-requests", () => {
     paginas = [[{ id: 1, is_custom: true }, { id: 2, is_custom: false }]];
     expect((await chamar()).map((x) => x.id)).toEqual(["1"]);
   });
+
+  it("só o que está à espera da Piquet é novo; os que falharam não voltam a sê-lo", async () => {
+    paginas = [[
+      { id: 1, is_custom: true, status: "PendingReview" },
+      { id: 2, is_custom: true, status: "MatchingFailed" },
+      { id: 3, is_custom: true, status: "Canceled" },
+      { id: 4, is_custom: true, status: "Scheduled" },
+      { id: 5, is_custom: true, status: "Finished" },
+      { id: 6, is_custom: true, status: "QualquerCoisaNova" },
+    ]];
+    const r = (await chamar()) as Array<{ id: string; status: string }>;
+    expect(Object.fromEntries(r.map((x) => [x.id, x.status]))).toEqual({
+      1: "novo", 2: "recusado", 3: "recusado", 4: "opcoes_enviadas", 5: "agendado", 6: "em_analise",
+    });
+  });
 });
