@@ -1,7 +1,8 @@
 import { apiOk, apiErr, withStaff } from "../../../_lib/handler";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import { ApiError } from "@/services/http";
-import { mapLaravelService, type LaravelServiceRow } from "../../../_lib/laravelServices";
+import { estadoDoBackoffice, mapLaravelService, type LaravelServiceRow } from "../../../_lib/laravelServices";
+import type { EventoDoPedido } from "@/lib/historicoPedido";
 import type { ServiceRequest } from "@/types";
 
 /**
@@ -35,11 +36,14 @@ export interface CandidatoLaravel {
 export interface DetalheDoServico {
   servico: ServiceRequest;
   candidatos: CandidatoLaravel[];
+  /** O histórico (service_events, backend #160). Vazio antes de 08/10/2026. */
+  eventos: EventoDoPedido[];
 }
 
 type RespostaLaravel = LaravelServiceRow & {
   candidates?: CandidatoLaravel[] | LaravelServiceRow["candidates"];
   candidate_counts?: LaravelServiceRow["candidates"];
+  events?: EventoDoPedido[];
 };
 
 /** As colunas `decimal` do Laravel chegam como texto ("3.00"). */
@@ -77,7 +81,13 @@ export const GET = withStaff(async (_req, { params }) => {
     const lista = (Array.isArray(d.candidates) ? d.candidates : []).map(numeros);
     const servico = mapLaravelService({ ...d, candidates: d.candidate_counts ?? null });
 
-    return apiOk<DetalheDoServico>({ servico, candidatos: lista });
+    const eventos = (d.events ?? []).map((e) => ({
+      ...e,
+      deBackoffice: e.de ? estadoDoBackoffice(e.de) : null,
+      paraBackoffice: e.para ? estadoDoBackoffice(e.para) : null,
+    }));
+
+    return apiOk<DetalheDoServico>({ servico, candidatos: lista, eventos });
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return apiErr("Serviço não encontrado.", 404);
     return apiErr(e instanceof ApiError ? e.message : "Erro ao ler o serviço.", e instanceof ApiError ? e.status : 500);

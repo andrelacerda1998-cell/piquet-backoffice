@@ -9,7 +9,8 @@ import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import type { ServiceRequest } from "@/types";
 import { X, Star, Lock } from "lucide-react";
 import { getFotosDoCliente, getDetalheDoServico, type FotoDoCliente } from "@/services/dashboardService";
-import type { CandidatoLaravel } from "@/app/api/services/[id]/detalhe/route";
+import type { CandidatoLaravel, DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
+import { comIntervalos, textoDoEvento } from "@/lib/historicoPedido";
 
 /*
   ——— O que saiu deste painel, e porquê ———
@@ -40,6 +41,8 @@ import type { CandidatoLaravel } from "@/app/api/services/[id]/detalhe/route";
 
 export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequest; onClose: () => void }) {
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
+  // O detalhe lê-se UMA vez: os convites e a cronologia saem da mesma resposta.
+  const detalhe = useDetalhe(service.id);
 
   return (
     /*
@@ -99,8 +102,8 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
         */}
         <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 columns-1 lg:columns-2 xl:columns-3 gap-5">
           <Seccao titulo="Resumo"><Resumo service={service} /></Seccao>
-          <Seccao titulo="Técnicos convidados"><Matching service={service} /></Seccao>
-          <Seccao titulo="Cronologia"><Cronologia service={service} /></Seccao>
+          <Seccao titulo="Técnicos convidados"><Matching detalhe={detalhe} /></Seccao>
+          <Seccao titulo="Cronologia"><Cronologia service={service} detalhe={detalhe} /></Seccao>
           <Seccao titulo="Pagamento"><Pagamento service={service} /></Seccao>
           <Seccao titulo="Faturas"><Faturas service={service} /></Seccao>
           <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
@@ -122,7 +125,6 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
               </div>
             </div>
           </Seccao>
-          <Seccao titulo="Histórico"><Historico service={service} /></Seccao>
           <Seccao titulo="Conversa"><Conversa service={service} /></Seccao>
         </div>
       </div>
@@ -192,22 +194,26 @@ function tempoDeResposta(c: CandidatoLaravel): string | null {
  * cliente diz "ninguém pegou no meu pedido": se ninguém foi convidado, falta
  * gente na zona; se foram doze e nenhum respondeu, o problema é outro.
  */
-function Matching({ service }: { service: ServiceRequest }) {
-  const [lista, setLista] = useState<CandidatoLaravel[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+type EstadoDoDetalhe = { detalhe: DetalheDoServico | null; erro: string | null; aCarregar: boolean };
 
+/** O detalhe do serviço (convites e histórico), lido uma vez por painel. */
+function useDetalhe(id: string): EstadoDoDetalhe {
+  const [estado, setEstado] = useState<EstadoDoDetalhe>({ detalhe: null, erro: null, aCarregar: true });
   useEffect(() => {
     let vivo = true;
-    setLista(null);
-    setErro(null);
-    getDetalheDoServico(service.id)
-      .then((d) => vivo && setLista(d?.candidatos ?? []))
-      .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Não foi possível ler os convites."));
+    setEstado({ detalhe: null, erro: null, aCarregar: true });
+    getDetalheDoServico(id)
+      .then((d) => vivo && setEstado({ detalhe: d, erro: null, aCarregar: false }))
+      .catch((e) => vivo && setEstado({ detalhe: null, erro: e instanceof Error ? e.message : "Não foi possível ler o serviço.", aCarregar: false }));
     return () => { vivo = false; };
-  }, [service.id]);
+  }, [id]);
+  return estado;
+}
 
+function Matching({ detalhe: { detalhe, erro, aCarregar } }: { detalhe: EstadoDoDetalhe }) {
+  const lista = detalhe?.candidatos ?? [];
   if (erro) return <p className="text-sm text-danger">{erro}</p>;
-  if (lista === null) return <p className="text-sm text-text-muted">A carregar…</p>;
+  if (aCarregar) return <p className="text-sm text-text-muted">A carregar…</p>;
   if (lista.length === 0) {
     return (
       <p className="text-sm text-text-muted">
@@ -256,26 +262,70 @@ function step(label: string, at?: string) {
   return { label, at };
 }
 
-function Cronologia({ service }: { service: ServiceRequest }) {
+/**
+ * O caminho do pedido.
+ *
+ * Com o histórico do Laravel (pedidos a partir de 08/10/2026): cada passo, a
+ * hora, e quanto tempo passou desde o anterior — é aqui que se vê quanto
+ * esteve à procura ou quanto o técnico demorou a sair. Sem ele, a versão
+ * aproximada de antes, dita como tal: o "técnico atribuído" usava a hora do
+ * pedido porque não havia outra.
+ */
+function Cronologia({ service, detalhe: { detalhe, aCarregar } }: { service: ServiceRequest; detalhe: EstadoDoDetalhe }) {
+  const eventos = detalhe?.eventos ?? [];
+  if (aCarregar) return <p className="text-sm text-text-muted">A carregar…</p>;
+
+  if (eventos.length > 0) {
+    return (
+      <ol className="relative border-l border-surface-border ml-2 space-y-4">
+        {comIntervalos(eventos).map((e, i) => {
+          const { titulo, detalhe: pormenor } = textoDoEvento(e);
+          return (
+            <li key={i} className="ml-4">
+              <span className={cn("absolute -left-1.5 h-3 w-3 rounded-full border-2 border-surface", e.tipo === "estado" || e.tipo === "criado" ? "bg-piquet" : "bg-surface-strong")} />
+              <p className="text-sm font-medium text-text-primary">{titulo}</p>
+              <p className="text-xs text-text-muted">
+                {formatDateTime(e.em)}
+                {pormenor && <> · {pormenor}</>}
+                {e.segundosDesdeAnterior != null && e.segundosDesdeAnterior >= 60 && <> · +{duracaoCurta(e.segundosDesdeAnterior)}</>}
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
   const steps = [
     step("Pedido recebido", service.requestedAt),
-    step("Técnico atribuído", service.technicianName ? service.requestedAt : undefined),
     step("Agendado", service.scheduledAt),
     step("Serviço iniciado", service.startedAt),
     step("Serviço concluído", service.completedAt),
   ].filter((s) => s.at);
 
   return (
-    <ol className="relative border-l border-surface-border ml-2 space-y-6">
-      {steps.map((s, i) => (
-        <li key={i} className="ml-4">
-          <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-piquet border-2 border-surface" />
-          <p className="text-sm font-medium text-text-primary">{s.label}</p>
-          <p className="text-xs text-text-muted">{s.at ? formatDateTime(s.at) : "—"}</p>
-        </li>
-      ))}
-    </ol>
+    <div className="space-y-3">
+      <ol className="relative border-l border-surface-border ml-2 space-y-6">
+        {steps.map((s, i) => (
+          <li key={i} className="ml-4">
+            <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-piquet border-2 border-surface" />
+            <p className="text-sm font-medium text-text-primary">{s.label}</p>
+            <p className="text-xs text-text-muted">{s.at ? formatDateTime(s.at) : "—"}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="text-[11px] text-text-muted">Cronologia aproximada: o histórico completo de cada pedido só existe a partir de 08/10/2026.</p>
+    </div>
   );
+}
+
+/** "3 min", "2 h 10 min", "1 d 4 h". */
+function duracaoCurta(segundos: number): string {
+  const m = Math.round(segundos / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h${m % 60 ? ` ${m % 60} min` : ""}`;
+  return `${Math.floor(h / 24)} d${h % 24 ? ` ${h % 24} h` : ""}`;
 }
 
 /**
@@ -449,24 +499,6 @@ function Reclamacao({ service }: { service: ServiceRequest }) {
         Este serviço está marcado como tendo reclamação. O que o cliente disse chega como ticket em Suporte, com o
         número do serviço no assunto.
       </p>
-    </div>
-  );
-}
-
-function Historico({ service }: { service: ServiceRequest }) {
-  const events = [
-    { at: service.requestedAt, text: "Pedido criado no sistema" },
-    { at: service.scheduledAt, text: "Marcação agendada" },
-    { at: service.completedAt, text: "Serviço fechado" },
-  ].filter((e) => e.at);
-  return (
-    <div className="space-y-2">
-      {events.map((e, i) => (
-        <div key={i} className="flex justify-between text-sm py-2 border-b border-surface-border">
-          <span className="text-text-secondary">{e.text}</span>
-          <span className="text-text-muted">{e.at ? formatDateTime(e.at) : "—"}</span>
-        </div>
-      ))}
     </div>
   );
 }

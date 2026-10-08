@@ -109,24 +109,42 @@ export const NAV_ITEMS = [
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
 ] as const;
 
-// Consolidação 2026-07-20: o menu passa a 9 grupos; cada um agrega os ecrãs
-// relacionados em separadores (ex.: Técnicos inclui Recrutamento; Financeiro
-// inclui Impostos e RH; Equipa inclui Tarefas e Desenvolvimento). Nada é
-// apagado — os separadores são acessíveis por ⌘K (NAV_DEEPLINKS) e por URL.
-// Menu enxuto: Clientes é o hub de pessoas (absorve o CRM & Leads como
-// destino), e os ecrãs de nicho (Desenvolvimento) e pessoais (As minhas
-// tarefas) saem do topo mas ficam a um ⌘K e a um atalho contextual.
-export const NAV_PRIMARY: string[] = [
-  "/", "/alertas",
-  "/servicos",
-  // Qualidade é um ecrã por direito próprio (/qualidade) e não um separador de
-  // Operações: estava embutido lá dentro e, com a entrada no menu, ter as duas
-  // coisas era o mesmo conteúdo em dois sítios.
-  "/qualidade",
-  "/clientes", "/tecnicos", "/financeiro", "/produto",
-  "/marketing", "/leads", "/suporte", "/configuracao",
+/**
+ * O menu: SEIS grupos, por trabalho a fazer, e não doze ecrãs lado a lado.
+ *
+ * A auditoria de 06/10/2026 contou 14 entradas (12 depois de tirar Equipa e
+ * Desenvolvimento): lia-se como um índice de ecrãs, não como um painel de
+ * operações. Nada sai: cada ecrã fica dentro do grupo a que pertence, e o
+ * grupo da página em que se está abre-se sozinho. Ver src/lib/navGrupos.ts.
+ */
+export interface NavGroup {
+  id: string;
+  label: string;
+  icon: string;
+  /** Os ecrãs do grupo; o primeiro que o perfil pode ver é o destino do grupo. */
+  filhos: string[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/"] },
+  // O que se faz hoje: os pedidos ao vivo, o que pede ação, a qualidade e os tickets.
+  { id: "operacoes", label: "Operações", icon: "Wrench", filhos: ["/servicos", "/alertas", "/qualidade", "/suporte"] },
+  { id: "tecnicos", label: "Técnicos", icon: "HardHat", filhos: ["/tecnicos", "/recrutamento"] },
+  { id: "clientes", label: "Clientes", icon: "Users", filhos: ["/clientes", "/leads"] },
+  { id: "financeiro", label: "Financeiro", icon: "Euro", filhos: ["/financeiro"] },
+  { id: "crescimento", label: "Crescimento", icon: "Megaphone", filhos: ["/marketing", "/produto"] },
 ];
-// Vazio: com só 9 grupos, o menu mostra tudo direto (sem "Mais" recolhível).
+
+/** Fora dos grupos, no rodapé do menu: utilitários, não trabalho do dia. */
+export const NAV_RODAPE: string[] = ["/configuracao"];
+
+/** Como um ecrã se chama DENTRO do seu grupo, quando o nome do menu não serve. */
+export const NAV_ROTULO_NO_GRUPO: Record<string, string> = {
+  "/servicos": "Pedidos e serviços",
+};
+
+// Todos os ecrãs do menu, por ordem (o ⌘K usa esta lista).
+export const NAV_PRIMARY: string[] = [...NAV_GROUPS.flatMap((g) => g.filhos), ...NAV_RODAPE];
 export const NAV_SECONDARY: string[] = [];
 export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 
@@ -142,7 +160,6 @@ export const NAV_DEEPLINKS: string[] = [
   "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados",
-  "/recrutamento",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
 ];
 
