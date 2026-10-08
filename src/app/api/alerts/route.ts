@@ -4,6 +4,8 @@ import { gerarAlertas, type SinaisDoNegocio } from "@/lib/alertRules";
 import { agruparAlertas } from "@/lib/alertGroups";
 import { normalizeLeadStage } from "@/lib/leadStages";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
+import type { AoVivo } from "@/lib/aoVivo";
+import type { NoShowsData } from "@/services/noShowsService";
 
 /**
  * GET /api/alerts — alertas DERIVADOS do estado real do negócio.
@@ -29,7 +31,42 @@ export const GET = withStaff(async () => {
     try { return await fn(); } catch { falhas.push(nome); return vazio; }
   };
 
+  /*
+    A operação: as Operações ao vivo do Laravel (pedidos com alerta e pedidos
+    perdidos) e as faltas prováveis. Uma leitura de cada, partilhada pelos
+    sinais que delas saem.
+  */
+  const aoVivo = await tenta("operacoes-ao-vivo", async () => (
+    LARAVEL_ADMIN_ENABLED ? await laravelAdminRequest<AoVivo>("/v1/admin/operacoes/ao-vivo") : null
+  ), null as AoVivo | null);
+  const faltas = await tenta("vendor-no-shows", async () => (
+    LARAVEL_ADMIN_ENABLED ? await laravelAdminRequest<NoShowsData>("/v1/admin/services/vendor-no-shows") : null
+  ), null as NoShowsData | null);
+
   const sinais: SinaisDoNegocio = {
+    pedidosComAlerta: [...(aoVivo?.a_procura ?? []), ...(aoVivo?.em_curso ?? [])]
+      .filter((p) => p.alerta)
+      .map((p) => ({
+        id: String(p.id), cliente: p.cliente, tipo: p.tipo, cidade: p.cidade,
+        nivel: p.alerta!.nivel, motivo: p.alerta!.motivo, desde: p.criado_em,
+      })),
+    pedidosPerdidos: (aoVivo?.perdidos ?? []).map((p) => ({
+      id: String(p.id), cliente: p.cliente, tipo: p.tipo, cidade: p.cidade,
+      desfecho: p.desfecho, criadoEm: p.criado_em,
+    })),
+    faltasProvaveis: (faltas?.suspected ?? []).map((f) => ({
+      servicoId: String(f.service_id),
+      tecnico: f.vendor?.name ?? null,
+      cliente: f.customer?.name ?? null,
+      marcadoPara: f.scheduled_day ? [f.scheduled_day, f.scheduled_time?.slice(0, 5)].filter(Boolean).join(" ") : null,
+    })),
+    lotesPorAprovar: await tenta("payout_lotes", async () => {
+      const { data, error } = await db.from("payout_lotes")
+        .select("id, total, criado_em, criado_por_email").eq("estado", "rascunho").limit(50);
+      if (error) throw error;
+      return ((data ?? []) as Array<{ id: string; total: number; criado_em: string; criado_por_email: string | null }>)
+        .map((l) => ({ id: l.id, total: Number(l.total) || 0, criadoEm: l.criado_em, criadoPor: l.criado_por_email }));
+    }, []),
     leadsPorResponder: await tenta("leads", async () => {
       const { data } = await db.from("leads").select("id, name, phone, stage, created_at").limit(500);
       return ((data ?? []) as Array<{ id: string; name: string; phone: string; stage: string; created_at: string }>)

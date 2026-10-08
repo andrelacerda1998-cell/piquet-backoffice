@@ -26,6 +26,8 @@ const ROTA_POR_ENTIDADE: Record<string, string> = {
   pagamentos: "/financeiro",
   fatura: "/financeiro",
   imposto: "/financeiro",
+  pedido: "/servicos",
+  lotes: "/financeiro",
 };
 
 /**

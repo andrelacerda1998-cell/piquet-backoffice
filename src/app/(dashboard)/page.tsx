@@ -11,6 +11,7 @@ import { getFinanceGmv, getFinanceSummary } from "@/services/financeService";
 import { getGoals, getLeads } from "@/services/extrasService";
 import { getOperacoesAoVivo } from "@/services/dashboardService";
 import { pct } from "@/lib/aoVivo";
+import { PrecisaDeTi } from "@/components/hoje/PrecisaDeTi";
 import { getVendorDocuments } from "@/services/vendorDocumentsService";
 import { buildMetricValue } from "@/lib/calculations";
 import { useAuthStore } from "@/stores";
@@ -229,8 +230,12 @@ export default function OverviewPage() {
 
         {tab === "resumo" && (
         <div className="space-y-8">
-        {/* ---------- À espera de resposta ---------- */}
-        {(leadsPorResponder.length > 0 || kycPendentes > 0) && (
+        {/*
+          A fila do que está à espera de alguém (os alertas mais urgentes,
+          com uma ação cada). Quem não vê alertas fica com os dois cartões de
+          antes, de contactos e documentos.
+        */}
+        {pode("view_alerts") ? <PrecisaDeTi /> : (leadsPorResponder.length > 0 || kycPendentes > 0) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {leadsPorResponder.length > 0 && (
               <Link href="/leads"

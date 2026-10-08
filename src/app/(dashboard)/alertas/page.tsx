@@ -10,7 +10,8 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import { getAlerts, adiarAlerta, reporAlerta, type AlertaAdiado } from "@/services/supportService";
 import { formatDateTime, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import type { DashboardAlert, AlertPriority } from "@/types";
+import type { AlertPriority } from "@/types";
+import { destinoDoAlerta as destino } from "@/lib/alertLinks";
 
 /**
  * Alertas DERIVADOS do estado real do negócio.
@@ -23,30 +24,6 @@ import type { DashboardAlert, AlertPriority } from "@/types";
  * isso a única ação é ir ao ecrã onde isso se faz, e o alerta desaparece
  * sozinho quando o motivo deixar de existir.
  */
-
-/** Para onde vai o botão de cada alerta, conforme o que o originou. */
-function destino(a: DashboardAlert): { href: string; label: string } {
-  // Os `tab` têm de bater certo com os ids reais de cada página — três destes
-  // apontavam para separadores que não existem ("kyc", "faturas") e o clique
-  // abria a página no separador por omissão, como se não tivesse funcionado.
-  switch (a.entityType) {
-    // Com o id, o CRM abre o pedido em vez de deixar o utilizador à procura.
-    case "lead": return { href: `/leads?lead=${a.entityId ?? ""}`, label: "Abrir contacto" };
-    // Os alertas agrupados apontam para a lista: são vários registos, não um.
-    case "leads": return { href: "/leads", label: "Ver contactos" };
-    case "tickets": return { href: "/suporte", label: "Ver tickets" };
-    case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
-    case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
-    case "kyc": return { href: "/tecnicos?tab=aprovacoes", label: "Rever documentos" };
-    case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
-    case "pagamentos": return { href: "/financeiro?tab=app-pagamentos", label: "Ver pagamentos" };
-    case "fatura": return { href: "/financeiro?tab=custos", label: "Ver faturas" };
-    // KYC, integrações e impostos são filas/listas, não um registo só — o
-    // destino certo é mesmo o separador.
-    case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
-    default: return { href: "/", label: "Abrir" };
-  }
-}
 
 /**
  * Os títulos dizem o que fazer, não o "nível" do alerta. A regra por trás é
