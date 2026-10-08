@@ -60,10 +60,11 @@ describe("o que cada perfil pode fazer", () => {
   });
 
   it("só quem gere dinheiro reembolsa e paga técnicos", () => {
-    expect(podeChamar("financeiro", "PUT", "/api/vendor-payments/7/pay")).toBe(true);
+    expect(podeChamar("financeiro", "POST", "/api/finance/payout-lotes/ab-12/pagar")).toBe(true);
     expect(podeChamar("financeiro", "POST", "/api/finance/app-payments/ab-12/refund")).toBe(true);
     for (const role of ["operacoes", "suporte", "marketing", "gestao_tecnicos", "colaborador", "developer"]) {
-      expect(podeChamar(role, "PUT", "/api/vendor-payments/7/pay"), role).toBe(false);
+      expect(podeChamar(role, "POST", "/api/finance/payout-lotes/ab-12/pagar"), role).toBe(false);
+      expect(podeChamar(role, "POST", "/api/finance/payout-lotes/ab-12/aprovar"), role).toBe(false);
       expect(podeChamar(role, "POST", "/api/finance/app-payments/ab-12/refund"), role).toBe(false);
     }
   });
@@ -130,7 +131,9 @@ describe("como se lê o pedido", () => {
   });
 
   it("um id não deixa saltar de rota", () => {
-    expect(requisitoDe("PUT", "/api/vendor-payments/7/pay/extra")).toBeNull();
-    expect(requisitoDe("PUT", "/api/vendor-payments//pay")).toBeNull();
+    expect(requisitoDe("POST", "/api/finance/payout-lotes/7/pagar/extra")).toBeNull();
+    expect(requisitoDe("POST", "/api/finance/payout-lotes//pagar")).toBeNull();
+    // O pagar direto saiu: já nem a liderança o pode chamar.
+    expect(requisitoDe("PUT", "/api/vendor-payments/7/pay")).toBeNull();
   });
 });

@@ -233,6 +233,8 @@ const LIVE_EXACT = new Set<string>([
   "/vendor-documents",
   // Fase 10 — Pagamentos a vendors (idem, via Laravel)
   "/vendor-payments",
+  "/finance/payout-lotes",
+  "/finance/payout-lotes/conferir",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
@@ -417,6 +419,8 @@ const REAL_DATA = new Set<string>([
   "/vendor-documents",
   // Pagamentos a vendors — idem, ledger real (bavix/laravel-wallet) do Laravel.
   "/vendor-payments",
+  "/finance/payout-lotes",
+  "/finance/payout-lotes/conferir",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
@@ -565,7 +569,8 @@ export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/support\/inbox\/[^/]+$/,
   /^\/vouchers\/[^/]+$/, // editar/apagar voucher
   /^\/vendor-documents\/[^/]+\/(approve|decline)$/, // rever documento KYC
-  /^\/vendor-payments\/[^/]+\/pay$/, // pagar vendor
+  // Lotes de pagamento a técnicos (substituem o "pagar" direto, que saiu).
+  /^\/finance\/payout-lotes\/[^/]+\/(aprovar|pagar|cancelar)$/,
   /^\/customers\/[^/]+\/(block|restore)$/, // bloquear/reativar cliente
   /^\/customers\/[^/]+\/payment-methods$/, // listar métodos de pagamento
   /^\/customers\/[^/]+\/payment-methods\/[^/]+$/, // apagar método de pagamento
