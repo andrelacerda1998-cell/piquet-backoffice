@@ -23,6 +23,8 @@ interface ConfirmDialogProps {
   requireReason?: boolean;
   reasonLabel?: string;
   reasonPlaceholder?: string;
+  /** Mínimo de letras do motivo (o servidor das ações registadas exige 5). */
+  minReason?: number;
   loading?: boolean;
 }
 
@@ -38,14 +40,16 @@ export function ConfirmDialog({
   requireReason = false,
   reasonLabel = "Motivo",
   reasonPlaceholder = "",
+  minReason = 1,
   loading = false,
 }: ConfirmDialogProps) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const working = loading || busy;
+  const motivoCurto = requireReason && reason.trim().length < minReason;
 
   const confirm = async () => {
-    if (requireReason && !reason.trim()) return;
+    if (motivoCurto) return;
     setBusy(true);
     try {
       await onConfirm(requireReason ? reason.trim() : undefined);
@@ -68,7 +72,7 @@ export function ConfirmDialog({
           <button onClick={close} disabled={working} className="btn-secondary text-sm disabled:opacity-50">{cancelLabel}</button>
           <button
             onClick={confirm}
-            disabled={working || (requireReason && !reason.trim())}
+            disabled={working || motivoCurto}
             className={cn(
               "text-sm px-3 py-2 rounded-lg font-medium disabled:opacity-50",
               tone === "danger" ? "bg-danger text-danger-on hover:opacity-90" : "bg-piquet text-ink hover:opacity-90"

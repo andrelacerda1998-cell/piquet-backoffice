@@ -7,6 +7,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Users, UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { getMotivos } from "@/services/acoesDaEquipaService";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { Modal, Field } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -86,13 +88,19 @@ export default function CustomersPage() {
   // customersService.ts) -- notifica ninguém (o Filament também não notifica
   // aqui), só remove/repõe o acesso.
   const [actingId, setActingId] = useState<number | null>(null);
-  const handleBlock = async (c: RealCustomer) => {
+  // Bloquear tira o acesso à app: pede confirmação e um motivo, que fica
+  // registado com o nome de quem bloqueou (ver acoes_da_equipa).
+  const [paraBloquear, setParaBloquear] = useState<RealCustomer | null>(null);
+  const { data: motivosBloqueio, refetch: refetchMotivos } = useAsyncData(() => getMotivos("bloquear_cliente"), []);
+  const handleBlock = async (c: RealCustomer, motivo: string) => {
     setActingId(c.id);
     try {
-      await blockCustomer(c.id);
+      await blockCustomer(c.id, motivo);
       toast(`Cliente ${c.name ?? c.id} bloqueado.`, "error");
+      setParaBloquear(null);
       refetchCustomers();
       refetchBlocked();
+      refetchMotivos();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível bloquear o cliente.", "error");
     } finally {
@@ -293,7 +301,7 @@ export default function CustomersPage() {
     { key: "acao", label: "", render: (r) => r.kind === "customer" ? (
       r.customer.blocked_at
         ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
-        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleBlock(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
+        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); setParaBloquear(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
     ) : (
       // A lead não se gere aqui — abre-se no CRM, o dono do pipeline. Evita
       // duplicar eliminação/estado nesta tabela (que é só um diretório).
@@ -308,6 +316,11 @@ export default function CustomersPage() {
     { key: "name", label: "Cliente", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "email", label: "Email", render: (r) => r.email ?? "—" },
     { key: "blocked_at", label: "Bloqueado em", render: (r) => r.blocked_at ? formatDate(r.blocked_at) : "—" },
+    { key: "motivo", label: "Motivo", render: (r) => {
+      const m = motivosBloqueio?.get(String(r.id));
+      if (!m) return <span className="text-text-muted">Sem registo</span>;
+      return <span>{m.motivo}<span className="block text-xs text-text-muted">{m.staff_email ?? "—"}</span></span>;
+    } },
     { key: "acao", label: "", render: (r) => (
       <button disabled={actingId === r.id} onClick={() => handleRestore(r)} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
     ) },
@@ -637,6 +650,25 @@ export default function CustomersPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={paraBloquear !== null}
+        onClose={() => setParaBloquear(null)}
+        onConfirm={async (motivo) => { if (paraBloquear && motivo) await handleBlock(paraBloquear, motivo); }}
+        title={`Bloquear ${paraBloquear?.name ?? "este cliente"}?`}
+        description={
+          <>
+            Deixa de conseguir entrar na app e de fazer pedidos. Dá para desfazer em <strong>Bloqueados › Reativar</strong>.
+            O motivo fica registado com o teu nome.
+          </>
+        }
+        requireReason
+        minReason={MOTIVO_MINIMO}
+        reasonLabel="Porque é que estás a bloquear?"
+        reasonPlaceholder="Ex.: pagamentos recusados repetidamente; comportamento abusivo com o profissional"
+        confirmLabel="Bloquear"
+        tone="danger"
+      />
 
       <ConfirmDialog
         open={methodToDelete !== null}

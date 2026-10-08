@@ -77,8 +77,8 @@ export async function getAllCustomers(search?: string): Promise<RealCustomer[]> 
  * "bloqueado"). Reativar = restore do soft-delete. Ambas ações reais, tal
  * como os pagamentos/documentos KYC -- não são formulários locais.
  */
-export async function blockCustomer(id: number): Promise<RealCustomer> {
-  return apiPut<RealCustomer>(`/customers/${id}/block`, {}, () => {
+export async function blockCustomer(id: number, motivo: string): Promise<RealCustomer> {
+  return apiPut<RealCustomer>(`/customers/${id}/block`, { motivo }, () => {
     throw new Error("Bloquear clientes precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }

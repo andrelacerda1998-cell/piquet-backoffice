@@ -17,7 +17,6 @@ import { getAudits, type AuditEntry } from "@/services/auditsService";
 import {
   getSentNotifications, getSentNotificationTypes, type SentNotification,
 } from "@/services/sentNotificationsService";
-import { getSmsCodes, type SmsCode } from "@/services/smsCodesService";
 import { toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -75,7 +74,6 @@ export default function ConfiguracaoPage() {
             { id: "atividade", label: "Atividade" },
             { id: "este-dispositivo", label: "Avisos neste dispositivo" },
             { id: "notificacoes", label: "Notificações enviadas" },
-            { id: "sms", label: "Códigos SMS" },
           ]}>
             {(sub) => (
               <>
@@ -95,7 +93,6 @@ export default function ConfiguracaoPage() {
                   </div>
                 )}
                 {sub === "notificacoes" && <NotificacoesTab />}
-                {sub === "sms" && <SmsCodesTab />}
               </>
             )}
           </SubTabs>
@@ -563,69 +560,10 @@ function NotificacoesTab() {
   );
 }
 
-/* ------------------------------- Códigos SMS ------------------------------- */
-
-const SMS_TYPE_LABELS: Record<string, string> = {
-  verification: "Verificação",
-  login: "Login",
-};
-
-/**
- * Códigos SMS — migrado do Filament (SmsCodeResource). Só leitura, usado pelo
- * suporte para confirmar o código enviado a um número (ex: "não recebi o
- * SMS"). Um código já não aparece aqui assim que é validado com sucesso —
- * fica apenas o histórico do que foi emitido até ser consumido.
- */
-function SmsCodesTab() {
-  const { page, setPage, pageSize, search, setSearch } = usePagination();
-  const debouncedSearch = useDebouncedValue(search);
-  const [type, setType] = useState<"" | "verification" | "login">("");
-
-  const { data, loading, error, refetch } = useAsyncData(
-    () => getSmsCodes(page, pageSize, {
-      search: debouncedSearch || undefined,
-      type: type || undefined,
-    }),
-    [page, pageSize, debouncedSearch, type]
-  );
-
-  const columns: Column<SmsCode>[] = [
-    { key: "phone_number", label: "Número", render: (r) => r.phone_number ?? "—" },
-    { key: "code", label: "Código", render: (r) => <span className="font-mono font-medium">{r.code}</span> },
-    { key: "type", label: "Tipo", render: (r) => (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-subtle text-text-secondary">
-        {SMS_TYPE_LABELS[r.type] ?? r.type}
-      </span>
-    ) },
-    { key: "user", label: "Utilizador", render: (r) => r.user?.name ?? "—" },
-    { key: "created_at", label: "Criado", render: (r) => (r.created_at ? formatDateTime(r.created_at) : "—") },
-  ];
-
-  if (loading && !data) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold">Códigos SMS</h3>
-        <DemoBadge endpoint="/sms-codes" />
-      </div>
-      <p className="text-sm text-text-secondary">
-        Códigos de verificação enviados por SMS — útil para confirmar o que foi enviado a um cliente que diz não o ter recebido.
-        Um código desaparece daqui assim que é validado com sucesso.
-      </p>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar número ou nome..." />
-        <select value={type} onChange={(e) => { setType(e.target.value as typeof type); setPage(1); }} className="input-field text-sm max-w-[200px]">
-          <option value="">Todos os tipos</option>
-          <option value="verification">Verificação</option>
-          <option value="login">Login</option>
-        </select>
-      </div>
-
-      <DataTable columns={columns} data={data?.data ?? []} keyField="id" emptyMessage="Sem códigos SMS" />
-      {data && <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />}
-    </div>
-  );
-}
+/*
+  Aqui esteve "Códigos SMS": a lista dos códigos de verificação e de LOGIN
+  emitidos e ainda por validar. Um código por validar é exatamente o que
+  falta para entrar na conta de outra pessoa -- quem visse este separador
+  entrava como qualquer cliente ou técnico. Saiu (08/10/2026), com a rota
+  /api/sms-codes. Para "não recebi o SMS", o suporte pede para reenviar.
+*/

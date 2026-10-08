@@ -121,8 +121,8 @@ export async function getVendors(
  * com acesso ao backoffice, por isso esta ação aqui NÃO tem essa restrição
  * -- decisão explícita (ver VendorController no backend).
  */
-export async function suspendVendor(id: number): Promise<RealVendor> {
-  return apiPut<RealVendor>(`/technicians/${id}/suspend`, {}, () => {
+export async function suspendVendor(id: number, motivo: string): Promise<RealVendor> {
+  return apiPut<RealVendor>(`/technicians/${id}/suspend`, { motivo }, () => {
     throw new Error("Suspender técnicos precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }

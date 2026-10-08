@@ -237,6 +237,7 @@ const LIVE_EXACT = new Set<string>([
   "/vendor-payments",
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
+  "/acoes-da-equipa",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Fase 11 — Catálogo (tipos de serviço) + Categorias (idem, via Laravel;
@@ -254,8 +255,6 @@ const LIVE_EXACT = new Set<string>([
   // SentNotificationController)
   "/sent-notifications",
   "/sent-notifications/types",
-  // Fase 16 — Códigos SMS (idem, via Laravel; só leitura, ver SmsCodeController)
-  "/sms-codes",
   // Fase 17 — Cobertura por técnico (idem, via Laravel; só leitura, ver CoverageController)
   "/coverage",
 ]);
@@ -425,6 +424,7 @@ const REAL_DATA = new Set<string>([
   "/vendor-payments",
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
+  "/acoes-da-equipa",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
   "/vendor-no-shows",
   // Clientes — idem, tabela users real do Laravel (CustomerResource migrado).
@@ -447,9 +447,6 @@ const REAL_DATA = new Set<string>([
   // (SentNotificationResource migrado).
   "/sent-notifications",
   "/sent-notifications/types",
-  // Códigos SMS — idem, tabela phone_number_validation_codes real do Laravel
-  // (SmsCodeResource migrado).
-  "/sms-codes",
   // Cobertura por técnico — idem, tabelas allowed_zone/vendor_allowed_zones/
   // survey_cities/vendor_city_votes reais do Laravel (CoverageController,
   // sem equivalente direto no Filament).

@@ -32,6 +32,8 @@ import {
 } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { getMotivos } from "@/services/acoesDaEquipaService";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
@@ -519,13 +521,19 @@ export default function TechniciansPage() {
   // vendorsService.ts) -- SEM a restrição de super-admin que o Filament tem
   // (decisão explícita, ver nota no VendorController do backend).
   const [actingId, setActingId] = useState<number | null>(null);
-  const handleSuspend = async (v: RealVendor) => {
+  // Suspender tira o técnico do matching: pede confirmação e um motivo, que
+  // fica registado com o nome de quem suspendeu (ver acoes_da_equipa).
+  const [paraSuspender, setParaSuspender] = useState<RealVendor | null>(null);
+  const { data: motivosSuspensao, refetch: refetchMotivos } = useAsyncData(() => getMotivos("suspender_tecnico"), []);
+  const handleSuspend = async (v: RealVendor, motivo: string) => {
     setActingId(v.id);
     try {
-      await suspendVendor(v.id);
+      await suspendVendor(v.id, motivo);
       toast(`Técnico ${v.name ?? v.id} suspenso.`, "error");
+      setParaSuspender(null);
       refetchVendors();
       refetchSuspended();
+      refetchMotivos();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível suspender o técnico.", "error");
     } finally {
@@ -629,7 +637,7 @@ export default function TechniciansPage() {
     { key: "acao", label: "", render: (r) => (
       <div className="flex items-center justify-end gap-3">
         <button onClick={(e) => { e.stopPropagation(); setProfileVendor(r); }} className="btn-secondary text-xs py-1">Ver perfil</button>
-        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); handleSuspend(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); setParaSuspender(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
       </div>
     ) },
   ];
@@ -638,6 +646,11 @@ export default function TechniciansPage() {
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
     { key: "nif", label: "NIF", render: (r) => r.nif ?? "—" },
     { key: "suspended_at", label: "Suspenso em", render: (r) => r.suspended_at ? formatDate(r.suspended_at) : "—" },
+    { key: "motivo", label: "Motivo", render: (r) => {
+      const m = motivosSuspensao?.get(String(r.id));
+      if (!m) return <span className="text-text-muted">Sem registo</span>;
+      return <span>{m.motivo}<span className="block text-xs text-text-muted">{m.staff_email ?? "—"}</span></span>;
+    } },
     /*
       Reativar e apagar lado a lado, mas não com o mesmo peso.
 
@@ -1640,6 +1653,26 @@ export default function TechniciansPage() {
         "tem a certeza?". O que se perde aqui não se recupera, e a pessoa que
         carrega merece ver a lista antes, não um aviso genérico.
       */}
+      <ConfirmDialog
+        open={paraSuspender !== null}
+        onClose={() => setParaSuspender(null)}
+        onConfirm={async (motivo) => { if (paraSuspender && motivo) await handleSuspend(paraSuspender, motivo); }}
+        title={`Suspender ${paraSuspender?.name ?? "este técnico"}?`}
+        description={
+          <>
+            Deixa de receber pedidos e de entrar na app. Os pedidos que já tem marcados não são reatribuídos
+            sozinhos: confirma em Operações se tem algum agendado. Dá para desfazer em <strong>Suspensos › Reativar</strong>.
+            O motivo fica registado com o teu nome.
+          </>
+        }
+        requireReason
+        minReason={MOTIVO_MINIMO}
+        reasonLabel="Porque é que estás a suspender?"
+        reasonPlaceholder="Ex.: duas faltas sem aviso esta semana; documentos expirados"
+        confirmLabel="Suspender"
+        tone="danger"
+      />
+
       <ConfirmDialog
         open={vendorParaApagar !== null}
         onClose={() => setVendorParaApagar(null)}
