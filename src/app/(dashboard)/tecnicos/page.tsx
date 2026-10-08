@@ -9,14 +9,13 @@ import { DocumentPreview } from "@/components/ui/DocumentPreview";
 import { HardHat, Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
-import { ChartCard, BarChartComponent, DonutChartComponent, HeatMapGrid } from "@/components/charts/Charts";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import {
   getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getVendorsByCategory,
-  getVendorsByLocation, getTopVendors, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
+  getTopVendors, getOnboardingTecnicos, getVendorCoverage, setVendorAtValidation, getVendorLiveLocations,
   createVendorInvoiceWorkspace,
   createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces,
   getTecnicosSemWorkspace, type TecnicoSemWorkspace,
@@ -34,6 +33,7 @@ import {
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
+import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
 import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
@@ -102,8 +102,10 @@ function Degraus({ contagem }: { contagem: ContagemWorkspaces }) {
   // O que depende de NÓS vai à parte, e só aparece quando existe. Nenhum dos
   // degraus acima é trabalho nosso: todos dependem do técnico.
   const nossos = [
-    { rotulo: "À espera de nós", n: contagem.aEspera,
-      nota: "têm tudo — falta criar-lhes o workspace de faturação" },
+    // O mesmo nome que em Aprovações: "à espera de nós" queria dizer
+    // documentos no ecrã de Onboarding e workspaces aqui.
+    { rotulo: "Workspace por criar", n: contagem.aEspera,
+      nota: "têm tudo — falta criarmos o workspace de faturação (em Aprovações)" },
   ];
 
   return (
@@ -183,11 +185,35 @@ function GrupoDeDocumentos({ titulo, nota, tecnicos, detalhe, onAbrir }: {
   );
 }
 
+/**
+ * O que há para fazer em Aprovações: um número por trabalho, cada um a levar
+ * à sua secção. Zero aparece apagado — não há nada a fazer ali.
+ */
+function ResumoDoKyc({ itens, nota }: { itens: Array<{ id: string; rotulo: string; n: number }>; nota?: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {itens.map((i) => (
+          <button key={i.rotulo} type="button" disabled={i.n === 0}
+            onClick={() => document.getElementById(i.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className={cn("card p-3 text-left transition-shadow", i.n > 0 ? "hover:shadow-elevated border-piquet/40" : "opacity-60 cursor-default")}>
+            <p className={cn("text-2xl font-bold tabular-nums", i.n > 0 ? "text-text-primary" : "text-text-muted")}>{formatNumber(i.n)}</p>
+            <p className="text-xs text-text-secondary">{i.rotulo}</p>
+          </button>
+        ))}
+      </div>
+      {nota && <p className="text-xs text-text-muted">{nota}</p>}
+    </div>
+  );
+}
+
 export default function TechniciansPage() {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   // ?tab=aprovacoes — deep-link vindo dos avisos da Visão executiva.
-  const [tab, setTab] = useTabParam("visao");
+  const [tab, setTab] = useTabParam("resumo");
+  // Endereços antigos: ?tab=visao era o Resumo.
+  useEffect(() => { if (tab === "visao") setTab("resumo"); }, [tab, setTab]);
 
   // Indicadores reais da Visão geral (App\Http\Controllers\Api\Admin\
   // VendorController::metrics() e derivados) -- substituem os "estados"
@@ -226,12 +252,17 @@ export default function TechniciansPage() {
     abertura da página, mesmo quem só queria ver a Visão geral, e era metade
     da demora de que o André se queixou.
   */
+  // As inscrições paradas (o que era o ecrã Onboarding): só na aba Aprovações.
+  const { data: inscricoes } = useAsyncData(
+    () => (tab === "aprovacoes" ? getOnboardingTecnicos().catch(() => null) : Promise.resolve(null)),
+    [tab],
+  );
+  const paradosPorEles = (inscricoes?.parados ?? []).filter((t) => !(t.etapa && ESPERA_POR_NOS[t.etapa as Etapa]));
   const { data: docs } = useAsyncData(
     () => (tab === "aprovacoes" ? getResumoDocumentos() : Promise.resolve(null)),
     [tab],
   );
 
-  const { data: byLocation } = useAsyncData(() => getVendorsByLocation(), []);
   const { data: byCategory } = useAsyncData(() => getVendorsByCategory(), []);
   const { data: coverage } = useAsyncData(() => getVendorCoverage(), []);
   const { data: topVendors } = useAsyncData(() => getTopVendors(10), []);
@@ -336,16 +367,6 @@ export default function TechniciansPage() {
   // continuava a dizer que havia N por validar até se recarregar à mão.
   const [revisaoFeita, setRevisaoFeita] = useState(0);
   const { data: pendingDocsMeta } = useAsyncData(() => getVendorDocuments("pending", 1, 1), [revisaoFeita]);
-  // Aviso por técnico: quais os técnicos com documentos por validar (não só o total).
-  const { data: pendingDocsList } = useAsyncData(() => getVendorDocuments("pending", 1, 100), [revisaoFeita]);
-  const pendingByVendor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const d of pendingDocsList?.items ?? []) {
-      const name = d.vendor_name?.trim() || "Técnico sem nome";
-      m.set(name, (m.get(name) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]); // mais pendentes primeiro
-  }, [pendingDocsList]);
   const [docStatus, setDocStatus] = useState<VendorDocumentStatus>("pending");
   const docsData = useAsyncData(() => getVendorDocuments(docStatus, 1, 50), [docStatus]);
 
@@ -371,9 +392,9 @@ export default function TechniciansPage() {
   // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
   // filtrar só a página daria contas erradas — com filtro ativo carregamos a
   // lista toda de uma vez e filtramos aqui.
-  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif">("");
+  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif" | "suspensos">("");
   const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
-    () => (atFilter ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
+    () => (atFilter && atFilter !== "suspensos" ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
     [atFilter, debouncedSearch]
   );
   const atFiltered = useMemo(() => {
@@ -557,10 +578,16 @@ export default function TechniciansPage() {
     }
   };
 
+  /*
+    Quatro separadores, sem sub-separadores. Eram três com seis
+    sub-separadores, mais um ecrã de Onboarding à parte que repetia o funil
+    do Resumo com outros nomes e outros totais.
+  */
   const TABS: TabDef[] = [
-    { id: "visao", label: "Visão geral" },
+    { id: "resumo", label: "Resumo" },
     { id: "lista", label: "Lista" },
-    { id: "aprovacoes", label: "Aprovações e KYC", count: pendingDocsMeta?.meta.total ?? 0 },
+    { id: "aprovacoes", label: "Aprovações", count: pendingDocsMeta?.meta.total ?? 0 },
+    { id: "cobertura", label: "Cobertura" },
   ];
 
   const topColumns: Column<TopVendor>[] = [
@@ -636,138 +663,50 @@ export default function TechniciansPage() {
           icon={HardHat}
           eyebrow="Pessoas"
           title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
-          subtitle={`${metrics?.registered ?? 0} técnicos registados`}
+          subtitle="Quem trabalha com a Piquet, quem está a meio da inscrição e onde há cobertura"
         />
 
-        {/* Aviso: quais os técnicos com documentos por validar (não só o total). */}
-        {pendingByVendor.length > 0 && (
-          <div className="card border-l-4 border-l-warning bg-warning-light/40 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-text-primary">
-                  ⚠️ {pendingByVendor.length} técnico(s) com documentos por validar
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {pendingByVendor.slice(0, 12).map(([name, n]) => (
-                    <button
-                      key={name}
-                      onClick={() => setTab("aprovacoes")}
-                      title="Abrir a fila de aprovações KYC"
-                      className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-medium border border-surface-border hover:border-warning"
-                    >
-                      {name}
-                      <span className="text-warning font-bold">{n}</span>
-                    </button>
-                  ))}
-                  {pendingByVendor.length > 12 && (
-                    <span className="text-xs text-text-muted self-center">+{pendingByVendor.length - 12} …</span>
-                  )}
-                </div>
+        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+        {tab === "resumo" && (
+          <div className="space-y-6">
+            {/*
+              Um número por pergunta, de uma só fonte. Havia quatro para
+              "quantos estão prontos" (Podem aceitar serviço, Perfil completo,
+              Nada em falta, Prontos a trabalhar no Onboarding), três para
+              "quantos há" e duas percentagens. Ficam os do Laravel; o funil
+              abaixo diz onde estão os outros.
+            */}
+            {metrics && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <MetricCard title="Inscritos" hideDelta
+                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
+                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
+                        <MetricCard title="Prontos a trabalhar" hideDelta
+                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
+                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
+                        <MetricCard title="Online" hideDelta
+                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
+                            "Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo")} />
+                        <MetricCard title="Sem serviços" hideDelta
+                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
+                            "Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço")} />
               </div>
-              <button onClick={() => setTab("aprovacoes")} className="btn-primary text-sm shrink-0">Rever documentos</button>
+            )}
+
+            {semWorkspace && semWorkspace.contagem.total > 0 && (
+              <Degraus contagem={semWorkspace.contagem} />
+            )}
+
+            <div>
+              <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
+              <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
             </div>
           </div>
         )}
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
-
-        {tab === "visao" && (
-          <SubTabs tabs={[
-            { id: "resumo", label: "Resumo" },
-            { id: "categoria", label: "Por categoria" },
-            { id: "cobertura", label: "Cobertura" },
-            { id: "mapa", label: "Mapa ao vivo" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "resumo" && (
-                  <div className="space-y-6">
-                    {metrics && (
-                      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                        {/*
-                          Cada cartão diz o que MEDE, não só o que se chama.
-                          Metade destes números foi mal lida hoje -- "Sem
-                          serviços" parecia ser sobre os 460 e é sobre os
-                          elegíveis; "Online agora" parece presença e é uma
-                          bandeira que o técnico deixa ligada.
-                        */}
-                        <MetricCard title="Registados" hideDelta
-                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
-                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
-                        <MetricCard title="Podem aceitar serviço" hideDelta
-                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
-                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
-                        <MetricCard title="Online agora" hideDelta
-                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
-                            "Têm o estado Online ligado. Não é presença: quem fecha a app sem desligar continua a contar — ver o Mapa ao vivo")} />
-                        <MetricCard title="Sem serviços" hideDelta
-                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
-                            "Dos que podem aceitar serviço, quantos ainda não fecharam nenhum — não é sobre os registados")} />
-                        <MetricCard title="Taxa de elegibilidade" hideDelta format="percent"
-                          metric={buildMetricValue(metrics.approvalRate, metrics.approvalRate, false, undefined,
-                            "Quantos dos registados podem aceitar serviço. Inclui no denominador quem nunca confirmou um contacto")} />
-                        {/*
-                          Na MESMA fila dos outros, e não num bloco à parte.
-
-                          Esteve num bloco próprio enquanto o "Podem aceitar
-                          serviço" ao lado estava errado (dizia 41 onde eram
-                          69, por o backend filtrar pela regra antiga da AT).
-                          Dois blocos a dizer a mesma coisa com números
-                          diferentes é pior do que um número a menos —
-                          corrigida a origem (backend #124), o duplicado sai.
-                        */}
-                        {semWorkspace && semWorkspace.contagem.total > 0 && (
-                          <MetricCard
-                            title="Perfil completo"
-                            hideDelta
-                            metric={buildMetricValue(
-                              semWorkspace.contagem.perfilCompleto,
-                              semWorkspace.contagem.perfilCompleto,
-                              false,
-                              undefined,
-                              `${((semWorkspace.contagem.perfilCompleto / semWorkspace.contagem.total) * 100)
-                                .toFixed(1).replace(".", ",")}% — documentos validados e workspace criado`,
-                            )}
-                          />
-                        )}
-                      </div>
-                    )}
-
-                    {semWorkspace && semWorkspace.contagem.total > 0 && (
-                      <Degraus contagem={semWorkspace.contagem} />
-                    )}
-
-                    {/*
-                      O `perfilCompleto` é DERIVADO, não medido: o Laravel não
-                      expõe `all_documents_verified` por técnico, e o código de
-                      bloqueio só revela o primeiro problema. Quem tem os dois
-                      contactos por verificar fica por classificar — e isso
-                      diz-se, em vez de se apresentar o número como exacto.
-                    */}
-                    {(semWorkspace?.contagem.contactoPorVerificar ?? 0) > 0 && (
-                      <p className="text-xs text-text-muted -mt-3">
-                        O «perfil completo» pode estar até{" "}
-                        <b className="text-warning">{formatNumber(semWorkspace!.contagem.contactoPorVerificar)}</b>{" "}
-                        abaixo do real: esses técnicos têm ambos os contactos por verificar, o que tapa o estado dos
-                        documentos.
-                      </p>
-                    )}
-
-                    <div>
-                      <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
-                      <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
-                    </div>
-                  </div>
-                )}
-                {/* Só o circular: as barras e o donut liam os MESMOS `byCategory`,
-                    lado a lado. Duas leituras do mesmo número não acrescentam
-                    nada — e a proporção é o que interessa aqui. */}
-                {sub === "categoria" && (
-                  <ChartCard title="Distribuição de técnicos por categoria" subtitle="Áreas de operação em que estão registados">
-                    <DonutChartComponent data={byCategory ?? []} centerLabel="Técnicos" />
-                  </ChartCard>
-                )}
-                {sub === "cobertura" && (
+        {tab === "cobertura" && (
+          <div className="space-y-6">
                   <div className="space-y-5">
                     {/* Sem cobertura declarada não se pode falar de oferta —
                         dizê-lo em vez de mostrar zeros que parecem factos. */}
@@ -891,15 +830,24 @@ export default function TechniciansPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Técnicos por zona" subtitle="Zonas de cobertura declaradas"><BarChartComponent data={byLocation ?? []} /></ChartCard>
-                      <ChartCard title="Procura vs oferta" subtitle="Pedidos de serviço vs técnicos que cobrem a zona">
-                        <HeatMapGrid data={(coverage ?? []).map((c) => ({ name: c.name, value: c.procura, ratio: c.ratio }))} />
-                      </ChartCard>
-                    </div>
                   </div>
-                )}
-                {sub === "mapa" && (
+
+            {/* Por categoria: uma lista e não um gráfico circular num separador só para ele. */}
+            <div className="card p-4 space-y-2">
+              <h3 className="font-semibold text-text-primary">Técnicos por categoria</h3>
+              {(byCategory ?? []).length === 0 ? (
+                <p className="text-sm text-text-muted">Sem dados.</p>
+              ) : [...(byCategory ?? [])].sort((a, b) => b.value - a.value).map((c) => (
+                <div key={c.name} className="flex items-baseline justify-between text-sm">
+                  <span className="text-text-secondary">{c.name}</span>
+                  <span className="font-medium tabular-nums text-text-primary">{c.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* O mapa: onde estão, agora, os técnicos com localização recente. */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-text-primary">Mapa ao vivo</h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm text-text-secondary">
@@ -918,212 +866,222 @@ export default function TechniciansPage() {
                           />
                           Mostrar contas de teste
                         </label>
-                        <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1">Criar conta de teste</button>
                       </div>
                     </div>
                     <div className="card overflow-hidden">
                       <TechnicianMap locations={liveLocations ?? []} />
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </SubTabs>
+            </div>
+          </div>
         )}
 
         {tab === "aprovacoes" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/*
-              A ordem desta aba é a ordem do TRABALHO, e não a ordem por que
-              as coisas foram sendo acrescentadas -- que era o que estava, e
-              por isso parecia desarrumada.
+              Três trabalhos, por esta ordem, e um resumo em cima a dizer
+              quanto há de cada:
 
-                1. os números, para se saber onde se está;
-                2. a fila de documentos por rever, que é O trabalho desta aba
-                   e por isso vem antes de tudo o resto;
-                3. a documentação a tratar (caducados e recusados), que é
-                   trabalho de contacto e não de revisão;
-                4. os workspaces, que dependem de nós mas raramente existem.
+                1. documentos por rever — o trabalho desta aba;
+                2. workspaces de faturação por criar — depende só de nós, e
+                   sem ele o técnico não pode ficar online;
+                3. técnicos para contactar — documentos caducados ou recusados.
 
-              O aviso da lista incompleta fica colado à tabela a que se
-              refere: longe dela não se percebia de que lista falava.
+              Até 08/10/2026 as listas 2 e 3 estavam, por engano, DENTRO da
+              célula "Aprovar / Recusar" da tabela de documentos (ficaram lá
+              numa reordenação, no #53): repetiam-se em cada linha pendente.
+              Era isso, mais do que a quantidade de coisas, que tornava a aba
+              ilegível.
             */}
-            {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/*
-                  Só o que é de KYC. A "Taxa de conclusão de perfil" e os
-                  "Podem aceitar serviço" saíram daqui: vivem na Visão geral,
-                  e tê-los nos dois sítios dava oito números no mesmo ecrã,
-                  dois deles a dizer a mesma coisa com valores diferentes por
-                  virem de fontes distintas.
-                */}
-                <MetricCard title="Documentação completa" metric={buildMetricValue(metrics.docComplete, metrics.docComplete)} hideDelta />
-                <MetricCard title="Em validação" metric={buildMetricValue(metrics.inValidation, metrics.inValidation)} hideDelta />
-              </div>
-            )}
-            {docsIncompletos > 0 && (
-              <div className="card border-l-[3px] border-l-warning p-4">
-                <p className="font-semibold text-text-primary">Lista incompleta</p>
-                <p className="text-sm text-text-secondary mt-1">
-                  O backend não conseguiu devolver cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos
-                  (erro do servidor em algumas páginas). Os estados mostrados nas colunas e nos perfis podem estar
-                  incompletos para esses técnicos — não quer dizer que não tenham entregado.
-                </p>
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <p className="text-sm text-text-secondary max-w-2xl">
-                Documentos enviados pelos técnicos, à espera de revisão. Aprovar ou recusar notifica o técnico a sério (email + push) <DemoBadge endpoint="/vendor-documents" />
-              </p>
-              <div className="flex gap-1 shrink-0">
-                {([
-                  { id: "pending", label: "Pendentes" },
-                  { id: "approved", label: "Aprovados" },
-                  { id: "declined", label: "Recusados" },
-                ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
-                  <button key={s.id} onClick={() => setDocStatus(s.id)}
-                    className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <DataTable
-              columns={[
-                { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
-                { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
-                { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
-                { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
-                  ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
-                      <Eye className="h-3.5 w-3.5" /> Pré-visualizar
-                    </button>
-                  : <span className="text-text-muted text-xs">—</span> },
-                { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
-                  <div className="flex items-center gap-3 justify-end">
-                    <button onClick={() => openApprove(r)} className="text-xs text-success hover:underline">Aprovar</button>
-                    <button onClick={() => openDecline(r)} className="text-sm text-danger hover:underline">Recusar</button>
+            <ResumoDoKyc
+              itens={[
+                { id: "kyc-documentos", rotulo: "Documentos por rever", n: pendingDocsMeta?.meta.total ?? 0 },
+                { id: "kyc-workspace", rotulo: "Workspaces por criar", n: semWorkspace?.total ?? 0 },
+                { id: "kyc-contactar", rotulo: "Com documentos caducados", n: docs?.com_expirado ?? 0 },
+                { id: "kyc-contactar", rotulo: "Com documentos recusados", n: docs?.com_recusado ?? 0 },
+              ]}
+              nota={metrics ? `${formatNumber(metrics.docComplete)} técnicos têm a documentação toda aprovada.` : undefined}
+            />
 
-            {docs && (docs.expirados.length > 0 || docs.recusados.length > 0) && (
-              <div className="card overflow-hidden">
-                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
-                  <p className="font-semibold text-text-primary">Documentação a tratar</p>
-                  {/*
-                    Porque é que só estes dois aparecem em lista: são os únicos
-                    em que uma pessoa resolve uma pessoa. Os que nunca
-                    submeteram são 337 -- isso não é uma lista de trabalho, é
-                    um relatório, e resolve-se no funil de inscrição.
-                  */}
-                  <p className="text-sm text-text-secondary mt-1">
-                    {docs.com_expirado > 0 && <><b className="text-text-primary">{docs.com_expirado}</b> com documentos caducados</>}
-                    {docs.com_expirado > 0 && docs.com_recusado > 0 && " · "}
-                    {docs.com_recusado > 0 && <><b className="text-text-primary">{docs.com_recusado}</b> com documentos recusados</>}
-                    {". "}
-                    Os outros {formatNumber(docs.nunca_submeteram)} nunca submeteram — esses resolvem-se na inscrição.
+            {/* 1. Documentos por rever */}
+            <section id="kyc-documentos" className="space-y-3 scroll-mt-20">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold text-text-primary">Documentos</h2>
+                  <p className="text-sm text-text-secondary">
+                    Aprovar ou recusar avisa o técnico (email e notificação). <DemoBadge endpoint="/vendor-documents" />
                   </p>
                 </div>
+                <div className="flex gap-1 shrink-0">
+                  {([
+                    { id: "pending", label: "Por rever" },
+                    { id: "approved", label: "Aprovados" },
+                    { id: "declined", label: "Recusados" },
+                  ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
+                    <button key={s.id} onClick={() => setDocStatus(s.id)}
+                      className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {docsIncompletos > 0 && (
+                <p className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 px-3 py-2 text-xs text-text-secondary">
+                  O servidor não devolveu cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos. Um técnico
+                  que pareça não ter entregado pode ter: confirma no perfil dele.
+                </p>
+              )}
+              <DataTable
+                columns={[
+                  { key: "vendor_name", label: "Técnico", render: (r: VendorDocument) => <span className="font-medium">{r.vendor_name ?? "—"}</span> },
+                  { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
+                  { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
+                  { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
+                    ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
+                        <Eye className="h-3.5 w-3.5" /> Ver
+                      </button>
+                    : <span className="text-text-muted text-xs">—</span> },
+                  { key: "acao", label: "", render: (r: VendorDocument) => r.status === "pending" ? (
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => openApprove(r)} className="btn-primary text-xs py-1">Aprovar</button>
+                      <button onClick={() => openDecline(r)} className="btn-secondary text-xs py-1 text-danger">Recusar</button>
+                    </div>
+                  ) : null },
+                ]}
+                data={docsData.data?.items ?? []}
+                keyField="id"
+                loading={docsData.loading}
+                emptyMessage={docStatus === "pending" ? "Nenhum documento por rever 🎉" : "Sem documentos neste estado"}
+              />
+            </section>
 
+            {/* 2. Workspaces por criar */}
+            {((semWorkspace?.items.length ?? 0) > 0 || (semWorkspace?.contagem.bloqueados ?? 0) > 0) && (
+              <section id="kyc-workspace" className="card overflow-hidden scroll-mt-20">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <h2 className="font-semibold text-text-primary">Workspace de faturação por criar</h2>
+                  {/*
+                    Enquanto não houver workspace, o técnico NÃO pode ficar
+                    online nem aceitar um serviço (Vendor::canAcceptService
+                    exige-o). Ele fez a parte dele; falta a nossa.
+                  */}
+                  <p className="text-sm text-text-secondary mt-1">
+                    Entregaram o acesso à AT e não têm nada em falta. Sem o workspace não podem ficar online nem aceitar
+                    serviços. Os mais antigos primeiro.
+                  </p>
+                </div>
+                {(semWorkspace?.items.length ?? 0) > 0 && (
+                  <ul className="divide-y divide-surface-border">
+                    {semWorkspace!.items.map((t) => (
+                      <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate">{t.name ?? `Técnico ${t.id}`}</p>
+                          <p className="text-xs text-text-muted">
+                            AT: {t.at_user ?? "—"}
+                            {t.created_at ? ` · inscrito ${formatDate(t.created_at)}` : ""}
+                          </p>
+                        </div>
+                        <button onClick={() => criarWorkspaceDaLista(t)} disabled={wsDaLista === t.id}
+                          className="btn-primary text-xs shrink-0 disabled:opacity-60">
+                          {wsDaLista === t.id ? "A criar…" : "Criar workspace"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {(semWorkspace?.contagem.bloqueados ?? 0) > 0 && (
+                  <p className="px-4 sm:px-5 py-3 text-xs text-text-secondary border-t border-surface-border bg-surface-subtle">
+                    Mais <b className="text-text-primary">{semWorkspace!.contagem.bloqueados}</b> entregaram a AT mas ainda têm
+                    um documento, o IBAN ou a morada fiscal por resolver: o workspace só se cria depois disso.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* 3. Para contactar */}
+            {docs && (docs.expirados.length > 0 || docs.recusados.length > 0) && (
+              <section id="kyc-contactar" className="card overflow-hidden scroll-mt-20">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
+                  <h2 className="font-semibold text-text-primary">Para contactar</h2>
+                  {/*
+                    Só estes dois em lista: são os únicos em que uma pessoa
+                    resolve uma pessoa. Os que nunca submeteram são centenas
+                    — isso é um relatório, e resolve-se no funil de inscrição.
+                  */}
+                  <p className="text-sm text-text-secondary mt-1">
+                    Técnicos a quem falta reenviar um documento. Os {formatNumber(docs.nunca_submeteram)} que nunca
+                    submeteram nada estão no funil de inscrição, no Resumo.
+                  </p>
+                </div>
                 {docs.expirados.length > 0 && (
                   <GrupoDeDocumentos
-                    titulo="Caducados"
-                    // Já tiveram tudo aprovado: provavelmente já trabalharam e
-                    // pararam sem dar por isso. É o grupo com melhor retorno.
+                    titulo="Documentos caducados"
+                    // Já tiveram tudo aprovado: o grupo com melhor retorno.
                     nota="já tiveram tudo aprovado — basta reenviarem"
                     tecnicos={docs.expirados}
                     detalhe={(d) => (d.em ? `caducou ${formatDate(d.em)}` : "caducado")}
                     onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
                   />
                 )}
-
                 {docs.recusados.length > 0 && (
                   <GrupoDeDocumentos
-                    titulo="Recusados"
+                    titulo="Documentos recusados"
                     nota="submeteram e foi-lhes dito que não"
                     tecnicos={docs.recusados}
                     detalhe={(d) => d.motivo || "sem motivo registado"}
                     onAbrir={(nome) => { setSearch(nome); setPage(1); setTab("lista"); }}
                   />
                 )}
-              </div>
+              </section>
             )}
 
+            {/* 4. Inscrições paradas — o que era o ecrã "Onboarding de técnicos". */}
             {/*
-              Quem entregou a AT mas tem algo por resolver do lado dele.
-
-              Uma frase e não um cartão com um número grande: não é uma
-              métrica para acompanhar, é uma lista de pessoas para contactar.
+              Só quem está parado por algo que depende DELE. Quem espera por
+              nós (documentos por rever, workspace) já está nas secções 1 e 2:
+              aparecer aqui também era a mesma pessoa em dois sítios.
             */}
-            {(semWorkspace?.contagem.bloqueados ?? 0) > 0 && (
-              <div className="card border-l-[3px] border-l-warning p-4">
-                <p className="text-sm text-text-secondary">
-                  <b className="text-text-primary">{semWorkspace!.contagem.bloqueados} técnicos</b> entregaram o acesso
-                  à AT mas têm um documento, o IBAN ou a morada fiscal por resolver — não lhes conseguimos criar o
-                  workspace até isso ficar feito.
-                </p>
-              </div>
-            )}
-
-            {(semWorkspace?.items.length ?? 0) > 0 && (
-              <div className="card border-l-[3px] border-l-piquet overflow-hidden">
+            {paradosPorEles.length > 0 && (
+              <section id="kyc-inscricoes" className="card overflow-hidden scroll-mt-20">
                 <div className="px-4 sm:px-5 py-3.5 border-b border-surface-border">
-                  <p className="font-semibold text-text-primary">
-                    {semWorkspace!.total} técnico{semWorkspace!.total === 1 ? "" : "s"} à espera do workspace de faturação
-                  </p>
-                  {/*
-                    Porque é que isto está no topo: enquanto não houver
-                    workspace, o técnico NÃO pode ficar online nem aceitar um
-                    serviço (Vendor::canAcceptService exige-o). Ele fez a parte
-                    dele; falta a nossa.
-                  */}
+                  <h2 className="font-semibold text-text-primary">Inscrições paradas</h2>
                   <p className="text-sm text-text-secondary mt-1">
-                    Já entregaram o subutilizador da AT e não têm nada em falta. Sem workspace não podem ficar
-                    online nem aceitar serviços. Os mais antigos aparecem primeiro.
+                    Inscreveram-se para trabalhar e ficaram a meio por algo que falta da parte deles. Os que esperam há
+                    mais tempo primeiro; o passo é o primeiro que lhes falta. Quantos estão em cada passo vê-se no Resumo.
                   </p>
                 </div>
                 <ul className="divide-y divide-surface-border">
-                  {semWorkspace!.items.map((t) => (
-                    <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-text-primary truncate">{t.name ?? `Técnico ${t.id}`}</p>
+                  {paradosPorEles.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 sm:px-5 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text-primary truncate">{t.nome}</p>
                         <p className="text-xs text-text-muted">
-                          AT: {t.at_user ?? "—"}
-                          {t.created_at ? ` · inscrito ${formatDate(t.created_at)}` : ""}
+                          {t.categorias.length > 0 ? t.categorias.join(" · ") : "sem categoria"}
+                          {t.criadoEm && ` · inscrito a ${formatDate(t.criadoEm)}`}
                         </p>
                       </div>
-                      <button
-                        onClick={() => criarWorkspaceDaLista(t)}
-                        disabled={wsDaLista === t.id}
-                        className="btn-primary text-xs shrink-0 disabled:opacity-60"
-                      >
-                        {wsDaLista === t.id ? "A criar…" : "Criar workspace"}
-                      </button>
+                      {t.telefone && (
+                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-piquet-700">{t.telefone}</a>
+                      )}
+                      <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">
+                        {t.etapa ? ETAPA_LABEL[t.etapa as Etapa] : "—"}
+                      </span>
+                      <span className="text-xs tabular-nums text-text-muted w-24 text-right">
+                        {t.diasParado == null ? "sem data" : t.diasParado === 0 ? "hoje" : `há ${t.diasParado} dias`}
+                      </span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
             )}
-
-                  </div>
-                ) : null },
-              ]}
-              data={docsData.data?.items ?? []}
-              keyField="id"
-              loading={docsData.loading}
-              emptyMessage={docStatus === "pending" ? "Sem documentos pendentes 🎉" : "Sem documentos neste estado"}
-            />
           </div>
         )}
 
         {tab === "lista" && (
-          <SubTabs tabs={[
-            { id: "todos", label: "Todos" },
-            { id: "suspensoes", label: "Suspensões", count: suspendedVendors?.total ?? 0 },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "todos" && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
+                      <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1 ml-auto order-last">Criar conta de teste</button>
                       <div className="chip-row">
                         {([
                           { id: "", label: "Todos" },
@@ -1132,6 +1090,8 @@ export default function TechniciansPage() {
                           // Sem NIF não há como faturar em nome do técnico —
                           // são registos que nunca poderão receber.
                           { id: "sem_nif", label: "Sem NIF" },
+                          // Era um sub-separador à parte; é um filtro como os outros.
+                          { id: "suspensos", label: "Suspensos" },
                         ] as const).map((f) => (
                           <button key={f.id} onClick={() => setAtFilter(f.id)}
                             className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
@@ -1143,6 +1103,7 @@ export default function TechniciansPage() {
                               <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
                                 {f.id === "validada" ? atCounts.validada
                                   : f.id === "por_validar" ? atCounts.por_validar
+                                  : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
                                   : atCounts.sem_nif}
                               </span>
                             )}
@@ -1151,7 +1112,18 @@ export default function TechniciansPage() {
                       </div>
                     </div>
 
-                    {atFilter ? (
+                    {atFilter === "suspensos" ? (
+                      <>
+                        <p className="text-sm text-text-secondary">Suspensos: sem acesso a novos serviços até serem reativados.</p>
+                    <DataTable
+                      columns={suspendedColumns}
+                      data={suspendedVendors?.data ?? []}
+                      keyField="id"
+                      loading={suspendedLoading}
+                      emptyMessage="Sem técnicos suspensos 🎉"
+                    />
+                      </>
+                    ) : atFilter ? (
                       <>
                         <p className="text-sm text-text-secondary">
                           <b className="text-text-primary tabular-nums">{atFiltered.length}</b>{" "}
@@ -1170,22 +1142,6 @@ export default function TechniciansPage() {
                       </>
                     )}
                   </div>
-                )}
-                {sub === "suspensoes" && (
-                  <div className="space-y-4">
-                    <p className="text-sm text-text-secondary">Técnicos suspensos — sem acesso a novos serviços até reativação.</p>
-                    <DataTable
-                      columns={suspendedColumns}
-                      data={suspendedVendors?.data ?? []}
-                      keyField="id"
-                      loading={suspendedLoading}
-                      emptyMessage="Sem técnicos suspensos 🎉"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </SubTabs>
         )}
       </div>
 

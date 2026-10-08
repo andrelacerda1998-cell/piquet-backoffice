@@ -104,7 +104,8 @@ export const NAV_ITEMS = [
   { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
-  { href: "/recrutamento", label: "Onboarding de técnicos", icon: "UserPlus" },
+  // O antigo "Onboarding de técnicos" (/recrutamento) está aqui dentro.
+  { href: "/tecnicos?tab=aprovacoes", label: "Aprovações de técnicos", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
 ] as const;
@@ -129,7 +130,7 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/"] },
   // O que se faz hoje: os pedidos ao vivo, o que pede ação, a qualidade e os tickets.
   { id: "operacoes", label: "Operações", icon: "Wrench", filhos: ["/servicos", "/alertas", "/qualidade", "/suporte"] },
-  { id: "tecnicos", label: "Técnicos", icon: "HardHat", filhos: ["/tecnicos", "/recrutamento"] },
+  { id: "tecnicos", label: "Técnicos", icon: "HardHat", filhos: ["/tecnicos"] },
   { id: "clientes", label: "Clientes", icon: "Users", filhos: ["/clientes", "/leads"] },
   { id: "financeiro", label: "Financeiro", icon: "Euro", filhos: ["/financeiro"] },
   { id: "crescimento", label: "Crescimento", icon: "Megaphone", filhos: ["/marketing", "/produto"] },
@@ -160,6 +161,7 @@ export const NAV_DEEPLINKS: string[] = [
   "/tarefas",
   "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados",
+  "/tecnicos?tab=aprovacoes",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
 ];
 
