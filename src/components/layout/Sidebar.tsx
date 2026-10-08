@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, NAV_PRIMARY, NAV_SECONDARY } from "@/config/dashboard";
+import { NAV_ITEMS, NAV_RODAPE } from "@/config/dashboard";
+import { estaEm, gruposVisiveis, type GrupoVisivel } from "@/lib/navGrupos";
 import { useFilterStore } from "@/stores";
 import { canAccessRoute, ROLE_LABELS } from "@/lib/permissions";
 import { useNavBadges } from "@/hooks/useNavBadges";
@@ -15,7 +16,7 @@ import {
   MapPin, Megaphone, Headphones, Bell, Settings, ChevronLeft, X,
   Radio, BookOpen, Tag, Map, ShieldCheck, FileText,
   MessageSquare, Target, ListChecks, Wand2, UserPlus, SlidersHorizontal,
-  MoreHorizontal, ChevronDown, MonitorSmartphone, Code2, Inbox,
+  ChevronDown, MonitorSmartphone, Code2, Inbox,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -32,17 +33,20 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useFilterStore();
   const user = useAuthStore((s) => s.user);
-  const [showMore, setShowMore] = useState(false);
+  // Grupos abertos à mão; o da página atual abre-se sempre sozinho.
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
   // Quantos assuntos estão à espera em cada ecrã — mesma fonte dos Alertas.
   const badges = useNavBadges();
 
   const canSee = (href: string) => (user ? canAccessRoute(user.role, href) : false);
-  const isActive = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(href));
+  const grupos = gruposVisiveis(user?.role, pathname, badges);
+  const rodape = NAV_RODAPE.filter(canSee);
 
-  // Abre "Mais" automaticamente quando a página ativa está lá dentro.
+  // Ao mudar de página, o grupo dela fica aberto (e os abertos à mão também).
   useEffect(() => {
-    if (NAV_SECONDARY.some((h) => pathname === h || (h !== "/" && pathname.startsWith(h)))) setShowMore(true);
-  }, [pathname]);
+    const ativo = gruposVisiveis(user?.role, pathname, {}).find((g) => g.ativo);
+    if (ativo) setAbertos((a) => (a.has(ativo.id) ? a : new Set(a).add(ativo.id)));
+  }, [pathname, user?.role]);
 
   /**
    * `colapsado` é um parâmetro e não o estado global de propósito: recolher a
@@ -79,83 +83,38 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Navegação enxuta: primário sempre visível + "Mais" recolhível */}
+      {/*
+        Seis grupos (ver NAV_GROUPS). Um grupo com um ecrã só é um link; com
+        vários, abre-se para os mostrar. Recolhido, cada grupo é um ícone que
+        leva ao primeiro ecrã dele.
+      */}
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-        {(() => {
-          const renderLink = (href: string) => {
-            const item = NAV_BY_HREF[href];
-            if (!item) return null;
-            const Icon = iconMap[item.icon] ?? LayoutDashboard;
-            const badge = badges[href] ?? 0;
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileSidebarOpen(false)}
-                className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive(href)
-                    ? "bg-piquet text-ink font-semibold shadow-sm"
-                    : "text-ink-muted hover:bg-ink-soft hover:text-white",
-                  colapsado && "justify-center px-2"
-                )}
-                title={colapsado ? item.label : undefined}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!colapsado && <span className="truncate">{item.label}</span>}
-                {/*
-                  Recolhido, o menu só tem ícones: aí a bolinha vira um ponto
-                  sobre o ícone — o número não caberia e ficaria ilegível.
-                */}
-                {badge > 0 && (colapsado ? (
-                  <span
-                    className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ink-alert ring-2 ring-ink-deep"
-                    aria-hidden
-                  />
-                ) : (
-                  <span className={cn(
-                    "ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold",
-                    "inline-flex items-center justify-center tabular-nums",
-                    // Ativo, o fundo já é dourado: o vermelho vivo por cima
-                    // vibra, por isso ali usa-se o contraste do próprio item.
-                    isActive(href) ? "bg-ink text-piquet" : "bg-ink-alert text-white",
+        {grupos.map((g) => (
+          <Grupo key={g.id} g={g} colapsado={colapsado} aberto={abertos.has(g.id) || g.ativo}
+            alternar={() => setAbertos((a) => { const n = new Set(a); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })}
+            fechar={() => setMobileSidebarOpen(false)} />
+        ))}
+        {rodape.length > 0 && (
+          <div className="pt-3 mt-3 border-t border-ink-border space-y-1">
+            {rodape.map((href) => {
+              const item = NAV_BY_HREF[href];
+              if (!item) return null;
+              const Icon = iconMap[item.icon] ?? LayoutDashboard;
+              return (
+                <Link key={href} href={href} onClick={() => setMobileSidebarOpen(false)}
+                  title={colapsado ? item.label : undefined}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                    estaEm(pathname, href) ? "bg-piquet text-ink font-semibold" : "text-ink-muted hover:bg-ink-soft hover:text-white",
+                    colapsado && "justify-center px-2",
                   )}>
-                    {rotuloBadge(badge)}
-                  </span>
-                ))}
-                <span className="sr-only">
-                  {badge > 0 ? `${badge} por tratar` : ""}
-                </span>
-              </Link>
-            );
-          };
-
-          const primary = NAV_PRIMARY.filter(canSee);
-          const secondary = NAV_SECONDARY.filter(canSee);
-
-          // Recolhido (só ícones): mostra tudo em lista, sem "Mais".
-          if (colapsado) return [...primary, ...secondary].map(renderLink);
-
-          return (
-            <>
-              {primary.map(renderLink)}
-              {secondary.length > 0 && (
-                <div className="pt-1">
-                  <button
-                    onClick={() => setShowMore((v) => !v)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink-muted hover:bg-ink-soft hover:text-white transition-colors"
-                    aria-expanded={showMore}
-                  >
-                    <MoreHorizontal className="h-5 w-5 shrink-0" />
-                    <span className="flex-1 text-left">Mais</span>
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", showMore && "rotate-180")} />
-                  </button>
-                  {showMore && <div className="mt-1 space-y-1">{secondary.map(renderLink)}</div>}
-                </div>
-              )}
-            </>
-          );
-        })()}
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {!colapsado && <span className="truncate">{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* Rodapé / utilizador */}
@@ -207,5 +166,67 @@ export function Sidebar() {
         {sidebarContent(false)}
       </aside>
     </>
+  );
+}
+
+/** O número de assuntos à espera; recolhido, um ponto sobre o ícone. */
+function Badge({ n, colapsado, sobreAtivo }: { n: number; colapsado: boolean; sobreAtivo: boolean }) {
+  if (n <= 0) return null;
+  if (colapsado) {
+    return <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-ink-alert ring-2 ring-ink-deep" aria-hidden />;
+  }
+  return (
+    <span className={cn(
+      "ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold inline-flex items-center justify-center tabular-nums",
+      // Ativo, o fundo já é dourado: o vermelho vivo por cima vibra.
+      sobreAtivo ? "bg-ink text-piquet" : "bg-ink-alert text-white",
+    )}>
+      {rotuloBadge(n)}
+    </span>
+  );
+}
+
+function Grupo({ g, colapsado, aberto, alternar, fechar }: {
+  g: GrupoVisivel; colapsado: boolean; aberto: boolean; alternar: () => void; fechar: () => void;
+}) {
+  const Icon = iconMap[g.icon] ?? LayoutDashboard;
+  const simples = g.filhos.length === 1 || colapsado;
+  const base = "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors";
+  const estilo = (ativo: boolean) => ativo ? "bg-piquet text-ink font-semibold shadow-sm" : "text-ink-muted hover:bg-ink-soft hover:text-white";
+
+  if (simples) {
+    return (
+      <Link href={g.destino} onClick={fechar} title={colapsado ? g.label : undefined}
+        className={cn(base, estilo(g.ativo), colapsado && "justify-center px-2")}>
+        <Icon className="h-5 w-5 shrink-0" />
+        {!colapsado && <span className="truncate">{g.label}</span>}
+        <Badge n={g.badge} colapsado={colapsado} sobreAtivo={g.ativo} />
+        <span className="sr-only">{g.badge > 0 ? `${g.badge} por tratar` : ""}</span>
+      </Link>
+    );
+  }
+
+  return (
+    <div>
+      <button onClick={alternar} aria-expanded={aberto}
+        className={cn(base, "w-full", g.ativo ? "text-white" : "text-ink-muted hover:bg-ink-soft hover:text-white")}>
+        <Icon className={cn("h-5 w-5 shrink-0", g.ativo && "text-piquet")} />
+        <span className="flex-1 text-left truncate">{g.label}</span>
+        {!aberto && <Badge n={g.badge} colapsado={false} sobreAtivo={false} />}
+        <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", aberto && "rotate-180")} />
+      </button>
+      {aberto && (
+        <div className="mt-1 ml-4 pl-3 border-l border-ink-border space-y-1">
+          {g.filhos.map((f) => (
+            <Link key={f.href} href={f.href} onClick={fechar}
+              className={cn("relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors", estilo(f.ativo))}>
+              <span className="truncate">{f.label}</span>
+              <Badge n={f.badge} colapsado={false} sobreAtivo={f.ativo} />
+              <span className="sr-only">{f.badge > 0 ? `${f.badge} por tratar` : ""}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

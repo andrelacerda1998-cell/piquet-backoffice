@@ -149,7 +149,8 @@ async function recolherPendentes(): Promise<{
 async function recolherServicos(): Promise<{ avisos: Pendente[]; fonte: string }> {
   try {
     if (servicesFromLaravel()) {
-      const todos = await fetchAllLaravelServices();
+      // Fresco: um aviso não pode sair de uma leitura com um minuto.
+      const todos = await fetchAllLaravelServices({ fresco: true });
       /*
         A data do último concluído vai para o registo porque "não há avisos
         porque não aconteceu nada" e "não há avisos porque nenhum serviço é

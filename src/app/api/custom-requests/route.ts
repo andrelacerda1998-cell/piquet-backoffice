@@ -1,5 +1,5 @@
 import { apiOk, withStaff } from "../_lib/handler";
-import { servicesFromLaravel, fetchAllLaravelServices } from "../_lib/laravelServices";
+import { servicesFromLaravel } from "../_lib/laravelServices";
 import { laravelAdminRequest } from "@/lib/laravelAdmin";
 
 /**
@@ -50,16 +50,24 @@ const ESTADO: Record<string, string> = {
 export const GET = withStaff(async () => {
   if (!servicesFromLaravel()) return apiOk([]);
 
-  const todos = await fetchAllLaravelServices();
   /*
-    `fetchAllLaravelServices` devolve a forma que o resto do backoffice usa e
-    perde os campos do pedido personalizado pelo caminho. Uma segunda leitura
-    crua é mais barata do que alargar aquele mapeamento a campos que só este
-    ecrã precisa.
-  */
-  const crus = await laravelAdminRequest<{ items: ServicoCru[] }>("/v1/admin/services?per_page=100");
+    Só os personalizados (`is_custom=1`), de TODAS as páginas.
 
-  const personalizados = (crus.items ?? []).filter((s) => s.is_custom);
+    Lia antes o histórico inteiro para nada (o resultado não era usado) e
+    depois só os 100 serviços mais recentes, onde procurava os
+    personalizados: um mais antigo desaparecia do ecrã. E o sino pede isto a
+    cada 45 segundos, a cada pessoa com o backoffice aberto. Um Laravel sem o
+    filtro devolve todos e filtra-se aqui, como antes.
+  */
+  const crus: ServicoCru[] = [];
+  for (let pagina = 1; pagina <= 20; pagina++) {
+    const r = await laravelAdminRequest<{ items: ServicoCru[]; meta?: { last_page?: number } }>(
+      `/v1/admin/services?is_custom=1&per_page=100&page=${pagina}`,
+    );
+    crus.push(...(r.items ?? []));
+    if (pagina >= (r.meta?.last_page ?? 1)) break;
+  }
+  const personalizados = crus.filter((s) => s.is_custom);
 
   return apiOk(personalizados.map((s) => ({
     id: String(s.id),

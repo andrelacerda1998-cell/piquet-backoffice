@@ -151,6 +151,11 @@ const LARAVEL_STATUS_MAP: Record<string, ServiceStatus> = {
   Archived: "arquivado",
 };
 
+/** O estado do Laravel no vocabulário do backoffice. */
+export function estadoDoBackoffice(raw: string | null | undefined): ServiceStatus {
+  return mapStatus(raw);
+}
+
 function mapStatus(raw: string | null | undefined): ServiceStatus {
   const s = str(raw).trim();
   if (DASHBOARD_STATUSES.has(s as ServiceStatus)) return s as ServiceStatus;
@@ -280,21 +285,82 @@ export interface ServicesQuery {
  * isso pedir 1000 devolve 100 e cala-se. Foi assim que a cópia dos técnicos
  * andou meses a ver 100 de 438.
  */
-export async function fetchAllLaravelServices(): Promise<ServiceRequest[]> {
-  const todos: ServiceRequest[] = [];
-  let pagina = 1;
-  let ultima = 1;
+export async function fetchAllLaravelServices(opts: { fresco?: boolean } = {}): Promise<ServiceRequest[]> {
+  /*
+    UMA leitura por minuto, partilhada.
 
-  do {
-    const res = await laravelAdminRequest<LaravelServicesResponse>(
-      `/v1/admin/services?per_page=100&page=${pagina}`,
-    );
-    const itens = res.items ?? [];
-    todos.push(...itens.map(mapLaravelService));
-    ultima = res.meta?.last_page ?? (itens.length === 100 ? pagina + 1 : pagina);
-    pagina++;
-  } while (pagina <= ultima && pagina <= 100); // trava: 10 000 serviços
+    Seis ecrãs agregam o histórico inteiro (resumo financeiro, contagens da
+    Visão Geral, desempenho, qualidade, avisos…) e cada pedido percorria-o de
+    novo, página a página e em série. A Visão Geral pedia-o duas vezes ao
+    mesmo tempo. Agora: um minuto de cache por instância do servidor, e quem
+    chega enquanto outra leitura está a meio espera por ela em vez de abrir
+    outra. `fresco` (o cron dos avisos) passa à frente da cache.
 
+    Devolve uma cópia: quem ordena ou acrescenta não estraga a de todos.
+  */
+  if (!opts.fresco && cacheDosServicos && Date.now() - cacheDosServicos.em < CACHE_DOS_SERVICOS_MS) {
+    return cacheDosServicos.servicos.slice();
+  }
+  if (!opts.fresco && leituraACaminho) return (await leituraACaminho).slice();
+
+  const leitura = lerTodasAsPaginas().then((servicos) => {
+    cacheDosServicos = { em: Date.now(), servicos };
+    return servicos;
+  });
+  if (!opts.fresco) leituraACaminho = leitura;
+  try {
+    return (await leitura).slice();
+  } finally {
+    if (leituraACaminho === leitura) leituraACaminho = null;
+  }
+}
+
+const CACHE_DOS_SERVICOS_MS = 60_000;
+/** 300 páginas de 100: 30 000 serviços. Passando disto, estas contas têm de ir para o Laravel. */
+export const LIMITE_DE_PAGINAS = 300;
+const PAGINAS_EM_PARALELO = 5;
+let cacheDosServicos: { em: number; servicos: ServiceRequest[] } | null = null;
+let leituraACaminho: Promise<ServiceRequest[]> | null = null;
+
+/** Esquece a cache (testes, e depois de uma escrita que a deva invalidar). */
+export function _esquecerServicos(): void {
+  cacheDosServicos = null;
+  leituraACaminho = null;
+}
+
+async function lerTodasAsPaginas(): Promise<ServiceRequest[]> {
+  const pagina = (n: number) => laravelAdminRequest<LaravelServicesResponse>(`/v1/admin/services?per_page=100&page=${n}`);
+  const primeira = await pagina(1);
+  const todos = (primeira.items ?? []).map(mapLaravelService);
+
+  // Sem `meta` (um backend antigo): vai página a página enquanto vierem cheias.
+  if (!primeira.meta?.last_page) {
+    let n = 2;
+    let ultimas = primeira.items ?? [];
+    while (ultimas.length === 100 && n <= LIMITE_DE_PAGINAS) {
+      ultimas = (await pagina(n)).items ?? [];
+      todos.push(...ultimas.map(mapLaravelService));
+      n++;
+    }
+    return todos;
+  }
+
+  const ultima = primeira.meta.last_page;
+  if (ultima > LIMITE_DE_PAGINAS) {
+    /*
+      Era um corte em silêncio aos 10 000 serviços: as contas ficavam abaixo
+      do real sem ninguém saber. Continua a haver um teto — percorrer o
+      histórico inteiro a cada minuto não escala para sempre — mas agora diz-se.
+    */
+    console.error(`[serviços] o Laravel tem ${ultima} páginas e só se leem ${LIMITE_DE_PAGINAS}: as agregações deixam de estar completas. Passar estas contas para o Laravel.`);
+  }
+
+  // As restantes em paralelo, cinco de cada vez, pela ordem certa.
+  const resto = Array.from({ length: Math.min(ultima, LIMITE_DE_PAGINAS) - 1 }, (_, i) => i + 2);
+  for (let i = 0; i < resto.length; i += PAGINAS_EM_PARALELO) {
+    const lote = await Promise.all(resto.slice(i, i + PAGINAS_EM_PARALELO).map(pagina));
+    for (const r of lote) todos.push(...(r.items ?? []).map(mapLaravelService));
+  }
   return todos;
 }
 
