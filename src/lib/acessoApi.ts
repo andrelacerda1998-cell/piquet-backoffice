@@ -81,6 +81,7 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),
   "GET /custom-requests": qualquer("view_services"),
+  "GET /operacoes/ao-vivo": qualquer("view_services"),
 
   // ---------------------------------------------------------- técnicos
   "GET /technicians": qualquer("view_technicians"),

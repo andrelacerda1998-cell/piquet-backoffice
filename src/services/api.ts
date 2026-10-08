@@ -140,6 +140,8 @@ const LIVE_EXACT = new Set<string>([
   // Avaliacoes reais dos clientes (services.rating_by_customer).
   // Funil, estados e tempos, dos servicos reais do Laravel.
   "/services/operacao",
+  // Operações ao vivo: pedidos, oferta e liquidez do Laravel.
+  "/operacoes/ao-vivo",
   "/quality",
   "/technicians/onboarding",
   "/technicians/coverage",
@@ -355,6 +357,8 @@ const REAL_DATA = new Set<string>([
   // Avaliacoes reais dos clientes (services.rating_by_customer).
   // Funil, estados e tempos, dos servicos reais do Laravel.
   "/services/operacao",
+  // Operações ao vivo: pedidos, oferta e liquidez do Laravel.
+  "/operacoes/ao-vivo",
   "/quality",
   "/technicians/onboarding",
   "/technicians/coverage",
