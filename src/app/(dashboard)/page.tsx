@@ -19,8 +19,8 @@ import type { Permission } from "@/types";
 import type { MetricValue } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
-import ObjetivosPage from "./objetivos/page";
-import RelatoriosPage from "./relatorios/page";
+import ObjetivosPage from "./objetivos/Objetivos";
+import RelatoriosPage from "./relatorios/Relatorios";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -368,13 +368,13 @@ export default function OverviewPage() {
                 {goals.length > 0 && (
                   <span>· <b className="text-text-primary">{goalsOnTrack}/{goals.length}</b> no bom caminho</span>
                 )}
-                <Link href="/objetivos" className="text-piquet-600 font-medium hover:underline">Gerir objetivos →</Link>
+                <Link href="/?tab=objetivos" onClick={() => setTab("objetivos")} className="text-piquet-600 font-medium hover:underline">Gerir objetivos →</Link>
               </div>
             }
           />
 
           {goals.length === 0 ? (
-            <Link href="/objetivos" className="card p-6 flex items-center gap-4 hover:shadow-elevated transition-shadow">
+            <Link href="/?tab=objetivos" onClick={() => setTab("objetivos")} className="card p-6 flex items-center gap-4 hover:shadow-elevated transition-shadow">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700 shrink-0"><Target className="h-5 w-5" /></span>
               <div>
                 <p className="font-medium text-text-primary">Define os objetivos do ano</p>
@@ -388,7 +388,7 @@ export default function OverviewPage() {
                 const pct = g.target ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
                 const willHit = g.projection >= g.target;
                 return (
-                  <Link key={g.id} href="/objetivos" className="card p-4 hover:shadow-elevated transition-shadow group">
+                  <Link key={g.id} href="/?tab=objetivos" onClick={() => setTab("objetivos")} className="card p-4 hover:shadow-elevated transition-shadow group">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-text-primary truncate group-hover:text-piquet-700 transition-colors">{g.label}</p>

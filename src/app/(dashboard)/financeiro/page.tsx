@@ -7,7 +7,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
-import ImpostosRhPage from "../impostos-rh/page";
+import ImpostosRhPage from "../impostos-rh/ImpostosRh";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
