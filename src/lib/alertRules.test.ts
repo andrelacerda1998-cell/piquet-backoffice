@@ -134,5 +134,52 @@ describe("gerarAlertas", () => {
     const b = gerarAlertas(sinais, AGORA + 3_600_000);
     expect(a[0].id).toBe(b[0].id);
   });
-});
 
+  describe("a operação, pedido a pedido", () => {
+    const pedido = { id: "318", cliente: "Marta", tipo: "Canalização", cidade: "Almada", desde: haDias(0) };
+
+    it("um pedido crítico nas Operações ao vivo é crítico aqui, e leva ao pedido", () => {
+      const [a] = gerarAlertas({ ...vazio, pedidosComAlerta: [{ ...pedido, nivel: "critico", motivo: "prazo_esgotado" }] }, AGORA);
+      expect(a.priority).toBe("critica");
+      expect(a.entityType).toBe("pedido");
+      expect(a.entityId).toBe("318");
+      expect(a.title).toContain("#318");
+    });
+
+    it("quando a bola está do lado do cliente não passa de média", () => {
+      const [a] = gerarAlertas({ ...vazio, pedidosComAlerta: [{ ...pedido, nivel: "critico", motivo: "cliente_a_escolher" }] }, AGORA);
+      expect(a.priority).toBe("media");
+    });
+
+    it("os 'info' não são alertas", () => {
+      expect(gerarAlertas({ ...vazio, pedidosComAlerta: [{ ...pedido, nivel: "info", motivo: "prazo_a_acabar" }] }, AGORA)).toEqual([]);
+    });
+
+    it("um pedido perdido só alerta nas primeiras 24 h, e só se ainda se pode salvar", () => {
+      const perdidos = [
+        { ...pedido, id: "1", desfecho: "sem_resposta", criadoEm: haDias(0) },
+        { ...pedido, id: "2", desfecho: "sem_resposta", criadoEm: haDias(2) },
+        { ...pedido, id: "3", desfecho: "cancelado", criadoEm: haDias(0) },
+        { ...pedido, id: "4", desfecho: "servido", criadoEm: haDias(0) },
+      ];
+      const r = gerarAlertas({ ...vazio, pedidosPerdidos: perdidos }, AGORA);
+      expect(r.map((a) => a.entityId)).toEqual(["1"]);
+      expect(r[0].priority).toBe("alta");
+      expect(r[0].recommendedAction).toContain("Ligar ao cliente");
+    });
+
+    it("uma falta provável é crítica: há um cliente à espera", () => {
+      const [a] = gerarAlertas({ ...vazio, faltasProvaveis: [{ servicoId: "309", tecnico: "Rui", cliente: "Ana", marcadoPara: haDias(0) }] }, AGORA);
+      expect(a.priority).toBe("critica");
+      expect(a.entityId).toBe("309");
+    });
+
+    it("um lote por aprovar sobe a alta ao fim de um dia", () => {
+      const r = gerarAlertas({ ...vazio, lotesPorAprovar: [
+        { id: "a", total: 120, criadoEm: haDias(0), criadoPor: "ana@piquet.pt" },
+        { id: "b", total: 80, criadoEm: haDias(2), criadoPor: null },
+      ] }, AGORA);
+      expect(Object.fromEntries(r.map((a) => [a.entityId, a.priority]))).toEqual({ a: "media", b: "alta" });
+    });
+  });
+});

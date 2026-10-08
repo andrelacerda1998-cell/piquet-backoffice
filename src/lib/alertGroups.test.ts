@@ -20,7 +20,7 @@ describe("agruparAlertas", () => {
     const r = agruparAlertas(leads(10));
     expect(r).toHaveLength(1);
     expect(r[0].id).toBe("grupo-leads-sem-resposta");
-    expect(r[0].title).toBe("10 pedidos sem resposta");
+    expect(r[0].title).toBe("10 contactos sem resposta");
   });
 
   it("herda a urgência mais alta — agrupar não pode suavizar o pior caso", () => {

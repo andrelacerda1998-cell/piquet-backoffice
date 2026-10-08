@@ -9,11 +9,11 @@ import { readFileSync } from "fs";
  * Este teste lê os destinos reais do ecrã de Alertas e confirma que cada um
  * existe mesmo, em vez de confiar na memória de quem escreveu.
  */
-const PAGINA = "src/app/(dashboard)/alertas/page.tsx";
+const PAGINA = "src/lib/alertLinks.ts";
 
 function destinosDoEcra(): Array<{ href: string }> {
   const src = readFileSync(PAGINA, "utf8");
-  const bloco = src.slice(src.indexOf("function destino("), src.indexOf("const GRUPOS"));
+  const bloco = src.slice(src.indexOf("export function destinoDoAlerta("));
   return [...bloco.matchAll(/href: ["`]([^"`$]+)/g)].map((m) => ({ href: m[1] }));
 }
 
@@ -24,6 +24,7 @@ const FICHEIRO: Record<string, string> = {
   "/leads": "src/app/(dashboard)/leads/page.tsx",
   "/marketing": "src/app/(dashboard)/marketing/page.tsx",
   "/suporte": "src/app/(dashboard)/suporte/page.tsx",
+  "/servicos": "src/app/(dashboard)/servicos/page.tsx",
 };
 
 describe("destinos dos alertas", () => {
@@ -60,13 +61,13 @@ describe("alertas de um registo específico abrem esse registo", () => {
     // Abrir só /leads não chegava: com dezenas de pedidos, encontrar aquele à
     // mão é o trabalho todo.
     const src = readFileSync(PAGINA, "utf8");
-    const bloco = src.slice(src.indexOf("function destino("), src.indexOf("const GRUPOS"));
+    const bloco = src.slice(src.indexOf("export function destinoDoAlerta("));
     expect(bloco).toMatch(/case "lead":[^]*?\/leads\?lead=\$\{a\.entityId/);
   });
 
   it("o alerta de ticket leva o id no URL", () => {
     const src = readFileSync(PAGINA, "utf8");
-    const bloco = src.slice(src.indexOf("function destino("), src.indexOf("const GRUPOS"));
+    const bloco = src.slice(src.indexOf("export function destinoDoAlerta("));
     expect(bloco).toMatch(/case "ticket":[^]*?\/suporte\?ticket=\$\{a\.entityId/);
   });
 

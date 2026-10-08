@@ -8,6 +8,8 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getEquipa, type PessoaDaEquipa } from "@/services/equipaService";
+import { getUltimasAcoes } from "@/services/acoesDaEquipaService";
+import { ListaDoHistorico } from "@/components/ui/HistoricoDaEquipa";
 import { ROLE_LABELS } from "@/lib/permissions";
 import type { UserRole } from "@/types";
 import { getFeeSettings, updateFeeSettings, type FeeSettings } from "@/services/feeSettingsService";
@@ -369,11 +371,15 @@ function AdminsTab() {
  * backoffice Next.js) usam um token partilhado, não uma sessão por pessoa —
  * por isso não têm um utilizador Laravel associado e não aparecem aqui com
  * "quem" fez o quê. Só ações feitas através do Filament (sessão por admin)
- * ficam com autor identificado. Isto resolve-se quando o backoffice tiver
- * autenticação multi-utilizador própria (ver nota na aba Administradores).
+ * ficam com autor identificado.
+ *
+ * Desde 08/10/2026 o que a equipa faz NO BACKOFFICE fica, com autor, em
+ * `acoes_da_equipa` (o withStaff grava cada escrita). Aparece primeiro; os
+ * audits do Laravel ficam por baixo, para o que se faz no Filament.
  */
 function AtividadeTab() {
   const { data, loading, error, refetch } = useAsyncData(() => getAudits(), []);
+  const { data: daEquipa } = useAsyncData(() => getUltimasAcoes(), []);
   const log = data?.items ?? [];
 
   const columns: Column<AuditEntry>[] = [
@@ -395,7 +401,19 @@ function AtividadeTab() {
         <h3 className="font-semibold">Atividade</h3>
         <DemoBadge endpoint="/audits" />
       </div>
-      <p className="text-sm text-text-secondary">Registo de atividade da equipa — quem fez o quê, quando, e o que mudou. Algumas ações ainda aparecem sem autor identificado.</p>
+      <p className="text-sm text-text-secondary">Quem fez o quê, e quando.</p>
+
+      <div className="card p-4">
+        <h4 className="text-sm font-semibold text-text-primary">No backoffice</h4>
+        <p className="text-xs text-text-secondary mb-2">Cada alteração feita aqui, com o nome de quem a fez e o motivo quando há.</p>
+        {!daEquipa ? <p className="text-sm text-text-muted">A carregar…</p>
+          : !daEquipa.ativo ? <p className="text-sm text-text-muted">Ainda não ligado: falta a tabela acoes_da_equipa no Supabase.</p>
+          : daEquipa.registos.length === 0 ? <p className="text-sm text-text-muted">Ainda sem ações registadas.</p>
+          : <ListaDoHistorico registos={daEquipa.registos} comRegisto />}
+      </div>
+
+      <h4 className="text-sm font-semibold text-text-primary pt-2">No Laravel (Filament e apps)</h4>
+      <p className="text-xs text-text-secondary">O que se faz pelo backoffice chega ao Laravel sem autor; o que se faz no Filament fica com ele.</p>
       <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
     </div>
   );

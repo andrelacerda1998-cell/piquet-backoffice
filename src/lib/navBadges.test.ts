@@ -81,8 +81,8 @@ describe("as rotas do menu batem certo com os destinos dos alertas", () => {
    * divergirem, a bolinha aparece num separador e o alerta abre noutro.
    */
   it("cada entityType do ecrã de Alertas tem a mesma rota no menu", () => {
-    const pagina = readFileSync("src/app/(dashboard)/alertas/page.tsx", "utf8");
-    const bloco = pagina.slice(pagina.indexOf("function destino("), pagina.indexOf("const GRUPOS"));
+    const pagina = readFileSync("src/lib/alertLinks.ts", "utf8");
+    const bloco = pagina.slice(pagina.indexOf("export function destinoDoAlerta("));
     const casos = [...bloco.matchAll(/case "([a-z]+)": return \{ href: [`"]([^"`?$]+)/g)];
     expect(casos.length).toBeGreaterThanOrEqual(6);
 
