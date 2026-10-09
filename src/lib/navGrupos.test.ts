@@ -8,8 +8,9 @@ describe("o menu em oito áreas", () => {
   });
 
   it("nenhum ecrã do menu antigo se perdeu: cada um está num grupo (ou no rodapé), e num só", () => {
-    // /recrutamento juntou-se a Técnicos › Aprovações (o endereço redireciona).
-    const antigos = ["/", "/alertas", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
+    // /recrutamento juntou-se a Técnicos › Aprovações e /alertas é um
+    // separador da Visão Geral (os dois endereços redirecionam).
+    const antigos = ["/", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
     const todos = [...NAV_GROUPS.flatMap((g) => g.filhos), ...NAV_RODAPE];
     for (const href of antigos) {
       expect(todos.filter((h) => h === href), href).toHaveLength(1);
@@ -26,7 +27,7 @@ describe("gruposVisiveis", () => {
   it("o CEO vê as oito, com os ecrãs todos", () => {
     const g = gruposVisiveis("ceo", "/", {});
     expect(g.map((x) => x.id)).toEqual(["inicio", "pedidos", "suporte", "clientes", "tecnicos", "mercado", "financeiro", "crescimento"]);
-    expect(g.find((x) => x.id === "inicio")!.filhos.map((f) => f.href)).toEqual(["/", "/alertas"]);
+    expect(g.find((x) => x.id === "inicio")!.filhos.map((f) => f.href)).toEqual(["/"]);
     expect(g.find((x) => x.id === "tecnicos")!.filhos.map((f) => f.href)).toEqual(["/tecnicos", "/qualidade"]);
   });
 
@@ -44,9 +45,14 @@ describe("gruposVisiveis", () => {
   });
 
   it("a soma dos avisos fica no grupo", () => {
-    const inicio = gruposVisiveis("ceo", "/", { "/alertas": 45, "/": 3 }).find((x) => x.id === "inicio")!;
-    expect(inicio.badge).toBe(48);
-    expect(inicio.filhos.find((f) => f.href === "/alertas")!.badge).toBe(45);
+    const clientes = gruposVisiveis("ceo", "/", { "/clientes": 2, "/leads": 8 }).find((x) => x.id === "clientes")!;
+    expect(clientes.badge).toBe(10);
+    expect(clientes.filhos.find((f) => f.href === "/leads")!.badge).toBe(8);
+  });
+
+  it("a Visão Geral leva o número dos alertas, que agora vivem nela", () => {
+    const inicio = gruposVisiveis("ceo", "/", { "/": 45 }).find((x) => x.id === "inicio")!;
+    expect(inicio.badge).toBe(45);
   });
 
   it("o Mercado aparece a quem vê pedidos ou técnicos, e não ao marketing", () => {

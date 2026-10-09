@@ -31,7 +31,7 @@ describe("contarPorRota", () => {
     // bolinha nenhuma no menu.
     const r = contarPorRota([a("kyc-fila", "media", "kyc", "4 documentos de técnicos por aprovar")]);
     expect(r["/tecnicos"]).toBe(1);
-    expect(r["/alertas"]).toBe(1);
+    expect(r["/"]).toBe(1);
   });
 
   it("um alerta agrupado conta pelos registos que representa", () => {
@@ -39,18 +39,18 @@ describe("contarPorRota", () => {
     expect(r["/leads"]).toBe(8);
   });
 
-  it("/alertas leva o total do que está à nossa espera", () => {
+  it("a Visão Geral leva o total do que está à nossa espera", () => {
     const r = contarPorRota([
       a("grupo-leads-sem-resposta", "critica", "leads", "8 pedidos sem resposta"),
       a("kyc-fila", "alta", "kyc"),
       a("despacho-por-decidir-1", "alta", "despacho"),
     ]);
-    expect(r["/alertas"]).toBe(10);
+    expect(r["/"]).toBe(10);
   });
 
   it("não inventa rotas para entidades desconhecidas", () => {
-    expect(contarPorRota([a("x", "critica", "desconhecido")])["/alertas"]).toBe(1);
-    expect(Object.keys(contarPorRota([a("x", "critica", "desconhecido")]))).toEqual(["/alertas"]);
+    expect(contarPorRota([a("x", "critica", "desconhecido")])["/"]).toBe(1);
+    expect(Object.keys(contarPorRota([a("x", "critica", "desconhecido")]))).toEqual(["/"]);
   });
 
   it("sem alertas não há bolinhas", () => {
@@ -106,6 +106,6 @@ describe("despacho", () => {
   it("um técnico à espera de decisão acende os Pedidos", () => {
     const r = contarPorRota([a("despacho-por-decidir-1", "alta", "lead")]);
     expect(r["/leads"]).toBe(1);
-    expect(r["/alertas"]).toBe(1);
+    expect(r["/"]).toBe(1);
   });
 });

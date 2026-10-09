@@ -84,8 +84,6 @@ export const SERVICE_STATUS_LABELS: Record<string, string> = {
 
 export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
-  // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
-  { href: "/alertas", label: "Alertas", icon: "Bell" },
   { href: "/servicos", label: "Pedidos", icon: "Wrench" },
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
@@ -102,6 +100,8 @@ export const NAV_ITEMS = [
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   // Separadores dentro dos grupos acima (consolidação 2026-07-20). Fora do
   // menu, mas acessíveis por ⌘K e por URL (deep-link ?tab=).
+  // Os Alertas são um separador da Visão Geral desde 09/10/2026 (/alertas redireciona).
+  { href: "/?tab=alertas", label: "Alertas", icon: "Bell" },
   { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
   { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
@@ -135,8 +135,8 @@ export const NAV_GROUPS: NavGroup[] = [
     diferentes juntaram-se (Mercado junta o SLA de Operações e a Cobertura
     de Técnicos).
   */
-  // O que precisa de ação hoje, e a lista completa dos alertas.
-  { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/", "/alertas"] },
+  // O que precisa de ação hoje; os Alertas são um separador dela.
+  { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/"] },
   // Os pedidos: ao vivo, a lista, os personalizados.
   { id: "pedidos", label: "Pedidos", icon: "Wrench", filhos: ["/servicos"] },
   { id: "suporte", label: "Suporte", icon: "Headphones", filhos: ["/suporte"] },
@@ -172,7 +172,7 @@ export const NAV_DEEPLINKS: string[] = [
   */
   "/chat", "/desenvolvimento",
   "/tarefas",
-  "/?tab=objetivos", "/?tab=relatorios",
+  "/?tab=alertas", "/?tab=objetivos", "/?tab=relatorios",
   "/servicos?tab=personalizados",
   "/tecnicos?tab=aprovacoes",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
