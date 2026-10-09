@@ -42,7 +42,7 @@ export async function getTechnicians(
 
 // getTechnicianMetrics/getTechniciansByCategory/getTechniciansByLocation/
 // getTopTechnicians/getCoverageVsDemand foram removidas (2026-07-29): eram
-// só usadas pela aba "Visão geral" de src/app/(dashboard)/tecnicos/page.tsx,
+// só usadas pela aba "Visão geral" de src/app/(dashboard)/tecnicos/TecnicosView.tsx,
 // que passou a usar os equivalentes reais em vendorsService.ts
 // (getVendorMetrics/getVendorsByCategory/getVendorsByLocation/getTopVendors/
 // getVendorCoverage). Nenhum outro ficheiro as importava.

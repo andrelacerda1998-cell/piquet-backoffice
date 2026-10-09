@@ -429,3 +429,9 @@ export async function getOnboardingTecnicos(): Promise<FunilDTO> {
     throw new Error("O funil de técnicos precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }
+
+/** Um técnico pelo id (suspenso ou não), para a ficha em /tecnicos/:id. `null` se não existir. */
+export async function getVendor(id: number | string): Promise<RealVendor | null> {
+  return apiGet<RealVendor | null>(`/technicians/${id}`, () => null).then((r) => r.data).catch(() => null);
+}
+

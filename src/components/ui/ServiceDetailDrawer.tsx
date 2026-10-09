@@ -185,8 +185,9 @@ function Seccao({ titulo, children, fechada = false }: { titulo: string; childre
   );
 }
 
-/** O endereço que abre a ficha de um cliente ou técnico na sua página. */
+/** O endereço da ficha de um cliente ou técnico: /clientes/412 com um id do Laravel. */
 function fichaHref(base: string, chave: string, id: string, nome?: string): string {
+  if (/^\d+$/.test(id)) return `${base.split("?")[0]}/${id}`;
   const url = new URL(base, "http://x");
   url.searchParams.set(chave, id);
   if (nome?.trim()) url.searchParams.set("q", nome.trim());

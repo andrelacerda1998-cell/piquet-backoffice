@@ -275,7 +275,7 @@ describe("avisosDeWorkspace", () => {
     const [a] = avisosDeWorkspace([tecnico()]);
     expect(a.titulo).toBe("Workspace de faturação por criar");
     expect(a.corpo).toBe("Adriano Rocha já entregou o acesso à AT");
-    expect(a.url).toBe("/tecnicos?tecnico=94");
+    expect(a.url).toBe("/tecnicos/94");
   });
 
   it("a AT não é condição para lhe criarmos o workspace", () => {

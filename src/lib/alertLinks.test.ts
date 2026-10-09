@@ -19,7 +19,7 @@ function destinosDoEcra(): Array<{ href: string }> {
 
 const FICHEIRO: Record<string, string> = {
   "/produto": "src/app/(dashboard)/produto/page.tsx",
-  "/tecnicos": "src/app/(dashboard)/tecnicos/page.tsx",
+  "/tecnicos": "src/app/(dashboard)/tecnicos/TecnicosView.tsx",
   "/financeiro": "src/app/(dashboard)/financeiro/page.tsx",
   "/leads": "src/app/(dashboard)/leads/page.tsx",
   "/marketing": "src/app/(dashboard)/marketing/page.tsx",
