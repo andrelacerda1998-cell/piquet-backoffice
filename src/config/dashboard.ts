@@ -86,10 +86,11 @@ export const NAV_ITEMS = [
   { href: "/", label: "Visão Geral", icon: "LayoutDashboard" },
   // Logo a seguir à Visão Geral: é a lista do que precisa de ação hoje.
   { href: "/alertas", label: "Alertas", icon: "Bell" },
-  { href: "/servicos", label: "Operações", icon: "Wrench" },
+  { href: "/servicos", label: "Pedidos", icon: "Wrench" },
   { href: "/qualidade", label: "Qualidade", icon: "ShieldCheck" },
   { href: "/clientes", label: "Clientes", icon: "Users" },
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
+  { href: "/mercado", label: "Mercado", icon: "Map" },
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
   { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
   { href: "/marketing", label: "Marketing", icon: "Megaphone" },
@@ -127,11 +128,23 @@ export interface NavGroup {
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-  { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/"] },
-  // O que se faz hoje: os pedidos ao vivo, o que pede ação, a qualidade e os tickets.
-  { id: "operacoes", label: "Operações", icon: "Wrench", filhos: ["/servicos", "/alertas", "/qualidade", "/suporte"] },
-  { id: "tecnicos", label: "Técnicos", icon: "HardHat", filhos: ["/tecnicos"] },
+  /*
+    Oito áreas (09/10/2026), pela ordem em que se usam: primeiro o que se faz
+    todos os dias, depois o que se vê à semana e ao mês. Cada área responde a
+    uma pergunta; os ecrãs que respondiam à mesma pergunta em sítios
+    diferentes juntaram-se (Mercado junta o SLA de Operações e a Cobertura
+    de Técnicos).
+  */
+  // O que precisa de ação hoje, e a lista completa dos alertas.
+  { id: "inicio", label: "Visão Geral", icon: "LayoutDashboard", filhos: ["/", "/alertas"] },
+  // Os pedidos: ao vivo, a lista, os personalizados.
+  { id: "pedidos", label: "Pedidos", icon: "Wrench", filhos: ["/servicos"] },
+  { id: "suporte", label: "Suporte", icon: "Headphones", filhos: ["/suporte"] },
   { id: "clientes", label: "Clientes", icon: "Users", filhos: ["/clientes", "/leads"] },
+  // Os técnicos e a qualidade do trabalho deles (avaliações, faltas).
+  { id: "tecnicos", label: "Técnicos", icon: "HardHat", filhos: ["/tecnicos", "/qualidade"] },
+  // A procura e a oferta: se os pedidos estão a ser servidos e onde falta gente.
+  { id: "mercado", label: "Mercado", icon: "Map", filhos: ["/mercado"] },
   { id: "financeiro", label: "Financeiro", icon: "Euro", filhos: ["/financeiro"] },
   { id: "crescimento", label: "Crescimento", icon: "Megaphone", filhos: ["/marketing", "/produto"] },
 ];
