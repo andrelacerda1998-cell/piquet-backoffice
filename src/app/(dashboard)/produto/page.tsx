@@ -145,6 +145,15 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay,
   );
 }
 
+/** Como se mostra o estado de cada pipeline (ver src/lib/saudeDasIntegracoes.ts). */
+const ESTADO_DA_INTEGRACAO: Record<string, { tone: string; label: string }> = {
+  ok: { tone: "bg-success-light text-success", label: "Operacional" },
+  falha: { tone: "bg-danger-light text-danger", label: "Em falha" },
+  atrasado: { tone: "bg-warning-light text-warning", label: "Atrasado" },
+  sem_avisos: { tone: "bg-surface-subtle text-text-secondary", label: "Sem avisos" },
+  nunca: { tone: "bg-surface-subtle text-text-secondary", label: "Nunca correu" },
+};
+
 export default function ProdutoPage() {
   // Lê ?tab= para os alertas poderem apontar direto (ex.: Integrações).
   const [tab, setTab] = useTabParam("apps");
@@ -327,10 +336,8 @@ export default function ProdutoPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Pipelines de dados</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(health?.jobs ?? []).map((j) => {
-                  const tone = j.lastRunOk === null
-                    ? "bg-surface-subtle text-text-secondary"
-                    : j.lastRunOk ? "bg-success-light text-success" : "bg-danger-light text-danger";
-                  const label = j.lastRunOk === null ? "Nunca correu" : j.lastRunOk ? "Operacional" : "Em falha";
+                  const estado = j.estado ?? (j.lastRunOk === null ? "nunca" : j.lastRunOk ? "ok" : "falha");
+                  const { tone, label } = ESTADO_DA_INTEGRACAO[estado];
                   return (
                     <div key={j.id} className="card p-4 space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -346,8 +353,17 @@ export default function ProdutoPage() {
                       <p className="text-xs text-text-secondary">
                         {j.lastRunAt
                           ? <>Última execução {formatDateTime(j.lastRunAt)} · {j.lastUpserted} registos{!j.lastRunOk && j.lastDetail ? <> · <span className="text-danger">{j.lastDetail.slice(0, 120)}</span></> : null}</>
-                          : "Sem execuções registadas — a primeira fica registada no próximo ciclo."}
+                          : estado === "sem_avisos" ? "Nenhum aviso do Payshop recebido." : "Sem execuções registadas — a primeira fica registada no próximo ciclo."}
                       </p>
+                      {estado === "sem_avisos" && (
+                        <p className="text-xs text-text-muted">
+                          O Payshop só avisa as ordens criadas com o URL do aviso, que o Laravel junta quando tem
+                          PAYSHOP_SDK_NOTIFICATION_URL definida. Até lá o cron diário das 06:30 traz tudo na mesma.
+                        </p>
+                      )}
+                      {estado === "atrasado" && (
+                        <p className="text-xs text-warning">Não corre há mais de um dia: o cron devia ter corrido entretanto.</p>
+                      )}
                     </div>
                   );
                 })}
