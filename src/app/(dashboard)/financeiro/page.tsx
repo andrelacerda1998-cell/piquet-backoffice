@@ -885,7 +885,7 @@ export default function FinancePage() {
                   )}
                 </p>
                 <span className="inline-flex items-center gap-1.5 text-xs text-text-muted shrink-0">
-                  <RefreshCw className="h-3.5 w-3.5" /> Diário às 06:30 + webhook em tempo real
+                  <RefreshCw className="h-3.5 w-3.5" /> Diário às 06:30, e a cada aviso do Payshop quando ligado
                 </span>
               </div>
 

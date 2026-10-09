@@ -56,6 +56,8 @@ function demoGrowth(): AppGrowth {
 
 /* ---------------------- Saúde das integrações (cron_runs) ---------------------- */
 
+import type { EstadoDaIntegracao } from "@/lib/saudeDasIntegracoes";
+
 export interface IntegrationJob {
   id: string;
   name: string;
@@ -67,6 +69,8 @@ export interface IntegrationJob {
   lastUpserted: number;
   lastOkAt: string | null;
   consecutiveFailures: number;
+  /** ok, falha, atrasado (diário sem correr há >26 h), sem_avisos (aviso há >7 dias) ou nunca. */
+  estado?: EstadoDaIntegracao;
 }
 export interface IntegrationsStatus {
   jobs: IntegrationJob[];
