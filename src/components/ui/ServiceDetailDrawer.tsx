@@ -8,14 +8,15 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2 } from "lucide-react";
+import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
 import { refundAppPayment } from "@/services/financeService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
-import { getFotosDoCliente, getDetalheDoServico, type FotoDoCliente } from "@/services/dashboardService";
+import { getFotosDoCliente, getDetalheDoServico, acaoDoPedido, type FotoDoCliente } from "@/services/dashboardService";
+import { DespacharPersonalizado } from "@/components/ui/DespacharPersonalizado";
 import type { CandidatoLaravel, DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 import { comIntervalos, textoDoEvento } from "@/lib/historicoPedido";
 
@@ -75,7 +76,7 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <AcoesDoPedido service={service} detalhe={detalhe.detalhe} />
+              <AcoesDoPedido service={service} detalhe={detalhe.detalhe} onMudou={() => detalhe.recarregar?.()} />
               <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
           </div>
@@ -152,7 +153,7 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
             </div>
             )}
           </Seccao>
-          <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa entidade="pedido" id={service.id} /></Seccao>
+          <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa key={detalhe.versao} entidade="pedido" id={service.id} /></Seccao>
           <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
         </div>
       </div>
@@ -235,11 +236,42 @@ function Pessoa({ papel, nome, telefone, semAcesso, ficha }: {
  * ligado a um pagamento; o Laravel recusa na mesma se o serviço ainda estiver
  * vivo, e a mensagem dele diz porquê.
  */
-function AcoesDoPedido({ service, detalhe }: { service: ServiceRequest; detalhe: DetalheDoServico | null }) {
+function AcoesDoPedido({ service, detalhe, onMudou }: { service: ServiceRequest; detalhe: DetalheDoServico | null; onMudou: () => void }) {
   const role = useAuthStore((s) => s.user?.role);
   const [aReembolsar, setAReembolsar] = useState(false);
+  const [aDespachar, setADespachar] = useState(false);
+  const [acao, setAcao] = useState<"fechar" | "tentar-cobrar" | "desistir-e-devolver" | null>(null);
   const uuid = detalhe?.pagamentoUuid;
-  const podeReembolsar = !!uuid && !!role && hasPermission(role, "refund_payments") && service.paymentStatus === "pago";
+  const gereDinheiro = !!role && hasPermission(role, "refund_payments");
+  const podeReembolsar = !!uuid && gereDinheiro && service.paymentStatus === "pago";
+  /*
+    As ações que dependem do estado no Laravel (backend #165):
+    - personalizado à espera da Piquet → Despachar;
+    - técnico terminou e o cliente não confirmou (Finished) → Fechar, que cobra
+      e paga ao técnico (o dinheiro ainda está só cativo, por isso não há
+      "reembolsar" aqui);
+    - cobrança falhada (ClosedPendingPayment) → Tentar cobrar, ou Desistir e
+      devolver.
+  */
+  const estado = detalhe?.estadoLaravel;
+  const podeDespachar = estado === "PendingReview" && !!detalhe?.personalizado && !!role && hasPermission(role, "edit_services");
+  const podeFechar = estado === "Finished" && gereDinheiro;
+  const porCobrar = estado === "ClosedPendingPayment" && gereDinheiro;
+
+  const correr = async (motivo?: string) => {
+    if (!acao) return;
+    try {
+      const r = await acaoDoPedido(service.id, acao, { motivo });
+      const fechou = r.status === "Closed";
+      toast(acao === "desistir-e-devolver" ? "Cobrança abandonada e dinheiro devolvido ao cliente."
+        : fechou ? "Cobrado e fechado: o técnico já recebeu."
+        : "O Payshop não aceitou a cobrança: o pedido ficou em pagamento por capturar.", fechou || acao === "desistir-e-devolver" ? "success" : "error");
+      setAcao(null);
+      onMudou();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível concluir.", "error");
+    }
+  };
 
   const copiar = async () => {
     const url = `${window.location.origin}/servicos?servico=${encodeURIComponent(service.id)}`;
@@ -252,11 +284,60 @@ function AcoesDoPedido({ service, detalhe }: { service: ServiceRequest; detalhe:
       <button onClick={copiar} className="btn-secondary text-xs py-1.5" title="Copiar a ligação deste pedido">
         <Link2 className="h-3.5 w-3.5" /> Copiar ligação
       </button>
+      {podeDespachar && (
+        <button onClick={() => setADespachar(true)} className="btn-primary text-xs py-1.5">
+          <Send className="h-3.5 w-3.5" /> Despachar
+        </button>
+      )}
+      {podeFechar && (
+        <button onClick={() => setAcao("fechar")} className="btn-primary text-xs py-1.5">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Fechar e cobrar
+        </button>
+      )}
+      {porCobrar && (
+        <>
+          <button onClick={() => setAcao("tentar-cobrar")} className="btn-primary text-xs py-1.5">
+            <RefreshCw className="h-3.5 w-3.5" /> Tentar cobrar
+          </button>
+          <button onClick={() => setAcao("desistir-e-devolver")} className="btn-secondary text-xs py-1.5 text-danger">
+            <Undo2 className="h-3.5 w-3.5" /> Desistir e devolver
+          </button>
+        </>
+      )}
       {podeReembolsar && (
         <button onClick={() => setAReembolsar(true)} className="btn-secondary text-xs py-1.5 text-danger">
           <Undo2 className="h-3.5 w-3.5" /> Reembolsar
         </button>
       )}
+      {detalhe?.personalizado && (
+        <DespacharPersonalizado
+          open={aDespachar}
+          onClose={() => setADespachar(false)}
+          servicoId={service.id}
+          descricao={detalhe.personalizado.descricao}
+          categoriasDoCliente={detalhe.personalizado.categorias}
+          onDespachado={onMudou}
+        />
+      )}
+      <ConfirmDialog
+        open={acao !== null}
+        onClose={() => setAcao(null)}
+        onConfirm={correr}
+        title={acao === "fechar" ? `Fechar e cobrar o pedido #${service.id}?`
+          : acao === "tentar-cobrar" ? `Tentar cobrar de novo o pedido #${service.id}?`
+          : `Desistir da cobrança do pedido #${service.id}?`}
+        tone={acao === "desistir-e-devolver" ? "danger" : "default"}
+        confirmLabel={acao === "fechar" ? "Fechar e cobrar" : acao === "tentar-cobrar" ? "Tentar cobrar" : "Desistir e devolver"}
+        description={
+          acao === "fechar" ? <>O técnico deu o trabalho por terminado e o cliente não confirmou. Vais cobrar <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b> ao cliente e pagar ao técnico. Se o Payshop recusar, o pedido fica em pagamento por capturar.</>
+          : acao === "tentar-cobrar" ? <>Volta a pedir ao Payshop a cobrança de <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b>. Se passar, o pedido fecha e o técnico recebe.</>
+          : <>A cobrança não passa. O pedido é cancelado, o cliente recebe de volta o crédito e a pré-autorização, e o técnico <b className="text-text-primary">não</b> é pago. Não se desfaz.</>
+        }
+        requireReason={acao !== "tentar-cobrar"}
+        minReason={MOTIVO_MINIMO}
+        reasonLabel={acao === "fechar" ? "Porque é que estás a fechar sem o cliente confirmar?" : "Porque é que estás a desistir da cobrança?"}
+        reasonPlaceholder={acao === "fechar" ? "Ex.: cliente confirmou por telefone que o trabalho ficou feito" : "Ex.: cartão recusado três vezes; cliente sem outro meio de pagamento"}
+      />
       <ConfirmDialog
         open={aReembolsar}
         onClose={() => setAReembolsar(false)}
@@ -345,11 +426,13 @@ function tempoDeResposta(c: CandidatoLaravel): string | null {
  * cliente diz "ninguém pegou no meu pedido": se ninguém foi convidado, falta
  * gente na zona; se foram doze e nenhum respondeu, o problema é outro.
  */
-type EstadoDoDetalhe = { detalhe: DetalheDoServico | null; erro: string | null; aCarregar: boolean };
+type EstadoDoDetalhe = { detalhe: DetalheDoServico | null; erro: string | null; aCarregar: boolean; recarregar?: () => void; versao?: number };
 
 /** O detalhe do serviço (convites e histórico), lido uma vez por painel. */
 function useDetalhe(id: string): EstadoDoDetalhe {
   const [estado, setEstado] = useState<EstadoDoDetalhe>({ detalhe: null, erro: null, aCarregar: true });
+  // Depois de uma ação (despachar, fechar…) o pedido lê-se outra vez.
+  const [versao, setVersao] = useState(0);
   useEffect(() => {
     let vivo = true;
     setEstado({ detalhe: null, erro: null, aCarregar: true });
@@ -357,8 +440,8 @@ function useDetalhe(id: string): EstadoDoDetalhe {
       .then((d) => vivo && setEstado({ detalhe: d, erro: null, aCarregar: false }))
       .catch((e) => vivo && setEstado({ detalhe: null, erro: e instanceof Error ? e.message : "Não foi possível ler o serviço.", aCarregar: false }));
     return () => { vivo = false; };
-  }, [id]);
-  return estado;
+  }, [id, versao]);
+  return { ...estado, recarregar: () => setVersao((v) => v + 1), versao };
 }
 
 function Matching({ detalhe: { detalhe, erro, aCarregar } }: { detalhe: EstadoDoDetalhe }) {

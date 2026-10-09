@@ -105,14 +105,14 @@ export const LIMITES = {
 
 /** O que fazer em cada alerta das Operações ao vivo (o motivo vem do Laravel). */
 const ACAO_DO_MOTIVO: Record<string, { titulo: string; accao: string; doCliente?: boolean }> = {
-  personalizado_por_rever: { titulo: "pedido personalizado à espera da Piquet", accao: "Definir a duração e as áreas (no Filament) para os convites saírem." },
+  personalizado_por_rever: { titulo: "pedido personalizado à espera da Piquet", accao: "Despachar no pedido: definir a duração e as categorias para os convites saírem." },
   ninguem_convidado: { titulo: "ninguém foi convidado", accao: "Não há técnicos para este pedido: ligar ao cliente antes que falhe." },
   ninguem_a_responder: { titulo: "ninguém está a responder", accao: "Ligar a técnicos da zona, ou ao cliente para propor outra hora." },
   prazo_esgotado: { titulo: "o prazo acabou", accao: "Ligar já ao cliente: o pedido vai falhar a qualquer momento." },
   prazo_a_acabar: { titulo: "o prazo está a acabar", accao: "Ver os convidados e puxar por quem ainda não respondeu." },
   cliente_a_escolher: { titulo: "o cliente ainda não escolheu", accao: "Já há quem aceite; lembrar o cliente de escolher e pagar.", doCliente: true },
-  pagamento_por_capturar: { titulo: "pagamento por capturar", accao: "Trabalho feito e dinheiro por entrar: tentar cobrar de novo no Filament." },
-  cliente_nao_confirmou: { titulo: "o cliente não confirmou o fim", accao: "Perguntar ao cliente se o trabalho ficou feito.", doCliente: true },
+  pagamento_por_capturar: { titulo: "pagamento por capturar", accao: "Trabalho feito e dinheiro por entrar: \"Tentar cobrar\" no pedido, ou desistir e devolver." },
+  cliente_nao_confirmou: { titulo: "o cliente não confirmou o fim", accao: "Perguntar ao cliente se o trabalho ficou feito; se sim, \"Fechar e cobrar\" no pedido.", doCliente: true },
 };
 
 /** Desfechos de um pedido perdido que ainda se podem salvar com uma chamada. */

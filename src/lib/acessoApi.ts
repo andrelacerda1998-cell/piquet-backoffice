@@ -79,6 +79,12 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /services/counts": STAFF, // página inicial
   "GET /services/operacao": qualquer("view_services"),
   "GET /services/[id]": qualquer("view_services"),
+  // Ações que vivem no Laravel (backend #165). Despachar é operação; fechar
+  // (cobra) e tentar cobrar / desistir e devolver mexem no dinheiro do cliente.
+  "POST /services/[id]/despachar": qualquer("edit_services"),
+  "POST /services/[id]/fechar": qualquer("refund_payments"),
+  "POST /services/[id]/tentar-cobrar": qualquer("refund_payments"),
+  "POST /services/[id]/desistir-e-devolver": qualquer("refund_payments"),
   "PUT /services/[id]": qualquer("edit_services"),
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),

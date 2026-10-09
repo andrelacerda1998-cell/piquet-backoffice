@@ -487,6 +487,9 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   */
   /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/services\/[^/]+\/fotos$/, // media do Laravel, com URL assinado
+  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
+  /^\/customers\/\d+$/, // um cliente pelo id (Laravel)
+  /^\/technicians\/\d+$/, // um técnico pelo id (Laravel)
   /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
 ];
@@ -551,6 +554,9 @@ export const _LISTAS = { LIVE_EXACT, REAL_DATA } as const;
  */
 export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/services\/[^/]+\/fotos$/, // fotos que o cliente anexou
+  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
+  /^\/customers\/\d+$/, // um cliente pelo id
+  /^\/technicians\/\d+$/, // um técnico pelo id
   /^\/services\/[^/]+$/, // /services/:id (detalhe/write-back)
   /^\/tax\/obligations\/[^/]+\/pay$/, // marcar obrigação paga
   /^\/finance\/payouts\/[^/]+\/process$/, // processar pagamento

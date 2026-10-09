@@ -1,4 +1,4 @@
-import { apiGet } from "./api";
+import { apiGet, apiPost } from "./api";
 import { mockData } from "@/mocks/data";
 import { applyFiltersToServices, paginateArray, sortArray } from "@/lib/filters";
 import type {
@@ -137,10 +137,29 @@ import type { DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 export async function getDetalheDoServico(id: string): Promise<DetalheDoServico | null> {
   return apiGet<DetalheDoServico | null>(`/services/${id}/detalhe`, () => {
     const servico = mockData.services.find((s) => s.id === id);
-    return servico ? { servico, candidatos: [], eventos: [], contactos: { cliente: null, tecnico: null }, pagamentoUuid: null } : null;
+    return servico ? { servico, candidatos: [], eventos: [], contactos: { cliente: null, tecnico: null }, pagamentoUuid: null, estadoLaravel: null, personalizado: null } : null;
   }).then((r) => r.data);
 }
 
 export async function getFotosDoCliente(servicoId: string): Promise<FotoDTO[]> {
   return apiGet<FotoDTO[]>(`/services/${servicoId}/fotos`, () => []).then((r) => r.data);
+}
+
+/* ------------------------- Ações sobre um pedido ------------------------- */
+
+export type AcaoDoPedido = "despachar" | "fechar" | "tentar-cobrar" | "desistir-e-devolver";
+export interface ResultadoDaAcao { id: string; status: string; payment_status: string; convidados?: number }
+
+/**
+ * Despachar um personalizado, fechar, tentar cobrar, desistir e devolver
+ * (ver /api/services/:id/<acao>). Fechar e desistir pedem motivo.
+ */
+export async function acaoDoPedido(
+  id: string,
+  acao: AcaoDoPedido,
+  corpo: { motivo?: string; minutos?: number; areas?: number[] } = {},
+): Promise<ResultadoDaAcao> {
+  return apiPost<ResultadoDaAcao>(`/services/${id}/${acao}`, corpo, () => {
+    throw new Error("As ações sobre um pedido precisam da ligação ao Laravel.");
+  }).then((r) => r.data);
 }
