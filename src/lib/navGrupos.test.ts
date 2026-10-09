@@ -2,14 +2,15 @@ import { describe, it, expect } from "vitest";
 import { NAV_GROUPS, NAV_ITEMS, NAV_RODAPE } from "@/config/dashboard";
 import { estaEm, gruposVisiveis } from "./navGrupos";
 
-describe("o menu em seis grupos", () => {
-  it("são seis", () => {
-    expect(NAV_GROUPS).toHaveLength(6);
+describe("o menu em oito áreas", () => {
+  it("são oito", () => {
+    expect(NAV_GROUPS).toHaveLength(8);
   });
 
   it("nenhum ecrã do menu antigo se perdeu: cada um está num grupo (ou no rodapé), e num só", () => {
-    // /recrutamento juntou-se a Técnicos › Aprovações (o endereço redireciona).
-    const antigos = ["/", "/alertas", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
+    // /recrutamento juntou-se a Técnicos › Aprovações e /alertas é um
+    // separador da Visão Geral (os dois endereços redirecionam).
+    const antigos = ["/", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
     const todos = [...NAV_GROUPS.flatMap((g) => g.filhos), ...NAV_RODAPE];
     for (const href of antigos) {
       expect(todos.filter((h) => h === href), href).toHaveLength(1);
@@ -23,10 +24,11 @@ describe("o menu em seis grupos", () => {
 });
 
 describe("gruposVisiveis", () => {
-  it("o CEO vê os seis, com os ecrãs todos", () => {
+  it("o CEO vê as oito, com os ecrãs todos", () => {
     const g = gruposVisiveis("ceo", "/", {});
-    expect(g.map((x) => x.id)).toEqual(["inicio", "operacoes", "tecnicos", "clientes", "financeiro", "crescimento"]);
-    expect(g.find((x) => x.id === "operacoes")!.filhos.map((f) => f.href)).toEqual(["/servicos", "/alertas", "/qualidade", "/suporte"]);
+    expect(g.map((x) => x.id)).toEqual(["inicio", "pedidos", "suporte", "clientes", "tecnicos", "mercado", "financeiro", "crescimento"]);
+    expect(g.find((x) => x.id === "inicio")!.filhos.map((f) => f.href)).toEqual(["/"]);
+    expect(g.find((x) => x.id === "tecnicos")!.filhos.map((f) => f.href)).toEqual(["/tecnicos", "/qualidade"]);
   });
 
   it("o marketing não vê o Financeiro nem os ecrãs de operações que não são dele", () => {
@@ -36,16 +38,26 @@ describe("gruposVisiveis", () => {
   });
 
   it("um grupo só com parte dos ecrãs aponta para o primeiro que o perfil vê", () => {
-    // O suporte não vê Operações (view_services sim, mas…) — o destino é o primeiro visível.
-    const ops = gruposVisiveis("suporte", "/suporte", {}).find((x) => x.id === "operacoes")!;
-    expect(ops.destino).toBe(ops.filhos[0].href);
-    expect(ops.ativo).toBe(true);
+    // Gestão de técnicos não vê Qualidade (é do suporte): Técnicos leva à lista.
+    const tec = gruposVisiveis("gestao_tecnicos", "/tecnicos", {}).find((x) => x.id === "tecnicos")!;
+    expect(tec.destino).toBe(tec.filhos[0].href);
+    expect(tec.ativo).toBe(true);
   });
 
   it("a soma dos avisos fica no grupo", () => {
-    const ops = gruposVisiveis("ceo", "/", { "/alertas": 45, "/suporte": 3 }).find((x) => x.id === "operacoes")!;
-    expect(ops.badge).toBe(48);
-    expect(ops.filhos.find((f) => f.href === "/alertas")!.badge).toBe(45);
+    const clientes = gruposVisiveis("ceo", "/", { "/clientes": 2, "/leads": 8 }).find((x) => x.id === "clientes")!;
+    expect(clientes.badge).toBe(10);
+    expect(clientes.filhos.find((f) => f.href === "/leads")!.badge).toBe(8);
+  });
+
+  it("a Visão Geral leva o número dos alertas, que agora vivem nela", () => {
+    const inicio = gruposVisiveis("ceo", "/", { "/": 45 }).find((x) => x.id === "inicio")!;
+    expect(inicio.badge).toBe(45);
+  });
+
+  it("o Mercado aparece a quem vê pedidos ou técnicos, e não ao marketing", () => {
+    expect(gruposVisiveis("gestao_tecnicos", "/", {}).map((x) => x.id)).toContain("mercado");
+    expect(gruposVisiveis("marketing", "/", {}).map((x) => x.id)).not.toContain("mercado");
   });
 
   it("sem perfil, não há menu", () => {

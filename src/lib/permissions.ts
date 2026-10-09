@@ -27,10 +27,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: FULL_ACCESS,
 
   // Operações: gere serviços, estados, clientes/técnicos ao nível operacional.
+  // Vê os contactos (desde 09/10/2026): o trabalho é ligar ao cliente de um
+  // pedido parado e ao técnico que não aparece -- sem telefone não se faz.
   operacoes: [
     "view_dashboard", "view_services", "edit_services", "change_status",
     "destructive_actions", "view_customers", "view_technicians", "view_support",
-    "view_alerts", "export_data", "manage_technicians",
+    "view_alerts", "export_data", "manage_technicians", "view_personal_data",
   ],
 
   // Financeiro: finanças, impostos, folha e RH. Vê custos e salários.
@@ -55,6 +57,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   gestao_tecnicos: [
     "view_dashboard", "view_technicians", "view_services", "view_customers",
     "upload_documents", "view_alerts", "export_data", "manage_technicians",
+    // Liga aos técnicos (documentos, faltas): precisa do telefone.
+    "view_personal_data",
   ],
 
   // Developer: quadro de dev, produto/integrações (gated em view_dashboard).
@@ -81,6 +85,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/objetivos": ["view_dashboard"],
   "/produto": ["view_dashboard"],
   "/servicos-personalizados": ["view_services"],
+  "/mercado": ["view_services", "view_technicians"],
   "/recrutamento": ["view_employees", "view_technicians"],
   "/qualidade": ["view_support"],
   "/relatorios": ["export_data"],

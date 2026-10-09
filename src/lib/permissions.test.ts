@@ -58,6 +58,11 @@ describe("RBAC — isolamento por domínio", () => {
     expect(canAccessRoute("suporte", "/suporte")).toBe(true);
     expect(canAccessRoute("suporte", "/clientes")).toBe(true);
     expect(hasPermission("suporte", "view_personal_data")).toBe(true);
+    // Quem liga a clientes e técnicos vê os contactos; marketing e leitura não.
+    expect(hasPermission("operacoes", "view_personal_data")).toBe(true);
+    expect(hasPermission("gestao_tecnicos", "view_personal_data")).toBe(true);
+    expect(hasPermission("marketing", "view_personal_data")).toBe(false);
+    expect(hasPermission("colaborador", "view_personal_data")).toBe(false);
     expect(canAccessRoute("suporte", "/financeiro")).toBe(false);
     expect(hasPermission("suporte", "view_salaries")).toBe(false);
   });

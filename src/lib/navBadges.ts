@@ -58,10 +58,11 @@ export function contarPorRota(alertas: DashboardAlert[]): Record<string, number>
      */
     contas[rota] = (contas[rota] ?? 0) + quantosRepresenta(a);
   }
-  // Alertas: o total do que está à nossa espera, venha de onde vier.
+  // Visão Geral: o total do que está à nossa espera, venha de onde vier. É o
+  // número da fila "Precisa de ti" e do separador Alertas, que vivem nela.
   const total = alertas.filter(contaParaBadge)
     .reduce((s, a) => s + quantosRepresenta(a), 0);
-  if (total > 0) contas["/alertas"] = total;
+  if (total > 0) contas["/"] = total;
   return contas;
 }
 

@@ -307,6 +307,6 @@ export function avisosDeWorkspace(tecnicos: TecnicoParaAviso[]): Pendente[] {
       id: `workspace:${t.id}`,
       titulo: "Workspace de faturação por criar",
       corpo: `${t.nome?.trim() || `Técnico ${t.id}`} já entregou o acesso à AT`,
-      url: `/tecnicos?tecnico=${t.id}`,
+      url: `/tecnicos/${t.id}`,
     }));
 }

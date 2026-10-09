@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
@@ -21,6 +22,7 @@ import type { MetricValue } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import ObjetivosPage from "./objetivos/Objetivos";
+import AlertasPage from "./alertas/Alertas";
 import RelatoriosPage from "./relatorios/Relatorios";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
@@ -160,6 +162,7 @@ export default function OverviewPage() {
   const { data: leads } = useAsyncData(() => (pode("view_marketing", "view_customers") ? getLeads() : Promise.resolve([])), [role]);
   const { data: pendingDocs } = useAsyncData(() => (pode("view_technicians") ? getVendorDocuments("pending", 1, 1) : Promise.resolve(null)), [role]);
   const [tab, setTab] = useTabParam("resumo");
+  const [totalAlertas, setTotalAlertas] = useState<number | null>(null);
 
   if (loading && !gmvData) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -202,8 +205,14 @@ export default function OverviewPage() {
   const gmvMonthMetric = buildMetricValue(gmvMonth, gmvPrevMonth, false, undefined, "Payshop cobrado + serviços concluídos, no mês.");
   const commissionMetric = buildMetricValue(commissionMonth, commissionPrevMonth, false, undefined, "Receita da Piquet no mês.");
 
+  /*
+    Alertas é um separador da Visão Geral (09/10/2026): a lista completa do que
+    a fila "Precisa de ti" resume, ao lado dela. O número vem da fila (ou da
+    própria lista), sem uma leitura a mais.
+  */
   const TABS: TabDef[] = [
     { id: "resumo", label: "Resumo" },
+    ...(pode("view_alerts") ? [{ id: "alertas", label: "Alertas", count: totalAlertas || undefined }] : []),
     { id: "objetivos", label: "Objetivos do ano" },
     { id: "relatorios", label: "Relatórios" },
   ];
@@ -235,7 +244,7 @@ export default function OverviewPage() {
           com uma ação cada). Quem não vê alertas fica com os dois cartões de
           antes, de contactos e documentos.
         */}
-        {pode("view_alerts") ? <PrecisaDeTi /> : (leadsPorResponder.length > 0 || kycPendentes > 0) && (
+        {pode("view_alerts") ? <PrecisaDeTi onVerTodos={() => setTab("alertas")} onTotal={setTotalAlertas} /> : (leadsPorResponder.length > 0 || kycPendentes > 0) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {leadsPorResponder.length > 0 && (
               <Link href="/leads"
@@ -415,6 +424,7 @@ export default function OverviewPage() {
         </div>
         )}
 
+        {tab === "alertas" && pode("view_alerts") && <AlertasPage embutido onTotal={setTotalAlertas} />}
         {tab === "objetivos" && <ObjetivosPage />}
         {tab === "relatorios" && <RelatoriosPage />}
       </div>

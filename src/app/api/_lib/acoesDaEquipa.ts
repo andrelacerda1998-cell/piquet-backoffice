@@ -10,8 +10,9 @@ import type { StaffContext } from "./handler";
  * ação e retirado se ela falhar (o mesmo padrão dos lotes): assim nunca há
  * uma ação feita sem motivo guardado.
  */
-export type AcaoDaEquipa = "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento";
-export type Entidade = "cliente" | "tecnico" | "pagamento";
+export type AcaoDaEquipa =
+  | "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento" | "fechar_pedido" | "desistir_e_devolver";
+export type Entidade = "cliente" | "tecnico" | "pagamento" | "pedido";
 
 export interface RegistoDeAcao {
   id: string;

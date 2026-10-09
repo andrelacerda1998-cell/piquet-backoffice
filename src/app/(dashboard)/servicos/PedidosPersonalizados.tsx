@@ -8,7 +8,10 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import { getCustomRequests, type CustomRequest, type CustomRequestStatus } from "@/services/extrasService";
 import { formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { X, ArrowRight } from "lucide-react";
+import { X, ArrowRight, Send } from "lucide-react";
+import { useAuthStore } from "@/stores";
+import { hasPermission } from "@/lib/permissions";
+import { DespacharPersonalizado } from "@/components/ui/DespacharPersonalizado";
 
 /*
   Pedidos personalizados, como existem de verdade.
@@ -17,15 +20,15 @@ import { X, ArrowRight } from "lucide-react";
   técnicos com preço fixo e "enviava 3 opções para a app do cliente". O botão
   mostrava "3 opções enviadas" e nada saía do browser; havia até um "Simular
   escolha do cliente". O fluxo real é outro: o pedido nasce À ESPERA DA
-  PIQUET, alguém define a duração e as áreas (hoje só no Filament) e a partir
-  daí é um pedido como os outros, com matching normal.
+  PIQUET, alguém define a duração e as categorias e a partir daí é um pedido
+  como os outros, com matching normal.
 
-  Por isso isto é só de leitura: diz o que entrou, em que ponto está e leva
-  ao pedido completo.
+  Desde 09/10/2026 despacha-se daqui (backend #165), com o mesmo botão que
+  está na ficha do pedido.
 */
 
 const ESTADO: Record<CustomRequestStatus, { label: string; tone: string; nota: string }> = {
-  novo: { label: "À espera da Piquet", tone: "bg-danger-light text-danger", nota: "Falta definir a duração e as áreas (no Filament). Até lá o cliente vê \"Pedido em análise\"." },
+  novo: { label: "À espera da Piquet", tone: "bg-danger-light text-danger", nota: "Falta definir a duração e as categorias. Até lá o cliente vê \"Pedido em análise\"." },
   em_analise: { label: "À procura de técnico", tone: "bg-info-light text-info", nota: "Já foi despachado e está no matching normal." },
   opcoes_enviadas: { label: "Em curso", tone: "bg-warning-light text-warning", nota: "Aceite por um técnico: à espera de pagamento, agendado ou a decorrer." },
   agendado: { label: "Concluído", tone: "bg-success-light text-success", nota: "O serviço foi feito." },
@@ -36,6 +39,9 @@ export default function PedidosPersonalizados() {
   const { data, loading, error, refetch } = useAsyncData(() => getCustomRequests(), []);
   const [tab, setTab] = useState<"todos" | CustomRequestStatus>("todos");
   const [aberto, setAberto] = useState<CustomRequest | null>(null);
+  const [aDespachar, setADespachar] = useState(false);
+  const role = useAuthStore((s) => s.user?.role);
+  const podeDespachar = !!role && hasPermission(role, "edit_services");
 
   if (loading && !data) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -52,7 +58,7 @@ export default function PedidosPersonalizados() {
     <div className="space-y-4">
       <p className="text-sm text-text-secondary max-w-3xl">
         O cliente descreve o trabalho na app. Fica <b className="text-text-primary">à espera da Piquet</b> até alguém
-        definir a duração e as áreas; depois segue o matching normal. A definição faz-se por agora no Filament.
+        definir a duração e as categorias (botão <b className="text-text-primary">Despachar</b>); depois segue o matching normal.
       </p>
 
       <Tabs tabs={TABS} active={tab} onChange={(t) => setTab(t as typeof tab)} />
@@ -103,9 +109,24 @@ export default function PedidosPersonalizados() {
                 <div><dt className="text-text-muted">Duração definida</dt><dd>{aberto.estimatedHours != null ? `${aberto.estimatedHours} h` : "Ainda não"}</dd></div>
                 <div><dt className="text-text-muted">Fotografias</dt><dd>{aberto.photosCount ?? 0}</dd></div>
               </dl>
-              <Link href={`/servicos?servico=${encodeURIComponent(aberto.id)}`} className="btn-primary text-sm inline-flex">
-                Abrir o pedido completo <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {aberto.status === "novo" && podeDespachar && (
+                  <button onClick={() => setADespachar(true)} className="btn-primary text-sm inline-flex">
+                    <Send className="h-4 w-4" /> Despachar
+                  </button>
+                )}
+                <Link href={`/servicos?servico=${encodeURIComponent(aberto.id)}`} className="btn-secondary text-sm inline-flex">
+                  Abrir o pedido completo <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <DespacharPersonalizado
+                open={aDespachar}
+                onClose={() => setADespachar(false)}
+                servicoId={aberto.id}
+                descricao={aberto.description || null}
+                categoriasDoCliente={aberto.category.split(" · ").filter((c) => c !== "Por classificar")}
+                onDespachado={() => { setAberto(null); refetch(); }}
+              />
             </div>
           </div>
         </div>

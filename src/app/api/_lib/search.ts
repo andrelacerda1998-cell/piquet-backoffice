@@ -54,6 +54,12 @@ const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).joi
  * e abre a ficha quando o registo aparece.
  */
 export function fichaHref(base: string, chave: string, id: unknown, nome: unknown): string {
+  /*
+    Com um id do Laravel (só números), a ficha tem endereço próprio:
+    /clientes/412, /tecnicos/94 (desde 09/10/2026). O formato antigo, com a
+    pesquisa pelo nome, fica para ids que não sejam números.
+  */
+  if (/^\d+$/.test(String(id))) return `${base.split("?")[0]}/${id}`;
   const url = new URL(base, "http://x");
   url.searchParams.set(chave, String(id));
   const q = typeof nome === "string" ? nome.trim() : "";

@@ -66,6 +66,7 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /customers/metrics": qualquer("view_customers"),
   "GET /customers/retention": qualquer("view_customers"),
   "GET /customers/trend": qualquer("view_customers"),
+  "GET /customers/[id]": qualquer("view_customers"),
   "GET /customers/[id]/payment-methods": todas("view_customers", "view_personal_data"),
   "DELETE /customers/[id]/payment-methods/[methodId]": qualquer("destructive_actions"),
   "PUT /customers/[id]/block": qualquer("destructive_actions"),
@@ -79,6 +80,12 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /services/counts": STAFF, // página inicial
   "GET /services/operacao": qualquer("view_services"),
   "GET /services/[id]": qualquer("view_services"),
+  // Ações que vivem no Laravel (backend #165). Despachar é operação; fechar
+  // (cobra) e tentar cobrar / desistir e devolver mexem no dinheiro do cliente.
+  "POST /services/[id]/despachar": qualquer("edit_services"),
+  "POST /services/[id]/fechar": qualquer("refund_payments"),
+  "POST /services/[id]/tentar-cobrar": qualquer("refund_payments"),
+  "POST /services/[id]/desistir-e-devolver": qualquer("refund_payments"),
   "PUT /services/[id]": qualquer("edit_services"),
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),
@@ -96,6 +103,7 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /technicians/metrics": qualquer("view_technicians"),
   "GET /technicians/onboarding": qualquer("view_technicians"),
   "GET /technicians/top": qualquer("view_technicians"),
+  "GET /technicians/[id]": qualquer("view_technicians"),
   "GET /technicians/[id]/messages": qualquer("view_technicians"),
   "GET /coverage": qualquer("view_technicians"),
   "POST /technicians/test-account": qualquer("manage_technicians"),

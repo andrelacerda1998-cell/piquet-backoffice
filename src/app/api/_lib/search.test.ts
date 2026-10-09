@@ -8,17 +8,18 @@ import { fichaHref } from "./search";
 
 describe("fichaHref — o ⌘K leva à ficha, não à lista", () => {
   it("junta o id e o nome à aba que já vem no endereço", () => {
-    expect(fichaHref("/tecnicos?tab=lista", "tecnico", 7, "Rui Canalizador"))
-      .toBe("/tecnicos?tab=lista&tecnico=7&q=Rui+Canalizador");
+    expect(fichaHref("/tecnicos?tab=lista", "tecnico", 7, "Rui Canalizador")).toBe("/tecnicos/7");
+    expect(fichaHref("/tecnicos?tab=lista", "tecnico", "tech_7", "Rui Canalizador"))
+      .toBe("/tecnicos?tab=lista&tecnico=tech_7&q=Rui+Canalizador");
   });
 
   it("sem nome, só o id", () => {
-    expect(fichaHref("/clientes?tab=lista", "cliente", 42, null)).toBe("/clientes?tab=lista&cliente=42");
-    expect(fichaHref("/clientes?tab=lista", "cliente", 42, "  ")).toBe("/clientes?tab=lista&cliente=42");
+    expect(fichaHref("/clientes?tab=lista", "cliente", 42, null)).toBe("/clientes/42");
+    expect(fichaHref("/clientes?tab=lista", "cliente", "c_42", "  ")).toBe("/clientes?tab=lista&cliente=c_42");
   });
 
   it("um nome com & não parte o endereço", () => {
-    const href = fichaHref("/clientes?tab=lista", "cliente", 1, "Silva & Filhos");
+    const href = fichaHref("/clientes?tab=lista", "cliente", "c_1", "Silva & Filhos");
     expect(new URL(href, "http://x").searchParams.get("q")).toBe("Silva & Filhos");
   });
 });

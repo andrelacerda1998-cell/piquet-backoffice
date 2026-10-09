@@ -47,6 +47,10 @@ export interface DetalheDoServico {
   contactos: { cliente: string | null; tecnico: string | null } | null;
   /** O pagamento (Payshop) do pedido, que é o que o reembolso precisa. */
   pagamentoUuid: string | null;
+  /** O estado no Laravel ("Finished", "ClosedPendingPayment"…): decide que ações há. */
+  estadoLaravel: string | null;
+  /** Só num pedido personalizado: o que o cliente escreveu e o que a Piquet definiu. */
+  personalizado: { descricao: string | null; minutos: number | null; categorias: string[]; despachadoEm: string | null } | null;
 }
 
 type RespostaLaravel = LaravelServiceRow & {
@@ -55,7 +59,22 @@ type RespostaLaravel = LaravelServiceRow & {
   events?: EventoDoPedido[];
   technician_phone?: string | null;
   payment_order_uuid?: string | null;
+  is_custom?: boolean;
+  custom_description?: string | null;
+  custom_duration_minutes?: number | null;
+  custom_dispatched_at?: string | null;
+  custom_categories?: unknown[] | null;
 };
+
+/** O nome de uma categoria, venha como texto ou como traduções ({"pt-pt": …}). */
+function nomeDaCategoria(c: unknown): string {
+  if (typeof c === "string") return c;
+  if (c && typeof c === "object") {
+    const t = c as Record<string, string>;
+    return t["pt-pt"] ?? t.pt ?? Object.values(t)[0] ?? "";
+  }
+  return "";
+}
 
 /** As colunas `decimal` do Laravel chegam como texto ("3.00"). */
 const numOuNada = (v: unknown): number | null => {
@@ -105,6 +124,15 @@ export const GET = withStaff(async (_req, { params, staff }) => {
 
     return apiOk<DetalheDoServico>({
       servico, candidatos: lista, eventos, contactos, pagamentoUuid: d.payment_order_uuid || null,
+      estadoLaravel: d.status ?? null,
+      personalizado: d.is_custom
+        ? {
+          descricao: d.custom_description ?? null,
+          minutos: d.custom_duration_minutes ?? null,
+          categorias: (d.custom_categories ?? []).map(nomeDaCategoria).filter(Boolean),
+          despachadoEm: d.custom_dispatched_at ?? null,
+        }
+        : null,
     });
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return apiErr("Serviço não encontrado.", 404);

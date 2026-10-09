@@ -172,3 +172,9 @@ export async function getRetentionData() {
 export async function getNewVsRecurringTrend() {
   return apiGet<Array<{ name: string; novos: number; recorrentes: number }>>("/customers/trend", () => []).then((r) => r.data);
 }
+
+/** Um cliente pelo id (bloqueado ou não), para a ficha em /clientes/:id. `null` se não existir. */
+export async function getCustomer(id: number | string): Promise<RealCustomer | null> {
+  return apiGet<RealCustomer | null>(`/customers/${id}`, () => null).then((r) => r.data).catch(() => null);
+}
+

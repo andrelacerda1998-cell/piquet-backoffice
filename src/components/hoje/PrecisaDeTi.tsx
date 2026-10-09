@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -40,7 +40,11 @@ function haQuanto(iso: string): string {
   return `há ${d} ${d === 1 ? "dia" : "dias"}`;
 }
 
-export function PrecisaDeTi() {
+/**
+ * `onVerTodos`: na Visão Geral, "Ver todos" muda para o separador Alertas em
+ * vez de navegar. `onTotal` diz quantos alertas há (para o número no separador).
+ */
+export function PrecisaDeTi({ onVerTodos, onTotal }: { onVerTodos?: () => void; onTotal?: (n: number) => void } = {}) {
   const { data, loading, error, refetch } = useAsyncData(() => getAlerts(1, 200), []);
   const [aAdiar, setAAdiar] = useState<string | null>(null);
 
@@ -48,6 +52,7 @@ export function PrecisaDeTi() {
   const alertas = [...(data?.data ?? [])].sort((a, b) =>
     URGENCIA[a.priority] - URGENCIA[b.priority] || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
   const fila = alertas.slice(0, MAXIMO);
+  useEffect(() => { if (data) onTotal?.(alertas.length); }, [data, alertas.length, onTotal]);
 
   const adiar = async (a: DashboardAlert) => {
     setAAdiar(a.id);
@@ -72,11 +77,15 @@ export function PrecisaDeTi() {
         <h2 id="precisa-de-ti" className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
           Precisa de ti{alertas.length > 0 && <span className="ml-1.5 text-text-primary">{alertas.length}</span>}
         </h2>
-        {alertas.length > 0 && (
-          <Link href="/alertas" className="text-sm text-piquet-600 hover:underline">
+        {alertas.length > 0 && (onVerTodos ? (
+          <button onClick={onVerTodos} className="text-sm text-piquet-600 hover:underline">
+            {alertas.length > MAXIMO ? `Ver todos (${alertas.length})` : "Ver em Alertas"} →
+          </button>
+        ) : (
+          <Link href="/?tab=alertas" className="text-sm text-piquet-600 hover:underline">
             {alertas.length > MAXIMO ? `Ver todos (${alertas.length})` : "Ver em Alertas"} →
           </Link>
-        )}
+        ))}
       </div>
 
       {fila.length === 0 ? (
