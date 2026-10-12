@@ -179,8 +179,12 @@ function applyThemeClass(theme: Theme) {
 
 interface UiState {
   commandOpen: boolean;
+  /** O que o ⌘K traz escrito ao abrir (ex.: "> nota " vindo de "+ Novo › Nota"). */
+  commandTexto: string;
   welcomeDismissed: boolean;
   setCommandOpen: (open: boolean) => void;
+  /** Abre o ⌘K já com um texto escrito. */
+  abrirComando: (texto: string) => void;
   dismissWelcome: () => void;
 }
 
@@ -188,8 +192,10 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       commandOpen: false,
+      commandTexto: "",
       welcomeDismissed: false,
-      setCommandOpen: (open) => set({ commandOpen: open }),
+      setCommandOpen: (open) => set(open ? { commandOpen: true } : { commandOpen: false, commandTexto: "" }),
+      abrirComando: (texto) => set({ commandOpen: true, commandTexto: texto }),
       dismissWelcome: () => set({ welcomeDismissed: true }),
     }),
     {

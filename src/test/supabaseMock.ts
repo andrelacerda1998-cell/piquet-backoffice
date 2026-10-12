@@ -19,7 +19,7 @@ export const mockState: {
 
 function builder(result: Result, table = ""): any {
   const b: any = {};
-  for (const m of ["select", "eq", "or", "ilike", "gte", "lte", "gt", "order", "range", "limit", "update", "upsert", "delete"]) {
+  for (const m of ["select", "eq", "neq", "in", "or", "ilike", "like", "gte", "lte", "gt", "lt", "order", "range", "limit", "update", "upsert", "delete"]) {
     b[m] = () => b;
   }
   b.insert = (row: unknown) => { mockState.inserts.push({ table, row }); return b; };

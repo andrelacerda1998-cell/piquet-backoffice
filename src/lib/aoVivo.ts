@@ -19,6 +19,8 @@ export interface PedidoBase {
   cidade: string | null;
   criado_em: string | null;
   marcado_para: string | null;
+  /** Quando entrou no estado em que está (backend novo). */
+  estado_desde?: string | null;
 }
 
 export interface PedidoAProcura extends PedidoBase {
@@ -75,9 +77,17 @@ export interface AoVivo {
     podem_aceitar: number;
     prontos: number;
     por_area: Array<{ area_id: number | string; area: string; online: number; prontos: number }>;
+    /** Por cidade (backend novo): onde há e onde não há quem aceite. Técnicos sem cidade vêm com null. */
+    por_cidade?: Array<{ cidade: string | null; online: number; prontos: number }>;
   };
-  liquidez: { "7d": Liquidez; "30d": Liquidez };
+  liquidez: {
+    "7d": Liquidez; "30d": Liquidez;
+    /** O mês de calendário (backend novo): servidos ÷ criados. */
+    mes?: { criados: number; servidos: number; taxa: number | null };
+  };
   perdidos: PedidoPerdido[];
+  /** Números de agora que o backend novo acrescenta. */
+  agora?: { agendados_hoje?: number };
 }
 
 /** O que cada alerta quer dizer, na língua de quem tem de agir. */

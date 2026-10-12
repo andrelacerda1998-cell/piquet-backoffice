@@ -109,3 +109,27 @@ export function agruparAlertas(
   return [...grupos, ...soltos].sort((a, b) =>
     ORDEM[a.priority] - ORDEM[b.priority] || Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
+
+/**
+ * Um alerta por pedido. O mesmo pedido podia aparecer três vezes na fila
+ * ("o prazo acabou", "ficou sem técnico", "possível falta") -- três linhas
+ * para uma chamada só. Fica o mais urgente, e os outros motivos vão na
+ * descrição dele.
+ */
+export function umPorPedido(alertas: DashboardAlert[]): DashboardAlert[] {
+  const porPedido = new Map<string, DashboardAlert[]>();
+  const resto: DashboardAlert[] = [];
+  for (const a of alertas) {
+    if (a.entityType === "pedido" && a.entityId) porPedido.set(a.entityId, [...(porPedido.get(a.entityId) ?? []), a]);
+    else resto.push(a);
+  }
+  const pedidos = [...porPedido.values()].map((lista) => {
+    const [principal, ...outros] = [...lista].sort((x, y) =>
+      ORDEM[x.priority] - ORDEM[y.priority] || Date.parse(x.createdAt) - Date.parse(y.createdAt));
+    if (outros.length === 0) return principal;
+    const tambem = outros.map((o) => o.title.replace(/^Pedido #\S+:?\s*/, "").replace(/^Possível falta no pedido #\S+/, "possível falta")).join("; ");
+    return { ...principal, description: `${principal.description} · também: ${tambem}` };
+  });
+  return [...pedidos, ...resto].sort((a, b) =>
+    ORDEM[a.priority] - ORDEM[b.priority] || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+}

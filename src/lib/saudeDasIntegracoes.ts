@@ -23,6 +23,23 @@ export interface SaudeDoJob {
   consecutiveFailures: number;
 }
 
+/**
+ * As pipelines que o painel de Integrações mostra e que os alertas vigiam.
+ * `intervaloHoras: null` é um job que só corre quando há um aviso (webhook).
+ */
+export const JOBS_DAS_INTEGRACOES = [
+  { id: "app-metrics", name: "Downloads das lojas", schedule: "diário 06:10 UTC", providers: ["App Store", "Google Play"], intervaloHoras: 24 },
+  { id: "ad-metrics", name: "Anúncios", schedule: "diário 06:20 UTC", providers: ["Meta Ads", "Google Ads"], intervaloHoras: 24 },
+  { id: "pop-transactions", name: "Pagamentos Payshop (cron)", schedule: "diário 06:30 UTC", providers: ["Paylands"], intervaloHoras: 24 },
+  /*
+    Só corre quando o Paylands avisa, e ele só avisa as ordens criadas com
+    url_post -- o que o Laravel faz quando PAYSHOP_SDK_NOTIFICATION_URL está
+    definida (payshop-sdk #2). Sem isso fica "Sem avisos", e o cron diário
+    cobre tudo na mesma.
+  */
+  { id: "pop-webhook", name: "Pagamentos Payshop (tempo real)", schedule: "a cada aviso do Payshop", providers: ["Paylands"], intervaloHoras: null },
+] as const;
+
 /** Margem de um job diário: 26 h (um dia e um pouco de folga para o cron). */
 export const MARGEM_DIARIO_HORAS = 26;
 /** Um job que corre a cada aviso está "sem avisos" ao fim de 7 dias sem nenhum. */

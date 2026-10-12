@@ -55,10 +55,11 @@ describe("filas de filtros", () => {
 });
 
 describe("atalhos de teclado", () => {
-  it("o ⌘K não é sugerido a quem está no telemóvel", () => {
-    // Não há teclado: era uma indicação impossível de seguir.
+  it("o botão do guia não pede um atalho de teclado a quem está no telemóvel", () => {
+    // Não há teclado: "⌘K" num botão era uma indicação impossível de seguir.
+    // O botão abre a pesquisa (no telemóvel há a lupa), sem falar do atalho.
     const banner = ler("src/components/ui/WelcomeBanner.tsx");
-    const botao = banner.slice(banner.indexOf("setCommandOpen(true)"), banner.indexOf("Percebi, dispensar"));
-    expect(botao).toContain("hidden sm:inline-flex");
+    const botao = banner.slice(banner.indexOf("setCommandOpen(true)"), banner.indexOf("Percebi"));
+    expect(botao).not.toContain("⌘K");
   });
 });

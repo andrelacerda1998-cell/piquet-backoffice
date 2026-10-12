@@ -30,9 +30,10 @@ const STAFF = qualquer("view_dashboard");
 
 export const POLITICA: Record<string, Requisito> = {
   // ---------------------------------------------------------- alertas
-  "GET /alerts": qualquer("view_alerts"),
-  "POST /alerts/snooze": qualquer("view_alerts"),
-  "DELETE /alerts/snooze": qualquer("view_alerts"),
+  // Todos: cada alerta tem dono, e a rota só devolve os do perfil de quem pede.
+  "GET /alerts": STAFF,
+  "POST /alerts/snooze": STAFF,
+  "DELETE /alerts/snooze": STAFF,
 
   // ------------------------------------------- catálogo e configurações
   // Lidos por todos (o filtro global de categorias está no topo de cada

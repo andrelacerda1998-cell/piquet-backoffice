@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { UnitEconomics } from "@/components/crescimento/UnitEconomics";
 import { DataTable } from "@/components/ui/DataTable";
@@ -170,6 +171,9 @@ export default function MarketingPage() {
             </button>
           }
         />
+
+        {/* Anúncios sem dados: lembrete de gestão, aqui e não na fila da Visão Geral. */}
+        <LembretesDaArea rota="/marketing" />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

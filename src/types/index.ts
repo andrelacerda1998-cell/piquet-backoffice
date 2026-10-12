@@ -312,6 +312,16 @@ export interface DashboardAlert {
   status: AlertStatus;
   responsibleUserId?: string;
   recommendedAction: string;
+  /**
+   * Quem trata disto: o alerta aparece a quem tiver UMA destas permissões
+   * (vazio = toda a equipa). É o "responsável" de cada alerta, por perfil.
+   */
+  donos?: Permission[];
+  /**
+   * Lembrete de gestão (faturas, impostos, anúncios): fica na área respetiva
+   * (Financeiro, Marketing) e fora da fila "Precisa de ti".
+   */
+  lembrete?: boolean;
 }
 
 export interface MarketingCampaign {

@@ -66,3 +66,27 @@ describe("agruparAlertas", () => {
     expect(agruparAlertas(leads(5))[0].id).toBe(agruparAlertas(leads(9))[0].id);
   });
 });
+
+import { umPorPedido } from "./alertGroups";
+
+describe("umPorPedido — uma linha por pedido", () => {
+  const a = (id: string, priority: DashboardAlert["priority"], title: string, entityId = "282"): DashboardAlert => ({
+    id, type: "operacional", priority, title, description: "Marta · Lisboa", createdAt: "2026-10-12T10:00:00Z",
+    status: "novo", recommendedAction: "Ligar", entityType: "pedido", entityId,
+  });
+
+  it("fica o mais urgente, com os outros motivos na descrição", () => {
+    const r = umPorPedido([
+      a("pedido-prazo_esgotado-282", "alta", "Pedido #282: o prazo acabou"),
+      a("falta-282", "critica", "Possível falta no pedido #282"),
+      a("perdido-300", "alta", "Pedido #300 ficou sem técnico", "300"),
+    ]);
+    expect(r.map((x) => x.id)).toEqual(["falta-282", "perdido-300"]);
+    expect(r[0].description).toContain("também: o prazo acabou");
+  });
+
+  it("alertas que não são de pedidos não se tocam", () => {
+    const lead = { ...a("lead-1", "alta", "Lead nova"), entityType: "lead", entityId: "1" };
+    expect(umPorPedido([lead])).toEqual([lead]);
+  });
+});

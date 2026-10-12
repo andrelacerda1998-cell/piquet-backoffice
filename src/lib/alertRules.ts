@@ -1,4 +1,4 @@
-import type { DashboardAlert, AlertPriority } from "@/types";
+import type { DashboardAlert, AlertPriority, Permission } from "@/types";
 
 /**
  * Regras que transformam o estado real do negócio em alertas.
@@ -14,14 +14,28 @@ import type { DashboardAlert, AlertPriority } from "@/types";
  */
 
 export interface SinaisDoNegocio {
-  /** Leads no estado "novo", com a data de entrada. */
-  leadsPorResponder: Array<{ id: string; nome: string; recebidaEm: string }>;
+  /** Leads no estado "novo", com a data de entrada (e se pediram urgência). */
+  leadsPorResponder: Array<{ id: string; nome: string; recebidaEm: string; urgente?: boolean }>;
   /** Execuções recentes de cada cron: falhas seguidas indicam integração parada. */
   cronsFalhados: Array<{ job: string; falhasSeguidas: number; ultimoErro: string; ultimaTentativa: string }>;
-  /** Tickets de suporte abertos, com a data da última mensagem. */
-  ticketsAbertos: Array<{ id: string; assunto: string; canal: string; desde: string }>;
+  /**
+   * Tickets de suporte abertos, com a data da última mensagem. `esperaResposta`:
+   * a última mensagem é do cliente (false = já lhe respondemos, a bola é dele).
+   */
+  ticketsAbertos: Array<{
+    id: string; assunto: string; canal: string; desde: string;
+    prioridade?: string; categoria?: string | null; abertoEm?: string; esperaResposta?: boolean;
+  }>;
   /** Documentos de técnicos à espera de revisão. */
   documentosPendentes: number;
+  /** Quantos estão à espera há mais de 24 h, e desde quando o mais antigo (quando se sabe). */
+  documentosAntigos?: { quantos: number; maisAntigo: string | null };
+  /** As integrações do painel que falharam ou deixaram de correr quando deviam. */
+  integracoes?: Array<{ job: string; nome: string; estado: "falha" | "atrasado"; detalhe: string; quando: string | null; falhasSeguidas: number }>;
+  /** Cidades onde houve pedidos nas últimas 24 h e não há técnicos online. */
+  cidadesSemOferta?: Array<{ cidade: string; pedidos: number }>;
+  /** Pedidos que começam já (≤ 15 min) e cujo técnico ainda não saiu. */
+  faltasIminentes?: Array<{ servicoId: string; tecnico: string | null; cliente: string | null; comecaEm: string }>;
   /** Faturas de custos com o prazo de pagamento ultrapassado. */
   faturasVencidas: Array<{ fornecedor: string; valorEmDivida: number; venceuEm: string }>;
   /** Obrigações fiscais com o prazo ultrapassado e ainda não pagas. */
@@ -41,6 +55,8 @@ export interface SinaisDoNegocio {
   pedidosComAlerta?: Array<{
     id: string; cliente: string | null; tipo: string | null; cidade: string | null;
     nivel: "critico" | "atencao" | "info"; motivo: string; desde: string | null;
+    /** Quando o pedido entrou no estado em que está (o backend novo manda-o). */
+    estadoDesde?: string | null;
   }>;
   /** Pedidos que acabaram sem ser servidos, com o desfecho. */
   pedidosPerdidos?: Array<{
@@ -101,7 +117,48 @@ export const LIMITES = {
   perdidoHoras: 24,
   /** Um lote por aprovar passa a "alta" ao fim de 1 dia: há técnicos à espera do dinheiro. */
   loteHorasAlta: 24,
+  /**
+   * Uma cobrança que falhou tenta-se outra vez sozinha: só é alerta passados
+   * 30 minutos no estado (quando se sabe desde quando está nele).
+   */
+  capturaMinutos: 30,
+  /** Um contacto que pediu urgência passa a crítico se ninguém responder em 15 minutos. */
+  leadUrgenteMinutos: 15,
+  /** Horas sem resposta a um ticket, pela importância que tem. */
+  ticketHoras: { critica: 1, alta: 4, media: 24, baixa: 24 } as Record<string, number>,
+  /** Uma reclamação aberta há mais de um dia já devia estar resolvida. */
+  reclamacaoHoras: 24,
+  /** Um documento de técnico à espera há mais de um dia é um técnico parado por nossa causa. */
+  documentoHoras: 24,
 } as const;
+
+/**
+ * Quem trata de cada alerta, por permissão (basta uma). Um alerta só aparece
+ * a quem o pode resolver: as Finanças não precisam de ver contactos por
+ * responder, e a Operação não precisa de ver faturas vencidas.
+ */
+export const DONOS: Record<string, Permission[]> = {
+  operacao: ["view_services"],
+  cobranca: ["view_services", "refund_payments"],
+  contactos: ["view_customers", "view_marketing"],
+  suporte: ["view_support"],
+  tecnicos: ["manage_technicians", "view_technicians"],
+  financas: ["view_finance"],
+  pagarTecnicos: ["pay_technicians"],
+  sistema: ["manage_settings"],
+  marketing: ["view_marketing"],
+  mercado: ["view_services", "view_technicians"],
+};
+
+/** "8 min", "3 h", "2 dias". */
+function duracao(ms: number): string {
+  const min = Math.max(1, Math.round(ms / 60_000));
+  if (min < 60) return `${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24);
+  return `${d} ${d === 1 ? "dia" : "dias"}`;
+}
 
 /** O que fazer em cada alerta das Operações ao vivo (o motivo vem do Laravel). */
 const ACAO_DO_MOTIVO: Record<string, { titulo: string; accao: string; doCliente?: boolean }> = {
@@ -134,17 +191,32 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
     id: string, type: DashboardAlert["type"], priority: AlertPriority,
     title: string, description: string, recommendedAction: string,
     createdAt: string, entityType?: string, entityId?: string,
+    extra: { donos?: Permission[]; lembrete?: boolean } = {},
   ): DashboardAlert => ({
     id, type, priority, title, description, createdAt,
-    status: "novo", recommendedAction, entityType, entityId,
+    status: "novo", recommendedAction, entityType, entityId, ...extra,
   });
 
   // --- Leads por responder -------------------------------------------------
   // Uma a uma, não agregadas: cada lead é um contacto concreto à espera, e
   // agregá-las esconderia a mais antiga no meio das outras.
   for (const l of s.leadsPorResponder) {
+    const ms = agoraMs - Date.parse(l.recebidaEm);
     const dias = diasEntre(l.recebidaEm, agoraMs);
     if (dias < LIMITES.leadDiasAlerta) continue;
+    // Quem pediu urgência quer resposta em minutos, não no próprio dia.
+    if (l.urgente) {
+      alertas.push(novo(
+        `lead-sem-resposta-${l.id}`,
+        "marketing",
+        ms >= LIMITES.leadUrgenteMinutos * 60_000 ? "critica" : "alta",
+        `Contacto urgente por responder${ms >= 60_000 ? ` há ${duracao(ms)}` : ""}`,
+        `${l.nome} pediu urgência e continua no estado "Novo".`,
+        "Ligar já: pediu urgência.",
+        l.recebidaEm, "lead", l.id, { donos: DONOS.contactos },
+      ));
+      continue;
+    }
     alertas.push(novo(
       `lead-sem-resposta-${l.id}`,
       "marketing",
@@ -152,7 +224,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       dias === 0 ? "Lead nova por responder" : `Lead sem resposta há ${plural(dias, "dia", "dias")}`,
       `${l.nome} pediu contacto e continua no estado "Novo".`,
       "Abrir o contacto e responder, ou perguntar a técnicos.",
-      l.recebidaEm, "lead", l.id,
+      l.recebidaEm, "lead", l.id, { donos: DONOS.contactos },
     ));
   }
 
@@ -161,6 +233,9 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
   // do Laravel, mas quando a bola está do lado do cliente não passa de média.
   for (const p of s.pedidosComAlerta ?? []) {
     if (p.nivel === "info") continue;
+    // A cobrança que falhou volta a tentar-se sozinha: dá-se-lhe meia hora.
+    if (p.motivo === "pagamento_por_capturar" && p.estadoDesde
+      && agoraMs - Date.parse(p.estadoDesde) < LIMITES.capturaMinutos * 60_000) continue;
     const m = ACAO_DO_MOTIVO[p.motivo] ?? { titulo: p.motivo.replace(/_/g, " "), accao: "Abrir o pedido." };
     const prioridade: AlertPriority = m.doCliente ? "media" : p.nivel === "critico" ? "critica" : "alta";
     alertas.push(novo(
@@ -170,7 +245,8 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Pedido #${p.id}: ${m.titulo}`,
       [p.cliente, p.tipo, p.cidade].filter(Boolean).join(" · ") || "Pedido sem detalhe",
       m.accao,
-      p.desde ?? new Date(agoraMs).toISOString(), "pedido", p.id,
+      p.estadoDesde ?? p.desde ?? new Date(agoraMs).toISOString(), "pedido", p.id,
+      { donos: p.motivo === "pagamento_por_capturar" ? DONOS.cobranca : DONOS.operacao },
     ));
   }
 
@@ -186,21 +262,48 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Pedido #${p.id} ${r.titulo}`,
       [p.cliente, p.tipo, p.cidade].filter(Boolean).join(" · ") || "Pedido sem detalhe",
       r.accao,
-      p.criadoEm, "pedido", p.id,
+      p.criadoEm, "pedido", p.id, { donos: DONOS.operacao },
     ));
   }
 
-  // --- Faltas prováveis ------------------------------------------------------
-  // Crítica: há um cliente em casa à espera agora.
+  // --- Faltas ---------------------------------------------------------------
+  // A começar já e o técnico ainda não saiu: ainda dá para ligar e salvar.
+  for (const f of s.faltasIminentes ?? []) {
+    const hora = new Date(f.comecaEm).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
+    alertas.push(novo(
+      `falta-iminente-${f.servicoId}`,
+      "operacional",
+      "alta",
+      `Pedido #${f.servicoId} começa às ${hora} e o técnico ainda não saiu`,
+      `${f.tecnico ?? "O técnico"} não marcou "a caminho"${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
+      "Ligar ao técnico para confirmar que vai.",
+      f.comecaEm, "pedido", f.servicoId, { donos: DONOS.operacao },
+    ));
+  }
+  // Já passou da hora e não começou: crítica, há um cliente em casa à espera.
   for (const f of s.faltasProvaveis ?? []) {
     alertas.push(novo(
       `falta-${f.servicoId}`,
       "operacional",
       "critica",
       `Possível falta no pedido #${f.servicoId}`,
-      `${f.tecnico ?? "O técnico"} não marcou "a caminho"${f.marcadoPara ? ` (marcado para ${f.marcadoPara})` : ""}${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
-      "Ligar ao técnico; se não aparecer, declarar a falta em Qualidade › Faltas.",
-      f.marcadoPara ?? new Date(agoraMs).toISOString(), "pedido", f.servicoId,
+      `${f.tecnico ?? "O técnico"} ainda não começou${f.marcadoPara ? ` (estava marcado para ${f.marcadoPara})` : ""}${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
+      "Ligar ao técnico; se não aparecer, dar como falta em Técnicos › Qualidade › Faltas.",
+      f.marcadoPara ?? new Date(agoraMs).toISOString(), "pedido", f.servicoId, { donos: DONOS.operacao },
+    ));
+  }
+
+  // --- Cidades sem oferta ----------------------------------------------------
+  // Houve quem pedisse e não há ninguém do outro lado: é onde se perdem pedidos.
+  for (const c of s.cidadesSemOferta ?? []) {
+    alertas.push(novo(
+      `cidade-sem-oferta-${c.cidade.toLowerCase().replace(/\s+/g, "-")}`,
+      "operacional",
+      "alta",
+      `${c.cidade}: ${plural(c.pedidos, "pedido", "pedidos")} e nenhum técnico online`,
+      "Nas últimas 24 h houve procura nesta cidade e ninguém do lado da oferta.",
+      "Abrir Mercado › Cobertura e ativar ou recrutar técnicos da zona.",
+      new Date(agoraMs).toISOString(), "mercado", c.cidade, { donos: DONOS.mercado },
     ));
   }
 
@@ -214,11 +317,27 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Lote de pagamento de ${l.total.toLocaleString("pt-PT", { style: "currency", currency: "EUR" })} por aprovar`,
       `Criado${l.criadoPor ? ` por ${l.criadoPor}` : ""}. Tem de ser aprovado por outra pessoa antes de se pagar.`,
       "Aprovar em Financeiro › Pagamentos a técnicos.",
-      l.criadoEm, "lotes", l.id,
+      l.criadoEm, "lotes", l.id, { donos: DONOS.pagarTecnicos },
     ));
   }
 
   // --- Integrações paradas -------------------------------------------------
+  // As do painel: falharam (duas vezes seguidas) ou deixaram de correr quando deviam.
+  for (const i of s.integracoes ?? []) {
+    if (i.estado === "falha" && i.falhasSeguidas < 2) continue;
+    alertas.push(novo(
+      `cron-${i.job}`,
+      "produto",
+      "alta",
+      i.estado === "atrasado"
+        ? `Integração "${i.nome}" não corre desde ${i.quando ? new Date(i.quando).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "há muito"}`
+        : `Integração "${i.nome}" falhou ${plural(i.falhasSeguidas, "vez seguida", "vezes seguidas")}`,
+      i.detalhe.slice(0, 200) || "Sem detalhe.",
+      "Ver Produto › Integrações para o erro completo.",
+      i.quando ?? new Date(agoraMs).toISOString(), "integracao", i.job, { donos: DONOS.sistema },
+    ));
+  }
+  // As outras (sem horário conhecido): 3 falhas seguidas é avaria.
   for (const c of s.cronsFalhados) {
     if (c.falhasSeguidas < LIMITES.cronFalhasSeguidas) continue;
     alertas.push(novo(
@@ -228,39 +347,65 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Integração "${c.job}" falhou ${plural(c.falhasSeguidas, "vez seguida", "vezes seguidas")}`,
       c.ultimoErro.slice(0, 200),
       "Ver Produto › Integrações para o erro completo.",
-      c.ultimaTentativa, "integracao", c.job,
+      c.ultimaTentativa, "integracao", c.job, { donos: DONOS.sistema },
     ));
   }
 
-  // --- Suporte sem resposta ------------------------------------------------
+  // --- Suporte ----------------------------------------------------------------
   for (const t of s.ticketsAbertos) {
-    const dias = diasEntre(t.desde, agoraMs);
-    if (dias < LIMITES.ticketDiasAlerta) continue;
+    // Uma reclamação conta desde que foi aberta: mesmo respondida, por resolver é um cliente insatisfeito.
+    if (/reclama/i.test(t.categoria ?? "")) {
+      const desde = t.abertoEm ?? t.desde;
+      const ms = agoraMs - Date.parse(desde);
+      if (ms < LIMITES.reclamacaoHoras * 3_600_000) continue;
+      alertas.push(novo(
+        `reclamacao-${t.id}`,
+        "operacional",
+        ms >= 72 * 3_600_000 ? "critica" : "alta",
+        `Reclamação por resolver há ${duracao(ms)}`,
+        `${t.assunto} · ${t.canal}`,
+        "Abrir o ticket e resolver com o cliente.",
+        desde, "ticket", t.id, { donos: DONOS.suporte },
+      ));
+      continue;
+    }
+    // Se a última mensagem é nossa, a bola está do lado do cliente: não é alerta.
+    if (t.esperaResposta === false) continue;
+    const ms = agoraMs - Date.parse(t.desde);
+    const limite = LIMITES.ticketHoras[t.prioridade ?? "media"] ?? LIMITES.ticketHoras.media;
+    if (ms < limite * 3_600_000) continue;
     alertas.push(novo(
       `ticket-${t.id}`,
       "operacional",
-      dias >= 3 ? "critica" : "alta",
-      `Ticket sem resposta há ${plural(dias, "dia", "dias")}`,
+      t.prioridade === "critica" || ms >= 72 * 3_600_000 ? "critica" : "alta",
+      `Ticket ${t.prioridade === "critica" ? "crítico " : ""}sem resposta há ${duracao(ms)}`,
       `${t.assunto} · ${t.canal}`,
       "Responder em Suporte › Tickets.",
-      t.desde, "ticket", t.id,
+      t.desde, "ticket", t.id, { donos: DONOS.suporte },
     ));
   }
 
   // --- Fila de KYC ---------------------------------------------------------
-  if (s.documentosPendentes >= LIMITES.documentosPendentes) {
+  // Só o que espera há mais de um dia (quando se sabe a data); senão, a fila toda.
+  const antigos = s.documentosAntigos;
+  if (antigos ? antigos.quantos > 0 : s.documentosPendentes >= LIMITES.documentosPendentes) {
+    const n = antigos ? antigos.quantos : s.documentosPendentes;
     alertas.push(novo(
       "kyc-fila",
       "equipa",
       s.documentosPendentes >= LIMITES.documentosPendentesAlta ? "alta" : "media",
-      `${plural(s.documentosPendentes, "documento de técnico", "documentos de técnicos")} por aprovar`,
-      "Técnicos à espera de aprovação não podem aceitar serviços.",
+      antigos
+        ? `${plural(n, "documento de técnico", "documentos de técnicos")} à espera há mais de 24 h`
+        : `${plural(n, "documento de técnico", "documentos de técnicos")} por aprovar`,
+      antigos && s.documentosPendentes > n
+        ? `${s.documentosPendentes} por rever no total. Técnicos à espera de aprovação não podem aceitar serviços.`
+        : "Técnicos à espera de aprovação não podem aceitar serviços.",
       "Rever em Técnicos › Aprovações e KYC.",
-      new Date(agoraMs).toISOString(), "kyc",
+      antigos?.maisAntigo ?? new Date(agoraMs).toISOString(), "kyc", undefined, { donos: DONOS.tecnicos },
     ));
   }
 
-  // --- Faturas de custos vencidas ------------------------------------------
+  // --- Faturas de custos vencidas (lembrete de gestão: fica no Financeiro) --
   for (const f of s.faturasVencidas) {
     const dias = diasEntre(f.venceuEm, agoraMs);
     alertas.push(novo(
@@ -270,11 +415,11 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Fatura de ${f.fornecedor} vencida há ${plural(Math.max(dias, 1), "dia", "dias")}`,
       `${f.valorEmDivida.toFixed(2).replace(".", ",")} € em dívida — atrasos estragam a relação com fornecedores.`,
       "Registar o pagamento em Financeiro › Faturas de custos.",
-      f.venceuEm, "fatura",
+      f.venceuEm, "fatura", undefined, { donos: DONOS.financas, lembrete: true },
     ));
   }
 
-  // --- Obrigações fiscais vencidas -----------------------------------------
+  // --- Obrigações fiscais vencidas (lembrete de gestão) -----------------------
   // Sempre críticas: prazos fiscais falhados geram coimas, não conversas.
   for (const i of s.impostosVencidos) {
     alertas.push(novo(
@@ -284,11 +429,11 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `${i.nome} com prazo ultrapassado`,
       `${i.valor.toFixed(2).replace(".", ",")} €${i.estimado ? " (estimativa)" : ""} · prazo era ${i.venceuEm.slice(0, 10)}.`,
       "Confirmar o pagamento em Financeiro › Impostos e RH.",
-      i.venceuEm, "imposto",
+      i.venceuEm, "imposto", undefined, { donos: DONOS.financas, lembrete: true },
     ));
   }
 
-  // --- Recolha de anúncios parada -----------------------------------------
+  // --- Recolha de anúncios parada (lembrete de gestão: fica no Marketing) ---
   if (s.diasSemDadosDeAnuncios !== null && s.diasSemDadosDeAnuncios > LIMITES.diasSemAnuncios) {
     alertas.push(novo(
       "anuncios-parados",
@@ -297,7 +442,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `Sem dados de anúncios há ${plural(s.diasSemDadosDeAnuncios, "dia", "dias")}`,
       "Pode ser recolha avariada ou campanhas paradas — o Marketing não distingue sozinho.",
       "Carregar em \"Atualizar anúncios\" no Marketing e ler a mensagem.",
-      new Date(agoraMs).toISOString(), "marketing",
+      new Date(agoraMs).toISOString(), "marketing", undefined, { donos: DONOS.marketing, lembrete: true },
     ));
   }
 
@@ -310,7 +455,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       `${plural(s.pagamentosRecusados, "pagamento recusado", "pagamentos recusados")} nos últimos 7 dias`,
       "Cada recusa é um serviço que pode não ter sido pago.",
       "Ver Financeiro › Pagamentos da app.",
-      new Date(agoraMs).toISOString(), "pagamentos",
+      new Date(agoraMs).toISOString(), "pagamentos", undefined, { donos: DONOS.financas },
     ));
   }
 
