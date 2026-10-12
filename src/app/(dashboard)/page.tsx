@@ -85,7 +85,7 @@ export default function OverviewPage() {
       : null;
 
   // Técnicos online por cidade: onde não há ninguém é onde se perdem pedidos.
-  const porCidade = [...(aoVivo?.oferta.por_cidade ?? [])].sort((a, b) => b.online - a.online);
+  const porCidade = (aoVivo?.oferta.por_cidade ?? []).filter((c) => c.cidade).sort((a, b) => b.online - a.online);
   const notaOnline = porCidade.length > 0
     ? porCidade.slice(0, 3).map((c) => `${c.cidade} ${c.online}`).join(" · ")
     : aoVivo ? `${aoVivo.oferta.prontos} prontos a aceitar` : "";

@@ -77,8 +77,8 @@ export interface AoVivo {
     podem_aceitar: number;
     prontos: number;
     por_area: Array<{ area_id: number | string; area: string; online: number; prontos: number }>;
-    /** Por cidade (backend novo): onde há e onde não há quem aceite. */
-    por_cidade?: Array<{ cidade: string; online: number; prontos: number }>;
+    /** Por cidade (backend novo): onde há e onde não há quem aceite. Técnicos sem cidade vêm com null. */
+    por_cidade?: Array<{ cidade: string | null; online: number; prontos: number }>;
   };
   liquidez: {
     "7d": Liquidez; "30d": Liquidez;
