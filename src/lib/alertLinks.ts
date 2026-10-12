@@ -21,15 +21,15 @@ export function destinoDoAlerta(a: DashboardAlert): { href: string; label: strin
     case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
     case "kyc": return { href: "/tecnicos?tab=aprovacoes", label: "Rever documentos" };
     case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
-    case "pagamentos": return { href: "/financeiro?tab=app-pagamentos", label: "Ver pagamentos" };
+    case "pagamentos": return { href: "/financeiro?tab=pagamentos", label: "Ver pagamentos" };
     case "fatura": return { href: "/financeiro?tab=custos", label: "Ver faturas" };
     // KYC, integrações e impostos são filas/listas, não um registo só — o
     // destino certo é mesmo o separador.
-    case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
+    case "imposto": return { href: "/financeiro?tab=resultado&secao=impostos", label: "Ver impostos" };
     // A operação: o pedido abre-se pelo número (é o que o ⌘K também faz).
     case "pedido": return { href: pedidoHref(a.entityId ?? ""), label: "Abrir pedido" };
     case "mercado": return { href: "/mercado?tab=cobertura", label: "Abrir Mercado" };
-    case "lotes": return { href: "/financeiro?tab=pagamentos", label: "Ver lotes" };
+    case "lotes": return { href: "/financeiro?tab=transferencias", label: "Ver lotes" };
     default: return { href: "/", label: "Abrir" };
   }
 }

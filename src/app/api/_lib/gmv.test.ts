@@ -88,3 +88,23 @@ describe("agruparPagamentos", () => {
     expect(p).toMatchObject({ id: "A", cliente: "PROD_SERVER_7", valorCents: 7000, estado: "pago", quando: "2026-10-02T10:00:00Z", teste: false });
   });
 });
+
+describe("reembolso parcial (12/10/2026)", () => {
+  const tx = (id: string, type: string, amount_cents: number) => ({
+    order_uuid: "o1", transaction_uuid: id, customer_ext_id: "PROD_SERVER_1",
+    amount_cents, status: "SUCCESS", type, created: "2026-10-01T10:00:00Z",
+  });
+
+  it("devolver uma parte deixa o pagamento cobrado, e o GMV conta o que ficou", () => {
+    const [p] = agruparPagamentos([tx("t1", "DEFERRED", 10000), tx("t2", "CONFIRMATION", 10000), tx("t3", "REFUND", 3000)]);
+    expect(p.estado).toBe("pago");
+    expect(p.reembolsadoCents).toBe(3000);
+    expect(gmvDe([p]).gmv).toBe(70);
+  });
+
+  it("devolver tudo é reembolsado, e sai do GMV", () => {
+    const [p] = agruparPagamentos([tx("t1", "DEFERRED", 10000), tx("t2", "CONFIRMATION", 10000), tx("t3", "REFUND", 10000)]);
+    expect(p.estado).toBe("reembolsado");
+    expect(gmvDe([p]).gmv).toBe(0);
+  });
+});

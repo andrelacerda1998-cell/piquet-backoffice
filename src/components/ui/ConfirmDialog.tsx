@@ -25,6 +25,12 @@ interface ConfirmDialogProps {
   reasonPlaceholder?: string;
   /** Mínimo de letras do motivo (o servidor das ações registadas exige 5). */
   minReason?: number;
+  /**
+   * Para o que não tem volta (apagar um técnico, um colaborador): só deixa
+   * confirmar depois de se escrever este texto (normalmente o nome). Um clique
+   * distraído não chega.
+   */
+  escreverParaConfirmar?: string;
   loading?: boolean;
 }
 
@@ -41,25 +47,30 @@ export function ConfirmDialog({
   reasonLabel = "Motivo",
   reasonPlaceholder = "",
   minReason = 1,
+  escreverParaConfirmar,
   loading = false,
 }: ConfirmDialogProps) {
   const [reason, setReason] = useState("");
+  const [escrito, setEscrito] = useState("");
+  const naoEscreveu = !!escreverParaConfirmar
+    && escrito.trim().toLocaleLowerCase("pt-PT") !== escreverParaConfirmar.trim().toLocaleLowerCase("pt-PT");
   const [busy, setBusy] = useState(false);
   const working = loading || busy;
   const motivoCurto = requireReason && reason.trim().length < minReason;
 
   const confirm = async () => {
-    if (motivoCurto) return;
+    if (motivoCurto || naoEscreveu) return;
     setBusy(true);
     try {
       await onConfirm(requireReason ? reason.trim() : undefined);
     } finally {
       setBusy(false);
       setReason("");
+      setEscrito("");
     }
   };
 
-  const close = () => { if (!working) { setReason(""); onClose(); } };
+  const close = () => { if (!working) { setReason(""); setEscrito(""); onClose(); } };
 
   return (
     <Modal
@@ -72,7 +83,7 @@ export function ConfirmDialog({
           <button onClick={close} disabled={working} className="btn-secondary text-sm disabled:opacity-50">{cancelLabel}</button>
           <button
             onClick={confirm}
-            disabled={working || motivoCurto}
+            disabled={working || motivoCurto || naoEscreveu}
             className={cn(
               "text-sm px-3 py-2 rounded-lg font-medium disabled:opacity-50",
               tone === "danger" ? "bg-danger text-danger-on hover:opacity-90" : "bg-piquet text-ink hover:opacity-90"
@@ -85,6 +96,11 @@ export function ConfirmDialog({
     >
       <div className="space-y-4">
         {description && <div className="text-sm text-text-secondary">{description}</div>}
+        {escreverParaConfirmar && (
+          <Field label={`Para confirmar, escreve "${escreverParaConfirmar}"`}>
+            <input value={escrito} onChange={(e) => setEscrito(e.target.value)} className="input-field" autoComplete="off" />
+          </Field>
+        )}
         {requireReason && (
           <Field label={reasonLabel}>
             <textarea

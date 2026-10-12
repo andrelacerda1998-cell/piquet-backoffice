@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/fetchAll";
 import { partesLisboa } from "@/lib/periodo";
 import { COMISSAO_PIQUET } from "@/lib/comissao";
-import { chargedCents, derivePaymentState, isTestAmount, paymentKey, type PaymentState } from "./paylands";
+import { chargedCents, derivePaymentState, isTestAmount, paymentKey, refundedCents, type PaymentState } from "./paylands";
 
 /**
  * O GMV da Piquet. Uma definição, um sítio.
@@ -42,6 +42,8 @@ export interface Pagamento<T extends TransacaoPayshop = TransacaoPayshop> {
   /** O cliente na app (`PROD_SERVER_<id>`), ou "" se o Payshop não o tiver. */
   cliente: string;
   valorCents: number;
+  /** O que já se devolveu (num reembolso parcial o pagamento continua cobrado, pelo resto). */
+  reembolsadoCents: number;
   estado: PaymentState;
   /** Quando foi feito: a primeira transação da encomenda. */
   quando: string | null;
@@ -66,6 +68,7 @@ export function agruparPagamentos<T extends TransacaoPayshop>(txs: readonly T[])
       id,
       cliente: transacoes.find((t) => t.customer_ext_id)?.customer_ext_id ?? "",
       valorCents,
+      reembolsadoCents: refundedCents(transacoes),
       estado: derivePaymentState(transacoes),
       quando: transacoes.map((t) => t.created).filter((c): c is string => !!c).sort()[0] ?? null,
       teste: isTestAmount(valorCents),
@@ -96,7 +99,8 @@ export function gmvDe(pagamentos: readonly Pagamento[], inicio?: Date | string, 
     const t = p.quando ? Date.parse(p.quando) : NaN;
     return Number.isFinite(t) && t >= de && t < ate;
   });
-  const cents = dentro.reduce((s, p) => s + p.valorCents, 0);
+  // Líquido do que se devolveu num reembolso parcial: o GMV é o que ficou cobrado.
+  const cents = dentro.reduce((s, p) => s + p.valorCents - p.reembolsadoCents, 0);
   return { gmv: euros(cents), commission: euros(cents * COMISSAO_PIQUET), pagamentos: dentro.length };
 }
 
@@ -112,7 +116,7 @@ export function gmvPorMes(pagamentos: readonly Pagamento[]): Array<{ mes: string
   for (const p of cobrados(pagamentos)) {
     if (!p.quando) continue;
     const m = mesDe(p.quando);
-    (porMes.get(m) ?? porMes.set(m, []).get(m)!).push(p.valorCents);
+    (porMes.get(m) ?? porMes.set(m, []).get(m)!).push(p.valorCents - p.reembolsadoCents);
   }
   return [...porMes.entries()]
     .sort(([a], [b]) => a.localeCompare(b))

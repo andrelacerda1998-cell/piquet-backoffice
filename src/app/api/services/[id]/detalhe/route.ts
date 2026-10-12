@@ -5,6 +5,8 @@ import { estadoDoBackoffice, mapLaravelService, type LaravelServiceRow } from ".
 import type { EventoDoPedido } from "@/lib/historicoPedido";
 import type { ServiceRequest, UserRole } from "@/types";
 import { hasPermission } from "@/lib/permissions";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import { chargedCents, refundedCents } from "../../../_lib/paylands";
 
 /**
  * GET /api/services/:id/detalhe — um serviço do Laravel, com os técnicos que
@@ -47,6 +49,11 @@ export interface DetalheDoServico {
   contactos: { cliente: string | null; tecnico: string | null } | null;
   /** O pagamento (Payshop) do pedido, que é o que o reembolso precisa. */
   pagamentoUuid: string | null;
+  /**
+   * Quanto se cobrou e já se devolveu nesse pagamento, em cêntimos, pelas
+   * transações do Payshop (as mesmas do Financeiro). `null` sem transações.
+   */
+  pagamento: { cobradoCents: number; reembolsadoCents: number } | null;
   /** O estado no Laravel ("Finished", "ClosedPendingPayment"…): decide que ações há. */
   estadoLaravel: string | null;
   /** Só num pedido personalizado: o que o cliente escreveu e o que a Piquet definiu. */
@@ -92,6 +99,23 @@ function numeros(c: CandidatoLaravel): CandidatoLaravel {
   };
 }
 
+/**
+ * O cobrado e o já devolvido de um pagamento, para o reembolso propor o que
+ * resta (e não o valor do pedido, que pode não ser o que se cobrou). Sem
+ * transações, ou se a leitura falhar, fica sem: o diálogo usa o valor do pedido.
+ */
+async function valoresDoPagamento(uuid: string): Promise<{ cobradoCents: number; reembolsadoCents: number } | null> {
+  try {
+    const { data, error } = await supabaseAdmin().from("pop_transactions")
+      .select("type, status, amount_cents").ilike("order_uuid", uuid).limit(50);
+    if (error || !data?.length) return null;
+    const txs = data as Array<{ type: string; status: string; amount_cents: number }>;
+    return { cobradoCents: chargedCents(txs), reembolsadoCents: refundedCents(txs) };
+  } catch {
+    return null;
+  }
+}
+
 export const GET = withStaff(async (_req, { params, staff }) => {
   if (!LARAVEL_ADMIN_ENABLED) {
     return apiErr("API de admin do Laravel não configurada.", 503);
@@ -124,6 +148,7 @@ export const GET = withStaff(async (_req, { params, staff }) => {
 
     return apiOk<DetalheDoServico>({
       servico, candidatos: lista, eventos, contactos, pagamentoUuid: d.payment_order_uuid || null,
+      pagamento: d.payment_order_uuid ? await valoresDoPagamento(d.payment_order_uuid) : null,
       estadoLaravel: d.status ?? null,
       personalizado: d.is_custom
         ? {

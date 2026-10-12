@@ -1,6 +1,6 @@
 import { apiGet, USE_REAL_API } from "./api";
 import { monthlySeries } from "@/lib/trends";
-import { TODAY } from "@/lib/today";
+import { hoje } from "@/lib/today";
 
 /**
  * Política "zero em vez de ficção": em produção, as listas de negócio semeadas
@@ -31,7 +31,8 @@ function lastMonthLabels(n: number): string[] {
   const fmt = new Intl.DateTimeFormat("pt-PT", { month: "short" });
   const out: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(TODAY.getFullYear(), TODAY.getMonth() - i, 1);
+    const agora = hoje();
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
     out.push(fmt.format(d).replace(".", ""));
   }
   return out;

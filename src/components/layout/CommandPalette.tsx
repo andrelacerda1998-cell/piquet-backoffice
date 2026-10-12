@@ -73,7 +73,7 @@ const ACOES: Array<{
   { id: "nova-fatura", label: "Nova fatura", sublabel: "Custos e faturas", perm: ["view_finance"], Icon: FileText, href: "/financeiro?tab=custos&novo=fatura" },
   { id: "novo-contacto", label: "Novo contacto", sublabel: "Alguém que pediu informação", perm: ["view_marketing", "view_customers"], Icon: Inbox, href: "/leads?novo=contacto" },
   { id: "conta-teste", label: "Criar conta de teste de técnico", perm: ["manage_technicians"], Icon: UserPlus, href: "/tecnicos?tab=lista&novo=conta-teste" },
-  { id: "lote", label: "Criar lote de transferências", sublabel: "Pagamentos a técnicos", perm: ["pay_technicians"], Icon: Euro, href: "/financeiro?tab=pagamentos" },
+  { id: "lote", label: "Criar lote de transferências", sublabel: "Financeiro › Transferências", perm: ["pay_technicians"], Icon: Euro, href: "/financeiro?tab=transferencias" },
   { id: "reembolsar", label: "Reembolsar um pedido…", sublabel: "Escreve o número: > reembolsar 282", perm: ["refund_payments"], Icon: Undo2, completar: "> reembolsar " },
   { id: "suspender", label: "Suspender um técnico…", sublabel: "Escreve o nome: > suspender Rui", perm: ["manage_technicians"], Icon: UserX, completar: "> suspender " },
   { id: "bloquear", label: "Bloquear um cliente…", sublabel: "Escreve o nome: > bloquear Ana", perm: ["destructive_actions"], Icon: Ban, completar: "> bloquear " },

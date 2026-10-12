@@ -216,7 +216,6 @@ const LIVE_EXACT = new Set<string>([
   "/goals",
   // Faturas de custos da empresa (manuais + Outlook)
   "/finance/company-invoices",
-  "/tax/vat",
   // Planeamento financeiro mensal (linhas de orçamento do André)
   "/finance/budget",
   // Saldo de tesouraria registado à mão (substitui a constante inventada).
@@ -294,6 +293,12 @@ const LIVE_DENY = new Set<string>([
  * migrados juntos na fatia da "Visão geral" (2026-07-29).
  */
 const REAL_DATA = new Set<string>([
+  /*
+    O IVA a entregar: calculado da comissão REAL (o GMV do Payshop) e das
+    faturas de custo registadas. Estava dado como ficção ("vem do seed") e por
+    isso o ecrã mostrava 0 € -- o seed que o alimentava há muito que não existe.
+  */
+  "/tax/vat",
   /*
     Volumes da Visão Geral (executados e agendados, mês e ano). Ia ao backend
     pelo padrão /services/:id e voltava ZERADO por não estar aqui: os quatro

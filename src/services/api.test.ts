@@ -168,7 +168,8 @@ describe("isDemoEndpoint — o que é FICÇÃO (≠ o que está ligado à BD)", 
     // regra das anteriores: as 27 obrigações semeadas foram apagadas e o
     // resumo passou a somar os serviços do Laravel. Ficar na lista fazia o
     // selo dizer "dados fictícios" por cima de números verdadeiros.)
-    for (const ep of ["/tax/summary", "/tax/vat"]) {
+    // (/tax/vat saiu a 2026-10-12: calcula-se do GMV real e das faturas.)
+    for (const ep of ["/tax/summary"]) {
       expect(isLiveEndpoint(ep), `${ep} devia ir ao backend`).toBe(true);
       expect(isDemoEndpoint(ep), `${ep} vem do seed → é demo`).toBe(true);
     }
@@ -301,7 +302,6 @@ describe("LIVE_EXACT × REAL_DATA — nenhuma lista pode divergir em silêncio",
    */
   const EXCECOES: Record<string, string> = {
     "/tax/summary": "vem do seed — é ficção, e o selo de demonstração está certo",
-    "/tax/vat": "idem",
     "/support/inbox/seed": "é uma ação de semear, não devolve números",
     "/technicians/test-account": "é uma ação sobre a conta de teste, não devolve números",
   };
@@ -360,7 +360,6 @@ describe("todo o GET que vai ao backend chega ao ecrã sem ser zerado", () => {
   /** Ficção declarada: vai ao backend e os números SÃO inventados, ou não é usado. */
   const FICCAO: Record<string, string> = {
     "/tax/summary": "vem do seed",
-    "/tax/vat": "vem do seed",
   };
 
   async function load() {

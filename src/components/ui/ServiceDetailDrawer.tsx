@@ -10,7 +10,7 @@ import type { ServiceRequest } from "@/types";
 import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
-import { refundAppPayment } from "@/services/financeService";
+import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
@@ -306,14 +306,23 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
     depois de saber se o pedido tem um pagamento cobrado. Se não tiver, diz porquê
     em vez de abrir uma janela que o Payshop ia recusar.
   */
-  const pediuReembolso = useRef(false);
+  const pediuAcao = useRef(false);
   useEffect(() => {
-    if (acaoInicial !== "reembolsar" || aCarregar || pediuReembolso.current) return;
-    pediuReembolso.current = true;
-    if (podeReembolsar) setAReembolsar(true);
-    else if (!gereDinheiro) toast("O teu perfil não pode reembolsar.", "error");
-    else toast(`O pedido #${service.id} não tem um pagamento cobrado para reembolsar.`, "error");
-  }, [acaoInicial, aCarregar, podeReembolsar, gereDinheiro, service.id]);
+    if (!acaoInicial || aCarregar || pediuAcao.current) return;
+    pediuAcao.current = true;
+    if (!gereDinheiro) { toast("O teu perfil não pode mexer em pagamentos.", "error"); return; }
+    // Vindo do ⌘K ou do Financeiro: abre a confirmação dessa ação, se o estado do pedido a permitir.
+    if (acaoInicial === "reembolsar") {
+      if (podeReembolsar) setAReembolsar(true);
+      else toast(`O pedido #${service.id} não tem um pagamento cobrado para reembolsar.`, "error");
+    } else if (acaoInicial === "tentar-cobrar") {
+      if (porCobrar) setAcao("tentar-cobrar");
+      else toast(`O pedido #${service.id} não está à espera de cobrança.`, "error");
+    } else if (acaoInicial === "fechar") {
+      if (podeFechar) setAcao("fechar");
+      else toast(`O pedido #${service.id} não está à espera de ser fechado.`, "error");
+    }
+  }, [acaoInicial, aCarregar, podeReembolsar, porCobrar, podeFechar, gereDinheiro, service.id]);
 
   const correr = async (motivo?: string) => {
     if (!acao) return;
@@ -395,35 +404,18 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
         reasonLabel={acao === "fechar" ? "Porque é que estás a fechar sem o cliente confirmar?" : "Porque é que estás a desistir da cobrança?"}
         reasonPlaceholder={acao === "fechar" ? "Ex.: cliente confirmou por telefone que o trabalho ficou feito" : "Ex.: cartão recusado três vezes; cliente sem outro meio de pagamento"}
       />
-      <ConfirmDialog
-        open={aReembolsar}
-        onClose={() => setAReembolsar(false)}
-        onConfirm={async (motivo) => {
-          if (!uuid || !motivo) return;
-          try {
-            await refundAppPayment(uuid, motivo, { servicoId: service.id });
-            toast(`Reembolso de ${formatCurrency(service.totalCustomerValue)} enviado ao Payshop.`);
-            setAReembolsar(false);
-          } catch (e) {
-            toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error");
-          }
-        }}
-        title={`Reembolsar o pedido #${service.id}?`}
-        tone="danger"
-        confirmLabel="Reembolsar"
-        description={
-          <>
-            Vais devolver <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b> a{" "}
-            <b className="text-text-primary">{service.customerName || "este cliente"}</b>, pelo mesmo meio de pagamento.
-            O dinheiro sai da conta da Piquet e não se desfaz. Se o pedido ainda estiver a decorrer, o Payshop não deixa:
-            primeiro tem de ser cancelado na app.
-          </>
-        }
-        requireReason
-        minReason={MOTIVO_MINIMO}
-        reasonLabel="Porque é que estás a reembolsar?"
-        reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do técnico"
-      />
+      {uuid && (
+        <ReembolsoDialog
+          open={aReembolsar}
+          onClose={() => setAReembolsar(false)}
+          onFeito={onMudou}
+          uuid={uuid}
+          cliente={service.customerName}
+          cobradoCents={detalhe?.pagamento?.cobradoCents ?? Math.round(service.totalCustomerValue * 100)}
+          jaDevolvidoCents={detalhe?.pagamento?.reembolsadoCents ?? 0}
+          servicoId={service.id}
+        />
+      )}
     </>
   );
 }

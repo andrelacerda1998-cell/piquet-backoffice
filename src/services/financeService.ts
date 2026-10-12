@@ -125,6 +125,8 @@ export interface AppPayment {
   attempts: number;
   /** Pagamento de teste do programador (<10 €) — fora dos KPIs e do GMV. */
   isTest?: boolean;
+  /** O pedido a que o pagamento pertence (quando o backend o diz). */
+  servicoId?: string | null;
 }
 
 export interface AppPaymentsData {
@@ -142,8 +144,8 @@ export interface AppPaymentsData {
 }
 
 /** Pagamentos reais da app (POP/Paylands), agregados por encomenda. */
-export async function getAppPayments(): Promise<AppPaymentsData> {
-  return apiGet("/finance/app-payments", () => ({
+export async function getAppPayments(comTestes = false): Promise<AppPaymentsData> {
+  return apiGet(`/finance/app-payments${comTestes ? "?testes=1" : ""}`, () => ({
     kpis: {
       pagoCents: 264300, pagoCount: 82, cativadoCents: 148050, cativadoCount: 36,
       canceladoCount: 24, recusadoCount: 21, reembolsadoCents: 18600,

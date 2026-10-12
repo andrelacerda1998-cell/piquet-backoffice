@@ -130,13 +130,29 @@ export type PaymentState = "pago" | "cativado" | "cancelado" | "reembolsado" | "
  * (cativação → confirmação/cancelamento/reembolso). O que aconteceu por último
  * no ciclo de vida manda — daí a ordem de precedência.
  */
-export function derivePaymentState(txs: Array<{ type: string; status: string }>): PaymentState {
+export function derivePaymentState(txs: Array<{ type: string; status: string; amount_cents?: number }>): PaymentState {
   const okOf = (t: string) => txs.some((x) => x.status === "SUCCESS" && x.type === t);
-  if (okOf("REFUND") || okOf("REVERSAL")) return "reembolsado";
+  if (okOf("REFUND") || okOf("REVERSAL")) {
+    /*
+      Um reembolso PARCIAL (devolveu-se uma parte) não faz do pagamento um
+      "reembolsado": continua cobrado, pelo resto. Só quando o devolvido chega
+      ao cobrado é que é reembolsado. Sem valores nas transações, como antes.
+    */
+    const devolvido = refundedCents(txs);
+    const cobrado = txs.every((t) => typeof t.amount_cents === "number") ? chargedCents(txs as Array<{ type: string; status: string; amount_cents: number }>) : 0;
+    if (cobrado > 0 && devolvido > 0 && devolvido < cobrado) return "pago";
+    return "reembolsado";
+  }
   if (okOf("CANCELLATION")) return "cancelado";
   if (okOf("CONFIRMATION") || okOf("PURCHASE") || okOf("CAPTURE") || okOf("PAYMENT")) return "pago";
   if (okOf("DEFERRED") || okOf("AUTHORIZATION")) return "cativado";
   return "recusado";
+}
+
+/** O que já se devolveu ao cliente (reembolsos com sucesso), em cêntimos. */
+export function refundedCents(txs: Array<{ type: string; status: string; amount_cents?: number }>): number {
+  return txs.filter((t) => t.status === "SUCCESS" && (t.type === "REFUND" || t.type === "REVERSAL"))
+    .reduce((s, t) => s + (t.amount_cents ?? 0), 0);
 }
 
 /** Tipos de transação que representam dinheiro efetivamente cobrado. */

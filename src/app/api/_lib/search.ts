@@ -232,19 +232,19 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
             `/v1/admin/payment-orders?uuids=${uuids.map(encodeURIComponent).join(",")}`,
           );
           const lista = Array.isArray(r) ? r : r.items ?? [];
-          for (const o of lista) if (o.service_id) pedidoDe.set(o.uuid, String(o.service_id));
+          for (const o of lista) if (o.service_id) pedidoDe.set(o.uuid.toUpperCase(), String(o.service_id));
         });
       }
       for (const uuid of uuids) {
         const txs = porPagamento.get(uuid) ?? [];
         const estado = PAGAMENTO_ESTADO[derivePaymentState(txs)];
-        const pedido = pedidoDe.get(uuid);
+        const pedido = pedidoDe.get(uuid.toUpperCase());
         const quando = txs.map((t) => t.created).filter(Boolean).sort()[0];
         out.push({
           type: "payment", typeLabel: "Pagamento", id: uuid,
           title: `Pagamento de ${euros(chargedCents(txs))}`,
           subtitle: join([pedido ? `pedido #${pedido}` : null, quando ? new Date(quando).toLocaleDateString("pt-PT") : null, uuid.slice(0, 8)]),
-          href: pedido ? pedidoHref(pedido) : "/financeiro?tab=app-pagamentos",
+          href: pedido ? pedidoHref(pedido) : "/financeiro?tab=pagamentos",
           estado: estado.label, tom: estado.tom,
         });
       }

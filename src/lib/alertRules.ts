@@ -316,7 +316,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       horas >= LIMITES.loteHorasAlta ? "alta" : "media",
       `Lote de pagamento de ${l.total.toLocaleString("pt-PT", { style: "currency", currency: "EUR" })} por aprovar`,
       `Criado${l.criadoPor ? ` por ${l.criadoPor}` : ""}. Tem de ser aprovado por outra pessoa antes de se pagar.`,
-      "Aprovar em Financeiro › Pagamentos a técnicos.",
+      "Aprovar em Financeiro › Transferências.",
       l.criadoEm, "lotes", l.id, { donos: DONOS.pagarTecnicos },
     ));
   }
@@ -428,7 +428,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       "critica",
       `${i.nome} com prazo ultrapassado`,
       `${i.valor.toFixed(2).replace(".", ",")} €${i.estimado ? " (estimativa)" : ""} · prazo era ${i.venceuEm.slice(0, 10)}.`,
-      "Confirmar o pagamento em Financeiro › Impostos e RH.",
+      "Confirmar o pagamento em Financeiro › Resultado › Impostos e RH.",
       i.venceuEm, "imposto", undefined, { donos: DONOS.financas, lembrete: true },
     ));
   }
@@ -454,7 +454,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       s.pagamentosRecusados >= 5 ? "alta" : "media",
       `${plural(s.pagamentosRecusados, "pagamento recusado", "pagamentos recusados")} nos últimos 7 dias`,
       "Cada recusa é um serviço que pode não ter sido pago.",
-      "Ver Financeiro › Pagamentos da app.",
+      "Ver Financeiro › Pagamentos.",
       new Date(agoraMs).toISOString(), "pagamentos", undefined, { donos: DONOS.financas },
     ));
   }
