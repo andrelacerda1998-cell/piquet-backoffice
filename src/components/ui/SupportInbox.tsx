@@ -14,7 +14,9 @@ import {
   TICKET_STATUS, statusMeta, CHANNEL_LABEL, isOpen,
   type InboxTicket, type TicketStatus, type TicketChannel, type TicketPriority,
 } from "@/services/supportInboxService";
-import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2, Check } from "lucide-react";
+import { Search, Send, Smartphone, HardHat, Mail, Clock, ChevronDown, Trash2, Check, Headphones, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { pedidoHref } from "@/lib/fichas";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 
@@ -22,6 +24,7 @@ const CHANNEL_ICON: Record<TicketChannel, typeof Mail> = {
   app_cliente: Smartphone,
   app_tecnico: HardHat,
   email: Mail,
+  backoffice: Headphones,
 };
 
 type StatusFilter = "todos" | "abertos" | TicketStatus;
@@ -457,6 +460,12 @@ export function SupportInbox() {
               <span className="text-[11px] text-text-muted inline-flex items-center gap-1">
                 <Clock className="h-3 w-3" />aberto {formatDateTime(selected.openedAt)}
               </span>
+              {/* A reclamação é sobre um pedido: abre-se a ficha dele daqui. */}
+              {selected.serviceId && /^\d+$/.test(selected.serviceId) && (
+                <Link href={pedidoHref(selected.serviceId)} className="text-xs font-medium text-piquet-600 hover:underline inline-flex items-center gap-0.5">
+                  Pedido #{selected.serviceId} <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              )}
               <button
                 onClick={() => setTicketAApagar(selected)}
                 title="Apagar este ticket (irreversível)"
@@ -525,7 +534,9 @@ export function SupportInbox() {
                   <div className="flex items-end gap-2">
                     <textarea value={reply} onChange={(e) => setReply(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                      rows={2} placeholder={`Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
+                      rows={2} placeholder={selected.channel === "backoffice"
+                        ? "Acrescentar ao ticket… (o cliente não vê: fala com ele por telefone ou WhatsApp)"
+                        : `Responder a ${selected.requesterName.split(" ")[0]}… (chega pelo canal ${CHANNEL_LABEL[selected.channel]})`}
                       className="input-field text-sm resize-none flex-1" />
                     <button onClick={send} disabled={!reply.trim()} className="btn-primary py-2 disabled:opacity-40 shrink-0"><Send className="h-4 w-4" /></button>
                   </div>

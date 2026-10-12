@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
-import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import type { ServiceRequest } from "@/types";
 import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
@@ -19,6 +18,11 @@ import { getFotosDoCliente, getDetalheDoServico, acaoDoPedido, type FotoDoClient
 import { DespacharPersonalizado } from "@/components/ui/DespacharPersonalizado";
 import type { CandidatoLaravel, DetalheDoServico } from "@/app/api/services/[id]/detalhe/route";
 import { comIntervalos, textoDoEvento } from "@/lib/historicoPedido";
+import { proximoPasso, type ProximoPasso } from "@/lib/proximoPasso";
+import { clienteHref, tecnicoHref, pedidoHref } from "@/lib/fichas";
+import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
+import { NotasInternas } from "@/components/ui/NotasInternas";
+import { TicketsDoPedido } from "@/components/ui/TicketsDoPedido";
 
 /*
   ——— O que saiu deste painel, e porquê ———
@@ -51,6 +55,22 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
   // O detalhe lê-se UMA vez: os convites e a cronologia saem da mesma resposta.
   const detalhe = useDetalhe(service.id);
+  const fotos = useFotos(service.id);
+  const d = detalhe.detalhe;
+  // Só depois de ler o detalhe: antes disso não se sabe o estado no Laravel nem os convites.
+  const passo = detalhe.aCarregar ? null : proximoPasso({
+    status: service.status,
+    estadoLaravel: d?.estadoLaravel,
+    pedidoEm: service.requestedAt,
+    marcadoPara: service.scheduledAt,
+    iniciadoEm: service.startedAt,
+    terminadoEm: service.completedAt,
+    temTecnico: !!service.technicianId,
+    personalizado: !!d?.personalizado,
+    temReclamacao: service.hasComplaint,
+    convidados: convidadosDe(d?.candidatos, service.matching),
+    eventos: d?.eventos,
+  }, Date.now());
 
   return (
     /*
@@ -63,20 +83,21 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
       daí o `!`.
     */
     <div className="fixed inset-0 z-50 bg-black/40 !mt-0" onClick={onClose}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Serviço ${service.id}`} className="w-full bg-surface h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Pedido ${service.id}`} className="w-full bg-surface h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Cabeçalho: o pedido, as duas pessoas e o que se pode fazer. */}
         <div className="sticky top-0 bg-surface border-b border-surface-border px-6 py-4 z-10">
-          <div className="mx-auto max-w-[1400px] flex items-start justify-between gap-4">
+          <div className="mx-auto max-w-[1400px] flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="font-mono text-xs text-text-muted">#{service.id}</p>
               <h2 className="text-lg font-bold mt-0.5">{service.serviceName}</h2>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
-                <StatusBadge status={service.status} label={SERVICE_STATUS_LABELS[service.status]} />
-                <span>{[service.city, service.requestedAt && `pedido ${formatDateTime(service.requestedAt)}`].filter(Boolean).join(" · ")}</span>
+              <div className="mt-1 flex flex-wrap items-start gap-x-3 gap-y-1 text-sm text-text-secondary">
+                {/* O estado simples, dito de quem é a vez; o técnico fica por baixo, em cinzento. */}
+                <EstadoDoPedido status={service.status} tecnico estadoLaravel={d?.estadoLaravel} />
+                <span className="pt-0.5">{[service.city, service.requestedAt && `pedido ${formatDateTime(service.requestedAt)}`].filter(Boolean).join(" · ")}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <AcoesDoPedido service={service} detalhe={detalhe.detalhe} onMudou={() => detalhe.recarregar?.()} />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <AcoesDoPedido service={service} detalhe={d} onMudou={() => detalhe.recarregar?.()} />
               <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
           </div>
@@ -84,79 +105,90 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
             <Pessoa
               papel="Cliente"
               nome={service.customerName || "(sem nome)"}
-              telefone={detalhe.detalhe?.contactos?.cliente}
-              semAcesso={!!detalhe.detalhe && detalhe.detalhe.contactos === null}
-              ficha={service.customerId ? fichaHref("/clientes?tab=lista", "cliente", service.customerId, service.customerName) : undefined}
+              telefone={d?.contactos?.cliente}
+              semAcesso={!!d && d.contactos === null}
+              ficha={service.customerId ? clienteHref(service.customerId, service.customerName) : undefined}
             />
             <Pessoa
               papel="Técnico"
               nome={service.technicianName ?? "Ainda sem técnico"}
-              telefone={service.technicianId ? detalhe.detalhe?.contactos?.tecnico : undefined}
-              semAcesso={!!service.technicianId && !!detalhe.detalhe && detalhe.detalhe.contactos === null}
-              ficha={service.technicianId ? fichaHref("/tecnicos?tab=lista", "tecnico", service.technicianId, service.technicianName) : undefined}
+              telefone={service.technicianId ? d?.contactos?.tecnico : undefined}
+              semAcesso={!!service.technicianId && !!d && d.contactos === null}
+              ficha={service.technicianId ? tecnicoHref(service.technicianId, service.technicianName) : undefined}
             />
           </div>
-          {/*
-            Os quatro botões antigos (Avançar estado, Agendar, Cancelar,
-            Reembolsar) só mostravam mensagens. Os que estão agora acima fazem
-            o que dizem: ligar, abrir a ficha, reembolsar pelo Payshop.
-          */}
         </div>
 
-        {/*
-          Tudo à vista, em colunas, em vez de dez separadores.
-
-          Isto era uma gaveta de 576px com dez abas: para ver o pagamento e a
-          cronologia do mesmo serviço era preciso saltar entre elas e guardar
-          uma na cabeça. Com o ecrã todo cabem lado a lado, e deixa de haver
-          conteúdo escondido atrás de um clique — que era metade do problema
-          deste painel.
-        */}
-        {/*
-          Colunas CSS e não `grid`.
-
-          Com `grid`, as células alinham por LINHA: o Resumo é alto, e os dois
-          cartões ao lado ficavam com um buraco por baixo até ao fim da linha.
-          Num serviço sem técnico e sem valores — onde metade dos cartões é
-          uma frase — metade do ecrã era espaço vazio.
-
-          `columns` empilha na vertical e só passa à coluna seguinte quando a
-          anterior enche, como uma página de jornal: sem linhas, sem buracos.
-          `break-inside-avoid` impede que um cartão seja cortado ao meio.
-        */}
-        <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 columns-1 lg:columns-2 xl:columns-3 gap-5">
-          <Seccao titulo="Pedido"><Resumo service={service} /></Seccao>
-          {/* Os convites importam enquanto não há técnico; depois ficam fechados. */}
-          <Seccao titulo="Técnicos convidados" fechada={!!service.technicianId}><Matching detalhe={detalhe} /></Seccao>
-          <Seccao titulo="Cronologia"><Cronologia service={service} detalhe={detalhe} /></Seccao>
-          <Seccao titulo="Dinheiro"><Pagamento service={service} /></Seccao>
-          <Seccao titulo="Fotos do cliente"><Fotos service={service} /></Seccao>
+        <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 space-y-5">
+          {passo && <AvisoDoProximoPasso passo={passo} />}
           {/*
-            Avaliação e reclamação num cartão só: são as duas o que o cliente
-            achou no fim e, na esmagadora maioria dos serviços, são as duas
-            uma frase a dizer que não há. Dois cartões para duas frases era o
-            desperdício mais visível deste ecrã.
+            Duas colunas, cada uma uma pilha: à esquerda o que aconteceu
+            (cronologia, convites, fotos, histórico), à direita o pedido, o
+            dinheiro, o que o cliente achou, os tickets e as notas.
+
+            Eram três colunas de jornal (CSS columns): os cartões mudavam de
+            coluna conforme a altura dos outros, e o dinheiro aparecia ora em
+            cima ora em baixo. Agora cada coisa está sempre no mesmo sítio.
           */}
-          <Seccao titulo="O que o cliente achou">
-            {!service.rating && !service.hasComplaint ? (
-              <p className="text-sm text-text-muted">Sem avaliação nem reclamação.</p>
-            ) : (
-            <div className="space-y-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Avaliação</p>
-                <Avaliacoes service={service} />
-              </div>
-              <div className="pt-3 border-t border-surface-border">
-                <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Reclamação</p>
-                <Reclamacao service={service} />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5 items-start">
+            <div className="space-y-5 min-w-0">
+              <Seccao titulo="Cronologia"><Cronologia service={service} detalhe={detalhe} /></Seccao>
+              {/* Os convites importam enquanto não há técnico; depois ficam fechados. */}
+              <Seccao titulo="Técnicos convidados" fechada={!!service.technicianId}><Matching detalhe={detalhe} /></Seccao>
+              <Seccao titulo="Fotos do cliente" vazia={fotos.fotos?.length === 0 ? "O cliente não anexou fotos." : null}>
+                <Fotos estado={fotos} />
+              </Seccao>
+              <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa key={detalhe.versao} entidade="pedido" id={service.id} /></Seccao>
+              <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
             </div>
-            )}
-          </Seccao>
-          <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa key={detalhe.versao} entidade="pedido" id={service.id} /></Seccao>
-          <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
+            <div className="space-y-5 min-w-0">
+              <Seccao titulo="Pedido"><Resumo service={service} /></Seccao>
+              <Seccao titulo="Dinheiro"><Pagamento service={service} /></Seccao>
+              {/*
+                Avaliação e reclamação num cartão só: são as duas o que o cliente
+                achou no fim e, na esmagadora maioria dos serviços, não há
+                nenhuma -- aí o cartão é uma linha.
+              */}
+              <Seccao titulo="O que o cliente achou" vazia={!service.rating && !service.hasComplaint ? "Sem avaliação nem reclamação." : null}>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Avaliação</p>
+                    <Avaliacoes service={service} />
+                  </div>
+                  <div className="pt-3 border-t border-surface-border">
+                    <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Reclamação</p>
+                    <Reclamacao service={service} />
+                  </div>
+                </div>
+              </Seccao>
+              <Seccao titulo="Tickets"><TicketsDoPedido servicoId={service.id} temReclamacao={service.hasComplaint} /></Seccao>
+              <Seccao titulo="Notas internas"><NotasInternas entidade="pedido" id={service.id} /></Seccao>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Os convites do matching, contados para o "Próximo passo" (do detalhe, ou da lista enquanto não chega). */
+function convidadosDe(lista: CandidatoLaravel[] | undefined, m: ServiceRequest["matching"]) {
+  if (lista) {
+    return {
+      total: lista.length,
+      aceitaram: lista.filter((c) => ["accepted", "selected", "lost"].includes(c.status)).length,
+      porResponder: lista.filter((c) => ["notified", "shortlisted"].includes(c.status)).length,
+    };
+  }
+  return m ? { total: m.invited, aceitaram: m.accepted, porResponder: m.notified } : null;
+}
+
+/** O "Próximo passo": âmbar quando alguém tem de agir, cinzento quando o pedido anda sozinho. */
+function AvisoDoProximoPasso({ passo }: { passo: ProximoPasso }) {
+  return (
+    <div className={cn("rounded-xl border-l-[3px] px-4 py-3",
+      passo.tom === "agir" ? "border-l-warning bg-warning-light/50" : "border-l-surface-strong bg-surface-subtle")}>
+      <p className="text-sm text-text-primary"><b>Próximo passo:</b> {passo.texto}</p>
     </div>
   );
 }
@@ -164,12 +196,22 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
 /**
  * Um bloco do ecrã, com título. Substitui um separador. `fechada` mostra só
  * o título até alguém o abrir: para o que raramente interessa naquele pedido.
+ * `vazia` encolhe o bloco a uma linha ("Sem fotos"): uma secção vazia aberta
+ * ocupava o mesmo espaço que uma cheia, para dizer que não há nada.
  */
-function Seccao({ titulo, children, fechada = false }: { titulo: string; children: React.ReactNode; fechada?: boolean }) {
+function Seccao({ titulo, children, fechada = false, vazia }: { titulo: string; children: React.ReactNode; fechada?: boolean; vazia?: string | null }) {
   const h3 = "text-xs font-semibold uppercase tracking-[0.14em] text-text-muted";
+  if (vazia) {
+    return (
+      <section className="card px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className={h3}>{titulo}</h3>
+        <p className="text-sm text-text-muted">{vazia}</p>
+      </section>
+    );
+  }
   if (fechada) {
     return (
-      <details className="card p-4 mb-5 break-inside-avoid group">
+      <details className="card p-4 group">
         <summary className={cn(h3, "cursor-pointer select-none list-none flex items-center justify-between")}>
           {titulo}<span className="normal-case tracking-normal font-normal text-text-secondary group-open:hidden">Mostrar</span>
         </summary>
@@ -178,20 +220,11 @@ function Seccao({ titulo, children, fechada = false }: { titulo: string; childre
     );
   }
   return (
-    <section className="card p-4 mb-5 break-inside-avoid">
+    <section className="card p-4">
       <h3 className={cn(h3, "mb-3")}>{titulo}</h3>
       {children}
     </section>
   );
-}
-
-/** O endereço da ficha de um cliente ou técnico: /clientes/412 com um id do Laravel. */
-function fichaHref(base: string, chave: string, id: string, nome?: string): string {
-  if (/^\d+$/.test(id)) return `${base.split("?")[0]}/${id}`;
-  const url = new URL(base, "http://x");
-  url.searchParams.set(chave, id);
-  if (nome?.trim()) url.searchParams.set("q", nome.trim());
-  return url.pathname + url.search;
 }
 
 /** Só os dígitos, com o indicativo de Portugal quando o número vem sem ele. */
@@ -275,7 +308,7 @@ function AcoesDoPedido({ service, detalhe, onMudou }: { service: ServiceRequest;
   };
 
   const copiar = async () => {
-    const url = `${window.location.origin}/servicos?servico=${encodeURIComponent(service.id)}`;
+    const url = `${window.location.origin}${pedidoHref(service.id)}`;
     try { await navigator.clipboard.writeText(url); toast("Ligação do pedido copiada."); }
     catch { toast(url, "info"); }
   };
@@ -574,18 +607,23 @@ function duracaoCurta(segundos: number): string {
  * Os URL são temporários (60 minutos, assinados pelo Laravel). Se o painel
  * ficar aberto muito tempo, deixam de abrir — daí o aviso.
  */
-function Fotos({ service }: { service: ServiceRequest }) {
-  const [fotos, setFotos] = useState<FotoDoCliente[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+type EstadoDasFotos = { fotos: FotoDoCliente[] | null; erro: string | null };
 
+/** As fotos do cliente, lidas uma vez por painel (a secção encolhe quando não há). */
+function useFotos(id: string): EstadoDasFotos {
+  const [estado, setEstado] = useState<EstadoDasFotos>({ fotos: null, erro: null });
   useEffect(() => {
     let vivo = true;
-    getFotosDoCliente(service.id)
-      .then((f) => vivo && setFotos(f))
-      .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Não foi possível ler as fotografias."));
+    setEstado({ fotos: null, erro: null });
+    getFotosDoCliente(id)
+      .then((f) => vivo && setEstado({ fotos: f, erro: null }))
+      .catch((e) => vivo && setEstado({ fotos: null, erro: e instanceof Error ? e.message : "Não foi possível ler as fotografias." }));
     return () => { vivo = false; };
-  }, [service.id]);
+  }, [id]);
+  return estado;
+}
 
+function Fotos({ estado: { fotos, erro } }: { estado: EstadoDasFotos }) {
   if (erro) return <p className="text-sm text-danger">{erro}</p>;
   if (fotos === null) return <p className="text-sm text-text-muted">A carregar…</p>;
   if (fotos.length === 0) {
@@ -712,11 +750,8 @@ function Reclamacao({ service }: { service: ServiceRequest }) {
         não vem na API.
       */}
       <p className="mt-1 text-sm text-text-secondary">
-        O que o cliente disse está no ticket, em Suporte, com o número do pedido no assunto.
+        O que o cliente disse está no ticket: vê a secção Tickets, ao lado.
       </p>
-      <Link href="/suporte" className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-danger hover:underline">
-        Abrir Suporte <ArrowUpRight className="h-3.5 w-3.5" />
-      </Link>
     </div>
   );
 }

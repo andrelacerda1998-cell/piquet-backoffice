@@ -12,7 +12,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from "./api";
  * O resto do backoffice (esta UI) não muda quando se ligam as fontes reais.
  * ========================================================================== */
 
-export type TicketChannel = "app_cliente" | "app_tecnico" | "email";
+export type TicketChannel = "app_cliente" | "app_tecnico" | "email" | "backoffice";
 export type TicketStatus = "novo" | "em_curso" | "aguarda_cliente" | "resolvido" | "fechado";
 export type TicketPriority = "baixa" | "media" | "alta" | "critica";
 
@@ -35,6 +35,8 @@ export interface InboxTicket {
   requesterEmail: string;
   subject: string;
   category?: string;
+  /** O pedido a que o ticket pertence, quando o há. */
+  serviceId?: string;
   priority: TicketPriority;
   status: TicketStatus;
   messages: InboxMessage[];
@@ -56,6 +58,8 @@ export const CHANNEL_LABEL: Record<TicketChannel, string> = {
   app_cliente: "App · Cliente",
   app_tecnico: "App · Técnico",
   email: "Email",
+  // Aberto pela equipa a partir da ficha do pedido (ex.: o cliente ligou a reclamar).
+  backoffice: "Aberto pela equipa",
 };
 
 const OPEN_STATES: TicketStatus[] = ["novo", "em_curso", "aguarda_cliente"];

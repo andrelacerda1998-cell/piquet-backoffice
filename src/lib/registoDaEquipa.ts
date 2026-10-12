@@ -50,6 +50,7 @@ export const ESCRITAS: Record<string, Escrita> = {
   // Pedidos
   "POST /services": { acao: "Registou um serviço", entidade: "pedido" },
   "PUT /services/[id]": { acao: "Alterou o pedido", entidade: "pedido", id: "id" },
+  "POST /services/[id]/tickets": { acao: "Abriu um ticket ligado ao pedido", entidade: "pedido", id: "id" },
   "POST /vendor-no-shows/[id]/declare": { acao: "Declarou falta do técnico", entidade: "pedido", id: "id", registoProprio: true },
   "POST /services/[id]/despachar": { acao: "Despachou o pedido personalizado", entidade: "pedido", id: "id" },
   "POST /services/[id]/fechar": { acao: "Fechou o pedido (cobrou e pagou ao técnico)", entidade: "pedido", id: "id", registoProprio: true },
@@ -122,6 +123,10 @@ export const ESCRITAS: Record<string, Escrita> = {
  * negócio. Registá-las enchia o histórico de ruído.
  */
 export const NAO_REGISTAR: Record<string, string> = {
+  // A nota é ela própria o registo: guarda quem a escreveu e quando.
+  "POST /services/[id]/notas": "a nota guarda o autor",
+  "POST /customers/[id]/notas": "a nota guarda o autor",
+  "POST /technicians/[id]/notas": "a nota guarda o autor",
   "POST /alerts/snooze": "adiar um alerta é arrumar a própria fila",
   "DELETE /alerts/snooze": "idem",
   "POST /marketing/refresh": "ir buscar dados aos anúncios não muda nada",

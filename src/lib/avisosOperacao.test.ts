@@ -116,7 +116,7 @@ describe("avisosDeServicos", () => {
   });
 
   it("leva ao serviço certo", () => {
-    expect(avisosDeServicos([servico()], { agora: AGORA })[0].url).toBe("/servicos?servico=282");
+    expect(avisosDeServicos([servico()], { agora: AGORA })[0].url).toBe("/servicos/282");
   });
 });
 

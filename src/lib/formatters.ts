@@ -152,6 +152,11 @@ export function statusTone(status: string): StatusTone {
   return STATUS_TONE[status] ?? "neutral";
 }
 
+/** Classe de cor (theme-aware) de um tom, para quem já sabe o tom (ex.: estados simples). */
+export function toneClass(tone: StatusTone): string {
+  return TONE_CLASS[tone];
+}
+
 /** Classe de cor (theme-aware) de um estado — fonte única. */
 export function getStatusColor(status: string): string {
   return TONE_CLASS[statusTone(status)];

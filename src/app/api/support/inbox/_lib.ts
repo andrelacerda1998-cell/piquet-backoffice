@@ -77,6 +77,8 @@ export function toInboxTicket(r: TicketRow) {
     requesterEmail: r.requester_email,
     subject: r.subject,
     category: r.category || undefined,
+    // O pedido a que o ticket pertence (as apps mandam-no; a ficha do pedido abre por ele).
+    serviceId: r.service_id || undefined,
     priority: r.priority,
     status: r.status,
     messages: Array.isArray(r.messages) ? r.messages : [],
