@@ -2,7 +2,7 @@
 
 import { useFilterStore } from "@/stores";
 import { getPeriodLabel } from "@/lib/formatters";
-import { TODAY } from "@/lib/today";
+import { hoje } from "@/lib/today";
 import { CalendarDays } from "lucide-react";
 
 const FULL_MONTHS = [
@@ -12,7 +12,8 @@ const FULL_MONTHS = [
 
 // Últimos 12 meses a partir da data de referência.
 const MONTHS = Array.from({ length: 12 }, (_, i) => {
-  const d = new Date(TODAY.getFullYear(), TODAY.getMonth() - i, 1);
+  const agora = hoje();
+  const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
   return {
     key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
     label: `${FULL_MONTHS[d.getMonth()]} ${d.getFullYear()}`,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CheckCircle2, Copy, Download, FileCheck2, ShieldCheck } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { useAuthStore, toast } from "@/stores";
@@ -58,6 +59,7 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
   const lotes = useMemo(() => data?.lotes ?? [], [data]);
   const [escolhidos, setEscolhidos] = useState<Set<number>>(new Set());
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [aConfirmar, setAConfirmar] = useState<{ tipo: "aprovar" | "pagar" | "cancelar"; lote: Lote } | null>(null);
   const [conferencia, setConferencia] = useState<ResultadoDaConferencia | null>(null);
 
   // Quem já está num lote por pagar não pode entrar noutro.
@@ -193,18 +195,39 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
           <p className="card p-4 text-sm text-text-secondary">Ainda não há lotes de pagamento.</p>
         ) : lotes.map((l) => (
           <CartaoDoLote key={l.id} lote={l} userId={user?.id ?? ""} podePagar={podePagar} ocupado={ocupado}
-            aprovar={() => correr(`aprovar:${l.id}`, () => aprovarLote(l.id), "Lote aprovado. Já se podem fazer as transferências.")}
-            pagar={() => {
-              if (!confirm(`Já fizeste as transferências deste lote (${formatCurrency(l.total)}) no banco?\n\nAo confirmar, cada carteira é debitada pelo valor do lote e cada técnico é avisado de que foi pago.`)) return;
-              correr(`pagar:${l.id}`, () => pagarLote(l.id), "Lote marcado como pago.");
-            }}
-            cancelar={() => {
-              if (!confirm("Cancelar este lote? Nenhuma carteira foi debitada.")) return;
-              correr(`cancelar:${l.id}`, () => cancelarLote(l.id), "Lote cancelado.");
-            }}
+            aprovar={() => setAConfirmar({ tipo: "aprovar", lote: l })}
+            pagar={() => setAConfirmar({ tipo: "pagar", lote: l })}
+            cancelar={() => setAConfirmar({ tipo: "cancelar", lote: l })}
           />
         ))}
       </section>
+
+      {/*
+        As três decisões sobre um lote mexem em dinheiro de pessoas: cada uma
+        diz o valor e o que acontece a seguir, na janela de confirmação do
+        backoffice (eram confirm() do browser, iguais a um aviso qualquer).
+      */}
+      <ConfirmDialog
+        open={aConfirmar !== null}
+        onClose={() => setAConfirmar(null)}
+        onConfirm={async () => {
+          if (!aConfirmar) return;
+          const { tipo, lote } = aConfirmar;
+          setAConfirmar(null);
+          if (tipo === "aprovar") await correr(`aprovar:${lote.id}`, () => aprovarLote(lote.id), "Lote aprovado. Já se podem fazer as transferências.");
+          if (tipo === "pagar") await correr(`pagar:${lote.id}`, () => pagarLote(lote.id), "Lote marcado como pago.");
+          if (tipo === "cancelar") await correr(`cancelar:${lote.id}`, () => cancelarLote(lote.id), "Lote cancelado.");
+        }}
+        tone={aConfirmar?.tipo === "cancelar" ? "danger" : "default"}
+        title={aConfirmar?.tipo === "aprovar" ? `Aprovar o lote de ${formatCurrency(aConfirmar.lote.total)}?`
+          : aConfirmar?.tipo === "pagar" ? `Já fizeste as transferências deste lote (${formatCurrency(aConfirmar.lote.total)})?`
+          : "Cancelar este lote?"}
+        description={aConfirmar?.tipo === "aprovar" ? "Depois de aprovado, as transferências fazem-se no banco e o lote marca-se como pago."
+          : aConfirmar?.tipo === "pagar" ? "Ao confirmar, cada carteira é debitada pelo valor do lote e cada técnico é avisado de que foi pago. Não se desfaz."
+          : "Nenhuma carteira foi debitada; os saldos voltam a ficar por pagar."}
+        confirmLabel={aConfirmar?.tipo === "aprovar" ? "Aprovar" : aConfirmar?.tipo === "pagar" ? "Sim, já transferi" : "Cancelar o lote"}
+        cancelLabel="Voltar"
+      />
     </div>
   );
 }

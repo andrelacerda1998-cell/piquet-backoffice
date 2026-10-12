@@ -1,6 +1,9 @@
 "use client";
 
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
+import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
+import { pedidoHref } from "@/lib/fichas";
+import Link from "next/link";
 import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -12,7 +15,6 @@ import { useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import ImpostosRhPage from "../impostos-rh/ImpostosRh";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ChartCard, BarChartComponent, AreaChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters } from "@/hooks/useDashboard";
@@ -27,7 +29,6 @@ import {
   type BudgetItem, type BudgetKind, type BudgetFrequency, type BudgetCategory,
   type InvoiceRecurrence,
   getTreasury, addTreasuryBalance,
-  refundAppPayment,
   cancelAppPaymentHold,
 } from "@/services/financeService";
 import { buildMonthlyPlan, type PlanItem } from "@/lib/budgetPlan";
@@ -45,32 +46,54 @@ import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
 import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
+/*
+  Quatro separadores (auditoria de 08/10/2026), e "pagamentos" a querer dizer
+  uma coisa só. Eram sete, com "Pagamentos da app" (dinheiro que ENTRA) ao
+  lado de "Pagamentos a técnicos" (dinheiro que SAI).
+
+  - Resultado: o resumo, o planeamento, o lucro do sistema e, recolhidos,
+    os impostos e a equipa. Fica primeiro, como pediu o André a 21/07.
+  - Pagamentos: o que os clientes pagaram (Payshop).
+  - Transferências: o que se paga aos técnicos, por lotes.
+  - Custos e faturas: as faturas de fornecedores.
+*/
 const TABS: TabDef[] = [
-  // Consolidado (2026-07-17): 8 → 5 abas. Tesouraria fundida no Resumo;
-  // Faturação e Reembolsos passaram a sub-abas de "Custos e faturas".
-  // 2026-07-21: Resumo primeiro (default), com as próximas faturas a pagar.
-  { id: "resumo", label: "Resumo" },
-  { id: "app-pagamentos", label: "Pagamentos da app" },
-  // "Receita" escondida a 2026-07-22: era 100% demo (seed zerado). Volta
-  // quando ligar aos serviços reais + Payshop (mesma fonte do GMV).
+  { id: "resultado", label: "Resultado" },
+  { id: "pagamentos", label: "Pagamentos" },
+  { id: "transferencias", label: "Transferências" },
   { id: "custos", label: "Custos e faturas" },
-  { id: "planeamento", label: "Planeamento" },
-  { id: "pagamentos", label: "Pagamentos a técnicos" },
-  { id: "impostos", label: "Impostos e RH" },
-  // Migrado do Filament (Pages\SystemProfit) — vem da API de admin do Laravel.
-  { id: "lucro-sistema", label: "Lucro do sistema" },
 ];
 
-/** Estado final de um pagamento da app (ciclo de vida do pagamento diferido). */
-const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
-  pago: { label: "Pago", tone: "bg-success-light text-success" },
-  cativado: { label: "Cativado", tone: "bg-info-light text-info" },
-  cancelado: { label: "Cancelado", tone: "bg-surface-subtle text-text-secondary" },
-  reembolsado: { label: "Reembolsado", tone: "bg-warning-light text-warning" },
-  recusado: { label: "Recusado", tone: "bg-danger-light text-danger" },
+/** Os separadores de antes: levam ao novo sítio (e à secção certa do Resultado). */
+const SEPARADORES_ANTIGOS: Record<string, { tab: string; secao?: string }> = {
+  resumo: { tab: "resultado" },
+  "app-pagamentos": { tab: "pagamentos" },
+  planeamento: { tab: "resultado", secao: "planeamento" },
+  impostos: { tab: "resultado", secao: "impostos" },
+  "lucro-sistema": { tab: "resultado", secao: "lucro" },
 };
+
+/**
+ * Estado final de um pagamento da app (ciclo de vida do pagamento diferido),
+ * com os nomes da auditoria: Cativo, Cobrado, Falhou, Reembolsado -- e
+ * "Libertado" para o cativo que se devolveu sem cobrar.
+ */
+const PAY_STATE: Record<PaymentState, { label: string; tone: string }> = {
+  pago: { label: "Cobrado", tone: "bg-success-light text-success" },
+  cativado: { label: "Cativo", tone: "bg-info-light text-info" },
+  cancelado: { label: "Libertado", tone: "bg-surface-subtle text-text-secondary" },
+  reembolsado: { label: "Reembolsado", tone: "bg-warning-light text-warning" },
+  recusado: { label: "Falhou", tone: "bg-danger-light text-danger" },
+};
+
+/** "Problemas primeiro": o que falhou, depois os cativos há mais de 3 dias, depois o resto por data. */
+function problemasPrimeiro(lista: AppPayment[]): AppPayment[] {
+  const peso = (p: AppPayment) => p.state === "recusado" ? 0
+    : p.state === "cativado" && p.created && Date.now() - Date.parse(p.created) > 3 * 86_400_000 ? 1 : 2;
+  return [...lista].sort((a, b) => peso(a) - peso(b) || (b.created ?? "").localeCompare(a.created ?? ""));
+}
 
 /**
  * O Laravel guarda `meta.type` como chave de tradução; aqui mapeamos as chaves
@@ -89,13 +112,24 @@ function walletTypeLabel(type: string): string {
 
 export default function FinancePage() {
   const filters = useFilters();
-  const [tab, setTab] = useTabParam("resumo");
+  const [tab, setTab] = useTabParam("resultado");
+  // A secção do Resultado a abrir (vinda de um separador antigo ou de ?secao=).
+  const [secao, setSecao] = useState<string | null>(null);
+  useAcaoPeloEndereco("secao", setSecao);
+  useEffect(() => {
+    const antigo = SEPARADORES_ANTIGOS[tab];
+    if (!antigo) return;
+    setTab(antigo.tab);
+    if (antigo.secao) setSecao(antigo.secao);
+  }, [tab, setTab]);
 
   const { data: summary, loading, error, refetch } = useAsyncData(() => getFinanceSummary(filters), [filters]);
   const { data: revenueVsCosts } = useAsyncData(() => getRevenueVsCosts(filters), [filters]);
   const { data: opResult } = useAsyncData(() => getOperationalResult(), []);
   const { data: companyInv, refetch: refetchInvoices } = useAsyncData(() => getCompanyInvoices(), []);
-  const { data: appPay, refetch: refetchAppPay } = useAsyncData(() => getAppPayments(), []);
+  // Os pagamentos de teste (< 10 €) ficam escondidos; só a pedido.
+  const [verTestes, setVerTestes] = useState(false);
+  const { data: appPay, refetch: refetchAppPay } = useAsyncData(() => getAppPayments(verTestes), [verTestes]);
   /*
     Reembolsar / libertar cativo. São operações sobre dinheiro real, por isso
     passam sempre por confirmação e o botão só aparece no estado em que a ação
@@ -105,10 +139,6 @@ export default function FinancePage() {
   */
   const [payToRefund, setPayToRefund] = useState<AppPayment | null>(null);
   const [payToRelease, setPayToRelease] = useState<AppPayment | null>(null);
-  const doRefund = async (p: AppPayment, motivo: string) => {
-    try { await refundAppPayment(p.id, motivo); toast(`Reembolso de ${formatCurrency(p.amount)} enviado ao Payshop.`); refetchAppPay(); }
-    catch (e) { toast(e instanceof Error ? e.message : "Erro ao reembolsar.", "error"); }
-  };
   const doRelease = async (p: AppPayment) => {
     try { await cancelAppPaymentHold(p.id); toast(`Cativo de ${formatCurrency(p.amount)} libertado.`); refetchAppPay(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro ao libertar o cativo.", "error"); }
@@ -207,6 +237,8 @@ export default function FinancePage() {
     try { await updateBudgetItem(item.id, { active: !item.active }); refetchBudget(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
+  // Remover uma linha do orçamento muda o planeamento todo: pede confirmação.
+  const [linhaARemover, setLinhaARemover] = useState<BudgetItem | null>(null);
   const removeBudgetItem = async (item: BudgetItem) => {
     try { await deleteBudgetItem(item.id); toast("Linha removida."); refetchBudget(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
@@ -311,12 +343,18 @@ export default function FinancePage() {
       refetchInvoices();
     } catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
-  const registerPartial = async (inv: CompanyInvoice) => {
-    const val = window.prompt(`Valor já pago desta fatura (total ${formatCurrency(inv.amount)}):`, String(inv.amountPaid || ""));
-    if (val === null) return;
-    const paid = Number(val.replace(",", "."));
-    if (!(paid >= 0)) { toast("Valor inválido.", "error"); return; }
-    try { await updateCompanyInvoice(inv.id, { amountPaid: paid }); toast("Pagamento registado."); refetchInvoices(); }
+  // Pagamento parcial de uma fatura: numa janela do backoffice (era um prompt() do browser).
+  const [parcialDe, setParcialDe] = useState<CompanyInvoice | null>(null);
+  const [valorParcial, setValorParcial] = useState("");
+  const registerPartial = (inv: CompanyInvoice) => {
+    setParcialDe(inv);
+    setValorParcial(inv.amountPaid ? String(inv.amountPaid).replace(".", ",") : "");
+  };
+  const gravarParcial = async () => {
+    if (!parcialDe) return;
+    const paid = Number(valorParcial.replace(/\s/g, "").replace(",", "."));
+    if (!(paid >= 0) || paid > parcialDe.amount) { toast(`Indica um valor entre 0 e ${formatCurrency(parcialDe.amount)}.`, "error"); return; }
+    try { await updateCompanyInvoice(parcialDe.id, { amountPaid: paid }); toast("Pagamento registado."); setParcialDe(null); refetchInvoices(); }
     catch (e) { toast(e instanceof Error ? e.message : "Erro.", "error"); }
   };
   // Remoção com confirmação (ConfirmDialog) — antes apagava direto ao clicar.
@@ -428,7 +466,7 @@ export default function FinancePage() {
     { key: "actions", label: "", render: (r) => (
       <div className="flex items-center gap-2 justify-end">
         <button onClick={() => openBudgetModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => removeBudgetItem(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+        <button onClick={() => setLinhaARemover(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
       </div>
     ) },
   ];
@@ -453,7 +491,7 @@ export default function FinancePage() {
             eyebrow="Financeiro"
             title="Financeiro"
             subtitle="Receita, custos e tesouraria"
-            actions={<MonthSelect />}
+            actions={tab === "resultado" ? <MonthSelect /> : undefined}
           />
 
           {/* Faturas vencidas e impostos: lembretes de gestão, aqui e não na fila da Visão Geral. */}
@@ -462,7 +500,7 @@ export default function FinancePage() {
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
           {/* ---------------------------------- RESUMO ---------------------------------- */}
-          {tab === "resumo" && (
+          {tab === "resultado" && (
             <div className="space-y-6">
               {/* GMV: o cobrado no Payshop (ver api/_lib/gmv.ts) — o mesmo da
                   Visão Geral e de todo o Financeiro. */}
@@ -704,8 +742,9 @@ export default function FinancePage() {
           {/* Planeamento financeiro mensal (2026-07-22): quanto dinheiro é preciso em cada
               mês. Linhas de orçamento reais (custos recorrentes + entradas previstas,
               tabela budget_items) projetadas 12 meses, somadas às faturas reais a pagar. */}
-          {tab === "planeamento" && (
-            <div className="space-y-6">
+          {tab === "resultado" && (
+            <div className="space-y-6" id="planeamento">
+              <SectionHeader title="Planeamento" aside={<span className="text-xs text-text-muted">Quanto dinheiro é preciso em cada mês, com as faturas a pagar</span>} />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {/* previous = current: são projeções do próprio plano, sem comparação fabricada. */}
                 <MetricCard title="Necessidade este mês" metric={buildMetricValue(plan.months[0]?.net ?? 0, plan.months[0]?.net ?? 0)} format="currency" />
@@ -825,7 +864,7 @@ export default function FinancePage() {
           {/* -------------------------------- PAGAMENTOS -------------------------------- */}
           {/* Real desde 2026-07-22: derivado dos serviços concluídos (valor do
               técnico por técnico × mês); "Processar" grava o registo do pagamento. */}
-          {tab === "pagamentos" && (
+          {tab === "transferencias" && (
             <div className="space-y-6">
               {(() => {
                 const itens = vendorPayments?.items ?? [];
@@ -881,14 +920,14 @@ export default function FinancePage() {
           )}
 
           {/* -------------------------------- TESOURARIA -------------------------------- */}
-          {tab === "app-pagamentos" && appPay && (
+          {tab === "pagamentos" && appPay && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p className="text-sm text-text-secondary max-w-2xl">
                   Pagamentos processados na app via Payshop Online Payments. Cada pagamento é
                   cativado na reserva e cobrado quando o serviço se confirma.
                   {(appPay.kpis.testCount ?? 0) > 0 && (
-                    <span className="text-text-muted"> {appPay.kpis.testCount} pagamentos de teste ({"<"}10 €) estão excluídos dos totais e do GMV.</span>
+                    <span className="text-text-muted"> {appPay.kpis.testCount} pagamentos de teste ({"<"}10 €) estão fora dos totais, do GMV e da lista.</span>
                   )}
                 </p>
                 <span className="inline-flex items-center gap-1.5 text-xs text-text-muted shrink-0">
@@ -909,7 +948,7 @@ export default function FinancePage() {
                 <div className="card p-5 border-l-4 border-l-info">
                   <div className="flex items-center gap-2 text-text-secondary">
                     <Clock className="h-4 w-4 text-info" />
-                    <span className="text-sm font-medium">Cativado</span>
+                    <span className="text-sm font-medium">Cativo</span>
                   </div>
                   <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(appPay.kpis.cativadoCents / 100)}</p>
                   <p className="mt-1 text-xs text-text-muted">{appPay.kpis.cativadoCount} pré-autorizações à espera de confirmação</p>
@@ -919,8 +958,8 @@ export default function FinancePage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MetricCard title="Ticket médio" metric={buildMetricValue(appPay.kpis.avgTicketCents / 100, appPay.kpis.avgTicketCents / 100)} format="currency" />
                 <MetricCard title="Taxa de sucesso" metric={buildMetricValue(appPay.kpis.successRate, appPay.kpis.successRate, false, undefined, "Pagamentos que avançaram (cobrados ou cativados) do total de tentativas")} format="percent" />
-                <MetricCard title="Cancelados" metric={buildMetricValue(appPay.kpis.canceladoCount, appPay.kpis.canceladoCount, true, undefined, "Cativações libertadas — a reserva não avançou")} />
-                <MetricCard title="Recusados" metric={buildMetricValue(appPay.kpis.recusadoCount, appPay.kpis.recusadoCount, true)} />
+                <MetricCard title="Libertados" metric={buildMetricValue(appPay.kpis.canceladoCount, appPay.kpis.canceladoCount, true, undefined, "Cativos devolvidos sem cobrar — a reserva não avançou")} />
+                <MetricCard title="Falharam" metric={buildMetricValue(appPay.kpis.recusadoCount, appPay.kpis.recusadoCount, true, undefined, "Pagamentos que o Payshop recusou (cartão, MB WAY…)")} />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -940,9 +979,17 @@ export default function FinancePage() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-semibold">Pagamentos</h2>
-                  <span className="text-xs text-text-muted">Um por reserva — o estado reflete o que aconteceu no fim</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h2 className="font-semibold">Pagamentos</h2>
+                    <span className="text-xs text-text-muted">Um por reserva. Primeiro os que falharam e os cativos há mais de 3 dias; depois os mais recentes.</span>
+                  </div>
+                  {(appPay.kpis.testCount ?? 0) > 0 && (
+                    <label className="inline-flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                      <input type="checkbox" checked={verTestes} onChange={(e) => setVerTestes(e.target.checked)} />
+                      Mostrar os {appPay.kpis.testCount} de teste
+                    </label>
+                  )}
                 </div>
                 <DataTable
                   columns={[
@@ -958,11 +1005,17 @@ export default function FinancePage() {
                     { key: "refunded", label: "Reembolsado", render: (r: AppPayment) => r.refunded > 0
                       ? <span className="text-danger">−{formatCurrency(r.refunded)}</span>
                       : <span className="text-text-muted">—</span> },
+                    // O pedido do pagamento: é lá que se resolve (reembolsar, tentar cobrar, falar com o cliente).
+                    { key: "servicoId", label: "Pedido", render: (r: AppPayment) => r.servicoId
+                      ? <Link href={pedidoHref(r.servicoId)} className="text-piquet-600 hover:underline whitespace-nowrap">#{r.servicoId}</Link>
+                      : <span className="text-text-muted">—</span> },
                     { key: "state", label: "Estado", render: (r: AppPayment) => {
                       const s = PAY_STATE[r.state];
+                      // Devolvida só uma parte: continua cobrado, pelo resto.
+                      const emParte = r.state === "pago" && r.refunded > 0;
                       return (
                         <span className="inline-flex items-center gap-1.5">
-                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{s.label}</span>
+                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{emParte ? "Cobrado · devolvido em parte" : s.label}</span>
                           {r.isTest && (
                             <span title="Pagamento de teste do programador (<10 €) — fora dos totais e do GMV."
                               className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
@@ -973,14 +1026,17 @@ export default function FinancePage() {
                       );
                     } },
                     { key: "acoes", label: "", render: (r: AppPayment) => (
-                      r.state === "pago" ? (
+                      r.state === "pago" && r.refunded < r.amount ? (
                         <button onClick={() => setPayToRefund(r)} className="text-xs text-danger hover:underline whitespace-nowrap">Reembolsar</button>
                       ) : r.state === "cativado" ? (
                         <button onClick={() => setPayToRelease(r)} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Libertar cativo</button>
+                      ) : r.state === "recusado" && r.servicoId ? (
+                        /* A nova tentativa faz-se no pedido, com a mesma confirmação do botão de lá. */
+                        <Link href={`${pedidoHref(r.servicoId)}?acao=tentar-cobrar`} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Tentar cobrar</Link>
                       ) : <span className="text-text-muted">—</span>
                     ) },
                   ]}
-                  data={appPay.payments}
+                  data={problemasPrimeiro(appPay.payments)}
                   keyField="id"
                   emptyMessage="Sem pagamentos — a primeira sincronização acontece no próximo ciclo"
                 />
@@ -988,10 +1044,16 @@ export default function FinancePage() {
             </div>
           )}
 
-          {tab === "impostos" && <ImpostosRhPage />}
+          {/* Impostos e RH: dentro do Resultado, recolhido -- é coisa de fim de mês, não do dia. */}
+          {tab === "resultado" && (
+            <SecaoRecolhida id="impostos" titulo="Impostos e RH" resumo="Obrigações fiscais, colaboradores e simulador" aberta={secao === "impostos"}>
+              <ImpostosRhPage />
+            </SecaoRecolhida>
+          )}
 
           {/* -------------------------- LUCRO DO SISTEMA (Laravel) -------------------------- */}
-          {tab === "lucro-sistema" && (
+          {tab === "resultado" && (
+            <SecaoRecolhida id="lucro" titulo="Lucro do sistema" resumo="A carteira da Piquet: comissões e taxas retidas em cada serviço" aberta={secao === "lucro"}>
             <div className="space-y-6">
               <p className="text-sm text-text-secondary max-w-2xl">
                 Saldo e livro de transações da wallet do sistema — comissões e taxas retidas pela Piquet em cada serviço.
@@ -1044,6 +1106,7 @@ export default function FinancePage() {
                 </>
               )}
             </div>
+            </SecaoRecolhida>
           )}
         </div>
 
@@ -1138,25 +1201,45 @@ export default function FinancePage() {
           </div>
         </Modal>
 
+        <Modal
+          open={parcialDe !== null}
+          onClose={() => setParcialDe(null)}
+          title="Registar pagamento parcial"
+          subtitle={parcialDe ? `${parcialDe.vendor} · total ${formatCurrency(parcialDe.amount)}` : undefined}
+          footer={
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setParcialDe(null)} className="btn-secondary">Cancelar</button>
+              <button onClick={gravarParcial} className="btn-primary">Registar</button>
+            </div>
+          }
+        >
+          <Field label="Valor já pago (€)" hint="O que já saiu da conta para esta fatura, no total.">
+            <input value={valorParcial} onChange={(e) => setValorParcial(e.target.value)} inputMode="decimal" className="input-field" autoFocus />
+          </Field>
+        </Modal>
+
         <ConfirmDialog
-          open={!!payToRefund}
-          onClose={() => setPayToRefund(null)}
-          onConfirm={async (motivo) => { if (payToRefund && motivo) { await doRefund(payToRefund, motivo); setPayToRefund(null); } }}
-          title="Reembolsar pagamento"
+          open={linhaARemover !== null}
+          onClose={() => setLinhaARemover(null)}
+          onConfirm={async () => { if (linhaARemover) { await removeBudgetItem(linhaARemover); setLinhaARemover(null); } }}
           tone="danger"
-          confirmLabel="Reembolsar"
-          requireReason
-          minReason={MOTIVO_MINIMO}
-          reasonLabel="Porque é que estás a reembolsar?"
-          reasonPlaceholder="Ex.: cobrança em duplicado; serviço não realizado por falta do técnico"
-          description={payToRefund && (
-            <>
-              Vais devolver <b className="text-text-primary">{formatCurrency(payToRefund.amount)}</b> ao cliente
-              <b className="text-text-primary"> {payToRefund.customer}</b>, pelo mesmo meio de pagamento ({payToRefund.method}).
-              O dinheiro sai da conta da Piquet e a operação não se desfaz.
-            </>
-          )}
+          title={`Remover "${linhaARemover?.name ?? "esta linha"}" do orçamento?`}
+          description="Sai do planeamento dos próximos 12 meses. Se só deixou de valer por agora, usa antes o interruptor para a desativar."
+          confirmLabel="Remover"
         />
+
+        {payToRefund && (
+          <ReembolsoDialog
+            open
+            onClose={() => setPayToRefund(null)}
+            onFeito={refetchAppPay}
+            uuid={payToRefund.id}
+            cliente={payToRefund.customer}
+            cobradoCents={Math.round(payToRefund.amount * 100)}
+            jaDevolvidoCents={Math.round(payToRefund.refunded * 100)}
+            servicoId={payToRefund.servicoId}
+          />
+        )}
 
         <ConfirmDialog
           open={!!payToRelease}
@@ -1254,5 +1337,24 @@ export default function FinancePage() {
         </div>
       </Modal>
     </RouteGuard>
+  );
+}
+
+/**
+ * Uma secção do Resultado que só se abre quando interessa (o lucro do sistema,
+ * os impostos e a equipa). Abre-se sozinha quando se chega por um endereço
+ * que aponta para ela (?secao=impostos).
+ */
+function SecaoRecolhida({ id, titulo, resumo, aberta = false, children }: {
+  id: string; titulo: string; resumo?: string; aberta?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <details id={id} open={aberta || undefined} className="card p-4 group">
+      <summary className="cursor-pointer select-none list-none flex flex-wrap items-baseline justify-between gap-2">
+        <span className="font-semibold text-text-primary">{titulo}</span>
+        <span className="text-xs text-text-muted">{resumo} <span className="group-open:hidden">· abrir</span></span>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
   );
 }

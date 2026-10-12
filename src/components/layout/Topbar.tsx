@@ -199,7 +199,8 @@ export function Topbar() {
 
           {/* Período e filtros — só nos ecrãs que os aplicam (ver ECRAS_COM_FILTROS). */}
           {filtrosValem && (<>
-          <select
+          {/* No Financeiro o período escolhe-se no próprio Resultado (um controlo só). */}
+          {!pathname.startsWith("/financeiro") && <select
             value={filters.period}
             onChange={(e) => setFilter("period", e.target.value as PeriodPreset)}
             className="input-field text-sm w-auto py-1.5 pr-8 hidden md:block"
@@ -208,7 +209,7 @@ export function Topbar() {
             {PERIOD_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
-          </select>
+          </select>}
 
           {/* Filters toggle */}
           <button

@@ -220,7 +220,7 @@ export default function TaxHRPage() {
           {r.employmentStatus === "ativo" && (
             <button onClick={(e) => { e.stopPropagation(); setEmpToDeactivate(r); }} className="text-xs text-warning hover:underline">Desativar</button>
           )}
-          {/* Registo errado → eliminar de vez. */}
+          {/* Registo errado → eliminar de vez (só depois de escrever o nome; quem saiu, desativa-se). */}
           <button onClick={(e) => { e.stopPropagation(); setEmpToDelete(r); }} className="text-xs text-text-muted hover:text-danger">Eliminar</button>
         </div>
       </PermissionGate>
@@ -463,6 +463,7 @@ export default function TaxHRPage() {
         title="Eliminar colaborador"
         tone="danger"
         confirmLabel="Eliminar definitivamente"
+        escreverParaConfirmar={empToDelete?.fullName}
         description={empToDelete && (
           <>Vais apagar <b className="text-text-primary">{empToDelete.fullName}</b> e todo o seu histórico de custos.
           Esta ação não pode ser anulada. Se a pessoa apenas saiu da empresa, usa <b className="text-text-primary">Desativar</b>,

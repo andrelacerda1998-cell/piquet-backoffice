@@ -64,7 +64,7 @@ const FAMILIAS: Familia[] = [
     prefixo: "imposto-vencido-",
     id: "grupo-impostos-vencidos",
     titulo: (n) => `${n} obrigações fiscais com prazo ultrapassado`,
-    accao: "Confirmar os pagamentos em Financeiro › Impostos e RH.",
+    accao: "Confirmar os pagamentos em Financeiro › Resultado › Impostos e RH.",
     entityType: "imposto",
   },
 ];

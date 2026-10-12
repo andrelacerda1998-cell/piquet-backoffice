@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { rowToTaxObligation, type TaxObligationRow } from "@/lib/supabase/adapters";
-import { TODAY } from "@/lib/today";
+import { hoje } from "@/lib/today";
 import { apiOk, withStaff } from "../../_lib/handler";
 
 /**
@@ -16,7 +16,7 @@ export const GET = withStaff(async () => {
   if (error) throw new Error(error.message);
   const obligations = ((data ?? []) as TaxObligationRow[]).map(rowToTaxObligation);
 
-  const now = TODAY;
+  const now = hoje();
   const thisMonth = now.toISOString().slice(0, 7);
   const daysTo = (d: string) => (new Date(d).getTime() - now.getTime()) / 86400000;
 

@@ -244,7 +244,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
           type: "payment", typeLabel: "Pagamento", id: uuid,
           title: `Pagamento de ${euros(chargedCents(txs))}`,
           subtitle: join([pedido ? `pedido #${pedido}` : null, quando ? new Date(quando).toLocaleDateString("pt-PT") : null, uuid.slice(0, 8)]),
-          href: pedido ? pedidoHref(pedido) : "/financeiro?tab=app-pagamentos",
+          href: pedido ? pedidoHref(pedido) : "/financeiro?tab=pagamentos",
           estado: estado.label, tom: estado.tom,
         });
       }

@@ -5,5 +5,5 @@ import { redirect } from "next/navigation";
  * para quem o tenha guardado.
  */
 export default function ImpostosRhAntigo() {
-  redirect("/financeiro?tab=impostos");
+  redirect("/financeiro?tab=resultado&secao=impostos");
 }
