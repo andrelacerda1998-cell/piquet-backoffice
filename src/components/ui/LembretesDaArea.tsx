@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  * que alguém tem de fazer hoje na operação; uma fatura de fornecedor em atraso
  * resolve-se quando se abre o Financeiro, e é aí que aparece.
  */
-export function LembretesDaArea({ rota }: { rota: "/financeiro" | "/marketing" }) {
+export function LembretesDaArea({ rota }: { rota: "/financeiro" | "/crescimento" }) {
   const { data, refetch } = useAsyncData(() => getAlerts(1, 200).catch(() => null), []);
   const [aAdiar, setAAdiar] = useState<string | null>(null);
   const lembretes = (data?.lembretes ?? []).filter((a) => rotaDoAlerta(a) === rota);

@@ -26,6 +26,8 @@ const FICHEIRO: Record<string, string> = {
   "/suporte": "src/app/(dashboard)/suporte/page.tsx",
   "/servicos": "src/app/(dashboard)/servicos/ServicosView.tsx",
   "/mercado": "src/app/(dashboard)/mercado/page.tsx",
+  "/crescimento": "src/app/(dashboard)/crescimento/page.tsx",
+  "/configuracao": "src/app/(dashboard)/configuracao/page.tsx",
 };
 
 describe("destinos dos alertas", () => {

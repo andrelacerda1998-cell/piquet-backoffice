@@ -113,7 +113,7 @@ export default function GoalsPage() {
       <div className="space-y-6">
         <PageHeader
           icon={Target}
-          eyebrow="Visão geral"
+          eyebrow="Crescimento"
           title={`Objetivos do ano — ${new Date().getFullYear()}`}
           subtitle={
             <>

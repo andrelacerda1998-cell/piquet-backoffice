@@ -109,7 +109,7 @@ export const GET = withStaff(async (_req, { staff }) => {
     cidadesSemOferta: (() => {
       const porCidade = aoVivo?.oferta.por_cidade;
       if (!porCidade) return [];
-      const online = new Map(porCidade.map((c) => [chaveDaCidade(c.cidade), c.online]));
+      const online = new Map(porCidade.filter((c) => c.cidade).map((c) => [chaveDaCidade(c.cidade), c.online]));
       const procura = new Map<string, { cidade: string; pedidos: number }>();
       for (const p of [...(aoVivo?.a_procura ?? []), ...(aoVivo?.em_curso ?? []), ...(aoVivo?.perdidos ?? [])]) {
         if (!p.cidade || !p.criado_em || agora - Date.parse(p.criado_em) > DIA) continue;

@@ -7,18 +7,16 @@
 
 import { useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { DataTable, type Column } from "@/components/ui/DataTable";
-import { usePersistentList } from "@/hooks/usePersistentList";
 import { getServices } from "@/services/dashboardService";
 import { getLeads, LEAD_STAGE_LABEL } from "@/services/extrasService";
 import { getCompanyInvoices, getFinanceGmv } from "@/services/financeService";
 import { getVendorPayments } from "@/services/vendorPaymentsService";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { formatDate, formatDateTime, formatCurrency, formatNumber } from "@/lib/formatters";
-import { downloadCsv, downloadReportCsv, cn, type CsvSection } from "@/lib/utils";
+import { downloadReportCsv, cn, type CsvSection } from "@/lib/utils";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { toast } from "@/stores";
-import { FileText, Download, FileDown, Trash2, BarChart3, Wrench, Wallet, Megaphone, Star } from "lucide-react";
+import { FileDown, BarChart3, Wrench, Wallet, Megaphone, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
@@ -37,16 +35,6 @@ const PERIODS = [
 ] as const;
 type PeriodId = (typeof PERIODS)[number]["id"];
 
-interface LocalReport {
-  id: string;
-  name: string;
-  type: string;
-  period: string;
-  format: "CSV";
-  createdAt: string;
-  headers: string[];
-  rows: string[][];
-}
 
 /** Intervalo [from, to] em ISO "YYYY-MM-DD" para cada período. */
 function periodRange(p: PeriodId): { from: string; to: string; label: string } {
@@ -164,7 +152,6 @@ function ReportSection({ title, subtitle, icon: Icon, accent, children }: {
 }
 
 export default function ReportsPage() {
-  const [reports, setReports] = usePersistentList<LocalReport>("generated-reports", []);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("mensal");
   const [type, setType] = useState<ReportType>("Operacional");
   const [period, setPeriod] = useState<PeriodId>("este_mes");
@@ -332,15 +319,12 @@ export default function ReportsPage() {
         subtitle: `Período: ${formatDate(from)} a ${formatDate(to)} (${label})`,
         lines: [`Gerado em: ${formatDateTime(new Date().toISOString())}`],
       }, sections);
-      const headers = ["Secção", "Coluna 1", "Coluna 2", "Coluna 3", "Coluna 4", "Coluna 5"];
-      const rows = flat;
-      const entry: LocalReport = {
-        id: `rep_${Date.now()}`,
-        name, type: effectiveType, period: label, format: "CSV",
-        createdAt: new Date().toISOString(), headers, rows,
-      };
-      setReports((prev) => [entry, ...prev].slice(0, 30));
-      toast(`Relatório gerado — ${rows.length} linha(s).`);
+      /*
+        Não se guarda uma lista dos relatórios gerados: ficava só no browser de
+        quem os gerou (outra pessoa não a via) e um relatório volta a gerar-se
+        num clique, com os números de agora.
+      */
+      toast(`${name}: descarregado (${flat.length} linha(s)).`);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível gerar o relatório.", "error");
     } finally {
@@ -348,34 +332,12 @@ export default function ReportsPage() {
     }
   };
 
-  const redownload = (r: LocalReport) => {
-    downloadCsv(`relatorio-${r.type.toLowerCase()}-${r.id}.csv`, r.headers, r.rows);
-  };
-  const remove = (id: string) => {
-    setReports((prev) => prev.filter((r) => r.id !== id));
-    toast("Relatório removido do histórico.");
-  };
-
-  const columns: Column<LocalReport>[] = [
-    { key: "name", label: "Relatório", sortable: true, render: (r) => <span className="font-medium inline-flex items-center gap-2"><FileText className="h-4 w-4 text-piquet-600" />{r.name}</span> },
-    { key: "period", label: "Período" },
-    { key: "rows", label: "Linhas", render: (r) => r.rows.length },
-    { key: "createdAt", label: "Gerado", sortable: true, render: (r) => formatDateTime(r.createdAt) },
-    { key: "format", label: "Formato", render: (r) => <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-subtle text-text-secondary">{r.format}</span> },
-    { key: "acoes", label: "", render: (r) => (
-      <div className="flex items-center gap-2 justify-end">
-        <button onClick={() => redownload(r)} className="btn-secondary text-xs py-1"><Download className="h-3.5 w-3.5" /> Descarregar</button>
-        <button onClick={() => remove(r.id)} className="text-xs text-text-muted hover:text-danger inline-flex items-center gap-1"><Trash2 className="h-3.5 w-3.5" /> Remover</button>
-      </div>
-    ) },
-  ];
-
   return (
     <RouteGuard route="/relatorios">
       <div className="space-y-6">
         <PageHeader
           icon={BarChart3}
-          eyebrow="Visão geral"
+          eyebrow="Crescimento"
           title="Relatórios"
           subtitle="Exporta os dados reais do negócio em CSV, por período"
         />
@@ -463,11 +425,6 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Histórico */}
-        <div>
-          <h3 className="font-semibold mb-3">Relatórios gerados</h3>
-          <DataTable columns={columns} data={reports} keyField="id" emptyMessage="Ainda não geraste relatórios — o histórico fica aqui e pode re-descarregar-se." />
-        </div>
       </div>
     </RouteGuard>
   );

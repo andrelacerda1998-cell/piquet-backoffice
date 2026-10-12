@@ -77,8 +77,8 @@ export interface AoVivo {
     podem_aceitar: number;
     prontos: number;
     por_area: Array<{ area_id: number | string; area: string; online: number; prontos: number }>;
-    /** Por cidade (backend novo): onde há e onde não há quem aceite. Técnicos sem cidade vêm com null. */
-    por_cidade?: Array<{ cidade: string | null; online: number; prontos: number }>;
+    /** Por cidade (backend #172): onde há e onde não há quem aceite. `null` = técnicos sem cidade escolhida. */
+    por_cidade?: Array<{ cidade: string | null; online: number; podem_aceitar?: number; prontos: number }>;
   };
   liquidez: {
     "7d": Liquidez; "30d": Liquidez;
@@ -100,6 +100,9 @@ export const MOTIVOS: Record<string, string> = {
   cliente_a_escolher: "Já há quem aceite: falta o cliente escolher e pagar.",
   pagamento_por_capturar: "Trabalho feito, mas o pagamento ficou por capturar.",
   cliente_nao_confirmou: "O técnico terminou há mais de 24 h e o cliente ainda não confirmou.",
+  tecnico_nao_chegou: "O técnico ainda não chegou: passou meia hora da hora marcada.",
+  em_execucao_ha_muito: "Em curso há mais de 8 horas: confirmar se terminou.",
+  cliente_sem_resposta: "O cliente não responde há mais de um dia.",
 };
 
 export const DESFECHOS: Record<Desfecho, string> = {

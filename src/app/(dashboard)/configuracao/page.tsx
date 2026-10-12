@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
+import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { useTabParam } from "@/hooks/useTabParam";
+import { PainelDeIntegracoes } from "@/components/sistema/PainelDeIntegracoes";
+import { getServiceTypes, type ServiceType } from "@/services/catalogService";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { Modal, Field } from "@/components/ui/Modal";
 import { LoadingState, ErrorState } from "@/components/ui/States";
@@ -21,87 +24,114 @@ import {
   getSentNotifications, getSentNotificationTypes, type SentNotification,
 } from "@/services/sentNotificationsService";
 import { toast } from "@/stores";
-import { formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Plus, FileCheck2, Settings, Pencil } from "lucide-react";
-import { Notificacoes } from "@/components/layout/Notificacoes";
 import { PageHeader } from "@/components/ui/PageHeader";
-import CatalogPage from "./_tabs/catalogo";
-import PricingPage from "./_tabs/precos";
-import ZonesPage from "./_tabs/zonas";
 import { DemoBadge } from "@/components/ui/DemoBadge";
+import CatalogPage from "./_tabs/catalogo";
+import ZonesPage from "./_tabs/zonas";
 
-// Consolidado (2026-07-19): 7 → 2 grupos. Oferta/preços de um lado,
-// administração do outro.
+/*
+  Um nível só, e cada separador com endereço (?tab=). Eram dois grupos com
+  sub-separadores sem endereço: um alerta não conseguia apontar para as
+  Integrações, nem se podia mandar a alguém a ligação para a Equipa.
+
+  Saíram: os Códigos SMS (08/10), os Avisos neste dispositivo (estão no menu
+  do utilizador), as Promoções (estão no Marketing) e a "Tabela de preços",
+  que lia um catálogo de demonstração e em produção estava vazia -- os preços
+  de referência vêm agora do catálogo do Laravel.
+*/
 const TABS: TabDef[] = [
-  { id: "servicos", label: "Serviços e preços" },
-  { id: "administracao", label: "Administração" },
+  { id: "catalogo", label: "Catálogo" },
+  { id: "zonas", label: "Zonas" },
+  { id: "precos", label: "Preços e comissões" },
+  { id: "documentos", label: "Documentos exigidos" },
+  { id: "equipa", label: "Equipa e acessos" },
+  { id: "historico", label: "Histórico" },
+  { id: "sistema", label: "Sistema" },
 ];
 
-/** Hub de configuração — oferta, taxas, documentos, admins e auditoria. */
+/** Os sub-separadores de antes, para as ligações antigas não se perderem. */
+const ANTIGOS: Record<string, string> = {
+  servicos: "catalogo", administracao: "documentos", taxas: "precos",
+  admins: "equipa", atividade: "historico", notificacoes: "sistema", integracoes: "sistema",
+};
+
+/** Configurações: as regras do negócio (catálogo, zonas, preços) e quem tem acesso. */
 export default function ConfiguracaoPage() {
-  const [tab, setTab] = useState("servicos");
+  const [tab, setTab] = useTabParam("catalogo");
+  useEffect(() => { if (ANTIGOS[tab]) setTab(ANTIGOS[tab]); }, [tab, setTab]);
   return (
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
         <PageHeader
           icon={Settings}
           eyebrow="Sistema"
-          title={<>Configurações <DemoBadge endpoint="/settings" /></>}
-          subtitle="Catálogo, preços, zonas, taxas, documentos e equipa"
+          title="Configurações"
+          subtitle="Catálogo, zonas, preços, documentos, equipa e o estado das integrações"
         />
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "servicos" && (
-          <SubTabs tabs={[
-            { id: "catalogo", label: "Catálogo" },
-            { id: "precos", label: "Preços" },
-            { id: "zonas", label: "Zonas" },
-            { id: "taxas", label: "Taxas e comissões" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "catalogo" && <CatalogPage />}
-                {sub === "precos" && <PricingPage />}
-                {sub === "zonas" && <ZonesPage />}
-                {sub === "taxas" && <TaxasTab />}
-              </>
-            )}
-          </SubTabs>
+        {tab === "catalogo" && <CatalogPage />}
+        {tab === "zonas" && <ZonesPage />}
+        {tab === "precos" && (
+          <div className="space-y-8">
+            <PrecosDeReferencia onEditar={() => setTab("catalogo")} />
+            <TaxasTab />
+          </div>
         )}
-
-        {tab === "administracao" && (
-          <SubTabs tabs={[
-            { id: "documentos", label: "Documentos" },
-            { id: "admins", label: "Equipa e acessos" },
-            { id: "atividade", label: "Atividade" },
-            { id: "este-dispositivo", label: "Avisos neste dispositivo" },
-            { id: "notificacoes", label: "Notificações enviadas" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "documentos" && <DocumentosTab />}
-                {sub === "admins" && <AdminsTab />}
-                {sub === "atividade" && <AtividadeTab />}
-                {sub === "este-dispositivo" && (
-                  <div className="card p-4 space-y-3">
-                    <div>
-                      <h3 className="font-semibold text-text-primary">Avisos neste dispositivo</h3>
-                      <p className="text-sm text-text-secondary mt-0.5">
-                        O backoffice não tinha como te tocar no ombro: só se sabia de um pedido urgente ou de um
-                        ticket se alguém estivesse a olhar para o ecrã.
-                      </p>
-                    </div>
-                    <Notificacoes />
-                  </div>
-                )}
-                {sub === "notificacoes" && <NotificacoesTab />}
-              </>
-            )}
-          </SubTabs>
+        {tab === "documentos" && <DocumentosTab />}
+        {tab === "equipa" && <AdminsTab />}
+        {tab === "historico" && <AtividadeTab />}
+        {tab === "sistema" && (
+          <div className="space-y-8">
+            <PainelDeIntegracoes />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Notificações enviadas</p>
+              <NotificacoesTab />
+            </div>
+          </div>
         )}
       </div>
     </RouteGuard>
+  );
+}
+
+/* ------------------------- Preços de referência ------------------------- */
+
+/**
+ * O "a partir de" de cada serviço, como está no catálogo do Laravel (é o que
+ * a app mostra). Só leitura: muda-se no Catálogo, onde está o resto do serviço.
+ */
+function PrecosDeReferencia({ onEditar }: { onEditar: () => void }) {
+  const { data, loading, error, refetch } = useAsyncData(() => getServiceTypes(), []);
+  if (loading && !data) return <LoadingState />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  const tipos = [...(data?.items ?? [])].sort((a, b) =>
+    (a.operation_area_name ?? "").localeCompare(b.operation_area_name ?? "") || a.name.localeCompare(b.name));
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">Preços de referência</h2>
+          <p className="text-xs text-text-secondary">O &quot;a partir de&quot; que a app mostra em cada serviço. O preço final depende do técnico (valor/hora) e da hora do dia (taxas abaixo).</p>
+        </div>
+        <button onClick={onEditar} className="btn-secondary text-sm"><Pencil className="h-4 w-4" /> Mudar no Catálogo</button>
+      </div>
+      <DataTable
+        columns={[
+          { key: "operation_area_name", label: "Categoria", render: (r: ServiceType) => r.operation_area_name ?? "—" },
+          { key: "name", label: "Serviço" },
+          { key: "starts_from", label: "A partir de", render: (r: ServiceType) => r.starts_from != null ? formatCurrency(r.starts_from) : <span className="text-text-muted">—</span> },
+          { key: "time", label: "Duração", render: (r: ServiceType) => r.time ? `${r.time} min` : "—" },
+          { key: "vendors_count", label: "Técnicos", render: (r: ServiceType) => r.vendors_count },
+        ]}
+        data={tipos}
+        keyField="id"
+        emptyMessage="Sem serviços no catálogo."
+      />
+    </section>
   );
 }
 

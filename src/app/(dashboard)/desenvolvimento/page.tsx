@@ -1,22 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RouteGuard } from "@/components/layout/RouteGuard";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Code2 } from "lucide-react";
-import { DevPanel } from "./DevPanel";
-
-export default function DevelopmentPage() {
-  return (
-    <RouteGuard route="/desenvolvimento">
-      <div className="space-y-6">
-        <PageHeader
-          icon={Code2}
-          eyebrow="Equipa & ferramentas"
-          title="Desenvolvimento"
-          subtitle="Quadro de tarefas do site e da app — arrasta os cartões entre colunas"
-        />
-        <DevPanel />
-      </div>
-    </RouteGuard>
-  );
+/**
+ * O quadro de desenvolvimento saiu do backoffice a 12/10/2026 (sem uso desde
+ * 02/09; o trabalho do CTO vive no GitHub). As tarefas continuam na tabela
+ * dev_tasks do Supabase.
+ */
+export default function DesenvolvimentoRedirect() {
+  redirect("/");
 }

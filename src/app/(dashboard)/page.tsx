@@ -19,9 +19,7 @@ import { hasAnyPermission } from "@/lib/permissions";
 import type { Permission } from "@/types";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
-import ObjetivosPage from "./objetivos/Objetivos";
 import AlertasPage from "./alertas/Alertas";
-import RelatoriosPage from "./relatorios/Relatorios";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard } from "lucide-react";
@@ -100,9 +98,11 @@ export default function OverviewPage() {
   const TABS: TabDef[] = [
     { id: "resumo", label: "Hoje" },
     { id: "alertas", label: "Alertas", count: totalAlertas || undefined },
-    { id: "objetivos", label: "Objetivos do ano" },
-    { id: "relatorios", label: "Relatórios" },
   ];
+  // Os objetivos e os relatórios estão em Crescimento (12/10/2026).
+  if (tab === "objetivos" || tab === "relatorios") {
+    if (typeof window !== "undefined") window.location.replace("/crescimento?tab=objetivos");
+  }
 
   return (
     <RouteGuard route="/">
@@ -173,7 +173,7 @@ export default function OverviewPage() {
               </div>
               <p className="mt-3 text-sm text-text-secondary">
                 O ano, o CAC, o LTV, os downloads e a avaliação nas lojas estão em{" "}
-                <Link href="/marketing" className="text-piquet-600 font-medium hover:underline">Crescimento</Link>;
+                <Link href="/crescimento" className="text-piquet-600 font-medium hover:underline">Crescimento</Link>;
                 o detalhe do dinheiro no <Link href="/financeiro" className="text-piquet-600 font-medium hover:underline">Financeiro</Link>.
               </p>
             </section>
@@ -181,8 +181,6 @@ export default function OverviewPage() {
         )}
 
         {tab === "alertas" && <AlertasPage embutido onTotal={setTotalAlertas} />}
-        {tab === "objetivos" && <ObjetivosPage />}
-        {tab === "relatorios" && <RelatoriosPage />}
       </div>
     </RouteGuard>
   );
