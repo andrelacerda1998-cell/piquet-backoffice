@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { useAsyncData } from "@/hooks/useDashboard";
+import { useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import { LEAD_LOSS_REASONS, lossReasonLabel, pedeMotivo, contarMotivos } from "@/lib/leadLossReasons";
 import { getLeads, updateLead, createLead, deleteLead, LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_STAGES_SEM_RECEITA, type Lead, type LeadStage, type LeadPatch } from "@/services/extrasService";
 import { DEFAULT_SETTINGS } from "@/config/dashboard";
@@ -340,6 +341,8 @@ function LeadsPageInner() {
 
   // Registo manual de um pedido (ex.: recebido pela app do WhatsApp).
   const [showLead, setShowLead] = useState(false);
+  // "Novo contacto" no ⌘K e no "+ Novo": /leads?novo=contacto.
+  useAcaoPeloEndereco("novo", (v) => { if (v === "contacto") setShowLead(true); });
   const [leadForm, setLeadForm] = useState({ name: "", phone: "", city: "", message: "" });
   const submitLead = async () => {
     if (!leadForm.name.trim() && !leadForm.phone.trim()) { toast("Indica o nome ou o telefone.", "info"); return; }

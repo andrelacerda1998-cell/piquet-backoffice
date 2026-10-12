@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
-import { ouvirPedidosDeAbertura } from "@/hooks/useAbrirPeloEndereco";
+import { ouvirPedidosDeAbertura, useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import PedidosPersonalizados from "./PedidosPersonalizados";
 import { ServiceDetailDrawer } from "@/components/ui/ServiceDetailDrawer";
 import { OperacoesAoVivo } from "./OperacoesAoVivo";
@@ -94,6 +94,12 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     // Já em Pedidos: o ⌘K muda o endereço sem voltar a montar a página.
     return ouvirPedidosDeAbertura((url) => doEndereco(url.search));
   }, [abrirPedido]);
+  // Vindo de um comando do ⌘K: `?acao=reembolsar` abre a confirmação do
+  // reembolso; `?nota=1` põe o cursor nas notas.
+  const [acaoInicial, setAcaoInicial] = useState<string | null>(null);
+  const [focarNota, setFocarNota] = useState(false);
+  useAcaoPeloEndereco("acao", setAcaoInicial);
+  useAcaoPeloEndereco("nota", () => setFocarNota(true));
   // O endereço acompanha a ficha: aberta é /servicos/282, fechada volta à lista.
   useEffect(() => {
     if (!urlPronta) return;
@@ -264,7 +270,12 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
 
         {/* Service detail drawer (com separadores) */}
         {selectedService && (
-          <ServiceDetailDrawer service={selectedService} onClose={() => setSelectedService(null)} />
+          <ServiceDetailDrawer
+            service={selectedService}
+            acaoInicial={acaoInicial}
+            focarNota={focarNota}
+            onClose={() => { setSelectedService(null); setAcaoInicial(null); setFocarNota(false); }}
+          />
         )}
       </div>
     </RouteGuard>

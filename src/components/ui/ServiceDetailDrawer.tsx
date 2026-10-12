@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
@@ -51,7 +51,14 @@ import { TicketsDoPedido } from "@/components/ui/TicketsDoPedido";
 */
 
 
-export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequest; onClose: () => void }) {
+export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, focarNota = false }: {
+  service: ServiceRequest;
+  onClose: () => void;
+  /** Vindo do ⌘K ("> reembolsar 282"): abre logo a confirmação dessa ação. */
+  acaoInicial?: string | null;
+  /** Vindo de "Nota…": o cursor começa na caixa das notas. */
+  focarNota?: boolean;
+}) {
   const panelRef = useDrawerA11y<HTMLDivElement>(onClose);
   // O detalhe lê-se UMA vez: os convites e a cronologia saem da mesma resposta.
   const detalhe = useDetalhe(service.id);
@@ -97,7 +104,7 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <AcoesDoPedido service={service} detalhe={d} onMudou={() => detalhe.recarregar?.()} />
+              <AcoesDoPedido service={service} detalhe={d} aCarregar={detalhe.aCarregar} acaoInicial={acaoInicial} onMudou={() => detalhe.recarregar?.()} />
               <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
           </div>
@@ -162,7 +169,7 @@ export function ServiceDetailDrawer({ service, onClose }: { service: ServiceRequ
                 </div>
               </Seccao>
               <Seccao titulo="Tickets"><TicketsDoPedido servicoId={service.id} temReclamacao={service.hasComplaint} /></Seccao>
-              <Seccao titulo="Notas internas"><NotasInternas entidade="pedido" id={service.id} /></Seccao>
+              <Seccao titulo="Notas internas"><NotasInternas entidade="pedido" id={service.id} focar={focarNota} /></Seccao>
             </div>
           </div>
         </div>
@@ -270,7 +277,9 @@ function Pessoa({ papel, nome, telefone, semAcesso, ficha }: {
  * ligado a um pagamento; o Laravel recusa na mesma se o serviço ainda estiver
  * vivo, e a mensagem dele diz porquê.
  */
-function AcoesDoPedido({ service, detalhe, onMudou }: { service: ServiceRequest; detalhe: DetalheDoServico | null; onMudou: () => void }) {
+function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
+  service: ServiceRequest; detalhe: DetalheDoServico | null; aCarregar: boolean; acaoInicial: string | null; onMudou: () => void;
+}) {
   const role = useAuthStore((s) => s.user?.role);
   const [aReembolsar, setAReembolsar] = useState(false);
   const [aDespachar, setADespachar] = useState(false);
@@ -291,6 +300,20 @@ function AcoesDoPedido({ service, detalhe, onMudou }: { service: ServiceRequest;
   const podeDespachar = estado === "PendingReview" && !!detalhe?.personalizado && !!role && hasPermission(role, "edit_services");
   const podeFechar = estado === "Finished" && gereDinheiro;
   const porCobrar = estado === "ClosedPendingPayment" && gereDinheiro;
+
+  /*
+    "> reembolsar 282" no ⌘K: abre a mesma confirmação do botão (valor e motivo),
+    depois de saber se o pedido tem um pagamento cobrado. Se não tiver, diz porquê
+    em vez de abrir uma janela que o Payshop ia recusar.
+  */
+  const pediuReembolso = useRef(false);
+  useEffect(() => {
+    if (acaoInicial !== "reembolsar" || aCarregar || pediuReembolso.current) return;
+    pediuReembolso.current = true;
+    if (podeReembolsar) setAReembolsar(true);
+    else if (!gereDinheiro) toast("O teu perfil não pode reembolsar.", "error");
+    else toast(`O pedido #${service.id} não tem um pagamento cobrado para reembolsar.`, "error");
+  }, [acaoInicial, aCarregar, podeReembolsar, gereDinheiro, service.id]);
 
   const correr = async (motivo?: string) => {
     if (!acao) return;

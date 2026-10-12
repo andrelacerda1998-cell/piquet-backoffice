@@ -90,7 +90,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/qualidade": ["view_support"],
   "/relatorios": ["export_data"],
   "/marketing": ["view_marketing"],
-  "/leads": ["view_marketing"],
+  // Os Contactos estão em Clientes: quem trata dos clientes também lhes responde.
+  "/leads": ["view_marketing", "view_customers"],
   "/suporte": ["view_support"],
   "/alertas": ["view_alerts"],
   // Configurações exige gerir definições (não só ver serviços, como estava).
