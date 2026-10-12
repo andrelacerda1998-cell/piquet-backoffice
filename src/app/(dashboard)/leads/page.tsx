@@ -165,7 +165,7 @@ function LeadsPageInner() {
     if (filteredLeads.length === 0) { toast("Sem contactos para exportar.", "error"); return; }
     downloadCsv(
       `crm-leads-${leadMonth || "todos"}.csv`,
-      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "Pedido", "Observações", "Estado", "Motivo da perda", "Detalhe do motivo", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
+      ["Recebida", "Contacto", "Telefone", "Cidade", "Categoria", "O que pediu", "Observações", "Estado", "Motivo da perda", "Detalhe do motivo", "Orçamento (€)", "Técnico (€)", "Comissão (€)", "Origem"],
       filteredLeads.map((l) => [
         l.createdAt ? formatDate(l.createdAt) : "",
         l.name, l.phone || "", l.city || "",
@@ -392,7 +392,7 @@ function LeadsPageInner() {
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-text-secondary">
         {r.createdAt ? formatDate(r.createdAt) : "—"}
         {isDuplicate(r) && (
-          <span title="Mesmo contacto e pedido de outra lead — possível duplicado"
+          <span title="O mesmo telefone e a mesma mensagem de outro contacto — possível duplicado"
             className="inline-flex items-center rounded-full bg-warning-light px-1.5 py-0.5 text-[11px] font-semibold text-warning">
             dup?
           </span>
@@ -549,7 +549,7 @@ function LeadsPageInner() {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, pedido…" className="input-field pl-9" aria-label="Pesquisar contactos" />
+                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, mensagem…" className="input-field pl-9" aria-label="Pesquisar contactos" />
                 </div>
                 <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto" aria-label="Filtrar por mês">
                   <option value="">Todos os meses</option>
@@ -575,11 +575,11 @@ function LeadsPageInner() {
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="text-text-secondary">
-                  <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "lead" : "leads"}
+                  <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "contacto" : "contactos"}
                   {hasActiveFilters ? " (filtrado)" : leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
                 </span>
                 {dupCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Leads com o mesmo contacto e pedido de outra — provavelmente o formulário enviou duas vezes.">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Contactos com o mesmo telefone e a mesma mensagem de outro — provavelmente o formulário enviou duas vezes.">
                     {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
                   </span>
                 )}
@@ -859,8 +859,8 @@ function LeadsPageInner() {
         title="Editar contacto"
         subtitle={
           editForm.stage === "concluido"
-            ? "Ao guardar como “Concluído”, o pedido fica registado como serviço feito fora da app. Não entra no GMV, que é só o que o Payshop cobrou."
-            : "Atualiza os dados e o estado do pedido."
+            ? "Ao guardar como “Concluído”, o contacto fica registado como serviço feito fora da app. Não entra no GMV, que é só o que o Payshop cobrou."
+            : "Atualiza os dados e o estado do contacto."
         }
         size="lg"
         footer={
@@ -905,7 +905,7 @@ function LeadsPageInner() {
                 onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                 rows={3}
                 maxLength={2000}
-                placeholder="Notas da equipa sobre este pedido — o que ficou combinado, o que falta confirmar, porque foi recusado…"
+                placeholder="Notas da equipa sobre este contacto — o que ficou combinado, o que falta confirmar, porque foi recusado…"
                 className="input-field resize-y"
               />
               <p className="mt-1 text-[11px] text-text-muted">
@@ -968,7 +968,7 @@ function LeadsPageInner() {
         open={motivoPara !== null}
         onClose={() => setMotivoPara(null)}
         title={motivoPara ? `Marcar como ${LEAD_STAGE_LABEL[motivoPara.stage]}` : ""}
-        subtitle={motivoPara ? `${motivoPara.lead.name} · porque é que este pedido não avançou?` : undefined}
+        subtitle={motivoPara ? `${motivoPara.lead.name} · porque é que não avançou?` : undefined}
         footer={
           <>
             <button onClick={() => setMotivoPara(null)} className="btn-secondary">Cancelar</button>
@@ -1023,7 +1023,7 @@ function LeadsPageInner() {
  */
 export default function LeadsPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-text-muted py-8 text-center">A carregar pedidos…</div>}>
+    <Suspense fallback={<div className="text-sm text-text-muted py-8 text-center">A carregar contactos…</div>}>
       <LeadsPageInner />
     </Suspense>
   );

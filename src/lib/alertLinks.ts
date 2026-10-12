@@ -18,9 +18,9 @@ export function destinoDoAlerta(a: DashboardAlert): { href: string; label: strin
     case "leads": return { href: "/leads", label: "Ver contactos" };
     case "tickets": return { href: "/suporte", label: "Ver tickets" };
     case "ticket": return { href: `/suporte?ticket=${a.entityId ?? ""}`, label: "Abrir ticket" };
-    case "integracao": return { href: "/produto?tab=integracoes", label: "Ver integrações" };
+    case "integracao": return { href: "/configuracao?tab=sistema", label: "Ver integrações" };
     case "kyc": return { href: "/tecnicos?tab=aprovacoes", label: "Rever documentos" };
-    case "marketing": return { href: "/marketing", label: "Ir para Marketing" };
+    case "marketing": return { href: "/crescimento?tab=marketing", label: "Ir para Marketing" };
     case "pagamentos": return { href: "/financeiro?tab=pagamentos", label: "Ver pagamentos" };
     case "fatura": return { href: "/financeiro?tab=custos", label: "Ver faturas" };
     // KYC, integrações e impostos são filas/listas, não um registo só — o

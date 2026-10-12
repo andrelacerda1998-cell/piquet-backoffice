@@ -8,9 +8,10 @@ describe("o menu em oito áreas", () => {
   });
 
   it("nenhum ecrã do menu antigo se perdeu: cada um está num grupo (ou no rodapé), e num só", () => {
-    // /recrutamento juntou-se a Técnicos › Aprovações e /alertas é um
-    // separador da Visão Geral (os dois endereços redirecionam).
-    const antigos = ["/", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/produto", "/marketing", "/leads", "/suporte", "/configuracao"];
+    // /recrutamento juntou-se a Técnicos › Aprovações, /alertas é um
+    // separador da Visão Geral, e /marketing e /produto são separadores de
+    // Crescimento (os endereços antigos redirecionam).
+    const antigos = ["/", "/servicos", "/qualidade", "/clientes", "/tecnicos", "/financeiro", "/crescimento", "/leads", "/suporte", "/configuracao"];
     const todos = [...NAV_GROUPS.flatMap((g) => g.filhos), ...NAV_RODAPE];
     for (const href of antigos) {
       expect(todos.filter((h) => h === href), href).toHaveLength(1);
@@ -32,7 +33,7 @@ describe("gruposVisiveis", () => {
   });
 
   it("o marketing não vê o Financeiro nem os ecrãs de operações que não são dele", () => {
-    const g = gruposVisiveis("marketing", "/marketing", {});
+    const g = gruposVisiveis("marketing", "/crescimento", {});
     expect(g.map((x) => x.id)).not.toContain("financeiro");
     expect(g.find((x) => x.id === "crescimento")!.ativo).toBe(true);
   });

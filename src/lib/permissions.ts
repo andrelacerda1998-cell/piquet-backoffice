@@ -79,11 +79,11 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   "/impostos-rh": ["view_finance", "view_employees"],
   "/clientes": ["view_customers"],
   "/tecnicos": ["view_technicians"],
-  "/chat": ["view_dashboard"],
-  "/desenvolvimento": ["view_dashboard"],
   "/tarefas": ["view_dashboard"],
   "/objetivos": ["view_dashboard"],
   "/produto": ["view_dashboard"],
+  // Crescimento: todos (os objetivos são da equipa); o Marketing, lá dentro, pede view_marketing.
+  "/crescimento": ["view_dashboard"],
   "/servicos-personalizados": ["view_services"],
   "/mercado": ["view_services", "view_technicians"],
   "/recrutamento": ["view_employees", "view_technicians"],

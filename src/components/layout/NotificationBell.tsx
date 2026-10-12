@@ -8,7 +8,6 @@ import { hasAnyPermission } from "@/lib/permissions";
 import type { Permission } from "@/types";
 import { getInboxTickets, CHANNEL_LABEL } from "@/services/supportInboxService";
 import { getCustomRequests, getLeads } from "@/services/extrasService";
-import { useLiveNotifications } from "@/hooks/useLiveNotifications";
 import type { AppNotification } from "@/stores";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +44,6 @@ function timeAgo(iso: string) {
 export function NotificationBell() {
   const router = useRouter();
   const { notifications, addNotification, markRead, markAllRead } = useNotificationStore();
-  useLiveNotifications(); // notificações ao vivo (chat, dev board, agenda)
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const unread = notifications.filter((n) => !n.read).length;
@@ -109,9 +107,9 @@ export function NotificationBell() {
         const freshLeads = novasLeads.filter((l) => !knownLeads.has(`lead:${l.id}`));
         freshLeads.forEach((l) => addNotification({
           kind: "lead",
-          title: "Nova lead do site",
+          title: "Novo contacto do site",
           body: `${l.name}${l.city ? ` · ${l.city}` : ""}${l.message ? ` — ${l.message}` : ""}`,
-          href: "/marketing?tab=crm",
+          href: `/leads?lead=${encodeURIComponent(l.id)}`,
           dedupeKey: `lead:${l.id}`,
         }));
         if (!firstRun.current && freshLeads.length > 0) {

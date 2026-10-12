@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 
-/**
- * Os objetivos vivem no separador «Objetivos do ano» da Visão Geral (08/10/2026). Este endereço repetia o separador e continua a funcionar
- * para quem o tenha guardado.
- */
-export default function ObjetivosAntigo() {
-  redirect("/?tab=objetivos");
+/** Os objetivos do ano estão em Crescimento › Objetivos e relatórios (12/10/2026). */
+export default function ObjetivosRedirect() {
+  redirect("/crescimento?tab=objetivos");
 }

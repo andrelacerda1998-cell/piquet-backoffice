@@ -90,25 +90,23 @@ export const NAV_ITEMS = [
   { href: "/tecnicos", label: "Técnicos", icon: "HardHat" },
   { href: "/mercado", label: "Mercado", icon: "Map" },
   { href: "/financeiro", label: "Financeiro", icon: "Euro" },
-  { href: "/produto", label: "Produto", icon: "MonitorSmartphone" },
-  { href: "/marketing", label: "Marketing", icon: "Megaphone" },
+  // Marketing, Produto e os objetivos juntaram-se em Crescimento (12/10/2026).
+  { href: "/crescimento", label: "Crescimento", icon: "Megaphone" },
   { href: "/leads", label: "Contactos", icon: "Inbox" },
   { href: "/suporte", label: "Suporte", icon: "Headphones" },
-  { href: "/chat", label: "Equipa", icon: "MessageSquare" },
-  { href: "/desenvolvimento", label: "Desenvolvimento", icon: "Code2" },
   { href: "/tarefas", label: "As minhas tarefas", icon: "ListChecks" },
   { href: "/configuracao", label: "Configurações", icon: "SlidersHorizontal" },
   // Separadores dentro dos grupos acima (consolidação 2026-07-20). Fora do
   // menu, mas acessíveis por ⌘K e por URL (deep-link ?tab=).
   // Os Alertas são um separador da Visão Geral desde 09/10/2026 (/alertas redireciona).
   { href: "/?tab=alertas", label: "Alertas", icon: "Bell" },
-  { href: "/?tab=objetivos", label: "Objetivos do ano", icon: "Target" },
-  { href: "/?tab=relatorios", label: "Relatórios", icon: "FileText" },
+  { href: "/crescimento?tab=marketing", label: "Marketing", icon: "Megaphone" },
+  { href: "/crescimento?tab=produto", label: "Produto e clientes", icon: "MonitorSmartphone" },
+  { href: "/crescimento?tab=objetivos", label: "Objetivos do ano e relatórios", icon: "Target" },
   { href: "/servicos?tab=personalizados", label: "Pedidos personalizados", icon: "Wand2" },
   // O antigo "Onboarding de técnicos" (/recrutamento) está aqui dentro.
   { href: "/tecnicos?tab=aprovacoes", label: "Aprovações de técnicos", icon: "UserPlus" },
   { href: "/financeiro?tab=resultado&secao=impostos", label: "Impostos e RH", icon: "Landmark" },
-  { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
   // Os separadores mais procurados, para o ⌘K levar direto a eles ("Ir para…").
   { href: "/servicos?tab=pedidos", label: "Lista de pedidos", icon: "Wrench" },
   { href: "/clientes?tab=lista", label: "Lista de clientes", icon: "Users" },
@@ -117,8 +115,8 @@ export const NAV_ITEMS = [
   { href: "/financeiro?tab=pagamentos", label: "Pagamentos (dinheiro que entra)", icon: "Euro" },
   { href: "/financeiro?tab=custos", label: "Custos e faturas", icon: "FileText" },
   { href: "/financeiro?tab=transferencias", label: "Transferências para técnicos", icon: "Euro" },
-  { href: "/produto?tab=funil", label: "Funil do produto", icon: "MonitorSmartphone" },
-  { href: "/produto?tab=integracoes", label: "Integrações", icon: "Radio" },
+  { href: "/crescimento?tab=produto&vista=funil", label: "Funil do produto", icon: "MonitorSmartphone" },
+  { href: "/configuracao?tab=sistema", label: "Integrações e sistema", icon: "Radio" },
 ] as const;
 
 /**
@@ -156,7 +154,8 @@ export const NAV_GROUPS: NavGroup[] = [
   // A procura e a oferta: se os pedidos estão a ser servidos e onde falta gente.
   { id: "mercado", label: "Mercado", icon: "Map", filhos: ["/mercado"] },
   { id: "financeiro", label: "Financeiro", icon: "Euro", filhos: ["/financeiro"] },
-  { id: "crescimento", label: "Crescimento", icon: "Megaphone", filhos: ["/marketing", "/produto"] },
+  // Marketing, produto, clientes e objetivos do ano: o que se vê à semana e ao mês.
+  { id: "crescimento", label: "Crescimento", icon: "Megaphone", filhos: ["/crescimento"] },
 ];
 
 /** Fora dos grupos, no rodapé do menu: utilitários, não trabalho do dia. */
@@ -175,20 +174,20 @@ export const NAV_VISIBLE: string[] = [...NAV_PRIMARY, ...NAV_SECONDARY];
 // Separadores/ecrãs fora do menu que o ⌘K deve encontrar (saltam direto ao tab).
 export const NAV_DEEPLINKS: string[] = [
   /*
-    Equipa e Desenvolvimento saíram do menu a 6/10/2026 (auditoria: um chat e
-    um kanban feitos à mão, ao lado do WhatsApp e do GitHub que a equipa já
-    usa). Continuam aqui, a um ⌘K, até se decidir se saem de vez -- tirar do
-    menu é reversível, apagar não é.
+    Equipa (/chat) e Desenvolvimento saíram de vez a 12/10/2026: sem uso desde
+    julho e setembro (um chat e um kanban feitos à mão, ao lado do WhatsApp e
+    do GitHub). Os dados ficam no Supabase. As tarefas pessoais estão no menu
+    do utilizador.
   */
-  "/chat", "/desenvolvimento",
   "/tarefas",
-  "/?tab=alertas", "/?tab=objetivos", "/?tab=relatorios",
+  "/?tab=alertas",
+  "/crescimento?tab=marketing", "/crescimento?tab=produto", "/crescimento?tab=objetivos",
   "/servicos?tab=personalizados",
   "/tecnicos?tab=aprovacoes",
-  "/financeiro?tab=resultado&secao=impostos", "/chat?tab=tarefas",
+  "/financeiro?tab=resultado&secao=impostos",
   "/servicos?tab=pedidos", "/clientes?tab=lista", "/tecnicos?tab=lista", "/mercado?tab=cobertura",
   "/financeiro?tab=pagamentos", "/financeiro?tab=custos", "/financeiro?tab=transferencias",
-  "/produto?tab=funil", "/produto?tab=integracoes",
+  "/crescimento?tab=produto&vista=funil", "/configuracao?tab=sistema",
 ];
 
 export const MARKETING_CHANNELS = [

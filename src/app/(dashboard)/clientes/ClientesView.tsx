@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Users, UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
@@ -12,23 +10,19 @@ import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
 import { getMotivos } from "@/services/acoesDaEquipaService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { Modal } from "@/components/ui/Modal";
-import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
+import { SubTabs } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAbrirPeloEndereco, useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import { NotasInternas } from "@/components/ui/NotasInternas";
-import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
-import { usePersistentList } from "@/hooks/usePersistentList";
 import {
-  getCustomers, getAllCustomers, getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend,
-  getCustomer, blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
+  getCustomers, getAllCustomers, getCustomer, blockCustomer, restoreCustomer, getCustomerPaymentMethods, deleteCustomerPaymentMethod,
   type RealCustomer, type CustomerPaymentMethod,
 } from "@/services/customersService";
 import { CreditCard, Smartphone, Trash2 } from "lucide-react";
-import { type Complaint, getLeads, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
+import { getLeads, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
 import { getServices } from "@/services/dashboardService";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatCurrency, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -37,9 +31,15 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
-  const [tab, setTab] = useTabParam("visao");
+  const [tab, setTab] = useTabParam("lista");
+  /*
+    Clientes abre na lista: é para encontrar uma pessoa. A "Visão geral"
+    (coortes, origem, localização) passou para Crescimento a 12/10/2026, e as
+    "Notas antigas" (guardadas só no browser) saíram -- as reclamações são
+    tickets em Suporte, ligados ao pedido.
+  */
+  useEffect(() => { if (tab === "visao" || tab === "reclamacoes") setTab("lista"); }, [tab, setTab]);
 
-  const { data: metrics } = useAsyncData(() => getCustomerMetrics(), []);
   // Lista real de clientes (App\Filament\Resources\CustomerResource migrado)
   // -- sem sort do lado do servidor (o Filament só ordenava name/created_at
   // por clique de coluna, e não vale a pena replicar já).
@@ -59,17 +59,6 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
   const origemLabel = (s: string) =>
     s === "whatsapp" ? "WhatsApp" : s === "landing" || s === "website" ? "Landing page" : (s || "—");
 
-  const { data: byLocation } = useAsyncData(() => getCustomersByLocation(), []);
-  const { data: retention } = useAsyncData(() => getRetentionData(), []);
-  const { data: trend } = useAsyncData(() => getNewVsRecurringTrend(), []);
-  /*
-    "Reclamações" era uma lista de notas guardada só no browser de quem as
-    escrevia: cada pessoa via as suas e mais ninguém. As reclamações a sério
-    chegam como tickets a Suporte, com o número do pedido. O separador só
-    aparece a quem tiver notas antigas neste computador, para não as perder,
-    e já não deixa criar novas.
-  */
-  const [complaints] = usePersistentList<Complaint>("reclamacoes", []);
 
 
   // Bloquear/Reativar = soft-delete real do User no Laravel (ver
@@ -161,13 +150,6 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
 
   // Distribuição por origem real (a app não regista canal de aquisição, mas
   // sabemos donde veio cada pessoa): registados = App; leads = Landing / WhatsApp.
-  const origemDistribuicao = useMemo(() => {
-    const counts = new Map<string, number>();
-    const add = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
-    (allCustomers ?? []).forEach(() => add("App"));
-    leadRows.forEach((l) => add(origemLabel(l.source)));
-    return [...counts.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [allCustomers, leadRows]);
 
   // Métodos de pagamento guardados — migrado do Filament
   // (PaymentMethodsRelationManager). Clicar numa linha da lista abre o
@@ -267,26 +249,9 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
     }
   };
 
-  const TABS: TabDef[] = [
-    { id: "visao", label: "Visão geral" },
-    { id: "lista", label: "Todos os registos" },
-    ...(complaints.length > 0 ? [{ id: "reclamacoes", label: "Notas antigas" }] : []),
-  ];
 
 
-  const complaintColumns: Column<Complaint>[] = [
-    { key: "id", label: "Serviço", render: (r) => <span className="font-mono text-xs">{r.id}</span> },
-    { key: "customerName", label: "Cliente", render: (r) => <span className="font-medium">{r.customerName}</span> },
-    { key: "serviceName", label: "Serviço" },
-    { key: "city", label: "Zona" },
-    { key: "openedAt", label: "Aberta em", render: (r) => formatDate(r.openedAt) },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.status === "resolvida" ? "bg-success-light text-success" : r.status === "em_analise" ? "bg-warning-light text-warning" : "bg-danger-light text-danger")}>
-        {r.status === "resolvida" ? "Resolvida" : r.status === "em_analise" ? "Em análise" : "Aberta"}
-      </span>
-    ) },
-  ];
+
 
   const unifiedColumns: Column<UnifiedRow>[] = [
     { key: "name", label: "Nome", render: (r) => (
@@ -356,79 +321,14 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
           icon={Users}
           eyebrow="Pessoas"
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
-          subtitle={`${metrics?.registered ?? 0} clientes registados`}
+          subtitle={allCustomers ? `${allCustomers.length} clientes registados` : "Encontrar uma pessoa e ver tudo o que se passou com ela"}
           actions={
             <a href="/leads" className="btn-secondary text-sm inline-flex items-center gap-1.5">
-              <UserPlus className="h-4 w-4" /> Pipeline de leads
+              <UserPlus className="h-4 w-4" /> Contactos
             </a>
           }
         />
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
-
-        {tab === "visao" && (
-          <SubTabs tabs={[
-            { id: "resumo", label: "Resumo" },
-            { id: "origem", label: "Por origem" },
-            { id: "localizacao", label: "Por localização" },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "resumo" && (
-                  <div className="space-y-6">
-                    {metrics && (
-                      /* Uma linha só (cartões `compact`): estes números lêem-se
-                         em conjunto — registados vs ativos vs recorrentes só
-                         diz alguma coisa comparado lado a lado. */
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                        <MetricCard compact title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-                        <MetricCard compact title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
-                        <MetricCard compact title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
-                        <MetricCard compact title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
-                        <MetricCard compact title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
-                        <MetricCard compact title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Novos vs recorrentes">
-                        <BarChartComponent
-                          data={(trend ?? []).map((d) => ({ name: d.name, novos: d.novos as number, recorrentes: d.recorrentes as number }))}
-                          bars={[{ key: "novos", color: "#FAB347", name: "Novos" }, { key: "recorrentes", color: "#3E7C8C", name: "Recorrentes" }]}
-                        />
-                      </ChartCard>
-                      <ChartCard title="Retenção por coorte"><BarChartComponent data={retention ?? []} /></ChartCard>
-                    </div>
-                  </div>
-                )}
-                {sub === "origem" && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-text-muted">Donde vieram os contactos: registados na app + leads da landing e do WhatsApp.</p>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <ChartCard title="Por origem"><BarChartComponent data={origemDistribuicao} /></ChartCard>
-                      <ChartCard title="Distribuição por origem"><DonutChartComponent data={origemDistribuicao} centerLabel="Contactos" /></ChartCard>
-                    </div>
-                  </div>
-                )}
-                {/* Só o circular: as barras e o donut liam os MESMOS `byLocation`. */}
-                {sub === "localizacao" && (
-                  <ChartCard title="Cidades com mais clientes" subtitle="Distribuição por localização">
-                    <DonutChartComponent data={byLocation ?? []} centerLabel="Clientes" />
-                  </ChartCard>
-                )}
-              </>
-            )}
-          </SubTabs>
-        )}
-
-        {tab === "reclamacoes" && (
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Notas escritas antes de 08/10/2026 e guardadas só neste computador. As reclamações estão em{" "}
-              <Link href="/suporte" className="text-piquet-600 hover:underline">Suporte</Link>, ligadas ao pedido.
-            </p>
-            <DataTable columns={complaintColumns} data={complaints} keyField="id" emptyMessage="Sem notas." />
-          </div>
-        )}
 
         {tab === "lista" && (
           <SubTabs tabs={[

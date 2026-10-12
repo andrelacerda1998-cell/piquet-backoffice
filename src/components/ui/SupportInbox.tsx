@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
+import { USE_REAL_API } from "@/services/api";
 import { metricasSuporte, formatarEspera, esperaDoTicket } from "@/lib/supportMetrics";
 import { useSearchParams } from "next/navigation";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -304,10 +305,15 @@ export function SupportInbox() {
               a enviá-los. O backoffice já está pronto do lado dele.
             </p>
             <p className="mt-2 text-[11px] text-text-muted font-mono">POST /api/tickets</p>
-            <button onClick={criarExemplos} disabled={aSemear} className="btn-secondary mt-4 text-xs disabled:opacity-60">
-              {aSemear ? "A criar…" : "Criar tickets de exemplo"}
-            </button>
-            <p className="mt-1.5 text-[11px] text-text-muted">Para experimentar o ecrã. Apagam-se a qualquer momento.</p>
+            {/* Tickets de exemplo só em demonstração: em produção misturavam-se com os verdadeiros. */}
+            {!USE_REAL_API && (
+              <>
+                <button onClick={criarExemplos} disabled={aSemear} className="btn-secondary mt-4 text-xs disabled:opacity-60">
+                  {aSemear ? "A criar…" : "Criar tickets de exemplo"}
+                </button>
+                <p className="mt-1.5 text-[11px] text-text-muted">Para experimentar o ecrã. Apagam-se a qualquer momento.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="card px-4 py-10 text-center text-sm text-text-muted">Sem tickets neste filtro.</div>

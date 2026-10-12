@@ -170,6 +170,10 @@ const ACAO_DO_MOTIVO: Record<string, { titulo: string; accao: string; doCliente?
   cliente_a_escolher: { titulo: "o cliente ainda não escolheu", accao: "Já há quem aceite; lembrar o cliente de escolher e pagar.", doCliente: true },
   pagamento_por_capturar: { titulo: "pagamento por capturar", accao: "Trabalho feito e dinheiro por entrar: \"Tentar cobrar\" no pedido, ou desistir e devolver." },
   cliente_nao_confirmou: { titulo: "o cliente não confirmou o fim", accao: "Perguntar ao cliente se o trabalho ficou feito; se sim, \"Fechar e cobrar\" no pedido.", doCliente: true },
+  // Pedidos parados (backend #172).
+  tecnico_nao_chegou: { titulo: "o técnico ainda não chegou", accao: "Passou meia hora da hora marcada: ligar ao técnico; se não aparecer, dar como falta." },
+  em_execucao_ha_muito: { titulo: "está em curso há mais de 8 horas", accao: "Confirmar com o técnico se o trabalho já terminou." },
+  cliente_sem_resposta: { titulo: "o cliente não responde há mais de um dia", accao: "Ligar ao cliente: pode estar com dificuldades a pagar ou a decidir.", doCliente: true },
 };
 
 /** Desfechos de um pedido perdido que ainda se podem salvar com uma chamada. */
