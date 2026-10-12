@@ -11,7 +11,8 @@ import type { StaffContext } from "./handler";
  * uma ação feita sem motivo guardado.
  */
 export type AcaoDaEquipa =
-  | "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento" | "fechar_pedido" | "desistir_e_devolver";
+  | "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento" | "fechar_pedido" | "desistir_e_devolver"
+  | "declarar_falta";
 export type Entidade = "cliente" | "tecnico" | "pagamento" | "pedido";
 
 export interface RegistoDeAcao {
