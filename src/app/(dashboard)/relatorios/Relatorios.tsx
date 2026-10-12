@@ -337,7 +337,7 @@ export default function ReportsPage() {
       <div className="space-y-6">
         <PageHeader
           icon={BarChart3}
-          eyebrow="Visão geral"
+          eyebrow="Crescimento"
           title="Relatórios"
           subtitle="Exporta os dados reais do negócio em CSV, por período"
         />
