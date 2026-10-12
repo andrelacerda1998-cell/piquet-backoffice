@@ -44,8 +44,8 @@ export interface DeclareResult {
   service: { id: number; vendor_no_show_at: string | null; penalty: number };
 }
 
-export async function declareVendorNoShow(serviceId: number): Promise<DeclareResult> {
-  return apiPost<DeclareResult>(`/vendor-no-shows/${serviceId}/declare`, {}, () => {
+export async function declareVendorNoShow(serviceId: number, motivo: string): Promise<DeclareResult> {
+  return apiPost<DeclareResult>(`/vendor-no-shows/${serviceId}/declare`, { motivo }, () => {
     throw new Error("Declarar faltas precisa da API de admin do Laravel configurada.");
   }).then((r) => r.data);
 }

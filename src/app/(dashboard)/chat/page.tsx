@@ -326,6 +326,14 @@ function Conversas({ base, channels, userName }: { base: ChatMessage[]; channels
   );
 }
 
+/*
+  Os formulários abriam com o 3.º membro da equipa (TEAM_MEMBERS[2]) de quando a
+  lista era fictícia. Hoje a equipa são duas pessoas e isso rebentava as
+  Tarefas e a Agenda ao abrir.
+*/
+const outroMembro = (eu: string) => TEAM_MEMBERS.find((m) => m.name !== eu)?.name ?? TEAM_MEMBERS[0]?.name ?? "";
+const daquiAUmaSemana = () => new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+
 /* ---------------------------- Agenda da equipa --------------------------- */
 
 function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: string }) {
@@ -334,7 +342,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
   const [view, setView] = useState<"semana" | "dia">("semana");
   const [day, setDay] = useState<string>(TEAM_AGENDA_DAYS[3]); // Seg 06
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", withPerson: TEAM_MEMBERS[2].name, date: TEAM_AGENDA_DAYS[3], start: "10:00", end: "10:30", location: "" });
+  const [form, setForm] = useState({ title: "", withPerson: outroMembro(userName), date: TEAM_AGENDA_DAYS[3], start: "10:00", end: "10:30", location: "" });
 
   const all = useMemo(() => [...base, ...localMeetings], [base, localMeetings]);
   const days = view === "semana" ? TEAM_AGENDA_DAYS : [day];
@@ -353,7 +361,7 @@ function AgendaEquipa({ base, userName }: { base: TeamAgendaEvent[]; userName: s
     };
     setLocalMeetings((prev) => [...prev, { ...ev, id: `tmp_${Date.now()}` }]);
     setOpen(false);
-    setForm({ title: "", withPerson: TEAM_MEMBERS[2].name, date: TEAM_AGENDA_DAYS[3], start: "10:00", end: "10:30", location: "" });
+    setForm({ title: "", withPerson: outroMembro(userName), date: TEAM_AGENDA_DAYS[3], start: "10:00", end: "10:30", location: "" });
     createTeamMeeting(ev).catch(() => toast("Falha ao marcar reunião.", "error"));
     toast(`Reunião marcada com ${ev.person} (${TEAM_DAY_LABEL[ev.date]}, ${ev.start}).`);
   };
@@ -462,7 +470,7 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
   const [tasks, setTasks] = useState<TeamTask[]>([]);
   const [person, setPerson] = useState("Todos");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", assignee: TEAM_MEMBERS[2].name, priority: "media" as TeamTask["priority"], due: "2026-07-10" });
+  const [form, setForm] = useState({ title: "", assignee: TEAM_MEMBERS[0]?.name ?? "", priority: "media" as TeamTask["priority"], due: daquiAUmaSemana() });
 
   useEffect(() => { setTasks(base); }, [base]);
 
@@ -492,7 +500,7 @@ function TarefasEquipa({ base }: { base: TeamTask[] }) {
     const assigneeName = form.assignee.split(" ")[0];
     setTasks((prev) => [{ ...task, id: tempId }, ...prev]);
     setOpen(false);
-    setForm({ title: "", assignee: TEAM_MEMBERS[2].name, priority: "media", due: "2026-07-10" });
+    setForm({ title: "", assignee: TEAM_MEMBERS[0]?.name ?? "", priority: "media", due: daquiAUmaSemana() });
     // Troca a tarefa otimista pela real; o dedupe por id evita duplicar quando
     // o realtime devolver a mesma tarefa.
     createTeamTask(task)

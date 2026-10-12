@@ -490,7 +490,6 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
   /^\/customers\/\d+$/, // um cliente pelo id (Laravel)
   /^\/technicians\/\d+$/, // um técnico pelo id (Laravel)
-  /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
 ];
 
@@ -554,6 +553,11 @@ export const _LISTAS = { LIVE_EXACT, REAL_DATA } as const;
  */
 export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/services\/[^/]+\/fotos$/, // fotos que o cliente anexou
+  // A ficha do pedido. Faltava aqui: em produção o browser respondia com o
+  // mock (null) e a ficha nunca mostrou contactos, convidados nem ações.
+  /^\/services\/[^/]+\/detalhe$/,
+  /^\/finance\/app-payments\/[^/]+\/(refund|cancel)$/, // reembolsar / libertar o cativo (Payshop)
+  /^\/vendor-no-shows\/[^/]+\/declare$/, // dar como falta (penalização ao técnico, devolução ao cliente)
   /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
   /^\/customers\/\d+$/, // um cliente pelo id
   /^\/technicians\/\d+$/, // um técnico pelo id

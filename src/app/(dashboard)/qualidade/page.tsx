@@ -16,6 +16,8 @@ import { formatDate, formatDateTime, formatCurrency } from "@/lib/formatters";
 import { getVendorNoShows, declareVendorNoShow, type NoShowService } from "@/services/noShowsService";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
 
 /*
   ——— O que saiu deste ecrã ———
@@ -45,13 +47,14 @@ export default function QualityPage() {
   // sem fazer nada.
   const { data: noShows, refetch: refetchNoShows } = useAsyncData(() => getVendorNoShows(), []);
   const [declaringId, setDeclaringId] = useState<number | null>(null);
-  const declareNow = async (r: NoShowService) => {
-    const custo = formatCurrency(r.penalty_if_declared / 100);
-    if (!confirm(`Dar o serviço #${r.service_id} como falta de ${r.vendor.name ?? "este técnico"}?\n\nIsto cobra-lhe ${custo} (metade do que ia receber), cancela o serviço e reembolsa o cliente. O técnico é notificado com o valor. Não se desfaz.`)) return;
+  // A falta a confirmar: abre o diálogo com o valor e pede o motivo.
+  const [aDeclarar, setADeclarar] = useState<NoShowService | null>(null);
+  const declareNow = async (r: NoShowService, motivo: string) => {
     setDeclaringId(r.service_id);
     try {
-      const res = await declareVendorNoShow(r.service_id);
+      const res = await declareVendorNoShow(r.service_id, motivo);
       toast(`Falta registada — ${formatCurrency(res.service.penalty / 100)} cobrados a ${r.vendor.name ?? "técnico"}.`);
+      setADeclarar(null);
       refetchNoShows();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível registar a falta.", "error");
@@ -95,7 +98,7 @@ export default function QualityPage() {
     { key: "acao", label: "", render: (r) => (
       <button
         disabled={declaringId === r.service_id}
-        onClick={() => declareNow(r)}
+        onClick={() => setADeclarar(r)}
         className="btn-primary text-xs py-1 disabled:opacity-50 whitespace-nowrap"
       >
         {declaringId === r.service_id ? "A registar…" : "Dar como falta"}
@@ -298,6 +301,26 @@ export default function QualityPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={!!aDeclarar}
+        onClose={() => setADeclarar(null)}
+        onConfirm={(motivo) => (aDeclarar && motivo ? declareNow(aDeclarar, motivo) : undefined)}
+        tone="danger"
+        title={aDeclarar ? `Dar o pedido #${aDeclarar.service_id} como falta?` : ""}
+        description={aDeclarar && (
+          <>
+            Cobra a {aDeclarar.vendor.name ?? "este técnico"} <strong>{formatCurrency(aDeclarar.penalty_if_declared / 100)}</strong>{" "}
+            (metade do que ia receber), cancela o pedido e devolve o dinheiro ao cliente. O técnico é avisado com o valor.
+            Não se desfaz.
+          </>
+        )}
+        confirmLabel="Dar como falta"
+        requireReason
+        minReason={MOTIVO_MINIMO}
+        reasonLabel="Motivo (fica registado com o teu nome)"
+        reasonPlaceholder="Ex.: o cliente ligou às 14:20 a dizer que ninguém apareceu"
+        loading={declaringId !== null}
+      />
     </RouteGuard>
   );
 }

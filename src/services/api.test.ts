@@ -419,3 +419,107 @@ describe("todo o GET que vai ao backend chega ao ecrã sem ser zerado", () => {
     }
   });
 });
+
+/**
+ * O par de cima, para TODOS os verbos: uma chamada cujo caminho tem rota no
+ * servidor (`src/app/api/.../route.ts`) tem de sair do browser.
+ *
+ * Sem isto, um caminho esquecido em `LIVE_EXACT`/`LIVE_PATTERNS` não dá erro
+ * nenhum: o pedido cai no ramo de demonstração e o ecrã mostra o mock (ou um
+ * erro a culpar a configuração). Foi o que aconteceu ao detalhe do pedido
+ * (`/services/:id/detalhe`: a ficha nunca mostrou contactos, convidados nem
+ * ações em produção), ao reembolso e libertação de pagamentos e ao "Dar como
+ * falta" — as rotas existiam e funcionavam, o browser é que nunca as chamava.
+ */
+describe("toda a chamada a uma rota que existe sai do browser", () => {
+  /** Rotas que existem mas que o browser não chama de propósito, com a razão. */
+  const FICA_NO_BROWSER: Record<string, string> = {};
+
+  async function load() {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://exemplo.test/api");
+    return import("@/services/api");
+  }
+  afterEach(() => vi.unstubAllEnvs());
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("node:fs") as typeof import("node:fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("node:path") as typeof import("node:path");
+
+  /** `[verbo, caminho]` de cada chamada escrita por extenso em src/services. */
+  function chamadasDoCodigo(): [string, string][] {
+    const dir = path.join(process.cwd(), "src/services");
+    const vistas = new Map<string, [string, string]>();
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
+      const t = fs.readFileSync(path.join(dir, f), "utf8");
+      for (const m of t.matchAll(/api(Get|Post|Put|Delete)\b/g)) {
+        const janela = t.slice(m.index! + m[0].length, m.index! + 400);
+        const p = janela.match(/^\s*(?:<[^(]*>)?\(\s*["`](\/[^"`]+)["`]/);
+        if (!p) continue;
+        const caminho = p[1].replace(/\$\{[^}]+\}/g, "{id}").split("?")[0];
+        vistas.set(`${m[1]} ${caminho}`, [m[1].toUpperCase(), caminho]);
+      }
+    }
+    return [...vistas.values()];
+  }
+
+  /** Uma expressão por rota do servidor; `[id]` aceita qualquer segmento. */
+  function rotasDoServidor(): RegExp[] {
+    const raiz = path.join(process.cwd(), "src/app/api");
+    const rotas: RegExp[] = [];
+    const andar = (dir: string, segmentos: string[]) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isFile() && e.name === "route.ts") {
+          const corpo = segmentos.map((s) =>
+            s.startsWith("[...") ? ".+" : s.startsWith("[") ? "[^/]+" : s.replace(/[.*+?^${}()|\\]/g, "\\$&"));
+          rotas.push(new RegExp(`^/${corpo.join("/")}$`));
+        }
+        // Pastas com "_" são privadas no App Router: não são rotas.
+        if (e.isDirectory() && !e.name.startsWith("_")) andar(path.join(dir, e.name), [...segmentos, e.name]);
+      }
+    };
+    andar(raiz, []);
+    return rotas;
+  }
+
+  /**
+   * Os ids reais têm várias formas (números do Laravel, uuids, `emp_…`), e
+   * algumas regras de LIVE_PATTERNS só aceitam uma delas. Basta uma servir.
+   */
+  const IDS = ["282", "emp_1", "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"];
+  const comId = (caminho: string, id: string) => caminho.replaceAll("{id}", id);
+
+  it("encontra as chamadas do código (se isto falhar, o leitor partiu-se)", () => {
+    const chamadas = chamadasDoCodigo().map(([v, c]) => `${v} ${c}`);
+    expect(chamadas.length).toBeGreaterThan(100);
+    expect(chamadas).toContain("GET /services/{id}/detalhe");
+    expect(chamadas).toContain("POST /finance/app-payments/{id}/refund");
+    expect(rotasDoServidor().length).toBeGreaterThan(80);
+  });
+
+  it("nenhuma fica presa no modo de demonstração", async () => {
+    const { isLiveEndpoint } = await load();
+    const rotas = rotasDoServidor();
+    const presas = chamadasDoCodigo()
+      .filter(([, c]) => !(c in FICA_NO_BROWSER))
+      .filter(([, c]) => IDS.some((id) => rotas.some((r) => r.test(comId(c, id)))))
+      .filter(([, c]) => !IDS.some((id) => isLiveEndpoint(comId(c, id))))
+      .map(([v, c]) => `${v} ${c}`);
+
+    expect(
+      presas,
+      `Chamada a uma rota que existe no servidor, mas que o browser responde com o mock. `
+      + `Acrescenta o caminho a LIVE_EXACT (exato) ou LIVE_PATTERNS (com id) em api.ts — e, `
+      + `se for uma leitura de dados reais, também a REAL_DATA/REAL_PATTERNS.`,
+    ).toEqual([]);
+  });
+
+  it("a lista de exceções não envelhece sozinha", () => {
+    const chamadas = new Set(chamadasDoCodigo().map(([, c]) => c));
+    for (const c of Object.keys(FICA_NO_BROWSER)) {
+      expect(chamadas.has(c), `${c} já não é chamado: sai de FICA_NO_BROWSER`).toBe(true);
+    }
+  });
+});
