@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import { servicesFromLaravel, mapLaravelService, type LaravelServiceRow } from "./laravelServices";
 import { derivePaymentState, chargedCents, paymentKey, type PaymentState } from "./paylands";
+import { invoiceStatusOf } from "./companyInvoices";
 import { estadoSimplesDe, precisaDeAtencao, rotuloSimples } from "@/lib/estados";
 import { ESTADOS_DO_TICKET } from "@/lib/tickets";
 import type { StatusTone } from "@/lib/formatters";
@@ -63,6 +64,16 @@ export interface SearchResult {
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 // O endereço das fichas vive em lib/fichas (usado também pela ficha do pedido).
 export { fichaHref };
+
+/**
+ * O estado de uma fatura de custos, como o Financeiro o mostra. Não há coluna
+ * de estado: deriva do que já foi pago face ao total (ver companyInvoices.ts).
+ */
+export function estadoDaFatura(valor: unknown, pago: unknown): { estado: string; tom: StatusTone } {
+  const s = invoiceStatusOf(Number(valor) || 0, Number(pago) || 0);
+  if (s === "pago") return { estado: "Paga", tom: "success" };
+  return { estado: s === "parcial" ? "Paga em parte" : "Por pagar", tom: "warning" };
+}
 
 async function safe(fn: () => Promise<void>) { try { await fn(); } catch { /* fonte indisponível — ignora */ } }
 
@@ -270,12 +281,12 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
       });
     }),
     safe(async () => {
-      const { data } = await admin.from("company_invoices").select("id, vendor, description, status")
+      const { data } = await admin.from("company_invoices").select("id, vendor, description, amount, amount_paid")
         .or(`vendor.ilike.${like},description.ilike.${like}`).limit(6);
       for (const f of data ?? []) out.push({
         type: "invoice", typeLabel: "Fatura", id: String(f.id),
         title: f.vendor || "(sem fornecedor)", subtitle: f.description || "", href: "/financeiro?tab=custos",
-        ...(f.status ? { estado: f.status === "pago" ? "Paga" : f.status === "parcial" ? "Paga em parte" : "Por pagar", tom: f.status === "pago" ? "success" as const : "warning" as const } : {}),
+        ...estadoDaFatura(f.amount, f.amount_paid),
       });
     }),
   ]);

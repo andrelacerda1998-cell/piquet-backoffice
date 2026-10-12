@@ -81,3 +81,18 @@ describe("ordenar — grupos numa ordem fixa, o pedido exato primeiro", () => {
     expect(ordenados[0]).not.toHaveProperty("exato");
   });
 });
+
+import { estadoDaFatura } from "./search";
+
+describe("estadoDaFatura — deriva do que já foi pago (a tabela não tem coluna de estado)", () => {
+  it("por pagar, paga em parte e paga, como no Financeiro", () => {
+    expect(estadoDaFatura(120, 0)).toEqual({ estado: "Por pagar", tom: "warning" });
+    expect(estadoDaFatura(120, 40)).toEqual({ estado: "Paga em parte", tom: "warning" });
+    expect(estadoDaFatura(120, 120)).toEqual({ estado: "Paga", tom: "success" });
+  });
+
+  it("aceita os valores como texto, que é como o numeric chega do Supabase", () => {
+    expect(estadoDaFatura("120.50", "120.50")).toEqual({ estado: "Paga", tom: "success" });
+    expect(estadoDaFatura("120.50", null)).toEqual({ estado: "Por pagar", tom: "warning" });
+  });
+});
