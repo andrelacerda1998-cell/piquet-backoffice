@@ -8,3 +8,12 @@ export const PRIORIDADES_DO_TICKET = [
   { id: "alta", label: "Alta" },
   { id: "critica", label: "Crítica" },
 ] as const;
+
+/** O estado de um ticket, como se lê (mesmo vocabulário da caixa de Suporte). */
+export const ESTADOS_DO_TICKET: Record<string, string> = {
+  novo: "Novo",
+  em_curso: "Em curso",
+  aguarda_cliente: "À espera do cliente",
+  resolvido: "Resolvido",
+  fechado: "Fechado",
+};

@@ -11,7 +11,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { useTabParam } from "@/hooks/useTabParam";
-import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
+import { useAbrirPeloEndereco, useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
+import { NotasInternas } from "@/components/ui/NotasInternas";
 import { getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getTopVendors, getOnboardingTecnicos, setVendorAtValidation, createVendorInvoiceWorkspace, createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces, getTecnicosSemWorkspace, type TecnicoSemWorkspace, getResumoDocumentos, type TecnicoComDocumento, getVendor } from "@/services/vendorsService";
 
 import { getVendorDocuments, getAllVendorDocuments, approveVendorDocument, declineVendorDocument, type VendorDocument, type VendorDocumentStatus } from "@/services/vendorDocumentsService";
@@ -383,6 +384,16 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
   }, [profileVendor, urlPronta]);
   // Vindo da pesquisa global (⌘K): `?tecnico=7&q=Rui` abre o perfil.
   useAbrirPeloEndereco("tecnico", vendors?.data, (v) => v.id, setProfileVendor, setSearch);
+  /*
+    Vindo de um comando do ⌘K: "> suspender Rui" abre a ficha e a MESMA
+    confirmação do botão (com motivo); "> nota Rui" põe o cursor nas notas;
+    "Criar conta de teste" abre a janela dela.
+  */
+  const [acaoPedida, setAcaoPedida] = useState<string | null>(null);
+  const [focarNota, setFocarNota] = useState(false);
+  useAcaoPeloEndereco("acao", setAcaoPedida);
+  useAcaoPeloEndereco("nota", () => setFocarNota(true));
+  useAcaoPeloEndereco("novo", (v) => { if (v === "conta-teste") openTestAccountModal(); });
 
   // Subutilizador AT: o backend pode enviá-lo com nomes diferentes (ou ainda
   // não o enviar de todo) — aceitamos qualquer um.
@@ -485,6 +496,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
   // Suspender tira o técnico do matching: pede confirmação e um motivo, que
   // fica registado com o nome de quem suspendeu (ver acoes_da_equipa).
   const [paraSuspender, setParaSuspender] = useState<RealVendor | null>(null);
+  useEffect(() => {
+    if (acaoPedida !== "suspender" || !profileVendor) return;
+    setAcaoPedida(null);
+    if (profileVendor.suspended_at) toast(`${profileVendor.name ?? "Este técnico"} já está suspenso.`, "info");
+    else setParaSuspender(profileVendor);
+  }, [acaoPedida, profileVendor]);
   const { data: motivosSuspensao, refetch: refetchMotivos } = useAsyncData(() => getMotivos("suspender_tecnico"), []);
   const handleSuspend = async (v: RealVendor, motivo: string) => {
     setActingId(v.id);
@@ -1302,6 +1319,11 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                     a uma lead, e por isso aparecia no CRM como um pedido de
                     serviço vindo de quem os executa.
                   */}
+                  <div className="pt-1">
+                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Notas internas</p>
+                    <NotasInternas entidade="tecnico" id={String(v.id)} focar={focarNota} />
+                  </div>
+
                   <div className="pt-1">
                     <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Histórico da equipa</p>
                     <HistoricoDaEquipa entidade="tecnico" id={String(v.id)} />

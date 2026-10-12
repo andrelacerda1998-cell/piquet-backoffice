@@ -127,16 +127,25 @@ export function Topbar() {
           type="button"
           onClick={() => setCommandOpen(true)}
           className="flex-1 max-w-md hidden sm:flex items-center gap-2 input-field text-sm text-text-muted text-left hover:bg-surface-muted transition-colors"
-          aria-label="Pesquisar clientes, técnicos, serviços e tickets"
+          aria-label="Pesquisar pedidos, clientes, técnicos e comandos"
         >
           <Search className="h-4 w-4 shrink-0" />
-          <span className="flex-1 truncate">Pesquisar clientes, técnicos, serviços…</span>
+          <span className="flex-1 truncate">Pedido, cliente, técnico, telefone…</span>
           <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-surface-border px-1.5 py-0.5 font-sans text-[11px] text-text-secondary">
             <Command className="h-3 w-3" />K
           </kbd>
         </button>
 
         <div className="flex items-center gap-2 ml-auto">
+          {/* No telemóvel a caixa não cabe: fica a lupa, que abre o mesmo ⌘K. */}
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            className="sm:hidden p-2 rounded-lg hover:bg-surface-muted"
+            aria-label="Pesquisar"
+          >
+            <Search className="h-5 w-5" />
+          </button>
 
           {/* Período e filtros — só nos ecrãs que os aplicam (ver ECRAS_COM_FILTROS). */}
           {filtrosValem && (<>

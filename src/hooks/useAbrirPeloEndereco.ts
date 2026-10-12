@@ -86,3 +86,27 @@ export function ouvirPedidosDeAbertura(fn: (url: URL) => void): () => void {
   window.addEventListener(EVENTO, ouvinte);
   return () => window.removeEventListener(EVENTO, ouvinte);
 }
+
+/**
+ * Corre, uma vez, uma ação pedida pelo endereço: `?novo=fatura` abre a janela
+ * de nova fatura, `/tecnicos/94?acao=suspender` abre a confirmação de suspender.
+ * É o caminho dos comandos do ⌘K e do "+ Novo". O parâmetro sai do endereço
+ * depois de usado, para não voltar a abrir ao mexer na página.
+ */
+export function useAcaoPeloEndereco(chave: string, correr: (valor: string) => void): void {
+  const ref = useRef(correr);
+  ref.current = correr;
+  useEffect(() => {
+    const ver = (search: string) => {
+      const valor = new URLSearchParams(search).get(chave);
+      if (!valor) return;
+      const url = new URL(window.location.href);
+      url.searchParams.delete(chave);
+      window.history.replaceState(null, "", url.toString());
+      ref.current(valor);
+    };
+    ver(window.location.search);
+    // Já nesta página: o ⌘K muda o endereço sem a voltar a montar.
+    return ouvirPedidosDeAbertura((url) => ver(url.search));
+  }, [chave]);
+}

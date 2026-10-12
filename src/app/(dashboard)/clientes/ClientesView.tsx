@@ -14,7 +14,8 @@ import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { Modal } from "@/components/ui/Modal";
 import { Tabs, SubTabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
-import { useAbrirPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
+import { useAbrirPeloEndereco, useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
+import { NotasInternas } from "@/components/ui/NotasInternas";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { usePersistentList } from "@/hooks/usePersistentList";
@@ -203,6 +204,20 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
   }, [selectedCustomer, urlPronta]);
   // Vindo da pesquisa global (⌘K): `?cliente=42&q=Ana` abre a ficha.
   useAbrirPeloEndereco("cliente", allCustomers, (c) => c.id, setSelectedCustomer, setSearch);
+  /*
+    Vindo de um comando do ⌘K: "> bloquear Ana" abre a ficha e a MESMA
+    confirmação do botão (com motivo); "> nota Ana" põe o cursor nas notas.
+  */
+  const [acaoPedida, setAcaoPedida] = useState<string | null>(null);
+  const [focarNota, setFocarNota] = useState(false);
+  useAcaoPeloEndereco("acao", setAcaoPedida);
+  useAcaoPeloEndereco("nota", () => setFocarNota(true));
+  useEffect(() => {
+    if (acaoPedida !== "bloquear" || !selectedCustomer) return;
+    setAcaoPedida(null);
+    if (selectedCustomer.blocked_at) toast(`${selectedCustomer.name ?? "Este cliente"} já está bloqueado.`, "info");
+    else setParaBloquear(selectedCustomer);
+  }, [acaoPedida, selectedCustomer]);
   // Histórico de serviços do cliente. Os clientes vêm do Laravel (id numérico)
   // e os serviços do Supabase (customer_id uuid) — os ids não correspondem, por
   // isso a ligação possível hoje é pelo nome. Assinalado no ecrã.
@@ -622,6 +637,11 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Notas internas</p>
+              <NotasInternas entidade="cliente" id={String(selectedCustomer.id)} focar={focarNota} />
             </div>
 
             <div>

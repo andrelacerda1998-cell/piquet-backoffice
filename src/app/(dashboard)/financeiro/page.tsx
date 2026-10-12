@@ -7,6 +7,7 @@ import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
+import { useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import ImpostosRhPage from "../impostos-rh/ImpostosRh";
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -168,6 +169,8 @@ export default function FinancePage() {
       : emptyInvForm());
     setInvModal({ open: true, editing: inv });
   };
+  // "Nova fatura" no ⌘K e no "+ Novo": /financeiro?tab=custos&novo=fatura.
+  useAcaoPeloEndereco("novo", (v) => { if (v === "fatura") { setTab("custos"); openInvoiceModal(null); } });
 
   // ------------------------- Planeamento financeiro mensal -------------------------
   // Mês corrente REAL (o lib/today está fixado numa data de demo — não serve aqui).

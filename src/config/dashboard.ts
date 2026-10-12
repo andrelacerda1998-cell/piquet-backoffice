@@ -109,6 +109,16 @@ export const NAV_ITEMS = [
   { href: "/tecnicos?tab=aprovacoes", label: "Aprovações de técnicos", icon: "UserPlus" },
   { href: "/financeiro?tab=impostos", label: "Impostos e RH", icon: "Landmark" },
   { href: "/chat?tab=tarefas", label: "Tarefas da equipa", icon: "ListChecks" },
+  // Os separadores mais procurados, para o ⌘K levar direto a eles ("Ir para…").
+  { href: "/servicos?tab=pedidos", label: "Lista de pedidos", icon: "Wrench" },
+  { href: "/clientes?tab=lista", label: "Lista de clientes", icon: "Users" },
+  { href: "/tecnicos?tab=lista", label: "Lista de técnicos", icon: "HardHat" },
+  { href: "/mercado?tab=cobertura", label: "Cobertura e mapa", icon: "MapPin" },
+  { href: "/financeiro?tab=app-pagamentos", label: "Pagamentos da app", icon: "Euro" },
+  { href: "/financeiro?tab=custos", label: "Custos e faturas", icon: "FileText" },
+  { href: "/financeiro?tab=pagamentos", label: "Pagamentos a técnicos", icon: "Euro" },
+  { href: "/produto?tab=funil", label: "Funil do produto", icon: "MonitorSmartphone" },
+  { href: "/produto?tab=integracoes", label: "Integrações", icon: "Radio" },
 ] as const;
 
 /**
@@ -176,6 +186,9 @@ export const NAV_DEEPLINKS: string[] = [
   "/servicos?tab=personalizados",
   "/tecnicos?tab=aprovacoes",
   "/financeiro?tab=impostos", "/chat?tab=tarefas",
+  "/servicos?tab=pedidos", "/clientes?tab=lista", "/tecnicos?tab=lista", "/mercado?tab=cobertura",
+  "/financeiro?tab=app-pagamentos", "/financeiro?tab=custos", "/financeiro?tab=pagamentos",
+  "/produto?tab=funil", "/produto?tab=integracoes",
 ];
 
 export const MARKETING_CHANNELS = [
