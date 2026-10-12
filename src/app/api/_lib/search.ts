@@ -1,4 +1,5 @@
 import "server-only";
+import { fichaHref, pedidoHref } from "@/lib/fichas";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
 import { servicesFromLaravel } from "./laravelServices";
@@ -48,24 +49,8 @@ export interface SearchResult {
 }
 
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
-/**
- * O endereço que abre a ficha de um registo (ver useAbrirPeloEndereco). O
- * nome vai junto porque a página só tem a lista com pesquisa: procura por ele
- * e abre a ficha quando o registo aparece.
- */
-export function fichaHref(base: string, chave: string, id: unknown, nome: unknown): string {
-  /*
-    Com um id do Laravel (só números), a ficha tem endereço próprio:
-    /clientes/412, /tecnicos/94 (desde 09/10/2026). O formato antigo, com a
-    pesquisa pelo nome, fica para ids que não sejam números.
-  */
-  if (/^\d+$/.test(String(id))) return `${base.split("?")[0]}/${id}`;
-  const url = new URL(base, "http://x");
-  url.searchParams.set(chave, String(id));
-  const q = typeof nome === "string" ? nome.trim() : "";
-  if (q) url.searchParams.set("q", q);
-  return url.pathname + url.search;
-}
+// O endereço das fichas vive em lib/fichas (usado também pela ficha do pedido).
+export { fichaHref };
 
 async function safe(fn: () => Promise<void>) { try { await fn(); } catch { /* fonte indisponível — ignora */ } }
 
@@ -88,7 +73,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
           // O número à frente: é o que o cliente diz ao telefone.
           title: `#${s.id} · ${String(s.service_name || s.customer_name || "Serviço")}`,
           subtitle: join([s.customer_name as string, s.technician_name as string, s.city as string]),
-          href: `/servicos?servico=${encodeURIComponent(String(s.id))}`,
+          href: pedidoHref(String(s.id)),
         });
         return;
       }
@@ -100,7 +85,7 @@ export async function searchEntities(raw: string): Promise<{ results: SearchResu
         type: "service", typeLabel: "Serviço", id: String(s.id),
         title: s.service_name || s.customer_name || String(s.id),
         subtitle: join([s.customer_name, s.technician_name, s.city]),
-        href: `/servicos?servico=${encodeURIComponent(String(s.id))}`,
+        href: pedidoHref(String(s.id)),
       });
     }),
     safe(async () => {

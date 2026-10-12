@@ -31,6 +31,8 @@ export interface StaffContext {
   userId: string;
   email: string;
   role: string;
+  /** O nome como está em `staff` (para assinar notas e mensagens). */
+  name?: string;
 }
 
 /**
@@ -60,11 +62,11 @@ export async function getStaff(req: Request): Promise<StaffContext | null> {
   if (error || !userData.user) return null;
   const { data: staff } = await admin
     .from("staff")
-    .select("role, email")
+    .select("role, email, name")
     .eq("id", userData.user.id)
     .single();
   if (!staff) return null;
-  const ctx: StaffContext = { userId: userData.user.id, email: staff.email, role: staff.role };
+  const ctx: StaffContext = { userId: userData.user.id, email: staff.email, role: staff.role, name: staff.name ?? undefined };
   staffCache.set(token, { staff: ctx, at: Date.now() });
   return ctx;
 }

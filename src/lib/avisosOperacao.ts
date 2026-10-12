@@ -1,4 +1,5 @@
 import { formatCurrency } from "./formatters";
+import { pedidoHref } from "@/lib/fichas";
 import type { Pendente } from "./avisosPendentes";
 
 /**
@@ -145,7 +146,7 @@ export function avisosDeServicos(
       id: `servico:${s.id}:${estado}`,
       titulo: `Serviço ${estado === "concluido" ? "concluído" : "agendado"} · ${valorDoAviso(s.totalCustomerValue)}`,
       corpo: [partes.join(" | "), marca].filter(Boolean).join(" · ") || `Serviço ${s.id}`,
-      url: `/servicos?servico=${s.id}`,
+      url: pedidoHref(s.id),
     };
   };
 

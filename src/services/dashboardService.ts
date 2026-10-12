@@ -163,3 +163,23 @@ export async function acaoDoPedido(
     throw new Error("As ações sobre um pedido precisam da ligação ao Laravel.");
   }).then((r) => r.data);
 }
+
+/* ------------------------------ Tickets do pedido ------------------------------ */
+
+export type { TicketDoPedido } from "@/app/api/services/[id]/tickets/route";
+import type { TicketDoPedido } from "@/app/api/services/[id]/tickets/route";
+
+/** Os tickets de Suporte ligados a um pedido. */
+export async function getTicketsDoPedido(servicoId: string): Promise<TicketDoPedido[]> {
+  return apiGet<TicketDoPedido[]>(`/services/${servicoId}/tickets`, () => []).then((r) => r.data ?? []);
+}
+
+/** Abre um ticket em nome do cliente do pedido (ex.: ligou a reclamar). */
+export async function abrirTicketDoPedido(
+  servicoId: string,
+  dados: { assunto?: string; mensagem: string; categoria: string; prioridade: string },
+): Promise<TicketDoPedido> {
+  return apiPost<TicketDoPedido>(`/services/${servicoId}/tickets`, dados, () => {
+    throw new Error("Abrir tickets precisa do Supabase configurado.");
+  }).then((r) => r.data);
+}

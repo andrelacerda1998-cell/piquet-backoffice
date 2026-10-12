@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { pedidoHref } from "@/lib/fichas";
 import Link from "next/link";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { LoadingState, ErrorState } from "@/components/ui/States";
@@ -115,7 +116,7 @@ export default function PedidosPersonalizados() {
                     <Send className="h-4 w-4" /> Despachar
                   </button>
                 )}
-                <Link href={`/servicos?servico=${encodeURIComponent(aberto.id)}`} className="btn-secondary text-sm inline-flex">
+                <Link href={pedidoHref(aberto.id)} className="btn-secondary text-sm inline-flex">
                   Abrir o pedido completo <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

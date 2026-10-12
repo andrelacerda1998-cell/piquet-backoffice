@@ -68,6 +68,8 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /customers/trend": qualquer("view_customers"),
   "GET /customers/[id]": qualquer("view_customers"),
   "GET /customers/[id]/payment-methods": todas("view_customers", "view_personal_data"),
+  "GET /customers/[id]/notas": qualquer("view_customers"),
+  "POST /customers/[id]/notas": qualquer("view_customers"),
   "DELETE /customers/[id]/payment-methods/[methodId]": qualquer("destructive_actions"),
   "PUT /customers/[id]/block": qualquer("destructive_actions"),
   "GET /acoes-da-equipa": qualquer("view_services", "view_customers", "view_technicians", "manage_settings"),
@@ -89,6 +91,12 @@ export const POLITICA: Record<string, Requisito> = {
   "PUT /services/[id]": qualquer("edit_services"),
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),
+  // Notas internas: quem vê a ficha pode escrever nela (a nota guarda o autor).
+  "GET /services/[id]/notas": qualquer("view_services"),
+  "POST /services/[id]/notas": qualquer("view_services"),
+  // Tickets ligados ao pedido: são Suporte.
+  "GET /services/[id]/tickets": qualquer("view_support"),
+  "POST /services/[id]/tickets": qualquer("view_support"),
   "GET /custom-requests": qualquer("view_services"),
   "GET /operacoes/ao-vivo": qualquer("view_services"),
 
@@ -105,6 +113,8 @@ export const POLITICA: Record<string, Requisito> = {
   "GET /technicians/top": qualquer("view_technicians"),
   "GET /technicians/[id]": qualquer("view_technicians"),
   "GET /technicians/[id]/messages": qualquer("view_technicians"),
+  "GET /technicians/[id]/notas": qualquer("view_technicians"),
+  "POST /technicians/[id]/notas": qualquer("view_technicians"),
   "GET /coverage": qualquer("view_technicians"),
   "POST /technicians/test-account": qualquer("manage_technicians"),
   "PUT /technicians/[id]/at-validation": qualquer("manage_technicians"),

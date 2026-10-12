@@ -491,6 +491,8 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/customers\/\d+$/, // um cliente pelo id (Laravel)
   /^\/technicians\/\d+$/, // um técnico pelo id (Laravel)
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
+  /^\/(services|customers|technicians)\/\d+\/notas$/, // notas internas (Supabase)
+  /^\/services\/\d+\/tickets$/, // tickets reais de Suporte
 ];
 
 /**
@@ -558,6 +560,8 @@ export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/services\/[^/]+\/detalhe$/,
   /^\/finance\/app-payments\/[^/]+\/(refund|cancel)$/, // reembolsar / libertar o cativo (Payshop)
   /^\/vendor-no-shows\/[^/]+\/declare$/, // dar como falta (penalização ao técnico, devolução ao cliente)
+  /^\/(services|customers|technicians)\/\d+\/notas$/, // notas internas da equipa
+  /^\/services\/\d+\/tickets$/, // tickets de Suporte ligados ao pedido
   /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
   /^\/customers\/\d+$/, // um cliente pelo id
   /^\/technicians\/\d+$/, // um técnico pelo id

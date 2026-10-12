@@ -1,4 +1,5 @@
 import type { DashboardAlert } from "@/types";
+import { pedidoHref } from "@/lib/fichas";
 
 /*
   O destino de cada alerta, partilhado pelo ecrã de Alertas e pela fila
@@ -26,7 +27,7 @@ export function destinoDoAlerta(a: DashboardAlert): { href: string; label: strin
     // destino certo é mesmo o separador.
     case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
     // A operação: o pedido abre-se pelo número (é o que o ⌘K também faz).
-    case "pedido": return { href: `/servicos?servico=${encodeURIComponent(a.entityId ?? "")}`, label: "Abrir pedido" };
+    case "pedido": return { href: pedidoHref(a.entityId ?? ""), label: "Abrir pedido" };
     case "lotes": return { href: "/financeiro?tab=pagamentos", label: "Ver lotes" };
     default: return { href: "/", label: "Abrir" };
   }
