@@ -112,7 +112,7 @@ function guardarRecente(userId: string | undefined, r: SearchResult) {
 
 export function CommandPalette() {
   const router = useRouter();
-  const { commandOpen, setCommandOpen } = useUiStore();
+  const { commandOpen, setCommandOpen, commandTexto } = useUiStore();
   const user = useAuthStore((s) => s.user);
   const { theme, toggleTheme } = useThemeStore();
   const [query, setQuery] = useState("");
@@ -136,11 +136,13 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (commandOpen) {
-      setQuery("");
+      // Aberto pelo "+ Novo › Nota" vem já com "> nota " escrito.
+      setQuery(commandTexto);
       setActive(0);
       setRecentes(lerRecentes(user?.id));
       setTimeout(() => inputRef.current?.focus(), 20);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commandOpen, user?.id]);
 
   const pode = (perm?: Permission[]) => !perm || perm.length === 0 || (!!user && hasAnyPermission(user.role, perm));

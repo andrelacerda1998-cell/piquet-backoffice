@@ -28,6 +28,7 @@ export function destinoDoAlerta(a: DashboardAlert): { href: string; label: strin
     case "imposto": return { href: "/financeiro?tab=impostos", label: "Ver impostos" };
     // A operação: o pedido abre-se pelo número (é o que o ⌘K também faz).
     case "pedido": return { href: pedidoHref(a.entityId ?? ""), label: "Abrir pedido" };
+    case "mercado": return { href: "/mercado?tab=cobertura", label: "Abrir Mercado" };
     case "lotes": return { href: "/financeiro?tab=pagamentos", label: "Ver lotes" };
     default: return { href: "/", label: "Abrir" };
   }

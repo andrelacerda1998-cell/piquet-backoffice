@@ -7,7 +7,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Bell, ArrowRight, CheckCircle2, RefreshCw, Clock, Undo2 } from "lucide-react";
 import { PriorityBadge, AlertTypeBadge } from "@/components/ui/StatusBadge";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { getAlerts, adiarAlerta, reporAlerta, type AlertaAdiado } from "@/services/supportService";
+import { getAlerts, adiarAlerta, reporAlerta, dispensarAlerta, amanhaAsNove } from "@/services/supportService";
+import { podeDispensar } from "@/components/hoje/PrecisaDeTi";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MOTIVO_MINIMO } from "@/lib/motivo";
+import type { DashboardAlert } from "@/types";
 import { formatDateTime, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { AlertPriority } from "@/types";
@@ -59,7 +63,8 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
   const { data, loading, refetch } = useAsyncData(() => getAlerts(1, 200), []);
   const alertas = useMemo(() => data?.data ?? [], [data]);
   useEffect(() => { if (data) onTotal?.(alertas.length); }, [data, alertas.length, onTotal]);
-  const adiados = (data as unknown as { adiados?: AlertaAdiado[] })?.adiados ?? [];
+  const adiados = data?.adiados ?? [];
+  const [aDispensar, setADispensar] = useState<DashboardAlert | null>(null);
   const [menuAberto, setMenuAberto] = useState<string | null>(null);
   const [verAdiados, setVerAdiados] = useState(false);
   const [aGravar, setAGravar] = useState<string | null>(null);
@@ -67,7 +72,8 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
 
   const adiar = async (id: string, dias: number) => {
     setAGravar(id); setErro(""); setMenuAberto(null);
-    const until = new Date(Date.now() + dias * 86_400_000).toISOString();
+    // "Amanhã" é amanhã às 9 h; os outros prazos contam-se a partir de agora.
+    const until = dias === 1 ? amanhaAsNove() : new Date(Date.now() + dias * 86_400_000).toISOString();
     try { await adiarAlerta(id, until); await refetch(); }
     catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível adiar."); }
     finally { setAGravar(null); }
@@ -79,7 +85,14 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
     catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível repor."); }
     finally { setAGravar(null); }
   };
-  const fontesEmFalta = (data as unknown as { fontesIndisponiveis?: string[] })?.fontesIndisponiveis ?? [];
+  const fontesEmFalta = data?.fontesIndisponiveis ?? [];
+
+  const dispensar = async (motivo?: string) => {
+    if (!aDispensar || !motivo) return;
+    setErro("");
+    try { await dispensarAlerta(aDispensar.id, motivo); setADispensar(null); await refetch(); }
+    catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível tirar da fila."); }
+  };
 
   const porGrupo = useMemo(
     () => GRUPOS.map((g) => ({ ...g, itens: alertas.filter((a) => a.priority === g.p) }))
@@ -93,7 +106,7 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
         {embutido ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-text-secondary">
-              Tudo o que precisa de ação, apurado a partir dos dados reais do negócio. A fila do Resumo mostra os seis mais urgentes.
+              Tudo o que precisa de ação, apurado a partir dos dados reais do negócio. A fila do Resumo mostra os sete mais urgentes. Faturas, impostos e anúncios estão no Financeiro e no Marketing.
             </p>
             <button onClick={refetch} className="btn-secondary inline-flex items-center gap-2">
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
@@ -201,6 +214,16 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
                           </div>
                         )}
                       </div>
+                      {podeDispensar(a) && (
+                        <button
+                          onClick={() => setADispensar(a)}
+                          disabled={aGravar === a.id}
+                          className="btn-secondary"
+                          title="Tirar da fila de vez, com o motivo"
+                        >
+                          Não é preciso
+                        </button>
+                      )}
                       <Link href={d.href} className="btn-secondary inline-flex items-center gap-1.5">
                         {d.label}
                         <ArrowRight className="h-3.5 w-3.5" />
@@ -220,7 +243,7 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
               className="text-sm text-text-secondary hover:text-text-primary inline-flex items-center gap-2"
             >
               <Clock className="h-4 w-4" />
-              {adiados.length} {adiados.length === 1 ? "alerta adiado" : "alertas adiados"}
+              {adiados.length} {adiados.length === 1 ? "alerta adiado ou dispensado" : "alertas adiados ou dispensados"}
               <span className="text-xs text-text-muted">{verAdiados ? "· esconder" : "· ver"}</span>
             </button>
             {verAdiados && (
@@ -229,7 +252,11 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
                   <div key={a.id} className="card p-3 flex items-center gap-3 opacity-80">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary truncate">{a.title}</p>
-                      <p className="text-xs text-text-muted">Volta a aparecer a {formatDate(a.snoozeUntil)}</p>
+                      {/* "Não é preciso" não tem data de volta: mostra-se porquê e quem decidiu. */}
+                      <p className="text-xs text-text-muted">
+                        {a.snoozeUntil.startsWith("9999") ? (a.nota ?? "Não é preciso") : `Volta a aparecer a ${formatDate(a.snoozeUntil)}`}
+                        {a.por && ` · ${a.por}`}
+                      </p>
                     </div>
                     <button
                       onClick={() => repor(a.id)}
@@ -249,6 +276,19 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
         {erro && (
           <p className="text-sm text-danger">{erro}</p>
         )}
+
+        <ConfirmDialog
+          open={aDispensar !== null}
+          onClose={() => setADispensar(null)}
+          onConfirm={dispensar}
+          title="Tirar da fila de vez?"
+          description={aDispensar && <><b className="text-text-primary">{aDispensar.title}</b> deixa de aparecer. Fica registado o motivo, com o teu nome; pode voltar a mostrar-se em &quot;adiados&quot;.</>}
+          confirmLabel="Não é preciso"
+          requireReason
+          minReason={MOTIVO_MINIMO}
+          reasonLabel="Porque não é preciso?"
+          reasonPlaceholder="Ex.: o cliente já foi contactado por telefone e remarcou"
+        />
 
         {alertas.length > 0 && (
           <p className="text-xs text-text-muted">

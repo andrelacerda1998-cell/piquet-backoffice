@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ehUrgente } from "@/lib/leadUrgencia";
 import { verificarChave } from "../../_lib/webhookAuth";
 import { supabaseAdmin, SUPABASE_ENABLED } from "@/lib/supabase/server";
 import { logCronRun } from "../../_lib/cronlog";
@@ -65,20 +66,6 @@ async function lerMemoria(): Promise<string[]> {
 
 async function gravarMemoria(ids: string[]): Promise<void> {
   await supabaseAdmin().from("app_state").upsert({ chave: CHAVE_MEMORIA, valor: ids }, { onConflict: "chave" });
-}
-
-/*
-  A urgência de um pedido NÃO é uma coluna: vem escrita no texto, num campo
-  "Urgência:" que a landing preenchia. A mesma regra do ecrã de pedidos
-  (parseLeadMessage em leads/page.tsx) -- se divergissem, o aviso dizia
-  urgente e o ecrã não, ou ao contrário.
-
-  Selecionar uma coluna `urgency` inexistente faria a consulta devolver 400 e
-  os pedidos desapareciam dos avisos em silêncio.
-*/
-function ehUrgente(mensagem: string): boolean {
-  const campo = mensagem.match(/urg[êe]ncia:\s*([^\n·]+)/i)?.[1] ?? "";
-  return /urgente|hoje|emerg|imediat|agora/i.test(campo);
 }
 
 /** A primeira linha do pedido é o serviço; é o que diz do que se trata. */

@@ -30,6 +30,8 @@ export interface NoShowService {
 
 export interface NoShowsData {
   suspected: NoShowService[];
+  /** A começar já (≤ 15 min) sem o técnico ter saído (backend novo). */
+  avisos?: NoShowService[];
   declared: NoShowService[];
   penalty_ratio: number;
 }

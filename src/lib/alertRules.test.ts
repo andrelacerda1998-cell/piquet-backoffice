@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gerarAlertas, LIMITES, type SinaisDoNegocio } from "./alertRules";
+import { gerarAlertas, LIMITES, type SinaisDoNegocio, DONOS } from "./alertRules";
 
 const AGORA = Date.parse("2026-08-20T12:00:00Z");
 const haDias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString();
@@ -181,5 +181,89 @@ describe("gerarAlertas", () => {
       ] }, AGORA);
       expect(Object.fromEntries(r.map((a) => [a.entityId, a.priority]))).toEqual({ a: "media", b: "alta" });
     });
+  });
+});
+
+describe("alertas com dono, lembretes e as regras da auditoria (12/10/2026)", () => {
+  const AGORA = Date.parse("2026-10-12T14:00:00Z");
+  const antes = (min: number) => new Date(AGORA - min * 60_000).toISOString();
+  const base = {
+    leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [], documentosPendentes: 0,
+    faturasVencidas: [], impostosVencidos: [], diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
+  };
+
+  it("cada alerta diz quem trata dele", () => {
+    const a = gerarAlertas({ ...base, leadsPorResponder: [{ id: "l1", nome: "Ana", recebidaEm: antes(5) }] }, AGORA);
+    expect(a[0].donos).toEqual(DONOS.contactos);
+  });
+
+  it("faturas, impostos e anúncios são lembretes (ficam na área, não na fila)", () => {
+    const a = gerarAlertas({
+      ...base,
+      faturasVencidas: [{ fornecedor: "EDP", valorEmDivida: 50, venceuEm: "2026-10-01" }],
+      diasSemDadosDeAnuncios: 5,
+    }, AGORA);
+    expect(a.every((x) => x.lembrete)).toBe(true);
+  });
+
+  it("contacto urgente: alto logo, crítico ao fim de 15 minutos", () => {
+    const um = (min: number) => gerarAlertas({ ...base, leadsPorResponder: [{ id: "l1", nome: "Ana", recebidaEm: antes(min), urgente: true }] }, AGORA)[0];
+    expect(um(5).priority).toBe("alta");
+    expect(um(20).priority).toBe("critica");
+    expect(um(20).title).toContain("urgente");
+  });
+
+  it("cobrança falhada há menos de 30 minutos ainda não é alerta (quando se sabe desde quando)", () => {
+    const p = (min: number | null) => gerarAlertas({ ...base, pedidosComAlerta: [{
+      id: "282", cliente: "Marta", tipo: "Canalização", cidade: "Lisboa", nivel: "critico",
+      motivo: "pagamento_por_capturar", desde: antes(600), estadoDesde: min === null ? null : antes(min),
+    }] }, AGORA);
+    expect(p(10)).toHaveLength(0);
+    expect(p(45)).toHaveLength(1);
+    expect(p(null)).toHaveLength(1);
+    expect(p(45)[0].donos).toEqual(DONOS.cobranca);
+  });
+
+  it("ticket: o prazo depende da importância, e não conta se a última mensagem é nossa", () => {
+    const t = (prioridade: string, min: number, esperaResposta = true) => gerarAlertas({ ...base, ticketsAbertos: [{
+      id: "TK-1", assunto: "Cobrança", canal: "app_cliente", desde: antes(min), prioridade, esperaResposta,
+    }] }, AGORA);
+    expect(t("critica", 90)).toHaveLength(1);
+    expect(t("critica", 30)).toHaveLength(0);
+    expect(t("media", 90)).toHaveLength(0);
+    expect(t("media", 60 * 25)).toHaveLength(1);
+    expect(t("critica", 90, false)).toHaveLength(0);
+  });
+
+  it("reclamação aberta há mais de 24 h é alerta, mesmo já respondida", () => {
+    const a = gerarAlertas({ ...base, ticketsAbertos: [{
+      id: "TK-2", assunto: "Torneira a pingar", canal: "backoffice", desde: antes(30), abertoEm: antes(60 * 30),
+      categoria: "Reclamação", esperaResposta: false,
+    }] }, AGORA);
+    expect(a.map((x) => x.id)).toEqual(["reclamacao-TK-2"]);
+  });
+
+  it("documentos: só os que esperam há mais de 24 h, quando se sabe a data", () => {
+    expect(gerarAlertas({ ...base, documentosPendentes: 3, documentosAntigos: { quantos: 0, maisAntigo: null } }, AGORA)).toHaveLength(0);
+    const a = gerarAlertas({ ...base, documentosPendentes: 3, documentosAntigos: { quantos: 2, maisAntigo: antes(60 * 30) } }, AGORA);
+    expect(a[0].title).toContain("há mais de 24 h");
+  });
+
+  it("integração do painel: atrasada ou com duas falhas seguidas", () => {
+    const i = (estado: "falha" | "atrasado", falhasSeguidas: number) => gerarAlertas({ ...base, integracoes: [{
+      job: "ad-metrics", nome: "Anúncios", estado, detalhe: "403", quando: antes(60 * 30), falhasSeguidas,
+    }] }, AGORA);
+    expect(i("falha", 1)).toHaveLength(0);
+    expect(i("falha", 2)).toHaveLength(1);
+    expect(i("atrasado", 0)[0].title).toContain("não corre desde");
+  });
+
+  it("cidade sem oferta e falta iminente", () => {
+    const a = gerarAlertas({
+      ...base,
+      cidadesSemOferta: [{ cidade: "Porto", pedidos: 2 }],
+      faltasIminentes: [{ servicoId: "300", tecnico: "Rui", cliente: "Ana", comecaEm: new Date(AGORA + 10 * 60_000).toISOString() }],
+    }, AGORA);
+    expect(a.map((x) => x.id).sort()).toEqual(["cidade-sem-oferta-porto", "falta-iminente-300"]);
   });
 });

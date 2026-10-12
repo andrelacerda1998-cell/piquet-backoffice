@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo } from "react";
+import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -454,6 +455,9 @@ export default function FinancePage() {
             subtitle="Receita, custos e tesouraria"
             actions={<MonthSelect />}
           />
+
+          {/* Faturas vencidas e impostos: lembretes de gestão, aqui e não na fila da Visão Geral. */}
+          <LembretesDaArea rota="/financeiro" />
 
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
 

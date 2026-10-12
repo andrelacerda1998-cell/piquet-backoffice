@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getOperationAreas } from "@/services/catalogService";
 import { usePathname } from "next/navigation";
 import { useFilterStore, useAuthStore, useUiStore } from "@/stores";
@@ -9,12 +9,19 @@ import { getPeriodLabel } from "@/lib/formatters";
 import { DEFAULT_SETTINGS , NAV_ITEMS } from "@/config/dashboard";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { Notificacoes } from "@/components/layout/Notificacoes";
+import { Modal } from "@/components/ui/Modal";
+import { hasAnyPermission } from "@/lib/permissions";
+import { pedirAbertura } from "@/hooks/useAbrirPeloEndereco";
+import { useThemeStore } from "@/stores";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Menu, Search, Filter,
-  ChevronDown, X, Command,
+  ChevronDown, X, Command, Plus, FileText, Inbox, UserPlus, StickyNote, ListChecks, BellRing, Moon, Sun, LogOut,
 } from "lucide-react";
+import type { Permission } from "@/types";
 import type { PeriodPreset } from "@/types";
 
 /*
@@ -58,6 +65,49 @@ export function Topbar() {
   const setCommandOpen = useUiStore((s) => s.setCommandOpen);
   const [showFilters, setShowFilters] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNovo, setShowNovo] = useState(false);
+  const [showAvisos, setShowAvisos] = useState(false);
+  const abrirComando = useUiStore((s) => s.abrirComando);
+  // Os dois menus fecham ao tocar fora deles ou com Esc.
+  const novoRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showNovo && !showUserMenu) return;
+    const fora = (e: Event) => {
+      const alvo = e.target as Node;
+      if (showNovo && !novoRef.current?.contains(alvo)) setShowNovo(false);
+      if (showUserMenu && !userRef.current?.contains(alvo)) setShowUserMenu(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { setShowNovo(false); setShowUserMenu(false); } };
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("touchstart", fora);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", fora);
+      document.removeEventListener("touchstart", fora);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [showNovo, showUserMenu]);
+  const { theme, toggleTheme } = useThemeStore();
+  const router = useRouter();
+
+  /*
+    "+ Novo": o que se cria sem ter de ir procurar o ecrã (auditoria, anexo F).
+    Cada um abre a janela certa no sítio certo (ver useAcaoPeloEndereco); a
+    nota pergunta primeiro onde, pelo ⌘K.
+  */
+  const NOVOS: Array<{ label: string; Icon: typeof Plus; perm?: Permission[]; href?: string; comando?: string }> = [
+    { label: "Fatura", Icon: FileText, perm: ["view_finance"], href: "/financeiro?tab=custos&novo=fatura" },
+    { label: "Contacto", Icon: Inbox, perm: ["view_marketing", "view_customers"], href: "/leads?novo=contacto" },
+    { label: "Conta de teste", Icon: UserPlus, perm: ["manage_technicians"], href: "/tecnicos?tab=lista&novo=conta-teste" },
+    { label: "Nota num pedido, cliente ou técnico", Icon: StickyNote, comando: "> nota " },
+  ];
+  const novos = NOVOS.filter((n) => !n.perm || (!!user && hasAnyPermission(user.role, n.perm)));
+  const criar = (n: (typeof NOVOS)[number]) => {
+    setShowNovo(false);
+    if (n.comando) { abrirComando(n.comando); return; }
+    if (n.href) { router.push(n.href); pedirAbertura(n.href); }
+  };
   const activeCount = getActiveFilterCount(filters);
 
   const pathname = usePathname();
@@ -185,12 +235,31 @@ export function Topbar() {
             lista: ver "Exportar CSV" em Pedidos, que usa downloadCsv().
           */}
 
-          <ThemeToggle />
+          <div className="relative" ref={novoRef}>
+            <button
+              onClick={() => setShowNovo(!showNovo)}
+              className="btn-primary text-sm py-1.5 px-2.5 sm:px-3"
+              aria-haspopup="menu"
+              aria-expanded={showNovo}
+              aria-label="Criar novo"
+            >
+              <Plus className="h-4 w-4" /> <span className="hidden md:inline">Novo</span>
+            </button>
+            {showNovo && (
+              <div role="menu" className="absolute right-0 top-full mt-1 w-64 bg-surface border border-surface-border rounded-lg shadow-elevated py-1 z-50">
+                {novos.map((n) => (
+                  <button key={n.label} role="menuitem" onClick={() => criar(n)} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                    <n.Icon className="h-4 w-4 text-text-muted" /> {n.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <NotificationBell />
 
           {/* User menu */}
-          <div className="relative">
+          <div className="relative" ref={userRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-muted"
@@ -208,14 +277,30 @@ export function Topbar() {
                   <p className="text-xs text-text-muted">{user?.email}</p>
                   <p className="text-xs text-piquet-600 mt-0.5">{user ? ROLE_LABELS[user.role] : ""}</p>
                 </div>
-                <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface-muted">
-                  Terminar sessão
+                {/* O que é de cada pessoa vive aqui, e não no menu de toda a gente. */}
+                <Link href="/tarefas" onClick={() => setShowUserMenu(false)} className="w-full px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-text-muted" /> As minhas tarefas
+                </Link>
+                <button onClick={() => { setShowAvisos(true); setShowUserMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                  <BellRing className="h-4 w-4 text-text-muted" /> Avisos neste dispositivo
+                </button>
+                <button onClick={() => toggleTheme()} className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                  {theme === "dark" ? <Sun className="h-4 w-4 text-text-muted" /> : <Moon className="h-4 w-4 text-text-muted" />}
+                  {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                </button>
+                <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface-muted inline-flex items-center gap-2 border-t border-surface-border mt-1">
+                  <LogOut className="h-4 w-4" /> Terminar sessão
                 </button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Avisos neste dispositivo: cada pessoa liga os seus, sem precisar de Configurações. */}
+      <Modal open={showAvisos} onClose={() => setShowAvisos(false)} title="Avisos neste dispositivo" subtitle="Notificações no telemóvel ou no computador quando há algo à tua espera.">
+        <Notificacoes />
+      </Modal>
 
       {/* Painel de filtros — fechado, e só existe onde os filtros valem. */}
       {showFilters && filtrosValem && (

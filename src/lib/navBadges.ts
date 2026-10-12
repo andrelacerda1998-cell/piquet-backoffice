@@ -28,7 +28,13 @@ const ROTA_POR_ENTIDADE: Record<string, string> = {
   imposto: "/financeiro",
   pedido: "/servicos",
   lotes: "/financeiro",
+  mercado: "/mercado",
 };
+
+/** O ecrã onde se resolve um alerta (o mesmo que conta a bolinha). */
+export function rotaDoAlerta(a: DashboardAlert): string | null {
+  return ROTA_POR_ENTIDADE[a.entityType ?? ""] ?? null;
+}
 
 /**
  * Tudo o que é alerta vale uma bolinha.
@@ -45,7 +51,11 @@ const ROTA_POR_ENTIDADE: Record<string, string> = {
  */
 const contaParaBadge = (_a: DashboardAlert) => true;
 
-export function contarPorRota(alertas: DashboardAlert[]): Record<string, number> {
+/**
+ * `lembretes` (faturas, impostos, anúncios) contam na bolinha da área deles e
+ * não no total da Visão Geral: estão fora da fila "Precisa de ti".
+ */
+export function contarPorRota(alertas: DashboardAlert[], lembretes: DashboardAlert[] = []): Record<string, number> {
   const contas: Record<string, number> = {};
   for (const a of alertas) {
     if (!contaParaBadge(a)) continue;
@@ -63,6 +73,10 @@ export function contarPorRota(alertas: DashboardAlert[]): Record<string, number>
   const total = alertas.filter(contaParaBadge)
     .reduce((s, a) => s + quantosRepresenta(a), 0);
   if (total > 0) contas["/"] = total;
+  for (const a of lembretes) {
+    const rota = ROTA_POR_ENTIDADE[a.entityType ?? ""];
+    if (rota) contas[rota] = (contas[rota] ?? 0) + quantosRepresenta(a);
+  }
   return contas;
 }
 

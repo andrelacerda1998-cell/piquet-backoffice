@@ -29,7 +29,7 @@ export function useNavBadges(): Record<string, number> {
     const ler = async () => {
       try {
         const r = await getAlerts(1, 200);
-        if (vivo) setContas(contarPorRota(r.data ?? []));
+        if (vivo) setContas(contarPorRota(r.data ?? [], r.lembretes ?? []));
       } catch {
         if (vivo) setContas({});
       }

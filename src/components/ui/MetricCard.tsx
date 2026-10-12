@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercent, formatChangePercent } from "@/lib/formatters";
 import type { MetricValue } from "@/types";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
@@ -69,11 +70,7 @@ export function MetricCard({ title, metric, format = "number", className, loadin
           {title}
           {demoEndpoint && <DemoBadge endpoint={demoEndpoint} className="ml-1.5 align-middle" />}
         </p>
-        {metric.tooltip && (
-          <span title={metric.tooltip} className="text-text-muted cursor-help">
-            <Info className="h-3.5 w-3.5" />
-          </span>
-        )}
+        {metric.tooltip && <InfoTip texto={metric.tooltip} />}
       </div>
       {empty ? (
         <>
