@@ -8,6 +8,8 @@ import { laravelAdminRequest, LARAVEL_ADMIN_ENABLED } from "@/lib/laravelAdmin";
  * O pedido de cada pagamento (backend: GET /v1/admin/payment-orders?uuids=…),
  * de 50 em 50 para o endereço não crescer demais. Um backend sem a rota deixa
  * os pagamentos sem pedido -- e o ecrã sem o "Abrir pedido" -- sem erro.
+ * Os ids comparam-se em maiúsculas: o Payshop grava-os assim em
+ * pop_transactions, e o Laravel pode devolvê-los de outra forma.
  */
 async function pedidosDosPagamentos(uuids: string[]): Promise<Map<string, string>> {
   const pedidoDe = new Map<string, string>();
@@ -18,7 +20,7 @@ async function pedidosDosPagamentos(uuids: string[]): Promise<Map<string, string
       const r = await laravelAdminRequest<Array<{ uuid: string; service_id: number | null }> | { items?: Array<{ uuid: string; service_id: number | null }> }>(
         `/v1/admin/payment-orders?uuids=${lote.map(encodeURIComponent).join(",")}`,
       );
-      for (const o of Array.isArray(r) ? r : r.items ?? []) if (o.service_id) pedidoDe.set(o.uuid, String(o.service_id));
+      for (const o of Array.isArray(r) ? r : r.items ?? []) if (o.service_id) pedidoDe.set(o.uuid.toUpperCase(), String(o.service_id));
     } catch {
       return pedidoDe;
     }
@@ -136,7 +138,7 @@ export const GET = withStaff(async (req) => {
       id: p.id, customer: p.customer, amount: p.amountCents / 100,
       refunded: p.refundedCents / 100, state: p.state, method: p.method,
       methodKind: p.methodKind, created: p.created, attempts: p.attempts,
-      isTest: p.isTest, servicoId: pedidoDe.get(p.id) ?? null,
+      isTest: p.isTest, servicoId: pedidoDe.get(p.id.toUpperCase()) ?? null,
     })),
   });
 });

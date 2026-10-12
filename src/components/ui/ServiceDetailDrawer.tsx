@@ -411,7 +411,8 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
           onFeito={onMudou}
           uuid={uuid}
           cliente={service.customerName}
-          cobradoCents={Math.round(service.totalCustomerValue * 100)}
+          cobradoCents={detalhe?.pagamento?.cobradoCents ?? Math.round(service.totalCustomerValue * 100)}
+          jaDevolvidoCents={detalhe?.pagamento?.reembolsadoCents ?? 0}
           servicoId={service.id}
         />
       )}

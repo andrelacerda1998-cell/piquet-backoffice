@@ -5,6 +5,7 @@ import { Modal, Field } from "./Modal";
 import { formatCurrency } from "@/lib/formatters";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { refundAppPayment } from "@/services/financeService";
+import { valorAEnviar } from "@/lib/reembolso";
 import { toast } from "@/stores";
 
 /**
@@ -36,15 +37,14 @@ export function ReembolsoDialog({ open, onClose, onFeito, uuid, cliente, cobrado
   const cents = Math.round(Number(valor.replace(/\s/g, "").replace(",", ".")) * 100);
   const valorValido = Number.isFinite(cents) && cents > 0 && cents <= disponivel;
   const motivoCurto = motivo.trim().length < MOTIVO_MINIMO;
-  const parcial = valorValido && cents < disponivel;
 
   const confirmar = async () => {
     if (!valorValido || motivoCurto) return;
     setAEnviar(true);
     try {
+      const amountCents = valorAEnviar(cents, cobradoCents, jaDevolvidoCents);
       await refundAppPayment(uuid, motivo.trim(), {
-        // Sem valor, o Payshop devolve tudo; com valor, só essa parte (em cêntimos).
-        ...(parcial ? { amountCents: cents } : {}),
+        ...(amountCents !== undefined ? { amountCents } : {}),
         ...(servicoId ? { servicoId } : {}),
       });
       toast(`Reembolso de ${formatCurrency(cents / 100)} enviado ao Payshop.`);
