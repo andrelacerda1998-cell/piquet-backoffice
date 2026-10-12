@@ -34,8 +34,12 @@ export const ESTADOS_SIMPLES: EstadoSimples[] = [
   },
 ];
 
-/** Os estados técnicos que pedem alguém da equipa, seja qual for o estado simples. */
-export const PRECISA_DE_ATENCAO: ServiceStatus[] = ["pagamento_por_capturar", "em_reclamacao"];
+/**
+ * Os estados técnicos que pedem alguém da equipa, seja qual for o estado
+ * simples. O personalizado à espera da Piquet (a_aguardar_orcamento) só anda
+ * quando alguém o despacha.
+ */
+export const PRECISA_DE_ATENCAO: ServiceStatus[] = ["pagamento_por_capturar", "em_reclamacao", "a_aguardar_orcamento"];
 
 export function precisaDeAtencao(status: ServiceStatus): boolean {
   return PRECISA_DE_ATENCAO.includes(status);

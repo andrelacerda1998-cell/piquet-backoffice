@@ -5,7 +5,8 @@ import { apiOk, apiErr, withStaff } from "../_lib/handler";
 import { upsertCustomerByName, upsertTechnicianByName, syncTechnicianCategories } from "../_lib/entities";
 import { servicesFromLaravel, fetchLaravelServices } from "../_lib/laravelServices";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
-import type { PeriodPreset, ServiceStatus } from "@/types";
+import type { PeriodPreset, ServiceStatus, UserRole } from "@/types";
+import { hasPermission } from "@/lib/permissions";
 
 const COMMISSION = 0.25; // margem fixa da Piquet (o técnico fica com 75%)
 
@@ -28,7 +29,7 @@ function flatten(r: EmbeddedServiceRow): ServiceRow {
 }
 
 /** GET /api/services — lista paginada com filtros/ordenação server-side. */
-export const GET = withStaff(async (req) => {
+export const GET = withStaff(async (req, { staff }) => {
   const url = new URL(req.url);
   const q = url.searchParams;
   const page = Math.max(1, Number(q.get("page") ?? 1));
@@ -56,11 +57,24 @@ export const GET = withStaff(async (req) => {
       A categoria do filtro global é a área de operação (o painel de filtros lê
       as categorias reais do catálogo).
     */
-    return apiOk(await fetchLaravelServices({
+    const r = await fetchLaravelServices({
       page, pageSize, status, city, search, from, to,
       statuses: statuses as ServiceStatus[],
       operationAreaId: categoryId,
-    }));
+      sort, dir,
+      // Sem ordenação escolhida, os que precisam de alguém vêm primeiro (o servidor decide quais).
+      atencao: !sort,
+      dia: q.get("dia") ?? undefined,
+      agendados: q.get("agendados") === "1",
+      abertos: q.get("abertos") === "1",
+      customerId: q.get("customerId") ?? undefined,
+      vendorId: q.get("vendorId") ?? undefined,
+    });
+    // Os telefones só a quem pode ver dados pessoais (como na ficha do pedido).
+    if (!hasPermission(staff.role as UserRole, "view_personal_data")) {
+      r.data = r.data.map((s) => ({ ...s, customerPhone: null, technicianPhone: null }));
+    }
+    return apiOk(r);
   }
 
   const admin = supabaseAdmin();
