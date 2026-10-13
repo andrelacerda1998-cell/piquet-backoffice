@@ -236,6 +236,8 @@ const LIVE_EXACT = new Set<string>([
   "/vendor-payments",
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
+  // Faturas de serviços por emitir (backend#176): a lista vem do Laravel.
+  "/finance/faturas-por-emitir",
   "/acoes-da-equipa",
   "/staff",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
@@ -430,6 +432,8 @@ const REAL_DATA = new Set<string>([
   "/vendor-payments",
   "/finance/payout-lotes",
   "/finance/payout-lotes/conferir",
+  // Faturas de serviços por emitir (backend#176): a lista vem do Laravel.
+  "/finance/faturas-por-emitir",
   "/acoes-da-equipa",
   "/staff",
   // Faltas de técnicos — idem, via Laravel (penalização de 50%, ver VendorNoShowPolicy).
@@ -498,6 +502,7 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
   /^\/(services|customers|technicians)\/\d+\/notas$/, // notas internas (Supabase)
   /^\/services\/\d+\/tickets$/, // tickets reais de Suporte
+  /^\/finance\/faturas-por-emitir\/\d+\/emitir$/, // "Emitir agora" (backend#176)
 ];
 
 /**
@@ -593,6 +598,7 @@ export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/vendor-documents\/[^/]+\/(approve|decline)$/, // rever documento KYC
   // Lotes de pagamento a técnicos (substituem o "pagar" direto, que saiu).
   /^\/finance\/payout-lotes\/[^/]+\/(aprovar|pagar|cancelar)$/,
+  /^\/finance\/faturas-por-emitir\/\d+\/emitir$/, // "Emitir agora" (backend#176)
   /^\/customers\/[^/]+\/(block|restore)$/, // bloquear/reativar cliente
   /^\/customers\/[^/]+\/payment-methods$/, // listar métodos de pagamento
   /^\/customers\/[^/]+\/payment-methods\/[^/]+$/, // apagar método de pagamento

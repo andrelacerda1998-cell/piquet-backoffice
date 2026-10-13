@@ -8,7 +8,7 @@ import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { cn, copiarParaAreaDeTransferencia, downloadCsv } from "@/lib/utils";
-import { csvDoLote, podeAprovar, type EstadoLinha, type EstadoLote, type Lote } from "@/lib/lotesPagamento";
+import { csvDoLote, pagavel, podeAprovar, type EstadoLinha, type EstadoLote, type Lote } from "@/lib/lotesPagamento";
 import {
   aprovarLote, cancelarLote, conferirExtrato, criarLote, getLotes, pagarLote,
   type ResultadoDaConferencia, type VendorPayment,
@@ -31,6 +31,7 @@ const RETENCAO: Record<string, string> = {
   iban_missing: "sem IBAN",
   fiscal_address_missing: "sem morada fiscal",
   at_user_missing: "sem acesso AT",
+  invoice_pending: "fatura por emitir",
 };
 
 const ROTULO_LOTE: Record<EstadoLote, { texto: string; cor: string }> = {
@@ -68,11 +69,16 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
       .flatMap((l) => l.linhas.filter((x) => x.estado !== "pago" && x.estado !== "confirmado").map((x) => x.vendor_id)),
   ), [lotes]);
   const impedimento = (v: VendorPayment) =>
-    !v.iban ? "sem IBAN" : v.payout_blocker ? RETENCAO[v.payout_blocker] ?? v.payout_blocker : emLoteAberto.has(v.id) ? "já num lote" : null;
+    !v.iban ? "sem IBAN"
+      : v.payout_blocker ? RETENCAO[v.payout_blocker] ?? v.payout_blocker
+        : pagavel(v) <= 0 ? RETENCAO.invoice_pending
+          : emLoteAberto.has(v.id) ? "já num lote" : null;
   // "Sem IBAN" já aparece no lugar do IBAN: não se repete ao lado.
   const avisoDe = (v: VendorPayment) => (v.iban ? impedimento(v) : null);
   const elegiveis = saldos.filter((v) => !impedimento(v));
-  const totalEscolhido = saldos.filter((v) => escolhidos.has(v.id)).reduce((s, v) => s + v.balance, 0);
+  // Só o que se pode pagar (ver `pagavel`): o dinheiro de um serviço com a
+  // fatura por emitir fica na carteira, e o lote não o leva.
+  const totalEscolhido = saldos.filter((v) => escolhidos.has(v.id)).reduce((s, v) => s + pagavel(v), 0);
 
   const correr = async (chave: string, fn: () => Promise<unknown>, ok: string) => {
     setOcupado(chave);
@@ -89,7 +95,7 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
   };
 
   const criar = () => correr("criar", async () => {
-    const linhas = saldos.filter((v) => escolhidos.has(v.id)).map((v) => ({ vendor_id: v.id, valor: v.balance }));
+    const linhas = saldos.filter((v) => escolhidos.has(v.id)).map((v) => ({ vendor_id: v.id, valor: pagavel(v) }));
     await criarLote(linhas);
     setEscolhidos(new Set());
   }, "Lote criado. Falta outra pessoa aprová-lo.");
@@ -154,7 +160,14 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
                 <span className="font-medium text-text-primary min-w-0 truncate">{v.vendor_name ?? `Técnico ${v.id}`}</span>
                 <Iban iban={v.iban} nome={v.vendor_name} />
                 {avisoDe(v) && <span className="text-xs text-warning whitespace-nowrap">{avisoDe(v)}</span>}
-                <span className="ml-auto font-semibold tabular-nums whitespace-nowrap">{formatCurrency(v.balance)}</span>
+                <span className="ml-auto text-right whitespace-nowrap">
+                  <span className="font-semibold tabular-nums">{formatCurrency(pagavel(v))}</span>
+                  {!!v.held_for_invoice && v.held_for_invoice > 0 && (
+                    <span className="block text-[11px] text-text-muted tabular-nums">
+                      + {formatCurrency(v.held_for_invoice)} à espera da fatura
+                    </span>
+                  )}
+                </span>
               </label>
             );
           })}

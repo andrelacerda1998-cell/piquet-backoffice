@@ -161,6 +161,10 @@ export const POLITICA: Record<string, Requisito> = {
   "POST /finance/payout-lotes/[id]/pagar": qualquer("pay_technicians"),
   "POST /finance/payout-lotes/[id]/cancelar": qualquer("pay_technicians"),
   "POST /finance/payout-lotes/conferir": qualquer("pay_technicians"),
+  // Faturas por emitir: o dinheiro desses serviços só se paga depois. Ler é
+  // de quem vê o Financeiro; pôr a fatura a sair é de quem paga técnicos.
+  "GET /finance/faturas-por-emitir": qualquer("view_finance"),
+  "POST /finance/faturas-por-emitir/[id]/emitir": qualquer("pay_technicians"),
   "GET /tax/obligations": qualquer("view_finance"),
   "GET /tax/summary": qualquer("view_finance"),
   "GET /tax/vat": qualquer("view_finance"),
