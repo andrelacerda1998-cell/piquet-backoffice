@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { conferir, csvDoLote, estadoDepoisDePagar, lerExtrato, podeAprovar, validarLinhas, type Movimento } from "./lotesPagamento";
+import { conferir, csvDoLote, estadoDepoisDePagar, lerExtrato, pagavel, podeAprovar, validarLinhas, type Movimento } from "./lotesPagamento";
 
 const saldos = [
   { id: 1, vendor_name: "Carlos Mendes", iban: "PT50000201231234567890154", balance: 150 },
@@ -23,6 +23,23 @@ describe("validarLinhas", () => {
       "Ana Lopes tem o pagamento retido (at_user_missing).",
       "Carlos Mendes aparece duas vezes.",
     ]);
+  });
+
+  // Desde 13/10/2026 só se paga o que está faturado. O lote é debitado DEPOIS
+  // da transferência: se levasse dinheiro à espera da fatura, o Laravel
+  // recusava o débito com o dinheiro já fora do banco.
+  it("não leva o dinheiro de serviços com a fatura por emitir", () => {
+    const comFaturaPorEmitir = [{ ...saldos[0], payable: 75, held_for_invoice: 75 }];
+
+    expect(validarLinhas([{ vendor_id: 1, valor: 150 }], comFaturaPorEmitir, new Set())).toEqual([
+      "O valor de Carlos Mendes inclui serviços com a fatura por emitir: pode pagar até 75.00 €.",
+    ]);
+    expect(validarLinhas([{ vendor_id: 1, valor: 75 }], comFaturaPorEmitir, new Set())).toEqual([]);
+  });
+
+  it("sem o campo (backend antigo), o limite continua a ser o saldo", () => {
+    expect(pagavel({ balance: 150 })).toBe(150);
+    expect(pagavel({ balance: 150, payable: 0 })).toBe(0);
   });
 
   it("um técnico só pode estar num lote aberto de cada vez", () => {

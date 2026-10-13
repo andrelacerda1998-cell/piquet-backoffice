@@ -48,10 +48,30 @@ export interface SaldoDoTecnico {
   vendor_name: string | null;
   iban: string | null;
   balance: number;
+  /**
+   * O que se pode pagar hoje: o saldo menos o que espera por faturas por
+   * emitir. Desde 13/10/2026 só se paga um serviço depois de a fatura dele
+   * sair (backend: `Vendor::ganhosPagaveis`). Sem o campo, backend antigo: é
+   * o saldo.
+   */
+  payable?: number;
+  /** Do saldo, o que espera pela fatura de serviços por faturar. */
+  held_for_invoice?: number;
   payout_blocker?: string | null;
 }
 
 export const cent = (v: number) => Math.round(v * 100);
+
+/**
+ * O máximo que um lote pode levar deste técnico.
+ *
+ * O lote paga-se DEPOIS de a transferência sair do banco: se levasse dinheiro
+ * à espera de uma fatura, o Laravel recusava o débito com a transferência já
+ * feita. Por isso o limite fica aqui, na criação, antes de haver dinheiro a
+ * sair.
+ */
+export const pagavel = (s: Pick<SaldoDoTecnico, "balance" | "payable">): number =>
+  typeof s.payable === "number" ? s.payable : s.balance;
 
 /**
  * As linhas que se pedem para um lote novo, verificadas contra os saldos de
@@ -78,6 +98,9 @@ export function validarLinhas(
     if (s.payout_blocker) erros.push(`${nome} tem o pagamento retido (${s.payout_blocker}).`);
     if (!(p.valor > 0)) erros.push(`O valor de ${nome} tem de ser positivo.`);
     else if (cent(p.valor) > cent(s.balance)) erros.push(`O valor de ${nome} é maior do que o saldo (${s.balance.toFixed(2)} €).`);
+    else if (cent(p.valor) > cent(pagavel(s))) erros.push(
+      `O valor de ${nome} inclui serviços com a fatura por emitir: pode pagar até ${pagavel(s).toFixed(2)} €.`,
+    );
   }
   return erros;
 }

@@ -82,6 +82,7 @@ export const ESCRITAS: Record<string, Escrita> = {
   "POST /finance/payout-lotes/[id]/pagar": { acao: "Pagou o lote", entidade: "lote", id: "id" },
   "POST /finance/payout-lotes/[id]/cancelar": { acao: "Cancelou o lote", entidade: "lote", id: "id" },
   "POST /finance/payout-lotes/conferir": { acao: "Conferiu lotes com o extrato", entidade: "lote" },
+  "POST /finance/faturas-por-emitir/[id]/emitir": { acao: "Pôs a sair as faturas em atraso", entidade: "tecnico", id: "id" },
   "PUT /tax/obligations/[id]/pay": { acao: "Marcou um imposto como pago", entidade: "imposto", id: "id" },
   "POST /employees": { acao: "Criou um colaborador", entidade: "colaborador" },
   "PUT /employees/[id]": { acao: "Alterou um colaborador", entidade: "colaborador", id: "id" },

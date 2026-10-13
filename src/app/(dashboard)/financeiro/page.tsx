@@ -38,6 +38,8 @@ import { getSystemProfit, type SystemProfitTransaction } from "@/services/system
 import { PIQUET_COMMISSION } from "@/mocks/data";
 import { getVendorPayments } from "@/services/vendorPaymentsService";
 import { LotesDePagamento } from "./LotesDePagamento";
+import { FaturasPorEmitir } from "./FaturasPorEmitir";
+import { pagavel } from "@/lib/lotesPagamento";
 import { buildMetricValue, semIVA } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
@@ -869,7 +871,10 @@ export default function FinancePage() {
               {(() => {
                 const itens = vendorPayments?.items ?? [];
                 const iva = DEFAULT_TAX_CONFIG.vatRate;
-                const aPagar = itens.reduce((s, v) => s + v.balance, 0);
+                // Só o que se pode pagar já; o dinheiro de serviços com a fatura
+                // por emitir fica à parte (ver Faturas por emitir, abaixo).
+                const aPagar = itens.reduce((s, v) => s + pagavel(v), 0);
+                const aEsperaDaFatura = itens.reduce((s, v) => s + (v.held_for_invoice ?? 0), 0);
                 // Totais só existem depois de o backend os expor; somar nulls
                 // daria 0 € e passaria por número real.
                 const comTotais = itens.filter((v) => v.total_invoiced != null);
@@ -902,6 +907,7 @@ export default function FinancePage() {
                       <p className="text-[11px] text-text-muted">a aguardar transferência</p>
                     </div>
                     {stat("A pagar", aPagar)}
+                    {aEsperaDaFatura > 0 && stat("À espera de fatura", aEsperaDaFatura)}
                     {comComissao.length > 0 && stat("Comissão Piquet", comissao, true)}
                     {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
                     <p className="text-[11px] text-text-muted max-w-xs ml-auto">
@@ -911,6 +917,7 @@ export default function FinancePage() {
                   </div>
                 );
               })()}
+              <FaturasPorEmitir recarregarSaldos={refetchVendorPayments} />
               <LotesDePagamento
                 saldos={vendorPayments?.items ?? []}
                 aCarregar={vendorPaymentsLoading}

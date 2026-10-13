@@ -28,8 +28,19 @@ export interface VendorPayment {
    */
   total_invoiced?: number | null;
   commission?: number | null;
-  /** Porque é que este saldo não se pode pagar (sem IBAN, sem morada fiscal, sem AT). */
+  /**
+   * Porque é que este saldo não se pode pagar (sem IBAN, sem morada fiscal,
+   * sem AT; desde 13/10/2026 também `invoice_pending`: o saldo todo espera por
+   * faturas por emitir).
+   */
   payout_blocker?: string | null;
+  /**
+   * Do saldo, o que se pode pagar hoje e o que espera por uma fatura (backend
+   * desde 13/10/2026). O lote usa o `payable` — ver `pagavel()` em
+   * src/lib/lotesPagamento.ts.
+   */
+  payable?: number;
+  held_for_invoice?: number;
 }
 
 export interface VendorPaymentsData {
@@ -42,6 +53,23 @@ export async function getVendorPayments(page = 1, perPage = 50): Promise<VendorP
     "/vendor-payments",
     () => ({ items: [], meta: { current_page: 1, last_page: 1, per_page: perPage, total: 0 } }),
     { page, per_page: perPage }
+  ).then((r) => r.data);
+}
+
+/* ------------------------- faturas por emitir ------------------------- */
+
+import type { FaturasPorEmitir } from "@/lib/faturasPorEmitir";
+
+/** As faturas por emitir (backend#176). `ativo: false` antes de o backend as ter. */
+export async function getFaturasPorEmitir(): Promise<FaturasPorEmitir> {
+  return apiGet<FaturasPorEmitir>("/finance/faturas-por-emitir", () => ({ ativo: false, items: [], total: 0 })).then((r) => r.data);
+}
+
+/** Põe já na fila as faturas por emitir de um técnico. Devolve quantas. */
+export async function emitirFaturasAgora(vendorId: number): Promise<{ vendor_id: number; por_emitir: number }> {
+  return apiPost<{ vendor_id: number; por_emitir: number }>(
+    `/finance/faturas-por-emitir/${vendorId}/emitir`, {},
+    () => { throw new Error("Emitir faturas precisa da API de admin do Laravel configurada."); },
   ).then((r) => r.data);
 }
 
