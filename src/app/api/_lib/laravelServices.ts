@@ -47,6 +47,10 @@ export interface LaravelServiceRow {
   invoice_status?: string | null;
   rating?: number | null;
   customer_phone?: string | null;
+  /** O telefone do técnico (backend #171). */
+  vendor_phone?: string | null;
+  /** Porque é que o pedido precisa de alguém (backend #171), ou null. */
+  atencao?: { nivel: "critico" | "atencao"; motivo: string } | null;
   customer_notes?: string | null;
   /** Marcação: vive na tabela `schedules`, e o dia e a hora vêm separados. */
   scheduled_day?: string | null;
@@ -252,6 +256,10 @@ export function mapLaravelService(r: LaravelServiceRow): ServiceRequest {
     cancellationReason: r.cancellation_reason ?? undefined,
     responseTimeMinutes: r.response_time_minutes ?? undefined,
     technicianAssignmentTimeMinutes: r.technician_assignment_time_min ?? undefined,
+    // Os telefones só seguem para quem pode ver dados pessoais (a rota tira-os aos outros).
+    customerPhone: r.customer_phone ?? null,
+    technicianPhone: r.vendor_phone ?? null,
+    atencao: r.atencao ?? null,
   };
 }
 
@@ -269,7 +277,25 @@ export interface ServicesQuery {
   search?: string;
   from?: string;
   to?: string;
+  /** A coluna do ecrã por que se ordena, e o sentido. */
+  sort?: string;
+  dir?: "asc" | "desc";
+  /** Sem ordenação escolhida: os que precisam de alguém primeiro (backend #171). */
+  atencao?: boolean;
+  /** "Hoje": os marcados para esse dia (Lisboa), ou criados nele sem marcação. */
+  dia?: string;
+  /** Só os agendados para o futuro (ex.: os afetados por suspender um técnico). */
+  agendados?: boolean;
+  /** Só os que ainda não acabaram. */
+  abertos?: boolean;
+  customerId?: string;
+  vendorId?: string;
 }
+
+/** As colunas do ecrã → o que o Laravel sabe ordenar. O resto ignora-se (fica a ordem por omissão). */
+const ORDENACAO_DO_LARAVEL: Record<string, string> = {
+  id: "id", requestedAt: "created_at", scheduledAt: "scheduled_at", totalCustomerValue: "amount",
+};
 
 /** Busca a lista paginada ao Laravel e devolve no MESMO envelope que a rota
  *  Supabase (`{ data, total, page, pageSize, totalPages }`). */
@@ -390,6 +416,22 @@ export async function fetchLaravelServices(query: ServicesQuery) {
   if (query.search) params.set("search", query.search);
   if (query.from) params.set("from", query.from);
   if (query.to) params.set("to", query.to);
+  /*
+    A ordenação ia para lado nenhum: os cabeçalhos ordenáveis da lista não
+    faziam nada em produção (só mexiam na página de 20 que já estava no ecrã).
+  */
+  const coluna = query.sort ? ORDENACAO_DO_LARAVEL[query.sort] : undefined;
+  if (coluna) {
+    params.set("sort", coluna);
+    params.set("dir", query.dir === "asc" ? "asc" : "desc");
+  } else if (query.atencao) {
+    params.set("atencao", "1");
+  }
+  if (query.dia && /^\d{4}-\d{2}-\d{2}$/.test(query.dia)) params.set("dia", query.dia);
+  if (query.agendados) params.set("agendados", "1");
+  if (query.abertos) params.set("abertos", "1");
+  if (query.customerId && /^\d+$/.test(query.customerId)) params.set("customer_id", query.customerId);
+  if (query.vendorId && /^\d+$/.test(query.vendorId)) params.set("vendor_id", query.vendorId);
 
   const res = await laravelAdminRequest<LaravelServicesResponse>(`/v1/admin/services?${params.toString()}`);
   const meta = res.meta ?? { current_page: 1, last_page: 1, per_page: query.pageSize ?? 20, total: (res.items ?? []).length };

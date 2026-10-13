@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -14,28 +13,43 @@ import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getServices, getDetalheDoServico } from "@/services/dashboardService";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { downloadCsv } from "@/lib/utils";
 import { toast } from "@/stores";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Phone, MessageCircle, Copy } from "lucide-react";
+import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
+import { MOTIVOS } from "@/lib/aoVivo";
+import { USE_REAL_API } from "@/services/api";
+import { todayISO } from "@/lib/today";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { ServiceRequest, ServiceStatus } from "@/types";
-import { ESTADOS_SIMPLES, PRECISA_DE_ATENCAO, atencaoPrimeiro, precisaDeAtencao } from "@/lib/estados";
+import { ESTADOS_SIMPLES, PRECISA_DE_ATENCAO, atencaoPrimeiro, precisaDeAtencao, rotuloSimples } from "@/lib/estados";
 import { pedidoHref } from "@/lib/fichas";
 
 /*
-  O filtro de estado são os seis estados simples (ver lib/estados.ts) e, à
-  cabeça, "Precisa de atenção". Eram oito grupos com mistura: "Em
-  reclamação" estava dentro de "Recusados / Sem técnico", e "Pagamento por
-  capturar" era um grupo à parte quando é um serviço feito com dinheiro por
-  entrar.
+  As vistas rápidas da lista (auditoria de 08/10/2026, anexo D): o que se
+  procura todos os dias, num clique. "Precisa de atenção" vem primeiro; "Hoje"
+  e "Agendados" vêm do Laravel (backend #171) e não do estado.
 */
-const STATUS_GROUPS: { id: string; label: string; statuses?: ServiceStatus[] }[] = [
-  { id: "todos", label: "Todos os estados" },
+type Vista = "todos" | "atencao" | "hoje" | "agendados" | "curso" | "concluidos" | "cancelados";
+const estadosDe = (id: string) => ESTADOS_SIMPLES.find((e) => e.id === id)?.statuses ?? [];
+const VISTAS: { id: Vista; label: string; statuses?: ServiceStatus[] }[] = [
+  { id: "todos", label: "Todos" },
   { id: "atencao", label: "Precisa de atenção", statuses: PRECISA_DE_ATENCAO },
-  ...ESTADOS_SIMPLES,
+  { id: "hoje", label: "Hoje" },
+  { id: "agendados", label: "Agendados" },
+  { id: "curso", label: "Em curso", statuses: estadosDe("curso") },
+  { id: "concluidos", label: "Concluídos", statuses: estadosDe("concluido") },
+  { id: "cancelados", label: "Cancelados", statuses: estadosDe("cancelado") },
 ];
+
+/** Só os dígitos, com o indicativo de Portugal quando o número vem sem ele. */
+const paraWhatsApp = (telefone: string) => {
+  const d = telefone.replace(/\D/g, "");
+  return d.length === 9 ? `351${d}` : d;
+};
 
 export default function ServicosView({ abrirId }: { abrirId?: string }) {
   const filters = useFilters();
@@ -109,8 +123,9 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     else if (!alvo && /^\/servicos\/[^/]+$/.test(aqui)) window.history.replaceState(null, "", `/servicos?tab=${tab}`);
   }, [selectedService, urlPronta, tab]);
 
-  const [statusGroup, setStatusGroup] = useState("todos");
-  const activeStatuses = STATUS_GROUPS.find((g) => g.id === statusGroup)?.statuses;
+  const [vista, setVista] = useState<Vista>("todos");
+  const activeStatuses = VISTAS.find((v) => v.id === vista)?.statuses;
+  const extra = vista === "hoje" ? { dia: todayISO() } : vista === "agendados" ? { agendados: true } : {};
 
   const TABS: TabDef[] = [
     { id: "ao-vivo", label: "Ao vivo" },
@@ -141,8 +156,8 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
   useEffect(() => { setPage(1); }, [chaveFiltros, setPage]);
 
   const { data, loading, error, refetch } = useAsyncData(
-    () => getServices(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch, activeStatuses),
-    [filters, page, pageSize, sortField, sortDirection, debouncedSearch, statusGroup]
+    () => getServices(filters, page, pageSize, sortField ? { field: sortField, direction: sortDirection } : undefined, debouncedSearch, activeStatuses, extra),
+    [filters, page, pageSize, sortField, sortDirection, debouncedSearch, vista]
   );
   // Quantos precisam de alguém, para o aviso por cima da lista (uma linha só).
   const { data: comAtencao } = useAsyncData(
@@ -150,43 +165,57 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     [chaveFiltros]
   );
   const quantosComAtencao = comAtencao?.total ?? 0;
-  // Sem ordenação escolhida, os que precisam de atenção sobem ao topo da página.
-  const linhas = sortField ? (data?.data ?? []) : atencaoPrimeiro(data?.data ?? []);
+  // Sem ordenação escolhida, os que precisam de atenção vêm primeiro: no servidor
+  // (backend #171, que sabe porquê); em demonstração, nesta página.
+  const linhas = sortField || USE_REAL_API ? (data?.data ?? []) : atencaoPrimeiro(data?.data ?? []);
 
 
-  // Sem ID; sem Agendado, Valor técnico, Origem, Tempo técnico e Reclamação
-  // (pedido do André 2026-07-22). Avaliação visível junto ao estado.
+  /*
+    Oito colunas, as que respondem "o que é, de quem, onde, em que pé está e
+    quanto vale" (auditoria, anexo D). As outras ficam em "Colunas", para quem
+    as quiser. O n.º voltou: é o que o cliente diz ao telefone. Só se ordena
+    pelo que o servidor sabe ordenar (n.º, data e valor).
+  */
   const columns: Column<ServiceRequest>[] = [
-    { key: "requestedAt", label: "Data", sortable: true, render: (r) => formatDate(r.requestedAt) },
-    { key: "customerName", label: "Cliente", sortable: true },
-    { key: "technicianName", label: "Técnico", render: (r) => r.technicianName ?? "—" },
-    { key: "categoryName", label: "Categoria" },
-    { key: "serviceName", label: "Serviço" },
-    { key: "city", label: "Localização", sortable: true },
-    /*
-      Quantos técnicos disseram que sim, de quantos se convidaram. É a
-      primeira pergunta quando um pedido fica parado: "0 de 12" é falta de
-      resposta, "0 de 0" é não haver ninguém por perto para convidar.
-    */
-    { key: "matching", label: "Técnicos", render: (r) => <ColunaMatching matching={r.matching} /> },
-    { key: "status", label: "Estado", render: (r) => (
-      <span className="inline-flex items-center gap-1.5">
-        {precisaDeAtencao(r.status) && <span className="h-2 w-2 rounded-full bg-danger shrink-0" title="Precisa de atenção" aria-label="Precisa de atenção" />}
-        <StatusBadge status={r.status} label={SERVICE_STATUS_LABELS[r.status]} />
+    { key: "id", label: "N.º", sortable: true, render: (r) => <span className="font-mono text-xs text-text-secondary">#{r.id}</span> },
+    { key: "requestedAt", label: "Quando", sortable: true, render: (r) => (
+      <span className="whitespace-nowrap">
+        {formatDate(r.requestedAt)}
+        {r.scheduledAt && <span className="block text-[11px] text-text-muted">marcado {r.scheduledAt.length > 10 ? formatDateTime(r.scheduledAt) : formatDate(r.scheduledAt)}</span>}
       </span>
     ) },
-    { key: "rating", label: "Avaliação", render: (r) => r.rating
+    { key: "customerName", label: "Cliente" },
+    { key: "serviceName", label: "Serviço", render: (r) => (
+      <span>
+        {r.serviceName || "—"}
+        {r.categoryName && r.categoryName !== r.serviceName && <span className="block text-[11px] text-text-muted">{r.categoryName}</span>}
+      </span>
+    ) },
+    { key: "city", label: "Cidade", render: (r) => r.city || "—" },
+    { key: "technicianName", label: "Técnico", render: (r) => r.technicianName ?? <span className="text-text-muted">—</span> },
+    { key: "status", label: "Estado", render: (r) => (
+      <span className="inline-flex items-center gap-1.5" title={r.atencao ? MOTIVOS[r.atencao.motivo] ?? r.atencao.motivo : undefined}>
+        {(r.atencao || precisaDeAtencao(r.status)) && <span className="h-2 w-2 rounded-full bg-danger shrink-0" aria-label="Precisa de atenção" />}
+        <EstadoDoPedido status={r.status} />
+      </span>
+    ) },
+    { key: "totalCustomerValue", label: "Valor", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue) },
+    // Secundárias: em "Colunas".
+    { key: "matching", label: "Convidados", hidden: true, render: (r) => <ColunaMatching matching={r.matching} /> },
+    { key: "rating", label: "Avaliação", hidden: true, render: (r) => r.rating
       ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
       : <span className="text-text-muted">—</span> },
-    { key: "totalCustomerValue", label: "Valor total", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue) },
-    { key: "piquetRevenue", label: "Receita Piquet", sortable: true, render: (r) => formatCurrency(r.piquetRevenue) },
+    { key: "piquetRevenue", label: "Comissão", hidden: true, render: (r) => formatCurrency(r.piquetRevenue) },
+    // As ações de cada linha: ligar, WhatsApp e copiar o n.º, sem abrir o pedido.
+    { key: "acoes", label: "", render: (r) => <AcoesDaLinha pedido={r} /> },
   ];
 
   const handleExport = () => {
     if (!data?.data) return;
-    downloadCsv("servicos.csv",
-      ["ID", "Cliente", "Técnico", "Categoria", "Estado", "Valor Total", "Receita Piquet"],
-      data.data.map((s) => [s.id, s.customerName, s.technicianName ?? "", s.categoryName, s.status, String(s.totalCustomerValue), String(s.piquetRevenue)])
+    // O estado como se lê no ecrã, não o identificador interno.
+    downloadCsv("pedidos.csv",
+      ["N.º", "Data", "Cliente", "Serviço", "Cidade", "Técnico", "Estado", "Estado técnico", "Valor", "Comissão"],
+      data.data.map((s) => [s.id, s.requestedAt, s.customerName, s.serviceName, s.city, s.technicianName ?? "", rotuloSimples(s.status), SERVICE_STATUS_LABELS[s.status] ?? s.status, String(s.totalCustomerValue), String(s.piquetRevenue)])
     );
   };
 
@@ -215,37 +244,26 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
 
         {tab === "pedidos" && (
           <div className="space-y-4">
-            {/*
-              O estado passou de sete chips a um filtro. A fila ocupava uma
-              linha inteira acima da pesquisa e dos outros filtros, e lia-se
-              como sub-abas -- quando é, na prática, mais um critério de
-              filtragem. Agora está com os restantes, na mesma linha.
-            */}
             <div className="flex flex-wrap items-center gap-3">
-              <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar serviços..." />
-              <select
-                value={statusGroup}
-                onChange={(e) => { setStatusGroup(e.target.value); setPage(1); }}
-                className="input-field w-auto"
-                aria-label="Filtrar por estado"
-              >
-                {STATUS_GROUPS.map((g) => (
-                  <option key={g.id} value={g.id}>{g.label}{g.id === "atencao" && quantosComAtencao ? ` (${quantosComAtencao})` : ""}</option>
-                ))}
-              </select>
+              <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="N.º, cliente, telefone, técnico…" />
               <FilterBar className="flex-1 min-w-[240px]" />
             </div>
-            {quantosComAtencao > 0 && statusGroup !== "atencao" && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-4 py-2.5">
-                <p className="text-sm text-text-primary">
-                  <b>{quantosComAtencao}</b> {quantosComAtencao === 1 ? "pedido precisa" : "pedidos precisam"} de atenção:
-                  pagamento por capturar ou reclamação.
-                </p>
-                <button onClick={() => { setStatusGroup("atencao"); setPage(1); }} className="text-sm font-medium text-danger hover:underline">
-                  Ver só esses
+            <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Vistas rápidas">
+              {VISTAS.map((v) => (
+                <button
+                  key={v.id}
+                  role="tab"
+                  aria-selected={vista === v.id}
+                  onClick={() => { setVista(v.id); setPage(1); }}
+                  className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                    vista === v.id ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary hover:bg-surface-muted",
+                    v.id === "atencao" && quantosComAtencao > 0 && vista !== v.id && "border-danger/40 text-danger")}
+                >
+                  {v.label}
+                  {v.id === "atencao" && quantosComAtencao > 0 && <span className="tabular-nums text-xs">{quantosComAtencao}</span>}
                 </button>
-              </div>
-            )}
+              ))}
+            </div>
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
               <>
                 <DataTable
@@ -257,6 +275,7 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
                   onSort={handleSort}
                   onRowClick={setSelectedService}
                   loading={loading}
+                  columnToggle
                 />
                 {data && (
                   <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />
@@ -292,6 +311,24 @@ function ColunaMatching({ matching }: { matching: ServiceRequest["matching"] }) 
       <span className={accepted > 0 ? "font-medium text-text-primary" : "text-danger"}>{accepted}</span>
       <span className="text-text-secondary"> de {invited}</span>
       {notified > 0 && <span className="ml-1 text-[11px] text-text-muted">· {notified} por responder</span>}
+    </span>
+  );
+}
+
+/** Ligar, WhatsApp e copiar o n.º, sem abrir o pedido (os telefones só para quem os pode ver). */
+function AcoesDaLinha({ pedido }: { pedido: ServiceRequest }) {
+  const botao = "inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-primary";
+  const tel = pedido.customerPhone;
+  const copiar = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try { await navigator.clipboard.writeText(pedido.id); toast(`N.º ${pedido.id} copiado.`); }
+    catch { toast(pedido.id, "info"); }
+  };
+  return (
+    <span className="inline-flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      {tel && <a href={`tel:${tel.replace(/\s/g, "")}`} className={botao} title={`Ligar ao cliente (${tel})`} aria-label="Ligar ao cliente"><Phone className="h-3.5 w-3.5" /></a>}
+      {tel && <a href={`https://wa.me/${paraWhatsApp(tel)}`} target="_blank" rel="noreferrer" className={botao} title="WhatsApp do cliente" aria-label="WhatsApp do cliente"><MessageCircle className="h-3.5 w-3.5" /></a>}
+      <button onClick={copiar} className={botao} title="Copiar o n.º" aria-label="Copiar o número do pedido"><Copy className="h-3.5 w-3.5" /></button>
     </span>
   );
 }

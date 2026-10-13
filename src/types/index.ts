@@ -115,6 +115,11 @@ export interface ServiceRequest {
   operationAreaId?: string;
   rating?: number;
   hasComplaint: boolean;
+  /** Telefones do cliente e do técnico (só para quem pode ver dados pessoais). */
+  customerPhone?: string | null;
+  technicianPhone?: string | null;
+  /** Porque é que precisa de alguém da equipa (backend #171), ou null. */
+  atencao?: { nivel: "critico" | "atencao"; motivo: string } | null;
   cancellationReason?: string;
   responseTimeMinutes?: number;
   technicianAssignmentTimeMinutes?: number;

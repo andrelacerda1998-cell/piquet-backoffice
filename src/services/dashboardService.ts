@@ -15,7 +15,9 @@ export async function getServices(
   pageSize = 20,
   sort?: SortParams,
   search?: string,
-  statuses?: import("@/types").ServiceStatus[]
+  statuses?: import("@/types").ServiceStatus[],
+  /** Vistas e fichas: "Hoje" (dia), agendados, abertos, os de um cliente ou técnico. */
+  extra: { dia?: string; agendados?: boolean; abertos?: boolean; customerId?: string; vendorId?: string } = {},
 ): Promise<PaginatedResult<ServiceRequest>> {
   // Os `params` são enviados ao backend real (paginação/filtros server-side).
   // Em modo demo são ignorados — o fetcher pagina/filtra localmente.
@@ -24,6 +26,8 @@ export async function getServices(
     () => {
       let items = getFilteredServices({ ...filters, search: search ?? filters.search });
       if (statuses?.length) items = items.filter((s) => statuses.includes(s.status));
+      if (extra.customerId) items = items.filter((s) => s.customerId === extra.customerId);
+      if (extra.vendorId) items = items.filter((s) => s.technicianId === extra.vendorId);
       if (sort) items = sortArray(items, sort.field as keyof ServiceRequest, sort.direction);
       return paginateArray(items, page, pageSize);
     },
@@ -38,6 +42,11 @@ export async function getServices(
       statuses: statuses?.join(","),
       sort: sort?.field,
       dir: sort?.direction,
+      dia: extra.dia,
+      agendados: extra.agendados ? "1" : undefined,
+      abertos: extra.abertos ? "1" : undefined,
+      customerId: extra.customerId,
+      vendorId: extra.vendorId,
     }
   ).then((r) => r.data);
 }
