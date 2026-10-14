@@ -187,7 +187,7 @@ function ResumoDoKyc({ itens, nota }: { itens: Array<{ id: string; rotulo: strin
           <button key={i.rotulo} type="button" disabled={i.n === 0}
             onClick={() => document.getElementById(i.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             className={cn("card p-3 text-left transition-shadow", i.n > 0 ? "hover:shadow-elevated border-piquet/40" : "opacity-60 cursor-default")}>
-            <p className={cn("text-2xl font-bold tabular-nums", i.n > 0 ? "text-text-primary" : "text-text-muted")}>{formatNumber(i.n)}</p>
+            <p className={cn("text-[22px] leading-7 font-semibold tracking-tight tabular-nums", i.n > 0 ? "text-text-primary" : "text-text-muted")}>{formatNumber(i.n)}</p>
             <p className="text-xs text-text-secondary">{i.rotulo}</p>
           </button>
         ))}
@@ -754,7 +754,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                   { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
                   { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
                   { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
-                    ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
+                    ? <button onClick={() => setPreviewDoc(r)} className="btn-ghost text-xs px-2 py-1">
                         <Eye className="h-3.5 w-3.5" /> Ver
                       </button>
                     : <span className="text-text-muted text-xs">—</span> },
@@ -878,7 +878,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                         </p>
                       </div>
                       {t.telefone && (
-                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-piquet-700">{t.telefone}</a>
+                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-text-primary hover:underline">{t.telefone}</a>
                       )}
                       <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">
                         {t.etapa ? ETAPA_LABEL[t.etapa as Etapa] : "—"}

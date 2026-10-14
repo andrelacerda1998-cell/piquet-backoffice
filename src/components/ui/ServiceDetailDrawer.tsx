@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatRating } from "@/lib/formatters";
 import type { ServiceRequest } from "@/types";
 import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, ArrowRight, ChevronDown, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
@@ -784,7 +784,7 @@ function Avaliacoes({ service }: { service: ServiceRequest }) {
         {Array.from({ length: 5 }).map((_, i) => (
           <Star key={i} className={cn("h-5 w-5", i < Math.round(service.rating ?? 0) ? "text-piquet fill-piquet" : "text-surface-strong")} />
         ))}
-        <span className="ml-2 font-bold text-text-primary">{service.rating?.toFixed(1)}</span>
+        <span className="ml-2 font-semibold text-text-primary">{formatRating(service.rating)}</span>
       </div>
       {/*
         Aqui estava uma opinião escrita pelo código: "excelente, técnico muito

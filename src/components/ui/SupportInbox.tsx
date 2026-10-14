@@ -500,7 +500,7 @@ export function SupportInbox() {
                 const own = m.from === "agente";
                 return (
                   <div key={m.id} className={cn("flex gap-2.5", own && "flex-row-reverse")}>
-                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
                       own ? "bg-piquet/15 text-piquet-700" : "bg-surface-strong text-text-secondary")}>
                       {initials(m.authorName)}
                     </span>
@@ -536,7 +536,7 @@ export function SupportInbox() {
             {/* Resposta */}
             {selected.status === "fechado" ? (
               <div className="pt-3 border-t border-surface-border text-center text-sm text-text-muted">
-                Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="font-medium text-text-primary underline decoration-surface-strong underline-offset-2 hover:decoration-text-primary">Reabrir</button>
+                Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="link">Reabrir</button>
               </div>
             ) : (
               <div className="pt-3 border-t border-surface-border">

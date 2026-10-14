@@ -366,7 +366,7 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
                           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: x.cor }} />
                           <p className="text-sm font-medium text-text-secondary">{x.app}</p>
                         </div>
-                        <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
+                        <p className="mt-1 text-[22px] leading-7 font-semibold tracking-tight text-text-primary tabular-nums">
                           {x.cpd != null ? formatCurrency(x.cpd) : "—"}
                         </p>
                         <p className="text-[11px] text-text-muted">
@@ -543,7 +543,7 @@ function CartaoCampanha({
         {numeros.map((n) => (
           <div key={n.rotulo} title={n.titulo}>
             <p className="text-xs text-text-secondary">{n.rotulo}</p>
-            <p className="text-lg font-bold text-text-primary tabular-nums">{n.valor}</p>
+            <p className="text-lg font-semibold text-text-primary tabular-nums">{n.valor}</p>
             {n.nota && <p className="text-[11px] text-text-muted">{n.nota}</p>}
           </div>
         ))}
@@ -560,7 +560,7 @@ function CartaoCampanha({
         ) : (
           <span />
         )}
-        <button onClick={onVerAnuncios} className="text-xs font-medium text-piquet-700 hover:underline">
+        <button onClick={onVerAnuncios} className="btn-ghost text-xs px-2 py-1">
           Ver anúncios desta campanha
         </button>
       </div>

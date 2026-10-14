@@ -188,6 +188,14 @@
   .aviso-perigo { @apply border-danger/30 bg-danger-light; }
   .aviso-sucesso { @apply border-success/30 bg-success-light; }
   .aviso-info { @apply border-info/30 bg-info-light; }
+  /*
+    Um link no meio de texto: a cor do texto, sublinhado discreto que escurece
+    ao passar. O dourado ficava para os botões principais -- um link dourado
+    lia-se como um terceiro tipo de botão.
+  */
+  .link {
+    @apply font-medium text-text-primary underline decoration-surface-strong underline-offset-2 transition-colors hover:decoration-text-primary;
+  }
   .input-field {
     @apply w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted transition-colors hover:border-surface-strong focus:border-piquet focus:outline-none focus:ring-2 focus:ring-piquet/25;
   }

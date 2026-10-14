@@ -385,7 +385,7 @@ function LeadsPageInner() {
         </p>
         {r.phone && (
           <div className="mt-0.5 flex items-center gap-1.5">
-            <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-piquet-700 hover:underline">{r.phone}</a>
+            <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-text-primary hover:underline">{r.phone}</a>
             <a href={waHref(r.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Abrir conversa no WhatsApp" className="text-success hover:text-success/80">
               <MessageCircle className="h-3.5 w-3.5" />
             </a>
@@ -707,7 +707,7 @@ function LeadsPageInner() {
                           href={`https://wa.me/${waNumero}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-piquet-700 hover:underline text-xs"
+                          className="link text-xs"
                         >
                           WhatsApp
                         </a>
@@ -907,7 +907,7 @@ function LeadsPageInner() {
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-piquet/10 border border-piquet/20 px-4 py-3">
               <div>
                 <p className="text-xs text-text-muted">Comissão da Piquet (calculada automaticamente)</p>
-                <p className="text-xl font-bold text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
+                <p className="text-xl font-semibold tracking-tight text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
               </div>
               <p className="text-xs text-text-secondary text-right leading-relaxed">
                 Orçamento {formatCurrency(q)}<br />− Técnico {formatCurrency(tech)}

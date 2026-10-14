@@ -222,7 +222,7 @@ export function Topbar() {
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Filtros</span>
             {activeCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 bg-piquet text-ink rounded-full text-[11px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 bg-piquet text-ink rounded-full text-[11px] font-semibold flex items-center justify-center">
                 {activeCount}
               </span>
             )}
@@ -276,7 +276,7 @@ export function Topbar() {
                 <div className="px-2.5 py-2 mb-1 border-b border-surface-border">
                   <p className="text-sm font-medium">{user?.name}</p>
                   <p className="text-xs text-text-muted">{user?.email}</p>
-                  <p className="text-xs text-piquet-600 mt-0.5">{user ? ROLE_LABELS[user.role] : ""}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{user ? ROLE_LABELS[user.role] : ""}</p>
                 </div>
                 {/* O que é de cada pessoa vive aqui, e não no menu de toda a gente. */}
                 <Link href="/tarefas" onClick={() => setShowUserMenu(false)} className="w-full px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2.5">

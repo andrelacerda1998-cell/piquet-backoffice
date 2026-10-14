@@ -79,7 +79,7 @@ export default function Liquidez() {
           <p className="text-[13px] text-text-muted">
             Tudo aqui sai dos serviços reais. Onde não há como medir — o tempo até responder, por exemplo, se o
             Laravel não o registar — aparece um traço em vez de um número. Para agir sobre os pedidos de agora, usa{" "}
-            <Link href="/servicos" className="font-medium text-text-primary underline decoration-surface-strong underline-offset-2 hover:decoration-text-primary">Pedidos › Ao vivo</Link>.
+            <Link href="/servicos" className="link">Pedidos › Ao vivo</Link>.
           </p>
         </>
       )}

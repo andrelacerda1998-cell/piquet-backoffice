@@ -22,7 +22,6 @@ import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
 import { MOTIVOS } from "@/lib/aoVivo";
 import { USE_REAL_API } from "@/services/api";
 import { todayISO } from "@/lib/today";
-import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Segmentado } from "@/components/ui/Segmentado";
 import type { ServiceRequest, ServiceStatus } from "@/types";

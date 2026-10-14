@@ -274,7 +274,7 @@ export default function QualityPage() {
             <section>
               <SectionHeader title="Faltas declaradas" description={<>
                 O técnico foi cobrado em metade do que ia receber, o serviço cancelado e o cliente reembolsado. As contestações chegam como tickets em{" "}
-                <Link href="/suporte" className="font-medium text-text-primary underline decoration-surface-strong underline-offset-2 hover:decoration-text-primary">Suporte</Link>, com o número do serviço no assunto.
+                <Link href="/suporte" className="link">Suporte</Link>, com o número do serviço no assunto.
               </>} />
               <DataTable columns={declaredColumns} data={noShows?.declared ?? []} keyField="service_id" emptyMessage="Sem faltas declaradas" />
             </section>

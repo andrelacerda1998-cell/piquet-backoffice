@@ -432,16 +432,19 @@ export default function FinancePage() {
       <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(r.status))}>{r.status}</span>
     ) },
     { key: "anexo", label: "Anexo", render: (r) => r.attachmentUrl
-      ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">{r.attachmentName || "abrir"}</a>
+      ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="link text-xs">{r.attachmentName || "abrir"}</a>
       : <span className="text-text-muted text-xs">—</span> },
     { key: "actions", label: "", render: (r) => (
-      <div className="flex items-center gap-2 justify-end">
-        {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
-        {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
-        {/* Corrigir uma marcação errada: volta a pendente. */}
-        {r.status === "pago" && <button onClick={() => setInvToReopen(r)} className="text-xs text-warning hover:underline">Reabrir</button>}
-        <button onClick={() => openInvoiceModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => setInvToRemove(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      <div className="flex items-center gap-0.5 justify-end">
+        {/* A ação do dia (pagar) fica sempre à vista; as outras aparecem ao passar. */}
+        {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="btn-ghost text-xs px-2 py-1 text-success hover:text-success">Marcar paga</button>}
+        <span className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+          {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="btn-ghost text-xs px-2 py-1">Parcial</button>}
+          {/* Corrigir uma marcação errada: volta a pendente. */}
+          {r.status === "pago" && <button onClick={() => setInvToReopen(r)} className="btn-ghost text-xs px-2 py-1">Reabrir</button>}
+          <button onClick={() => openInvoiceModal(r)} className="btn-ghost text-xs px-2 py-1">Editar</button>
+          <button onClick={() => setInvToRemove(r)} className="btn-ghost text-xs px-2 py-1 hover:text-danger">Remover</button>
+        </span>
       </div>
     ) },
   ];
@@ -470,9 +473,9 @@ export default function FinancePage() {
       </button>
     ) },
     { key: "actions", label: "", render: (r) => (
-      <div className="flex items-center gap-2 justify-end">
-        <button onClick={() => openBudgetModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => setLinhaARemover(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      <div className="flex items-center gap-0.5 justify-end md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+        <button onClick={() => openBudgetModal(r)} className="btn-ghost text-xs px-2 py-1">Editar</button>
+        <button onClick={() => setLinhaARemover(r)} className="btn-ghost text-xs px-2 py-1 hover:text-danger">Remover</button>
       </div>
     ) },
   ];

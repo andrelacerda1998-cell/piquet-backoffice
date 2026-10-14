@@ -182,14 +182,14 @@ export default function OverviewPage() {
                     info="Comissão do mês menos os custos imputados ao mês (equipa + média das faturas de fornecedores), contados até hoje."
                     value={resultado === null ? "—" : `${resultado >= 0 ? "+" : "−"}${formatCurrency(Math.abs(resultado))}`}
                     note={resultado === null
-                      ? <>Sem custos registados. <Link href="/financeiro?tab=custos" className="text-piquet-600 hover:underline">Registar</Link></>
+                      ? <>Sem custos registados. <Link href="/financeiro?tab=custos" className="link">Registar</Link></>
                       : `${formatCurrency(fin?.piquetRevenue ?? 0)} − ${formatCurrency(custosDoMes)} de custos`}
                     tone={resultado === null ? undefined : resultado >= 0 ? "bom" : "mau"}
                   />
                 </StatGroup>
                 <p className="mt-2 px-1 text-[13px] text-text-muted">
                   O ano, o CAC, o LTV e as lojas estão em{" "}
-                  <Link href="/crescimento" className="text-piquet-600 font-medium hover:underline">Crescimento</Link>.
+                  <Link href="/crescimento" className="link">Crescimento</Link>.
                 </p>
               </div>
             </div>

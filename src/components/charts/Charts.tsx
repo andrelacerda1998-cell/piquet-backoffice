@@ -314,7 +314,7 @@ export function HeatMapGrid({ data }: { data: Array<{ name: string; value: numbe
             style={{ backgroundColor: `rgba(250, 187, 91, ${0.15 + intensity * 0.75})` }}
           >
             <p className="text-sm font-medium text-text-primary">{item.name}</p>
-            <p className="text-lg font-bold">{formatNumber(item.value)}</p>
+            <p className="text-lg font-semibold tabular-nums">{formatNumber(item.value)}</p>
             {item.ratio !== undefined && (
               <p className="text-xs text-text-secondary">Rácio: {item.ratio.toFixed(1)}</p>
             )}

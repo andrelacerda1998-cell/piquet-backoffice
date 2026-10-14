@@ -39,7 +39,7 @@ export function AlertCard({ alert, onAction, compact }: AlertCardProps) {
         <div className="flex items-center justify-between text-xs text-text-muted">
           <span>{formatDateTime(alert.createdAt)}</span>
           {onAction && (
-            <button onClick={() => onAction(alert.id)} className="text-piquet-600 hover:text-piquet-700 font-medium">
+            <button onClick={() => onAction(alert.id)} className="link">
               Ver detalhe
             </button>
           )}
