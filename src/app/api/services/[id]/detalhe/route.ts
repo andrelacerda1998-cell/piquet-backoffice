@@ -58,6 +58,8 @@ export interface DetalheDoServico {
   estadoLaravel: string | null;
   /** Só num pedido personalizado: o que o cliente escreveu e o que a Piquet definiu. */
   personalizado: { descricao: string | null; minutos: number | null; categorias: string[]; despachadoEm: string | null } | null;
+  /** O tipo de serviço do pedido já saiu do catálogo (o nome continua a ser o dele). */
+  tipoForaDoCatalogo: boolean;
 }
 
 type RespostaLaravel = LaravelServiceRow & {
@@ -71,6 +73,7 @@ type RespostaLaravel = LaravelServiceRow & {
   custom_duration_minutes?: number | null;
   custom_dispatched_at?: string | null;
   custom_categories?: unknown[] | null;
+  service_type_removed?: boolean;
 };
 
 /** O nome de uma categoria, venha como texto ou como traduções ({"pt-pt": …}). */
@@ -158,6 +161,7 @@ export const GET = withStaff(async (_req, { params, staff }) => {
           despachadoEm: d.custom_dispatched_at ?? null,
         }
         : null,
+      tipoForaDoCatalogo: d.service_type_removed === true,
     });
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return apiErr("Serviço não encontrado.", 404);

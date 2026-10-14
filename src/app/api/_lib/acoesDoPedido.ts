@@ -7,16 +7,19 @@ import { anularRegisto, registarAcao, type AcaoDaEquipa } from "./acoesDaEquipa"
 /**
  * As ações sobre um pedido que vivem no Laravel (backend #165): despachar um
  * personalizado, fechar, tentar cobrar, desistir e devolver. Cada rota do
- * backoffice é uma porta para a mesma operação do Filament.
+ * backoffice é uma porta para a mesma operação do Filament. E cancelar, que é
+ * da equipa: o cliente não paga e o técnico não é penalizado.
  *
- * As que mexem em dinheiro do cliente (fechar = cobrar; desistir = devolver)
- * pedem motivo, gravado com o autor ANTES da ação e retirado se ela falhar.
+ * As que mexem em dinheiro do cliente (fechar = cobrar; desistir e cancelar =
+ * devolver) pedem motivo, gravado com o autor ANTES da ação e retirado se ela
+ * falhar.
  */
-export type AcaoDoPedido = "despachar" | "fechar" | "tentar-cobrar" | "desistir-e-devolver";
+export type AcaoDoPedido = "despachar" | "fechar" | "tentar-cobrar" | "desistir-e-devolver" | "cancelar";
 
 const COM_MOTIVO: Partial<Record<AcaoDoPedido, AcaoDaEquipa>> = {
   fechar: "fechar_pedido",
   "desistir-e-devolver": "desistir_e_devolver",
+  cancelar: "cancelar_pedido",
 };
 
 export interface ResultadoDaAcao { id: string; status: string; payment_status: string; convidados?: number }
@@ -47,7 +50,7 @@ export async function correrAcaoDoPedido(
   } catch (e) {
     if (registoId) await anularRegisto(registoId);
     if (e instanceof ApiError && e.status === 404) {
-      return apiErr("Esta ação ainda não existe no Laravel (falta o deploy do backend #165).", 503);
+      return apiErr("Esta ação ainda não existe no Laravel: falta publicar o backend.", 503);
     }
     return apiErr(e instanceof ApiError ? e.message : "Erro ao falar com o Laravel.", e instanceof ApiError ? e.status : 500);
   }

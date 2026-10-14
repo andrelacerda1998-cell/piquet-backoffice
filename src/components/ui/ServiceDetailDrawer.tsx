@@ -7,11 +7,12 @@ import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw } from "lucide-react";
+import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
+import { nomeDoServico, podeSerCancelado } from "@/lib/nomeDoServico";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
 import { getFotosDoCliente, getDetalheDoServico, acaoDoPedido, type FotoDoCliente } from "@/services/dashboardService";
@@ -42,6 +43,10 @@ import { TicketsDoPedido } from "@/components/ui/TicketsDoPedido";
   quando o pagamento ficou por capturar. Cancelar e agendar em nome de
   alguém não existe em lado nenhum: quem cancela é o cliente ou o técnico,
   na app.
+
+  Desde 14/10 há outra vez um Cancelar, agora a sério: é a Piquet que
+  cancela, antes de o trabalho começar, e o cliente não paga nada nem o
+  técnico é penalizado (backend: CancelarPeloBackoffice).
 
   Saiu também o separador "Chat", que eram três frases escritas no código,
   iguais em todos os serviços, com uma caixa de escrever que não enviava.
@@ -96,7 +101,7 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
           <div className="mx-auto max-w-[1400px] flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="font-mono text-xs text-text-muted">#{service.id}</p>
-              <h2 className="text-lg font-bold mt-0.5">{service.serviceName}</h2>
+              <h2 className="text-lg font-bold mt-0.5">{nomeDoServico(service, d?.personalizado) ?? "Pedido sem tipo de serviço"}</h2>
               <div className="mt-1 flex flex-wrap items-start gap-x-3 gap-y-1 text-sm text-text-secondary">
                 {/* O estado simples, dito de quem é a vez; o técnico fica por baixo, em cinzento. */}
                 <EstadoDoPedido status={service.status} tecnico estadoLaravel={d?.estadoLaravel} />
@@ -149,7 +154,7 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
               <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
             </div>
             <div className="space-y-5 min-w-0">
-              <Seccao titulo="Pedido"><Resumo service={service} /></Seccao>
+              <Seccao titulo="Pedido"><Resumo service={service} detalhe={d} /></Seccao>
               <Seccao titulo="Dinheiro"><Pagamento service={service} /></Seccao>
               {/*
                 Avaliação e reclamação num cartão só: são as duas o que o cliente
@@ -283,7 +288,7 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
   const role = useAuthStore((s) => s.user?.role);
   const [aReembolsar, setAReembolsar] = useState(false);
   const [aDespachar, setADespachar] = useState(false);
-  const [acao, setAcao] = useState<"fechar" | "tentar-cobrar" | "desistir-e-devolver" | null>(null);
+  const [acao, setAcao] = useState<"fechar" | "tentar-cobrar" | "desistir-e-devolver" | "cancelar" | null>(null);
   const uuid = detalhe?.pagamentoUuid;
   const gereDinheiro = !!role && hasPermission(role, "refund_payments");
   const podeReembolsar = !!uuid && gereDinheiro && service.paymentStatus === "pago";
@@ -300,6 +305,13 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
   const podeDespachar = estado === "PendingReview" && !!detalhe?.personalizado && !!role && hasPermission(role, "edit_services");
   const podeFechar = estado === "Finished" && gereDinheiro;
   const porCobrar = estado === "ClosedPendingPayment" && gereDinheiro;
+  /*
+    Cancelar pela Piquet: antes de o trabalho começar, o cliente não paga nada
+    (o que pagou volta) e o técnico não é penalizado. É de quem gere dinheiro,
+    porque devolve dinheiro ao cliente.
+  */
+  const podeCancelar = podeSerCancelado(estado) && gereDinheiro;
+  const pago = service.paymentStatus === "pago";
 
   /*
     "> reembolsar 282" no ⌘K: abre a mesma confirmação do botão (valor e motivo),
@@ -329,6 +341,12 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
     try {
       const r = await acaoDoPedido(service.id, acao, { motivo });
       const fechou = r.status === "Closed";
+      if (acao === "cancelar") {
+        toast(pago ? "Pedido cancelado. O cliente foi avisado e recebe o dinheiro de volta." : "Pedido cancelado. O cliente foi avisado.", "success");
+        setAcao(null);
+        onMudou();
+        return;
+      }
       toast(acao === "desistir-e-devolver" ? "Cobrança abandonada e dinheiro devolvido ao cliente."
         : fechou ? "Cobrado e fechado: o técnico já recebeu."
         : "O Payshop não aceitou a cobrança: o pedido ficou em pagamento por capturar.", fechou || acao === "desistir-e-devolver" ? "success" : "error");
@@ -370,6 +388,11 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
           </button>
         </>
       )}
+      {podeCancelar && (
+        <button onClick={() => setAcao("cancelar")} className="btn-secondary text-xs py-1.5 text-danger">
+          <XCircle className="h-3.5 w-3.5" /> Cancelar pedido
+        </button>
+      )}
       {podeReembolsar && (
         <button onClick={() => setAReembolsar(true)} className="btn-secondary text-xs py-1.5 text-danger">
           <Undo2 className="h-3.5 w-3.5" /> Reembolsar
@@ -391,18 +414,28 @@ function AcoesDoPedido({ service, detalhe, aCarregar, acaoInicial, onMudou }: {
         onConfirm={correr}
         title={acao === "fechar" ? `Fechar e cobrar o pedido #${service.id}?`
           : acao === "tentar-cobrar" ? `Tentar cobrar de novo o pedido #${service.id}?`
+          : acao === "cancelar" ? `Cancelar o pedido #${service.id}?`
           : `Desistir da cobrança do pedido #${service.id}?`}
-        tone={acao === "desistir-e-devolver" ? "danger" : "default"}
-        confirmLabel={acao === "fechar" ? "Fechar e cobrar" : acao === "tentar-cobrar" ? "Tentar cobrar" : "Desistir e devolver"}
+        tone={acao === "desistir-e-devolver" || acao === "cancelar" ? "danger" : "default"}
+        confirmLabel={acao === "fechar" ? "Fechar e cobrar" : acao === "tentar-cobrar" ? "Tentar cobrar" : acao === "cancelar" ? "Cancelar pedido" : "Desistir e devolver"}
         description={
           acao === "fechar" ? <>O técnico deu o trabalho por terminado e o cliente não confirmou. Vais cobrar <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b> ao cliente e pagar ao técnico. Se o Payshop recusar, o pedido fica em pagamento por capturar.</>
           : acao === "tentar-cobrar" ? <>Volta a pedir ao Payshop a cobrança de <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b>. Se passar, o pedido fecha e o técnico recebe.</>
+          : acao === "cancelar" ? <>
+              A Piquet cancela o pedido e o cliente <b className="text-text-primary">não paga nada</b>
+              {pago ? <>: os <b className="text-text-primary">{formatCurrency(service.totalCustomerValue)}</b> que pagou são devolvidos (ou libertados, se estavam só cativos).</> : <>. Ainda não há pagamento, por isso não há nada a devolver.</>}
+              {" "}O cliente{service.technicianName ? <> e {service.technicianName}</> : null} são avisados por notificação.
+              {service.technicianName && <> O técnico não recebe nada e <b className="text-text-primary">não</b> é penalizado; se foi ele que faltou, dá-lhe falta em Técnicos › Qualidade › Faltas.</>}
+              {" "}Não se desfaz.
+            </>
           : <>A cobrança não passa. O pedido é cancelado, o cliente recebe de volta o crédito e a pré-autorização, e o técnico <b className="text-text-primary">não</b> é pago. Não se desfaz.</>
         }
         requireReason={acao !== "tentar-cobrar"}
         minReason={MOTIVO_MINIMO}
-        reasonLabel={acao === "fechar" ? "Porque é que estás a fechar sem o cliente confirmar?" : "Porque é que estás a desistir da cobrança?"}
-        reasonPlaceholder={acao === "fechar" ? "Ex.: cliente confirmou por telefone que o trabalho ficou feito" : "Ex.: cartão recusado três vezes; cliente sem outro meio de pagamento"}
+        reasonLabel={acao === "fechar" ? "Porque é que estás a fechar sem o cliente confirmar?" : acao === "cancelar" ? "Porque é que estás a cancelar?" : "Porque é que estás a desistir da cobrança?"}
+        reasonPlaceholder={acao === "fechar" ? "Ex.: cliente confirmou por telefone que o trabalho ficou feito"
+          : acao === "cancelar" ? "Ex.: pedido parado há meses; o cliente confirmou por telefone que já não precisa"
+          : "Ex.: cartão recusado três vezes; cliente sem outro meio de pagamento"}
       />
       {uuid && (
         <ReembolsoDialog
@@ -435,11 +468,14 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   Laravel manda o mesmo nome em categoria e serviço) e a "Origem", que é
   sempre "app" -- só se mostra quando é outra.
 */
-function Resumo({ service }: { service: ServiceRequest }) {
+function Resumo({ service, detalhe }: { service: ServiceRequest; detalhe: DetalheDoServico | null }) {
   const local = [service.location, service.city].filter(Boolean).join(", ");
+  const nome = nomeDoServico(service, detalhe?.personalizado);
   return (
     <div className="space-y-1">
-      <Row label="Serviço" value={service.serviceName} />
+      <Row label="Serviço" value={nome
+        ? <>{nome}{detalhe?.tipoForaDoCatalogo && <span className="block text-xs font-normal text-text-muted">já não está no catálogo</span>}</>
+        : <span className="font-normal text-text-muted">Sem tipo de serviço registado</span>} />
       {service.categoryName && service.categoryName !== service.serviceName && <Row label="Categoria" value={service.categoryName} />}
       <Row label="Morada" value={local || "—"} />
       {service.scheduledAt && <Row label="Marcado para" value={service.scheduledAt.length > 10 ? formatDateTime(service.scheduledAt) : formatDate(service.scheduledAt)} />}
