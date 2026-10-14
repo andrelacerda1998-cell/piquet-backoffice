@@ -7,6 +7,8 @@ import { formatDateTime, formatNumber } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { Smartphone, HardHat, Users, RefreshCw } from "lucide-react";
+import { SectionHeader } from "@/components/ui/PageHeader";
+import { Etiqueta } from "@/components/ui/Ficha";
 
 /**
  * Campanhas de push, com os números que saíram mesmo.
@@ -52,8 +54,8 @@ export function PushCampanhas() {
 
   if (error) {
     return (
-      <div className="card p-4">
-        <p className="text-sm text-danger">{error}</p>
+      <div className="aviso aviso-perigo">
+        <p className="text-danger">{error}</p>
         <p className="text-sm text-text-secondary mt-1">
           As campanhas vivem no Laravel. Se a API de admin estiver em baixo, não há aqui nada a mostrar.
         </p>
@@ -65,22 +67,21 @@ export function PushCampanhas() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold">Campanhas de push</h3>
-          <p className="text-xs text-text-secondary">
-            Enviadas pela app. Criam-se no painel de administração — aqui vê-se o resultado e pára-se se for preciso.
-          </p>
-        </div>
-        <button onClick={refetch} className="btn-secondary text-sm">
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-        </button>
-      </div>
+      <SectionHeader
+        title="Campanhas de push"
+        description="Enviadas pela app. Criam-se no painel de administração — aqui vê-se o resultado e pára-se se for preciso."
+        aside={
+          <button onClick={refetch} className="btn-ghost text-[13px]">
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} /> Atualizar
+          </button>
+        }
+        className="mb-0"
+      />
 
       {campanhas.length === 0 && !loading && (
-        <div className="card p-5 text-center">
+        <div className="card px-4 py-8 text-center">
           <p className="text-sm font-medium text-text-primary">Nenhuma campanha de push criada.</p>
-          <p className="text-sm text-text-secondary">Criam-se no painel de administração da app; aparecem aqui com os números reais.</p>
+          <p className="text-sm text-text-muted">Criam-se no painel de administração da app; aparecem aqui com os números reais.</p>
         </div>
       )}
 
@@ -91,12 +92,9 @@ export function PushCampanhas() {
             <div key={c.id} className="card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-text-primary flex items-center gap-2">
+                  <p className="text-sm font-semibold text-text-primary flex items-center gap-2">
                     {c.name}
-                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                      c.is_active ? "bg-success-light text-success" : "bg-surface-muted text-text-muted")}>
-                      {c.is_active ? "Ativa" : "Parada"}
-                    </span>
+                    <Etiqueta tom={c.is_active ? "bom" : "neutro"}>{c.is_active ? "Ativa" : "Parada"}</Etiqueta>
                   </p>
                   <p className="text-sm text-text-secondary mt-0.5">{c.title}</p>
                   {c.body && <p className="text-xs text-text-muted mt-0.5 line-clamp-2">{c.body}</p>}

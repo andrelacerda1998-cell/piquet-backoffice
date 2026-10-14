@@ -187,7 +187,8 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
         */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs tabs={TABS} active={tab} onChange={setTab} variant="pill" />
-          {embutido && (
+          {/* Só nas campanhas: é delas que o botão vai buscar números. */}
+          {embutido && tab === "campanhas" && (
             <button
               onClick={atualizarAnuncios}
               disabled={aAtualizar}
@@ -409,12 +410,9 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
         )}
 
         {tab === "comunicacao" && (
-          <div className="space-y-6">
+          <div className="space-y-10">
             <PushCampanhas />
-            <div className="card p-4 space-y-3">
-              <SectionHeader title="Vouchers" />
-              <Vouchers />
-            </div>
+            <Vouchers />
             {/*
               Saíram os "Guiões de mensagens": cinco textos escritos no código,
               dois deles com promessas que não existem (20% com o código
