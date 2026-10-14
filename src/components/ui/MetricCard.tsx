@@ -49,8 +49,8 @@ export function MetricCard({ title, metric, format = "number", className, loadin
   if (loading) {
     return (
       <div className={cn("card p-4 animate-pulse", className)}>
-        <div className="h-4 w-24 bg-surface-subtle rounded mb-3" />
-        <div className="h-8 w-32 bg-surface-subtle rounded mb-2" />
+        <div className="h-3.5 w-24 bg-surface-subtle rounded mb-3" />
+        <div className="h-7 w-28 bg-surface-subtle rounded mb-2" />
         <div className="h-3 w-16 bg-surface-subtle rounded" />
       </div>
     );
@@ -64,9 +64,9 @@ export function MetricCard({ title, metric, format = "number", className, loadin
   const sparkData = (metric.sparkline ?? []).map((v, i) => ({ i, v }));
 
   return (
-    <div className={cn("card hover:shadow-elevated transition-shadow", compact ? "p-3" : "p-4", className)}>
-      <div className="flex items-start justify-between mb-1">
-        <p className={cn("text-text-secondary font-medium", compact ? "text-xs leading-tight" : "text-sm")}>
+    <div className={cn("card", compact ? "px-3.5 py-3" : "p-4", className)}>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className={cn("text-text-secondary font-medium", compact ? "text-xs leading-tight" : "text-[13px]")}>
           {title}
           {demoEndpoint && <DemoBadge endpoint={demoEndpoint} className="ml-1.5 align-middle" />}
         </p>
@@ -74,11 +74,11 @@ export function MetricCard({ title, metric, format = "number", className, loadin
       </div>
       {empty ? (
         <>
-          <p className={cn("font-bold text-text-muted mb-1", compact ? "text-xl" : "text-2xl")} title={emptyHint ?? "Sem fonte de dados"}>—</p>
+          <p className={cn("font-semibold text-text-muted mb-1", compact ? "text-xl" : "text-[26px] leading-8")} title={emptyHint ?? "Sem fonte de dados"}>—</p>
           {emptyHint && <p className="text-[11px] text-text-muted mb-1">{emptyHint}</p>}
         </>
       ) : (
-        <p className={cn("font-bold text-text-primary tabular-nums", compact ? "text-xl mb-0" : "text-2xl mb-2")}>{formattedValue}</p>
+        <p className={cn("font-semibold tracking-tight text-text-primary tabular-nums", compact ? "text-xl mb-0" : "text-[26px] leading-8 mb-1.5")}>{formattedValue}</p>
       )}
       {/* Só se mostra variação quando ela EXISTE: sem histórico real (anterior
           igual ao atual, ou zero sem história) não há nada a comparar — mostrar

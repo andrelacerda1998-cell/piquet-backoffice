@@ -66,8 +66,6 @@ export default function ConfiguracaoPage() {
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
         <PageHeader
-          icon={Settings}
-          eyebrow="Sistema"
           title="Configurações"
           subtitle="Catálogo, zonas, preços, documentos, equipa e o estado das integrações"
         />

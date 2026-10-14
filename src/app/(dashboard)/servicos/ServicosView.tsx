@@ -17,7 +17,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { downloadCsv } from "@/lib/utils";
 import { toast } from "@/stores";
-import { ClipboardList, Phone, MessageCircle, Copy } from "lucide-react";
+import { Phone, MessageCircle, Copy } from "lucide-react";
 import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
 import { MOTIVOS } from "@/lib/aoVivo";
 import { USE_REAL_API } from "@/services/api";
@@ -223,8 +223,6 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     <RouteGuard route="/servicos">
       <div className="space-y-6">
         <PageHeader
-          icon={ClipboardList}
-          eyebrow="Operação"
           title="Pedidos"
           subtitle="O que está a acontecer agora, a lista de todos os pedidos e os personalizados"
           actions={

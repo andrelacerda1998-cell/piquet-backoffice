@@ -18,98 +18,85 @@
 
 /* Tokens de cor como variáveis RGB (space-separated) para suportar tema claro/escuro
  *
- * LEGIBILIDADE: as cores semânticas e os dourados de texto eram fixos e
- * pensados para o tema escuro. No tema claro davam contrastes abaixo do
- * mínimo legível (WCAG AA = 4.5:1 para texto normal):
+ * REDESENHO (14/10/2026). O claro passa de creme a "papel quente" (um branco
+ * com um fio de amarelo) e o escuro de castanho a grafite: o castanho fundia
+ * cartões, fundo e barra lateral numa só mancha e tirava contraste ao dourado,
+ * que é o que deve sobressair. O dourado da marca (#FAB347) fica igual e
+ * passa a aparecer só onde há uma ação ou um estado ativo.
  *
- *   text-muted    #9A9389 sobre o fundo   2,84:1
- *   text-warning  #E39A1C sobre a etiqueta 2,10:1   <- praticamente invisível
- *   text-piquet-600 (links) sobre branco   3,29:1
- *   success / danger / info                3,2–3,9:1
+ * LEGIBILIDADE: todos os pares texto/fundo cumprem AA (4.5:1) nos dois temas,
+ * incluindo o pior caso -- texto `muted` sobre `surface-subtle` -- e as
+ * etiquetas (texto semântico sobre o seu fundo claro). Contas feitas com a
+ * fórmula do WCAG 2.1 antes de escolher cada tom:
  *
- * Passaram a variáveis: o tema claro recebe tons escurecidos que cumprem AA
- * sobre o fundo E sobre as etiquetas coloridas; o escuro recebe tons mais
- * claros do que os de antes, onde o problema era simétrico (o dourado escuro
- * dos links dava 3,99:1 sobre fundo escuro).
- *
- * Nenhuma cor de marca se perde: o #FAB347 continua a ser o dourado dos
- * preenchimentos (bg-piquet); o que muda são os tons usados como TEXTO.
+ *   claro:  muted 4,64:1 no subtil · aviso 5,04:1 na etiqueta · ouro 4,56:1
+ *   escuro: muted 4,82:1 no subtil · perigo 5,26:1 na etiqueta
  */
 :root {
-  --surface: 255 255 255; /* #FFFFFF */
-  --surface-muted: 250 247 242; /* #FAF7F2 */
-  --surface-subtle: 241 236 227; /* #F1ECE3 */
-  /* Contornos: eram tão claros que a estrutura dos cartões e das tabelas
-     desaparecia em ecrãs com brilho alto. */
-  --surface-border: 224 216 202; /* #E0D8CA */
-  --surface-strong: 199 188 169; /* #C7BCA9 */
+  --surface: 255 255 255; /* #FFFFFF — cartões */
+  --surface-muted: 246 245 242; /* #F6F5F2 — fundo da página */
+  --surface-subtle: 240 238 233; /* #F0EEE9 — cabeçalhos de tabela, hover */
+  --surface-border: 230 227 220; /* #E6E3DC */
+  --surface-strong: 207 202 193; /* #CFCAC1 */
+  --surface-sidebar: 251 250 248; /* #FBFAF8 */
 
-  --text-primary: 28 26 23; /* #1C1A17 */
-  /*
-   * Os três degraus passam a cumprir AA sobre TODAS as superfícies claras,
-   * incluindo a mais escura delas (`surface-subtle`, usada nos cartões dentro
-   * de cartões). O `muted` cumpria sobre o fundo da página e falhava aí, com
-   * 4,17:1 — e é onde vivem os rótulos dos KPIs ("722 avaliações").
-   */
-  --text-secondary: 92 86 77; /* #5C564D — 6,2:1 no pior fundo claro */
-  --text-muted: 111 106 96; /* #6F6A60 — 4,6:1 no pior fundo claro */
+  --text-primary: 26 25 23; /* #1A1917 — 15,2:1 no pior fundo */
+  --text-secondary: 87 83 76; /* #57534C — 6,6:1 no pior fundo */
+  --text-muted: 110 106 98; /* #6E6A62 — 4,6:1 no pior fundo */
 
   /* Semânticas como TEXTO: cumprem AA sobre o fundo e sobre a etiqueta clara. */
-  --success: 18 112 74; /* #12704A — 5,2:1 sobre a etiqueta verde */
-  --warning: 138 94 8; /* #8A5E08 — 5,0:1 sobre a etiqueta âmbar (era 2,1:1) */
-  --danger: 179 58 41; /* #B33A29 — 4,8:1 sobre a etiqueta terracota */
-  --info: 47 95 108; /* #2F5F6C — 6,0:1 sobre a etiqueta azul */
-  /* Texto POR CIMA de um vermelho cheio (botão destrutivo, contador do sino).
-     Segue o tema porque o próprio vermelho segue: claro escuro → texto branco;
-     escuro claro → texto escuro. */
+  --success: 18 112 74; /* #12704A */
+  --warning: 138 94 8; /* #8A5E08 */
+  --danger: 179 58 41; /* #B33A29 */
+  --info: 47 95 108; /* #2F5F6C */
+  /* Texto POR CIMA de um vermelho cheio (botão destrutivo, contador do sino). */
   --on-danger: 255 255 255;
   /* Dourados de texto (links e destaques). O #FAB347 fica para os fundos. */
-  --piquet-600: 150 96 10; /* #96600A — 5,3:1 sobre branco */
-  --piquet-700: 126 82 8; /* #7E5208 — 6,8:1 sobre branco */
+  --piquet-600: 150 96 10; /* #96600A */
+  --piquet-700: 126 82 8; /* #7E5208 */
 
-  --success-light: 225 241 233; /* #E1F1E9 */
-  --warning-light: 251 239 214; /* #FBEFD6 */
-  --danger-light: 247 226 221; /* #F7E2DD */
-  --info-light: 226 238 241; /* #E2EEF1 */
+  --success-light: 227 242 234; /* #E3F2EA */
+  --warning-light: 251 240 217; /* #FBF0D9 */
+  --danger-light: 248 228 223; /* #F8E4DF */
+  --info-light: 227 238 241; /* #E3EEF1 */
 
-  --scrollbar-thumb: 222 215 203;
+  --shadow-card: 0 1px 2px 0 rgb(26 25 23 / 0.04), 0 1px 3px 0 rgb(26 25 23 / 0.03);
+  --shadow-elevated: 0 16px 40px -12px rgb(26 25 23 / 0.18), 0 4px 12px -4px rgb(26 25 23 / 0.08);
+
+  --scrollbar-thumb: 214 209 200;
 }
 
 .dark {
-  --surface: 30 26 18; /* #1E1A12 */
-  --surface-muted: 20 17 9; /* #141109 */
-  --surface-subtle: 39 34 25; /* #272219 */
-  --surface-border: 61 54 42; /* #3D362A */
-  --surface-strong: 76 68 54; /* #4C4436 */
+  --surface: 26 25 24; /* #1A1918 */
+  --surface-muted: 17 16 16; /* #111010 */
+  --surface-subtle: 34 33 31; /* #22211F */
+  --surface-border: 44 42 39; /* #2C2A27 */
+  --surface-strong: 66 63 58; /* #423F3A */
+  --surface-sidebar: 21 20 19; /* #151413 */
 
-  --text-primary: 236 231 222; /* #ECE7DE */
-  --text-secondary: 180 173 161; /* #B4ADA1 */
-  /* Mesmo acerto do tema claro: sobre `surface-subtle` dava 4,28:1, e é aí
-     que vivem os rótulos dos KPIs ("utilizadores ativos", "nas lojas"). */
-  --text-muted: 150 142 128; /* #968E80 — 4,9:1 no pior fundo escuro */
+  --text-primary: 240 238 234; /* #F0EEEA — 13,9:1 no pior fundo */
+  --text-secondary: 180 175 167; /* #B4AFA7 — 7,4:1 no pior fundo */
+  --text-muted: 145 140 132; /* #918C84 — 4,8:1 no pior fundo */
 
   /* No escuro o problema é simétrico: tons mais claros, não mais escuros. */
-  --success: 63 191 138; /* #3FBF8A — 6,3:1 sobre a etiqueta verde escura */
-  --warning: 240 174 59; /* #F0AE3B — 6,9:1 */
-  /*
-   * Clareia como as outras. Antes ficava escuro (#D6503B) por causa do texto
-   * branco que lhe assenta por cima — e o preço era o texto VERMELHO das
-   * etiquetas a 3,7:1, ou seja "Crítica" e "Cancelado" mal legíveis no tema
-   * escuro. Resolve-se nos dois sentidos: o vermelho clareia (5,1:1 nas
-   * etiquetas) e o que assenta por cima dele passa a ser texto escuro.
-   */
+  --success: 63 191 138; /* #3FBF8A */
+  --warning: 240 174 59; /* #F0AE3B */
+  /* Claro, e por isso o que assenta por cima dele é texto escuro. */
   --danger: 233 112 92; /* #E9705C */
-  --on-danger: 28 26 23; /* #1C1A17 — 5,7:1 sobre o vermelho claro */
-  --info: 111 179 196; /* #6FB3C4 — 6,2:1 (era 3,1:1) */
+  --on-danger: 26 25 23;
+  --info: 111 179 196; /* #6FB3C4 */
   --piquet-600: 250 200 115; /* #FAC873 */
-  --piquet-700: 250 179 71; /* #FAB347 — era um dourado escuro, 4,0:1 */
+  --piquet-700: 250 179 71; /* #FAB347 */
 
-  --success-light: 22 45 36; /* verde escuro */
-  --warning-light: 58 45 20; /* âmbar escuro */
-  --danger-light: 58 29 24; /* terracota escuro */
-  --info-light: 23 44 49; /* teal escuro */
+  --success-light: 21 40 31; /* #15281F */
+  --warning-light: 46 36 20; /* #2E2414 */
+  --danger-light: 51 28 23; /* #331C17 */
+  --info-light: 21 37 41; /* #152529 */
 
-  --scrollbar-thumb: 61 54 42;
+  --shadow-card: 0 0 0 0 transparent;
+  --shadow-elevated: 0 20px 48px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+
+  --scrollbar-thumb: 56 54 50;
 }
 
 @layer base {
@@ -134,6 +121,9 @@
 
   html {
     @apply scroll-smooth;
+    /* A Geist com algarismos tabulares por defeito: colunas de valores
+       alinham-se sem ter de pôr `tabular-nums` célula a célula. */
+    font-feature-settings: "tnum" 1;
     /* Base da tipografia: as classes Tailwind são em rem, por isso este valor
        escala TODO o backoffice de uma vez. Esteve em 17px (a Open Sans tem
        altura-x maior e ganhava legibilidade), mas com as tabelas e painéis
@@ -145,17 +135,33 @@
     @apply bg-surface-muted text-text-primary antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Títulos ligeiramente mais justos: a Geist em 600 a 20px+ respira demais
+     com o espaçamento de texto corrido. */
+  h1, h2, h3 {
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: rgb(250 179 71 / 0.35);
+  }
 }
 
 @layer components {
   .card {
     @apply rounded-card bg-surface shadow-card border border-surface-border;
   }
+  /*
+   * Botões: três pesos e um tamanho. O dourado só para A ação do ecrã; o
+   * secundário com contorno; o fantasma para ações de linha ("Adiar",
+   * "Ver todos") que não devem competir com a principal.
+   */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-piquet px-4 py-2 text-sm font-semibold text-ink transition-all duration-150 hover:bg-piquet-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted disabled:opacity-50 disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-piquet px-3.5 py-2 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-piquet-300 active:bg-piquet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-all duration-150 hover:bg-surface-muted hover:border-surface-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-border bg-surface px-3.5 py-2 text-sm font-medium text-text-primary transition-colors duration-150 hover:bg-surface-subtle hover:border-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-text-secondary transition-colors duration-150 hover:bg-surface-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-piquet disabled:opacity-50 disabled:pointer-events-none;
   }
   /*
    * Fila de filtros/etiquetas. No telemóvel corre na horizontal em vez de
@@ -170,7 +176,7 @@
     @apply shrink-0;
   }
   .input-field {
-    @apply w-full rounded-xl border border-surface-border bg-surface px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-piquet focus:outline-none focus:ring-1 focus:ring-piquet;
+    @apply w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted transition-colors hover:border-surface-strong focus:border-piquet focus:outline-none focus:ring-2 focus:ring-piquet/25;
   }
 }
 

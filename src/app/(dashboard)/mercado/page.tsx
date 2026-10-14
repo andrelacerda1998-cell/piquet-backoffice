@@ -27,8 +27,6 @@ export default function MercadoPage() {
     <RouteGuard route="/mercado">
       <div className="space-y-6">
         <PageHeader
-          icon={MapIcon}
-          eyebrow="Marketplace"
           title="Mercado"
           subtitle="Se os pedidos estão a ser servidos, e onde há ou falta oferta"
         />

@@ -15,7 +15,7 @@ import {
   getTasks, createTask, updateTask, deleteTask, TASK_COLUMNS, RECURRENCE_LABELS,
   type PersonalTask, type TaskStatus, type TaskPriority, type Recurrence,
 } from "@/services/tasksService";
-import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat, KanbanSquare } from "lucide-react";
+import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskTimeline } from "@/components/ui/TaskTimeline";
 
@@ -223,8 +223,6 @@ export default function TarefasPage() {
     <RouteGuard route="/tarefas">
       <div className="space-y-6">
         <PageHeader
-          icon={KanbanSquare}
-          eyebrow="Equipa & ferramentas"
           title="As minhas tarefas"
           subtitle="As tuas tarefas e iniciativas do negócio — arrasta os cartões entre colunas."
           actions={<button onClick={() => openAdd("backlog")} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Nova tarefa</button>}

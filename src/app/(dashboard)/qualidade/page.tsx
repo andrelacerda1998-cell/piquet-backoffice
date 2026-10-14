@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
-import { ShieldCheck } from "lucide-react";
+
 import { MetricCard } from "@/components/ui/MetricCard";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { LoadingState } from "@/components/ui/States";
@@ -145,8 +145,6 @@ export default function QualityPage() {
     <RouteGuard route="/qualidade">
       <div className="space-y-6">
         <PageHeader
-          icon={ShieldCheck}
-          eyebrow="Operação"
           title="Qualidade"
           subtitle="O que os clientes disseram, e quem faltou"
         />

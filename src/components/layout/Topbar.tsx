@@ -151,11 +151,11 @@ export function Topbar() {
       isto este cabecalho ficava por baixo do relogio e da bateria. No browser
       e no computador a margem e zero.
     */
-    <header className="sticky top-0 z-20 bg-surface border-b border-surface-border pt-[var(--margem-topo)]">
-      <div className="flex items-center gap-3 px-4 h-16">
+    <header className="sticky top-0 z-20 bg-surface-muted/85 backdrop-blur-md border-b border-surface-border pt-[var(--margem-topo)]">
+      <div className="flex items-center gap-3 px-4 md:px-8 h-14">
         <button
           onClick={() => setMobileSidebarOpen(true)}
-          className="lg:hidden p-2 rounded-lg hover:bg-surface-muted"
+          className="lg:hidden -ml-1 p-2 rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
           aria-label="Abrir menu"
         >
           <Menu className="h-5 w-5" />
@@ -176,12 +176,12 @@ export function Topbar() {
         <button
           type="button"
           onClick={() => setCommandOpen(true)}
-          className="flex-1 max-w-md hidden sm:flex items-center gap-2 input-field text-sm text-text-muted text-left hover:bg-surface-muted transition-colors"
+          className="flex-1 max-w-sm hidden sm:flex items-center gap-2 rounded-lg border border-surface-border bg-surface px-3 py-1.5 text-sm text-text-muted text-left hover:border-surface-strong transition-colors"
           aria-label="Pesquisar pedidos, clientes, técnicos e comandos"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 truncate">Pedido, cliente, técnico, telefone…</span>
-          <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-surface-border px-1.5 py-0.5 font-sans text-[11px] text-text-secondary">
+          <kbd className="hidden md:inline-flex items-center gap-0.5 rounded-md bg-surface-subtle px-1.5 py-0.5 font-sans text-[11px] font-medium text-text-muted">
             <Command className="h-3 w-3" />K
           </kbd>
         </button>
@@ -191,7 +191,7 @@ export function Topbar() {
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="sm:hidden p-2 rounded-lg hover:bg-surface-muted"
+            className="sm:hidden p-2 rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
             aria-label="Pesquisar"
           >
             <Search className="h-5 w-5" />
@@ -203,7 +203,7 @@ export function Topbar() {
           {!pathname.startsWith("/financeiro") && <select
             value={filters.period}
             onChange={(e) => setFilter("period", e.target.value as PeriodPreset)}
-            className="input-field text-sm w-auto py-1.5 pr-8 hidden md:block"
+            className="input-field text-sm w-auto py-1.5 pr-8 hidden md:block bg-surface"
             aria-label="Período"
           >
             {PERIOD_OPTIONS.map((o) => (
@@ -215,14 +215,14 @@ export function Topbar() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={cn(
-              "btn-secondary text-sm py-1.5 relative",
+              "btn-secondary py-1.5 relative",
               activeCount > 0 && "border-piquet"
             )}
           >
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Filtros</span>
             {activeCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-piquet rounded-full text-[11px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 bg-piquet text-ink rounded-full text-[10px] font-bold flex items-center justify-center">
                 {activeCount}
               </span>
             )}
@@ -239,7 +239,7 @@ export function Topbar() {
           <div className="relative" ref={novoRef}>
             <button
               onClick={() => setShowNovo(!showNovo)}
-              className="btn-primary text-sm py-1.5 px-2.5 sm:px-3"
+              className="btn-primary py-1.5 px-2.5 sm:px-3"
               aria-haspopup="menu"
               aria-expanded={showNovo}
               aria-label="Criar novo"
@@ -247,9 +247,9 @@ export function Topbar() {
               <Plus className="h-4 w-4" /> <span className="hidden md:inline">Novo</span>
             </button>
             {showNovo && (
-              <div role="menu" className="absolute right-0 top-full mt-1 w-64 bg-surface border border-surface-border rounded-lg shadow-elevated py-1 z-50">
+              <div role="menu" className="absolute right-0 top-full mt-2 w-64 bg-surface border border-surface-border rounded-xl shadow-elevated p-1 z-50">
                 {novos.map((n) => (
-                  <button key={n.label} role="menuitem" onClick={() => criar(n)} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                  <button key={n.label} role="menuitem" onClick={() => criar(n)} className="w-full text-left px-2.5 py-2 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2.5">
                     <n.Icon className="h-4 w-4 text-text-muted" /> {n.label}
                   </button>
                 ))}
@@ -263,33 +263,33 @@ export function Topbar() {
           <div className="relative" ref={userRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-muted"
+              className="flex items-center gap-2 p-1 pr-1.5 rounded-lg hover:bg-surface-subtle"
+              aria-label="Menu da conta"
             >
-              <div className="w-8 h-8 bg-piquet rounded-full flex items-center justify-center text-sm font-bold">
-                {user?.name.charAt(0) ?? "?"}
+              <div className="w-7 h-7 bg-piquet/20 text-piquet-700 rounded-full flex items-center justify-center text-xs font-semibold">
+                {user?.name.split(" ").map((n) => n[0]).slice(0, 2).join("") ?? "?"}
               </div>
-              <span className="hidden md:inline text-sm font-medium">{user?.name}</span>
-              <ChevronDown className="h-4 w-4 text-text-muted hidden md:block" />
+              <ChevronDown className="h-3.5 w-3.5 text-text-muted hidden md:block" />
             </button>
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-surface border border-surface-border rounded-lg shadow-elevated py-1 z-50">
-                <div className="px-3 py-2 border-b border-surface-border">
+              <div className="absolute right-0 top-full mt-2 w-60 bg-surface border border-surface-border rounded-xl shadow-elevated p-1 z-50">
+                <div className="px-2.5 py-2 mb-1 border-b border-surface-border">
                   <p className="text-sm font-medium">{user?.name}</p>
                   <p className="text-xs text-text-muted">{user?.email}</p>
                   <p className="text-xs text-piquet-600 mt-0.5">{user ? ROLE_LABELS[user.role] : ""}</p>
                 </div>
                 {/* O que é de cada pessoa vive aqui, e não no menu de toda a gente. */}
-                <Link href="/tarefas" onClick={() => setShowUserMenu(false)} className="w-full px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                <Link href="/tarefas" onClick={() => setShowUserMenu(false)} className="w-full px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2.5">
                   <ListChecks className="h-4 w-4 text-text-muted" /> As minhas tarefas
                 </Link>
-                <button onClick={() => { setShowAvisos(true); setShowUserMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                <button onClick={() => { setShowAvisos(true); setShowUserMenu(false); }} className="w-full text-left px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2.5">
                   <BellRing className="h-4 w-4 text-text-muted" /> Avisos neste dispositivo
                 </button>
-                <button onClick={() => toggleTheme()} className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2">
+                <button onClick={() => toggleTheme()} className="w-full text-left px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2.5">
                   {theme === "dark" ? <Sun className="h-4 w-4 text-text-muted" /> : <Moon className="h-4 w-4 text-text-muted" />}
                   {theme === "dark" ? "Tema claro" : "Tema escuro"}
                 </button>
-                <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface-muted inline-flex items-center gap-2 border-t border-surface-border mt-1">
+                <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-2.5 py-1.5 text-sm rounded-md text-danger hover:bg-danger-light inline-flex items-center gap-2.5 mt-1">
                   <LogOut className="h-4 w-4" /> Terminar sessão
                 </button>
               </div>
@@ -305,7 +305,7 @@ export function Topbar() {
 
       {/* Painel de filtros — fechado, e só existe onde os filtros valem. */}
       {showFilters && filtrosValem && (
-        <div className="border-t border-surface-border px-4 py-3 bg-surface-muted/30">
+        <div className="border-t border-surface-border px-4 md:px-8 py-3">
           <div className="flex flex-wrap gap-3 items-end">
             <FilterSelect
               label="Categoria"
@@ -320,7 +320,7 @@ export function Topbar() {
               options={DEFAULT_SETTINGS.locations.map((l) => ({ value: l.name, label: l.name }))}
             />
             <div className="flex gap-2">
-              <button onClick={clearFilters} className="btn-secondary text-sm py-1.5">
+              <button onClick={clearFilters} className="btn-ghost">
                 <X className="h-3.5 w-3.5" /> Limpar
               </button>
             </div>
@@ -365,7 +365,7 @@ function FilterSelect({ label, value, onChange, options }: {
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 bg-piquet/15 text-xs rounded-full">
+    <span className="inline-flex items-center gap-1 px-2 py-1 bg-piquet/15 text-piquet-700 text-xs font-medium rounded-full">
       {label}
       <button onClick={onRemove} className="hover:text-danger" aria-label={`Remover filtro ${label}`}>
         <X className="h-3 w-3" />

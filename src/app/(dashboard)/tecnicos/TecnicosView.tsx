@@ -5,7 +5,7 @@ import { RouteGuard } from "@/components/layout/RouteGuard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DocumentPreview } from "@/components/ui/DocumentPreview";
-import { HardHat, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -650,8 +650,6 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
     <RouteGuard route="/tecnicos">
       <div className="space-y-6">
         <PageHeader
-          icon={HardHat}
-          eyebrow="Pessoas"
           title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
           subtitle="Quem trabalha com a Piquet, quem está a meio da inscrição e onde há cobertura"
         />

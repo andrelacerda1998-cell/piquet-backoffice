@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { SupportInbox } from "@/components/ui/SupportInbox";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { LifeBuoy } from "lucide-react";
+
 
 /**
  * Suporte = a caixa de entrada de tickets, e mais nada.
@@ -19,8 +19,6 @@ export default function SuportePage() {
     <RouteGuard route="/suporte">
       <div className="space-y-6">
         <PageHeader
-          icon={LifeBuoy}
-          eyebrow="Operação"
           title="Suporte"
           subtitle="Tickets das apps do cliente e do técnico — responde daqui, a resposta chega ao canal certo"
         />

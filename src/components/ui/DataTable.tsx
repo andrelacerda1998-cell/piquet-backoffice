@@ -142,13 +142,13 @@ export function DataTable<T extends object>({
           ) : <span />}
           {columnToggle && (
             <div className="relative shrink-0" ref={colRef}>
-              <button onClick={() => setColMenu((v) => !v)} className="btn-secondary text-xs py-1.5" aria-haspopup="menu" aria-expanded={colMenu}>
+              <button onClick={() => setColMenu((v) => !v)} className="btn-ghost text-[13px]" aria-haspopup="menu" aria-expanded={colMenu}>
                 <SlidersHorizontal className="h-3.5 w-3.5" /> Colunas
               </button>
               {colMenu && (
-                <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-surface border border-surface-border rounded-lg shadow-elevated p-1.5 max-h-72 overflow-y-auto">
+                <div className="absolute right-0 top-full mt-2 z-20 w-52 bg-surface border border-surface-border rounded-xl shadow-elevated p-1 max-h-72 overflow-y-auto">
                   {columns.map((c) => (
-                    <label key={c.key} className="flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-surface-muted cursor-pointer">
+                    <label key={c.key} className="flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle cursor-pointer">
                       <input
                         type="checkbox"
                         checked={!hiddenKeys.has(c.key)}
@@ -220,7 +220,7 @@ export function DataTable<T extends object>({
                   <dl className="mt-2 space-y-1">
                     {resto.map((col) => (
                       <div key={col.key} className="flex items-baseline justify-between gap-3">
-                        <dt className="text-[11px] uppercase tracking-[0.06em] text-text-muted shrink-0">{col.label}</dt>
+                        <dt className="text-xs text-text-muted shrink-0">{col.label}</dt>
                         <dd className="text-sm text-text-primary text-right min-w-0">{conteudo(col)}</dd>
                       </div>
                     ))}
@@ -236,7 +236,7 @@ export function DataTable<T extends object>({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-border bg-surface-muted/60">
+              <tr className="border-b border-surface-border bg-surface-subtle/60">
                 {selectable && (
                   <th className="px-4 py-2.5 w-10">
                     <input type="checkbox" className="accent-piquet" checked={allSelected} onChange={toggleAll} aria-label="Selecionar tudo" />
@@ -246,7 +246,7 @@ export function DataTable<T extends object>({
                   <th
                     key={col.key}
                     className={cn(
-                      "px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted whitespace-nowrap",
+                      "px-4 py-2.5 text-left text-xs font-medium text-text-muted whitespace-nowrap",
                       col.sortable && "cursor-pointer select-none hover:text-text-primary transition-colors",
                       col.className
                     )}
@@ -283,8 +283,8 @@ export function DataTable<T extends object>({
                     <tr
                       key={key}
                       className={cn(
-                        "border-b border-surface-border last:border-0 transition-colors",
-                        onRowClick && "cursor-pointer hover:bg-surface-muted",
+                        "border-b border-surface-border/70 last:border-0 transition-colors",
+                        onRowClick && "cursor-pointer hover:bg-surface-subtle/60",
                         selected.has(key) && "bg-piquet/5"
                       )}
                       onClick={() => onRowClick?.(row)}
@@ -323,7 +323,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
 
-  const navBtn = "flex h-8 w-8 items-center justify-center rounded-lg border border-surface-border text-text-secondary hover:bg-surface-muted hover:text-text-primary disabled:opacity-40 disabled:hover:bg-transparent transition-colors";
+  const navBtn = "flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary disabled:opacity-35 disabled:hover:bg-transparent transition-colors";
   return (
     <div className="flex items-center justify-between px-2 py-3 text-sm">
       <span className="text-text-secondary">
@@ -352,7 +352,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange }: 
 
 export function ExportButton({ onExport, label = "Exportar" }: { onExport: () => void; label?: string }) {
   return (
-    <button onClick={onExport} className="btn-secondary text-sm">
+    <button onClick={onExport} className="btn-secondary">
       {label}
     </button>
   );

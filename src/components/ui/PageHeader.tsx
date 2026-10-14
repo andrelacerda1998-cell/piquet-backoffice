@@ -9,41 +9,28 @@ interface PageHeaderProps {
   title: ReactNode;
   /** Uma linha de contexto por baixo do título. */
   subtitle?: ReactNode;
-  /** Ícone da secção — desenhado num chip dourado à esquerda. */
-  icon?: LucideIcon;
-  /** Sobre-título curto (ex.: o grupo de navegação a que a página pertence). */
-  eyebrow?: string;
   /** Botões/controlos à direita. */
   actions?: ReactNode;
   className?: string;
 }
 
 /**
- * Cabeçalho de página uniforme para todo o backoffice: chip com ícone,
- * sobre-título opcional, título e subtítulo à esquerda; ações à direita.
- * Substitui o `<h1 className="text-2xl font-bold">` solto que cada ecrã repetia,
- * dando a todos os ecrãs a mesma hierarquia e respiração.
+ * Cabeçalho de página uniforme para todo o backoffice: título e uma linha de
+ * contexto à esquerda, ações à direita.
+ *
+ * Saíram (redesenho de 14/10/2026) o quadrado com o ícone e o sobre-título
+ * ("OPERAÇÃO", "PESSOAS"): os dois repetiam o que a barra lateral já mostra
+ * ao lado -- o ícone e o grupo do ecrã -- e juntos empurravam o conteúdo
+ * 40px para baixo em todos os ecrãs.
  */
-export function PageHeader({ title, subtitle, icon: Icon, eyebrow, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, className }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
-      <div className="flex items-start gap-3.5 min-w-0">
-        {Icon && (
-          <span className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-piquet/15 text-piquet-700 ring-1 ring-inset ring-piquet/20">
-            <Icon className="h-5 w-5" />
-          </span>
-        )}
-        <div className="min-w-0">
-          {eyebrow && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted mb-0.5">{eyebrow}</p>
-          )}
-          {/* No telemóvel o título desce um degrau: a 2xl, um "Serviços
-              personalizados" ocupava três linhas antes de qualquer conteúdo. */}
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight flex items-center gap-2 flex-wrap">
-            {title}
-          </h1>
-          {subtitle && <p className="text-sm text-text-secondary mt-1 max-w-2xl">{subtitle}</p>}
-        </div>
+    <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-[26px] font-semibold text-text-primary leading-tight flex items-center gap-2 flex-wrap">
+          {title}
+        </h1>
+        {subtitle && <p className="text-sm text-text-secondary mt-1.5 max-w-2xl">{subtitle}</p>}
       </div>
       {/*
         As ações empilhavam-se uma por linha no telemóvel — dois botões
@@ -62,24 +49,29 @@ export function PageHeader({ title, subtitle, icon: Icon, eyebrow, actions, clas
 interface SectionHeaderProps {
   title: string;
   icon?: LucideIcon;
+  /** Uma linha de contexto por baixo do título. */
+  description?: ReactNode;
   /** Texto/nós à direita (contagens, ligações "ver todos", etc.). */
   aside?: ReactNode;
   className?: string;
 }
 
 /**
- * Rótulo de secção uniforme (maiúsculas, tracking largo) com ícone opcional e
- * um espaço à direita para meta-informação. Uniformiza os vários
- * `<p className="text-xs uppercase tracking...">` espalhados pelos ecrãs.
+ * Título de secção dentro de uma página. Em frase normal e a meio-negrito, e
+ * não em maiúsculas espaçadas: uma página com cinco secções em maiúsculas
+ * era uma página a gritar cinco vezes, e as maiúsculas leem-se mais devagar.
  */
-export function SectionHeader({ title, icon: Icon, aside, className }: SectionHeaderProps) {
+export function SectionHeader({ title, icon: Icon, description, aside, className }: SectionHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between gap-3 mb-3", className)}>
-      <div className="flex items-center gap-2 min-w-0">
-        {Icon && <Icon className="h-4 w-4 text-piquet-600 shrink-0" />}
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted truncate">{title}</p>
+    <div className={cn("flex items-end justify-between gap-3 mb-3", className)}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 text-text-muted shrink-0" />}
+          <h2 className="text-[15px] font-semibold text-text-primary truncate">{title}</h2>
+        </div>
+        {description && <p className="text-[13px] text-text-muted mt-0.5">{description}</p>}
       </div>
-      {aside && <div className="shrink-0 text-xs text-text-muted">{aside}</div>}
+      {aside && <div className="shrink-0 text-[13px] text-text-muted">{aside}</div>}
     </div>
   );
 }

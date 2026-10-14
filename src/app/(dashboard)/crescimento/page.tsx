@@ -6,7 +6,7 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAuthStore } from "@/stores";
 import { hasAnyPermission } from "@/lib/permissions";
-import { TrendingUp } from "lucide-react";
+
 import MarketingView from "../marketing/MarketingView";
 import ProdutoView from "../produto/ProdutoView";
 import ObjetivosPage from "../objetivos/Objetivos";
@@ -38,8 +38,6 @@ export default function CrescimentoPage() {
     <RouteGuard route="/crescimento">
       <div className="space-y-6">
         <PageHeader
-          icon={TrendingUp}
-          eyebrow="Crescimento"
           title="Crescimento"
           subtitle="Marketing, adoção das apps, clientes e objetivos do ano"
         />

@@ -14,7 +14,7 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn, downloadCsv } from "@/lib/utils";
-import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
+import { Trash2, Search, MessageCircle, Phone, MapPin, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { CronologiaPedido } from "@/components/ui/CronologiaPedido";
@@ -449,8 +449,6 @@ function LeadsPageInner() {
     <RouteGuard route="/leads">
       <div className="space-y-6">
         <PageHeader
-          icon={Headphones}
-          eyebrow="Operação"
           title="Contactos"
           subtitle="Tudo o que entrou, e em que ponto está: à procura de técnico, com técnico, ou fechado."
         />

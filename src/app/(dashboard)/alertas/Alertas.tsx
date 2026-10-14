@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Bell, ArrowRight, CheckCircle2, RefreshCw, Clock, Undo2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, RefreshCw, Clock, Undo2 } from "lucide-react";
 import { PriorityBadge, AlertTypeBadge } from "@/components/ui/StatusBadge";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getAlerts, adiarAlerta, reporAlerta, dispensarAlerta, amanhaAsNove } from "@/services/supportService";
@@ -115,8 +115,6 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
           </div>
         ) : (
           <PageHeader
-            icon={Bell}
-            eyebrow="Operação"
             title="Alertas"
             subtitle="O que precisa de ação, apurado a partir dos dados reais do negócio"
             actions={

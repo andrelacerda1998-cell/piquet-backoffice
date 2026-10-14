@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Users, UserPlus, ArrowUpRight } from "lucide-react";
+import { UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
@@ -318,8 +318,6 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
     <RouteGuard route="/clientes">
       <div className="space-y-6">
         <PageHeader
-          icon={Users}
-          eyebrow="Pessoas"
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
           subtitle={allCustomers ? `${allCustomers.length} clientes registados` : "Encontrar uma pessoa e ver tudo o que se passou com ela"}
           actions={

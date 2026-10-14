@@ -11,7 +11,7 @@ import { getCampaigns, getAdSpend, refreshAdSpend, type SpendMonth } from "@/ser
 import { toast } from "@/stores";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Megaphone, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { CriarAnuncio } from "./CriarAnuncio";
 import { Anuncios } from "./Anuncios";
@@ -172,8 +172,6 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
           </div>
         ) : (
           <PageHeader
-            icon={Megaphone}
-            eyebrow="Crescimento"
             title="Marketing"
             subtitle="O que se gastou em anúncios, quando, e o que rendeu"
             actions={

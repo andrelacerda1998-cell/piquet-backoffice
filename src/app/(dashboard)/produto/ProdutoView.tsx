@@ -16,7 +16,7 @@ import {
 import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatNumber, formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Star, AlertTriangle, Filter, ArrowDownRight, LineChart } from "lucide-react";
+import { Star, AlertTriangle, Filter, ArrowDownRight } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 
@@ -237,8 +237,6 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
       <div className="space-y-6">
         {!embutido && (
           <PageHeader
-            icon={LineChart}
-            eyebrow="Produto"
             title="Produto"
             subtitle="Adoção das apps e jornada do utilizador"
           />

@@ -32,8 +32,8 @@ export default function manifest(): MetadataRoute.Manifest {
       estado. Com o dourado da marca, o texto branco do sistema ficava
       ilegível por cima.
     */
-    background_color: "#1C1A17",
-    theme_color: "#1C1A17",
+    background_color: "#111010",
+    theme_color: "#111010",
     // `?v=` pela mesma razão do layout: sem ele o browser fica com o ícone
     // antigo indefinidamente, porque o endereço nunca muda.
     icons: [

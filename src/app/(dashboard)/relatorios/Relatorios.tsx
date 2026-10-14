@@ -16,7 +16,7 @@ import { formatDate, formatDateTime, formatCurrency, formatNumber } from "@/lib/
 import { downloadReportCsv, cn, type CsvSection } from "@/lib/utils";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { toast } from "@/stores";
-import { FileDown, BarChart3, Wrench, Wallet, Megaphone, Star } from "lucide-react";
+import { FileDown, Wrench, Wallet, Megaphone, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 const TABS = [
@@ -336,8 +336,6 @@ export default function ReportsPage() {
     <RouteGuard route="/relatorios">
       <div className="space-y-6">
         <PageHeader
-          icon={BarChart3}
-          eyebrow="Crescimento"
           title="Relatórios"
           subtitle="Exporta os dados reais do negócio em CSV, por período"
         />

@@ -112,8 +112,6 @@ export default function GoalsPage() {
     <RouteGuard route="/objetivos">
       <div className="space-y-6">
         <PageHeader
-          icon={Target}
-          eyebrow="Crescimento"
           title={`Objetivos do ano — ${new Date().getFullYear()}`}
           subtitle={
             <>

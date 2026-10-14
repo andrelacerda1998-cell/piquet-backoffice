@@ -489,8 +489,6 @@ export default function FinancePage() {
       <PermissionGate permission="view_finance">
         <div className="space-y-6">
           <PageHeader
-            icon={Wallet}
-            eyebrow="Financeiro"
             title="Financeiro"
             subtitle="Receita, custos e tesouraria"
             actions={tab === "resultado" ? <MonthSelect /> : undefined}

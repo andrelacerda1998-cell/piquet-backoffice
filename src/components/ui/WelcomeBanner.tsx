@@ -37,43 +37,42 @@ export function WelcomeBanner() {
   const firstName = user?.name.split(" ")[0] ?? "";
 
   return (
-    <div className="relative overflow-hidden rounded-card border border-piquet/30 bg-piquet/10 p-5">
-      <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-piquet/20 blur-3xl" />
+    <div className="card relative p-5">
       <button
         onClick={dismissWelcome}
-        className="absolute top-3 right-3 p-1.5 rounded-lg text-text-muted hover:bg-surface/60 hover:text-text-primary transition-colors"
+        className="absolute top-3 right-3 p-1.5 rounded-md text-text-muted hover:bg-surface-subtle hover:text-text-primary transition-colors"
         aria-label="Dispensar"
       >
         <X className="h-4 w-4" />
       </button>
 
-      <div className="relative">
-        <h2 className="text-lg font-bold text-text-primary">
-          Olá, {firstName}. Três coisas para começar:
-        </h2>
-        <ol className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {PASSOS.map((p, i) => (
-            <li key={p.titulo} className="rounded-xl bg-surface/70 p-3">
-              <p className="flex items-center gap-2 font-semibold text-text-primary text-sm">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-piquet text-xs text-white">{i + 1}</span>
-                <p.Icon className="h-4 w-4 text-piquet-700" />
+      <h2 className="text-[15px] font-semibold text-text-primary pr-8">
+        Olá, {firstName}. Três coisas para começar
+      </h2>
+      <ol className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+        {PASSOS.map((p, i) => (
+          <li key={p.titulo} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-xs font-semibold text-piquet-700">{i + 1}</span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-text-primary">
+                <p.Icon className="h-3.5 w-3.5 text-text-muted" />
                 {p.titulo}
               </p>
-              <p className="mt-1 text-sm text-text-secondary">{p.texto}</p>
-            </li>
-          ))}
-        </ol>
+              <p className="mt-0.5 text-[13px] text-text-secondary">{p.texto}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button onClick={() => setCommandOpen(true)} className="btn-secondary text-sm py-1.5">
-            <Search className="h-4 w-4" />
-            Experimentar a pesquisa
-          </button>
-          <button onClick={dismissWelcome} className="btn-primary text-sm py-1.5">
-            <Check className="h-4 w-4" />
-            Percebi
-          </button>
-        </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button onClick={dismissWelcome} className="btn-primary py-1.5">
+          <Check className="h-4 w-4" />
+          Percebi
+        </button>
+        <button onClick={() => setCommandOpen(true)} className="btn-ghost">
+          <Search className="h-4 w-4" />
+          Experimentar a pesquisa
+        </button>
       </div>
     </div>
   );
