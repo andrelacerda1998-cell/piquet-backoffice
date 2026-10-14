@@ -21,12 +21,18 @@ export function StatGroup({ title, aside, children, className, cols = 4 }: {
   /** Colunas a partir de ecrãs largos (no telemóvel são sempre duas). */
   cols?: 2 | 3 | 4 | 5 | 6;
 }) {
+  /*
+    Um número sozinho na última linha ocupa a linha toda, em vez de deixar
+    uma célula vazia ao lado (três números em duas colunas, no telemóvel).
+    Nos ecrãs largos, onde cabem todos numa linha, volta a uma coluna.
+  */
+  const sozinho = "[&>*:last-child:nth-child(odd)]:col-span-2";
   const grelha = {
-    2: "grid-cols-2",
-    3: "grid-cols-2 lg:grid-cols-3",
-    4: "grid-cols-2 lg:grid-cols-4",
-    5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5",
-    6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
+    2: `grid-cols-2 ${sozinho}`,
+    3: `grid-cols-2 lg:grid-cols-3 ${sozinho} lg:[&>*:last-child:nth-child(odd)]:col-span-1`,
+    4: `grid-cols-2 lg:grid-cols-4 ${sozinho} lg:[&>*:last-child:nth-child(odd)]:col-span-1`,
+    5: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 ${sozinho} lg:[&>*:last-child:nth-child(odd)]:col-span-1`,
+    6: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 ${sozinho} lg:[&>*:last-child:nth-child(odd)]:col-span-1`,
   }[cols];
   return (
     <section className={cn("card overflow-hidden", className)}>
