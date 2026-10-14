@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { duracao, ordenarPorUrgencia, pct, restanteAgora, type Alerta } from "./aoVivo";
+import { duracao, ordenarPorUrgencia, pct, pctDeFracao, restanteAgora, type Alerta } from "./aoVivo";
 
 const p = (id: string, alerta: Alerta | null, segundos_restantes: number | null = null, criado_em = "2026-10-07T10:00:00Z") =>
   ({ id, alerta, segundos_restantes, criado_em });
@@ -61,5 +61,12 @@ describe("pct", () => {
     expect(pct(33.3)).toBe("33,3%");
     expect(pct(50)).toBe("50%");
     expect(pct(null)).toBe("—");
+  });
+
+  it("uma taxa de 0 a 1 (a do mês) lê-se como percentagem, e não como 0,7%", () => {
+    expect(pctDeFracao(0.667)).toBe("66,7%");
+    expect(pctDeFracao(1)).toBe("100%");
+    expect(pctDeFracao(0)).toBe("0%");
+    expect(pctDeFracao(null)).toBe("—");
   });
 });

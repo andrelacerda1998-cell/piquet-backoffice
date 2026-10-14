@@ -11,7 +11,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getFinanceGmv, getFinanceSummary } from "@/services/financeService";
 import { getOperacoesAoVivo } from "@/services/dashboardService";
-import { pct } from "@/lib/aoVivo";
+import { pct, pctDeFracao } from "@/lib/aoVivo";
 import { PrecisaDeTi } from "@/components/hoje/PrecisaDeTi";
 import { buildMetricValue } from "@/lib/calculations";
 import { useAuthStore } from "@/stores";
@@ -77,7 +77,7 @@ export default function OverviewPage() {
   const mes = aoVivo?.liquidez.mes;
   const trinta = aoVivo?.liquidez["30d"];
   const servidos = mes
-    ? { valor: pct(mes.taxa), nota: `${mes.servidos} de ${mes.criados} pedidos do mês`, zero: mes.criados > 0 && mes.servidos === 0 }
+    ? { valor: pctDeFracao(mes.taxa), nota: `${mes.servidos} de ${mes.criados} pedidos do mês`, zero: mes.criados > 0 && mes.servidos === 0 }
     : trinta
       ? { valor: pct(trinta.taxa_servidos), nota: `${trinta.servidos} de ${trinta.terminados} terminados (30 dias)`, zero: trinta.terminados > 0 && trinta.servidos === 0 }
       : null;

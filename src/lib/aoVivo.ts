@@ -83,6 +83,7 @@ export interface AoVivo {
   liquidez: {
     "7d": Liquidez; "30d": Liquidez;
     /** O mês de calendário (backend novo): servidos ÷ criados. */
+    /** `taxa` de 0 a 1 (as `taxa_*` dos 7/30 dias vêm de 0 a 100): ver pctDeFracao. */
     mes?: { criados: number; servidos: number; taxa: number | null };
   };
   perdidos: PedidoPerdido[];
@@ -167,4 +168,15 @@ export function haQuanto(iso: string | null, agora: number): string {
 /** Percentagem com vírgula; sem base, um traço — nunca um 0% inventado. */
 export function pct(v: number | null | undefined): string {
   return v == null ? "—" : `${v.toFixed(1).replace(".", ",").replace(",0", "")}%`;
+}
+
+/**
+ * A mesma percentagem, para uma taxa de 0 a 1.
+ *
+ * O backend não manda todas as taxas na mesma escala: a `taxa_servidos` dos
+ * 7 e 30 dias vem de 0 a 100, mas a `liquidez.mes.taxa` (backend #172) vem
+ * de 0 a 1 -- e a Visão Geral mostrava "0,7%" para 16 pedidos servidos em 24.
+ */
+export function pctDeFracao(v: number | null | undefined): string {
+  return v == null ? "—" : pct(v * 100);
 }
