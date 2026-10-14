@@ -181,14 +181,14 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     { key: "requestedAt", label: "Quando", sortable: true, render: (r) => (
       <span className="whitespace-nowrap">
         {formatDate(r.requestedAt)}
-        {r.scheduledAt && <span className="block text-[11px] text-text-muted">marcado {r.scheduledAt.length > 10 ? formatDateTime(r.scheduledAt) : formatDate(r.scheduledAt)}</span>}
+        {r.scheduledAt && <span className="block text-xs text-text-muted">marcado {r.scheduledAt.length > 10 ? formatDateTime(r.scheduledAt) : formatDate(r.scheduledAt)}</span>}
       </span>
     ) },
-    { key: "customerName", label: "Cliente" },
+    { key: "customerName", label: "Cliente", render: (r) => <span className="block max-w-[170px] truncate" title={r.customerName}>{r.customerName || "—"}</span> },
     { key: "serviceName", label: "Serviço", render: (r) => (
-      <span>
-        {r.serviceName || "—"}
-        {r.categoryName && r.categoryName !== r.serviceName && <span className="block text-[11px] text-text-muted">{r.categoryName}</span>}
+      <span className="block max-w-[230px]">
+        <span className="block truncate" title={r.serviceName}>{r.serviceName || "—"}</span>
+        {r.categoryName && r.categoryName !== r.serviceName && <span className="block truncate text-xs text-text-muted">{r.categoryName}</span>}
       </span>
     ) },
     { key: "city", label: "Cidade", render: (r) => r.city || "—" },
@@ -199,7 +199,7 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
         <EstadoDoPedido status={r.status} />
       </span>
     ) },
-    { key: "totalCustomerValue", label: "Valor", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue) },
+    { key: "totalCustomerValue", label: "Valor", sortable: true, className: "text-right", render: (r) => <span className="font-medium tabular-nums">{formatCurrency(r.totalCustomerValue)}</span> },
     // Secundárias: em "Colunas".
     { key: "matching", label: "Convidados", hidden: true, render: (r) => <ColunaMatching matching={r.matching} /> },
     { key: "rating", label: "Avaliação", hidden: true, render: (r) => r.rating
@@ -225,9 +225,6 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
         <PageHeader
           title="Pedidos"
           subtitle="O que está a acontecer agora, a lista de todos os pedidos e os personalizados"
-          actions={
-            <ExportButton onExport={handleExport} />
-          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -241,27 +238,7 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
         )}
 
         {tab === "pedidos" && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="N.º, cliente, telefone, técnico…" />
-              <FilterBar className="flex-1 min-w-[240px]" />
-            </div>
-            <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Vistas rápidas">
-              {VISTAS.map((v) => (
-                <button
-                  key={v.id}
-                  role="tab"
-                  aria-selected={vista === v.id}
-                  onClick={() => { setVista(v.id); setPage(1); }}
-                  className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                    vista === v.id ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary hover:bg-surface-muted",
-                    v.id === "atencao" && quantosComAtencao > 0 && vista !== v.id && "border-danger/40 text-danger")}
-                >
-                  {v.label}
-                  {v.id === "atencao" && quantosComAtencao > 0 && <span className="tabular-nums text-xs">{quantosComAtencao}</span>}
-                </button>
-              ))}
-            </div>
+          <div className="space-y-3">
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
               <>
                 <DataTable
@@ -274,6 +251,31 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
                   onRowClick={setSelectedService}
                   loading={loading}
                   columnToggle
+                  toolbar={<>
+                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-64" placeholder="N.º, cliente, telefone, técnico…" />
+                    {/* As vistas: um seletor segmentado, como as sub-abas. */}
+                    <div className="inline-flex max-w-full gap-0.5 rounded-lg bg-surface-subtle p-0.5 overflow-x-auto tira-deslizante" role="tablist" aria-label="Vistas rápidas">
+                      {VISTAS.map((v) => {
+                        const ativa = vista === v.id;
+                        const alerta = v.id === "atencao" && quantosComAtencao > 0;
+                        return (
+                          <button
+                            key={v.id}
+                            role="tab"
+                            aria-selected={ativa}
+                            onClick={() => { setVista(v.id); setPage(1); }}
+                            className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-colors",
+                              ativa ? "bg-surface text-text-primary shadow-card ring-1 ring-surface-border" : "text-text-secondary hover:text-text-primary")}
+                          >
+                            {v.label}
+                            {alerta && <span className="rounded-full bg-danger/15 px-1.5 text-[11px] font-semibold tabular-nums text-danger">{quantosComAtencao}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <FilterBar />
+                  </>}
+                  actions={<ExportButton onExport={handleExport} label="Exportar" />}
                 />
                 {data && (
                   <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />

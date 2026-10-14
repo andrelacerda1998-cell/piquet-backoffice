@@ -6,6 +6,7 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import { getOperacoesAoVivo } from "@/services/dashboardService";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { SectionHeader } from "@/components/ui/PageHeader";
+import { StatGroup, Stat, Segmentos } from "@/components/ui/Stats";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { cn } from "@/lib/utils";
@@ -32,10 +33,13 @@ import {
 
 const ATUALIZAR_A_CADA_MS = 30_000;
 
+/* Um ponto colorido à frente do pedido e a frase do alerta na cor dele. Os
+   fundos pintados (vermelho, âmbar, dourado) ficavam a disputar a atenção
+   uns com os outros: com três pedidos, o ecrã era três manchas. */
 const COR_ALERTA: Record<Alerta["nivel"], string> = {
-  critico: "border-l-danger bg-danger-light/40",
-  atencao: "border-l-warning bg-warning-light/40",
-  info: "border-l-piquet bg-piquet/5",
+  critico: "bg-danger",
+  atencao: "bg-warning",
+  info: "bg-piquet",
 };
 
 const TEXTO_ALERTA: Record<Alerta["nivel"], string> = {
@@ -80,11 +84,11 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
           Ao vivo
         </span>
         <span className="text-text-muted">lido há {haQuanto(data.gerado_em, agora)} · atualiza a cada 30 s</span>
-        <button onClick={() => refetch()} className="btn-secondary text-xs py-1" disabled={loading}>
+        <button onClick={() => refetch()} className="btn-ghost text-xs px-2 py-1" disabled={loading}>
           <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} /> Atualizar
         </button>
-        <label className="ml-auto inline-flex items-center gap-2 text-text-secondary">
-          <input type="checkbox" checked={incluirTestes} onChange={(e) => setIncluirTestes(e.target.checked)} className="rounded border-surface-border" />
+        <label className="ml-auto inline-flex items-center gap-2 text-[13px] text-text-secondary">
+          <input type="checkbox" checked={incluirTestes} onChange={(e) => setIncluirTestes(e.target.checked)} className="rounded border-surface-border accent-piquet" />
           Mostrar contas de teste
         </label>
       </div>
@@ -94,23 +98,29 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
         </p>
       )}
 
-      {/* Números do momento */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Numero titulo="À procura de técnico" valor={String(fila.length)} nota={criticos > 0 ? `${criticos} a precisar de ti` : "nenhum em risco"} destaque={criticos > 0} />
-        <Numero titulo="Técnicos prontos agora" valor={String(data.oferta.prontos)}
-          nota={`${data.oferta.online} Online · posição há menos de ${data.oferta.janela_minutos} min`} destaque={data.oferta.prontos === 0} />
-        <Numero titulo={`Pedidos (${liq.dias} dias)`} valor={String(liq.pedidos)} nota={`${liq.terminados} já terminaram`} />
-        <Numero titulo="Com pelo menos um sim" valor={pct(liq.taxa_com_sim)} nota={`${liq.com_sim} de ${liq.terminados} terminados`} />
-        <Numero titulo="Servidos" valor={pct(liq.taxa_servidos)} nota={`${liq.servidos} de ${liq.terminados} terminados`} destaque={liq.terminados > 0 && liq.servidos === 0} />
-        <Numero titulo="Até ao primeiro sim" valor={liq.mediana_segundos_ate_primeiro_sim == null ? "—" : duracao(liq.mediana_segundos_ate_primeiro_sim)} nota="mediana" />
-      </div>
-      <div className="flex gap-1 -mt-3">
-        {(["7d", "30d"] as const).map((j) => (
-          <button key={j} onClick={() => setJanela(j)}
-            className={cn("text-xs px-2 py-1 rounded", janela === j ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
-            {j === "7d" ? "Últimos 7 dias" : "Últimos 30 dias"}
-          </button>
-        ))}
+      {/*
+        Dois grupos de números, porque respondem a duas perguntas: "e agora?"
+        (o que está à procura e quem pode pegar) e "como tem corrido?" (a
+        liquidez de um período). O período escolhe-se no próprio grupo que ele
+        muda -- antes era uma fila de botões solta por baixo dos seis cartões,
+        e não se percebia a quais deles se aplicava.
+      */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <StatGroup title="Agora" cols={2}>
+          <Stat label="À procura de técnico" value={String(fila.length)} note={criticos > 0 ? `${criticos} a precisar de ti` : "nenhum em risco"} tone={criticos > 0 ? "mau" : undefined} />
+          <Stat label="Técnicos prontos" value={String(data.oferta.prontos)}
+            note={`${data.oferta.online} Online · posição há < ${data.oferta.janela_minutos} min`} tone={data.oferta.prontos === 0 ? "mau" : undefined} />
+        </StatGroup>
+        <StatGroup
+          title="Liquidez"
+          aside={<Segmentos opcoes={[{ id: "7d", label: "7 dias" }, { id: "30d", label: "30 dias" }]} valor={janela} onChange={setJanela} />}
+          cols={4}
+        >
+          <Stat label="Pedidos" value={String(liq.pedidos)} note={`${liq.terminados} já terminaram`} />
+          <Stat label="Com pelo menos um sim" value={pct(liq.taxa_com_sim)} note={`${liq.com_sim} de ${liq.terminados} terminados`} />
+          <Stat label="Servidos" value={pct(liq.taxa_servidos)} note={`${liq.servidos} de ${liq.terminados} terminados`} tone={liq.terminados > 0 && liq.servidos === 0 ? "mau" : undefined} />
+          <Stat label="Até ao primeiro sim" value={liq.mediana_segundos_ate_primeiro_sim == null ? "—" : duracao(liq.mediana_segundos_ate_primeiro_sim)} note="mediana" />
+        </StatGroup>
       </div>
 
       {/* A fila */}
@@ -119,7 +129,7 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
         {fila.length === 0 ? (
           <p className="card p-6 text-center text-sm text-text-muted">Nenhum pedido à procura de técnico neste momento.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="card divide-y divide-surface-border overflow-hidden">
             {fila.map((p) => <LinhaAProcura key={p.id} p={p} lidoEm={data.gerado_em} agora={agora} onAbrir={onAbrir} />)}
           </ul>
         )}
@@ -132,7 +142,7 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
           {emCurso.length === 0 ? (
             <p className="card p-6 text-center text-sm text-text-muted">Nenhum serviço em curso.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="card divide-y divide-surface-border overflow-hidden">
               {emCurso.map((p) => <LinhaEmCurso key={p.id} p={p} agora={agora} onAbrir={onAbrir} />)}
             </ul>
           )}
@@ -150,12 +160,12 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
                   <span className="font-medium text-text-primary">{a.area}</span>
                   <span className="tabular-nums text-text-secondary">{a.online} · <strong className={a.prontos === 0 ? "text-danger" : "text-success"}>{a.prontos}</strong></span>
                 </div>
-                <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden flex">
+                <div className="mt-1.5 h-1.5 rounded-full bg-surface-subtle overflow-hidden flex">
                   <div className="h-full bg-success" style={{ width: `${a.online ? (a.prontos / a.online) * 100 : 0}%` }} />
                 </div>
               </div>
             ))}
-            <p className="text-xs text-text-secondary pt-1">
+            <p className="text-xs text-text-muted pt-1">
               «Pronto» é Online, com o perfil completo e a mandar a localização há menos de {data.oferta.janela_minutos} min — é quem a
               procura de um pedido para agora consegue encontrar.
             </p>
@@ -173,15 +183,15 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
           {data.perdidos.length === 0 ? (
             <p className="card p-6 text-center text-sm text-text-muted">Nenhum pedido perdido nos últimos 30 dias.</p>
           ) : (
-            <ul className="card divide-y divide-surface-border">
+            <ul className="card divide-y divide-surface-border overflow-hidden">
               {data.perdidos.map((p) => (
                 <li key={p.id}>
-                  <button onClick={() => onAbrir(p.id)} className="w-full text-left px-4 py-2.5 hover:bg-surface-subtle">
+                  <button onClick={() => onAbrir(p.id)} className="w-full text-left px-4 py-3 hover:bg-surface-subtle/60 transition-colors">
                     <div className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="font-medium text-text-primary truncate">#{p.id} · {p.tipo ?? "Serviço"}{p.cidade ? ` · ${p.cidade}` : ""}</span>
                       <span className="text-xs text-danger whitespace-nowrap">{DESFECHOS[p.desfecho]}</span>
                     </div>
-                    <p className="text-[11px] text-text-muted">
+                    <p className="mt-0.5 text-xs text-text-muted">
                       {MODOS[p.modo]} · {p.convidados} {p.convidados === 1 ? "convidado" : "convidados"} · durou {duracao(p.viveu_segundos)} · há {haQuanto(p.criado_em, agora)}
                     </p>
                   </button>
@@ -195,33 +205,23 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
   );
 }
 
-function Numero({ titulo, valor, nota, destaque }: { titulo: string; valor: string; nota?: string; destaque?: boolean }) {
-  return (
-    <div className={cn("card p-3", destaque && "border-danger/40")}>
-      <p className="text-xs text-text-secondary">{titulo}</p>
-      <p className={cn("text-xl font-bold tabular-nums", destaque ? "text-danger" : "text-text-primary")}>{valor}</p>
-      {nota && <p className="text-[11px] text-text-muted">{nota}</p>}
-    </div>
-  );
-}
-
 function Cabecalho({ p, agora }: { p: PedidoAProcura | PedidoEmCurso; agora: number }) {
   return (
     <div className="flex flex-wrap items-center gap-2 min-w-0">
       <span className="font-mono text-xs text-text-muted">#{p.id}</span>
-      <span className="font-medium text-text-primary truncate">{p.tipo ?? "Serviço"}</span>
-      <span className="text-xs text-text-secondary">{[p.cliente, p.cidade].filter(Boolean).join(" · ")}</span>
-      <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-[11px] text-text-secondary">{MODOS[p.modo]}</span>
+      <span className="text-sm font-medium text-text-primary truncate">{p.tipo ?? "Serviço"}</span>
+      <span className="text-[13px] text-text-secondary">{[p.cliente, p.cidade].filter(Boolean).join(" · ")}</span>
+      <span className="rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">{MODOS[p.modo]}</span>
       <StatusBadge status={p.estadoBackoffice} label={SERVICE_STATUS_LABELS[p.estadoBackoffice]} />
-      <span className="text-[11px] text-text-muted">há {haQuanto(p.criado_em, agora)}</span>
-      {p.marcado_para && <span className="text-[11px] text-text-muted">· marcado para {p.marcado_para}</span>}
+      <span className="text-xs text-text-muted">há {haQuanto(p.criado_em, agora)}</span>
+      {p.marcado_para && <span className="text-xs text-text-muted">· marcado para {formatarMarcacao(p.marcado_para)}</span>}
     </div>
   );
 }
 
 function AvisoDoAlerta({ alerta }: { alerta: Alerta }) {
   return (
-    <p className={cn("mt-1 text-xs font-medium inline-flex items-center gap-1", TEXTO_ALERTA[alerta.nivel])}>
+    <p className={cn("mt-1.5 text-[13px] font-medium inline-flex items-center gap-1.5", TEXTO_ALERTA[alerta.nivel])}>
       {alerta.nivel !== "info" && <AlertTriangle className="h-3.5 w-3.5" />}
       {MOTIVOS[alerta.motivo] ?? alerta.motivo}
     </p>
@@ -233,40 +233,67 @@ function LinhaAProcura({ p, lidoEm, agora, onAbrir }: { p: PedidoAProcura; lidoE
   return (
     <li>
       <button onClick={() => onAbrir(p.id)}
-        className={cn("w-full text-left card border-l-[3px] px-4 py-3 hover:shadow-elevated transition-shadow", p.alerta ? COR_ALERTA[p.alerta.nivel] : "border-l-surface-border")}>
+        className="w-full text-left px-4 py-3.5 hover:bg-surface-subtle/60 transition-colors flex gap-3">
+        <Ponto alerta={p.alerta} />
+        <div className="min-w-0 flex-1">
         {/* Grelha e não flex com quebra: o prazo fica sempre na coluna da
             direita, mesmo quando o cabeçalho ocupa duas linhas. */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <Cabecalho p={p} agora={agora} />
           {p.prazo && (
             <div className="text-right">
-              <p className={cn("text-lg font-bold tabular-nums", restante !== null && restante <= 60 ? "text-danger" : "text-text-primary")}>{duracao(restante)}</p>
-              <p className="text-[11px] text-text-muted">{p.prazo_de === "cliente" ? "para o cliente escolher" : "para os técnicos aceitarem"}{p.assincrono ? " · agendado com tempo" : ""}</p>
+              <p className={cn("text-lg font-semibold tabular-nums leading-6", restante !== null && restante <= 60 ? "text-danger" : "text-text-primary")}>{duracao(restante)}</p>
+              <p className="text-xs text-text-muted">{p.prazo_de === "cliente" ? "para o cliente escolher" : "para os técnicos aceitarem"}{p.assincrono ? " · agendado com tempo" : ""}</p>
             </div>
           )}
         </div>
-        <p className="mt-1 text-xs text-text-secondary tabular-nums">
+        <p className="mt-1 text-[13px] text-text-secondary tabular-nums">
           {p.convidados === 0
             ? "Ninguém convidado"
             : <>{p.aceitaram} de {p.convidados} aceitaram · {p.por_responder} por responder · {p.recusaram} recusaram · {p.expiraram} não responderam · onda {p.onda}</>}
         </p>
         {p.alerta && <AvisoDoAlerta alerta={p.alerta} />}
+        </div>
       </button>
     </li>
   );
+}
+
+/** O ponto à frente de cada pedido: a cor do alerta, ou nenhuma. */
+function Ponto({ alerta }: { alerta: Alerta | null }) {
+  return (
+    <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", alerta ? COR_ALERTA[alerta.nivel] : "bg-transparent")} aria-hidden />
+  );
+}
+
+/**
+ * "2026-10-15 10:00:00" → "15/10, 10:00".
+ *
+ * O backend manda a marcação como o cliente a escolheu: dia e hora de relógio
+ * de Lisboa, sem fuso. Lê-se o texto e não um `Date`, que a interpretaria no
+ * fuso de quem está a ver (e o Safari nem a aceita com espaço no meio).
+ */
+function formatarMarcacao(texto: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](?:00:00:00 )?(\d{2}):(\d{2}))?/.exec(texto.trim());
+  if (!m) return texto;
+  const [, , mes, dia, hh, mm] = m;
+  return hh ? `${dia}/${mes}, ${hh}:${mm}` : `${dia}/${mes}`;
 }
 
 function LinhaEmCurso({ p, agora, onAbrir }: { p: PedidoEmCurso; agora: number; onAbrir: (id: string) => void }) {
   return (
     <li>
       <button onClick={() => onAbrir(p.id)}
-        className={cn("w-full text-left card border-l-[3px] px-4 py-3 hover:shadow-elevated transition-shadow", p.alerta ? COR_ALERTA[p.alerta.nivel] : "border-l-surface-border")}>
+        className="w-full text-left px-4 py-3.5 hover:bg-surface-subtle/60 transition-colors flex gap-3">
+        <Ponto alerta={p.alerta} />
+        <div className="min-w-0 flex-1">
         <Cabecalho p={p} agora={agora} />
-        <p className="mt-1 text-xs text-text-secondary">
+        <p className="mt-1 text-[13px] text-text-secondary">
           {p.tecnico ?? "Sem técnico"}
           {p.chegou_em ? ` · no local há ${haQuanto(p.chegou_em, agora)}` : p.a_caminho_em ? ` · a caminho há ${haQuanto(p.a_caminho_em, agora)}` : ""}
         </p>
         {p.alerta && <AvisoDoAlerta alerta={p.alerta} />}
+        </div>
       </button>
     </li>
   );
@@ -287,7 +314,7 @@ function Desfechos({ liq }: { liq: Liquidez }) {
               <span className={cn("font-medium", d === "servido" ? "text-success" : d === "em_aberto" ? "text-text-secondary" : "text-text-primary")}>{DESFECHOS[d]}</span>
               <span className="tabular-nums text-text-secondary">{n} ({Math.round((n / total) * 100)}%)</span>
             </div>
-            <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
+            <div className="mt-1.5 h-1.5 rounded-full bg-surface-subtle overflow-hidden">
               <div className={cn("h-full rounded-full", d === "servido" ? "bg-success" : d === "em_aberto" ? "bg-surface-strong" : "bg-danger/70")} style={{ width: `${(n / total) * 100}%` }} />
             </div>
           </div>
