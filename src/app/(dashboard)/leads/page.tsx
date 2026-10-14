@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -408,7 +409,7 @@ function LeadsPageInner() {
         <div className="max-w-[300px]">
           {(catName || urgent) && (
             <div className="chip-row">
-              {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
+              {catName && <span className="inline-flex items-center rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">{catName}</span>}
               {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger">Urgente</span>}
             </div>
           )}
@@ -596,25 +597,16 @@ function LeadsPageInner() {
               dropdown de estado. Em chip, o mesmo filtro e as mesmas contagens
               cabem numa linha — e são o único sítio onde se escolhe o estado.
             */}
-            <div className="chip-row">
-              {([
-                { id: "" as const, label: "A trabalhar", total: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
-                ...LEAD_STAGES.map((s) => ({ id: s.id, label: s.label, total: baseFiltered.filter((l) => l.stage === s.id).length })),
-                { id: "todos" as const, label: "Todos", total: baseFiltered.length },
-              ]).map((c) => {
-                const active = leadStage === c.id;
-                return (
-                  <button key={c.id || "ativos"} onClick={() => setLeadStage(c.id)}
-                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
-                      active
-                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                    {c.label}
-                    <span className={cn("tabular-nums text-xs", active ? "opacity-80" : "text-text-muted")}>{c.total}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <Segmentado
+              ariaLabel="Estado dos contactos"
+              opcoes={[
+                { id: "" as const, label: "A trabalhar", count: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
+                ...LEAD_STAGES.map((st) => ({ id: st.id, label: st.label, count: baseFiltered.filter((l) => l.stage === st.id).length })),
+                { id: "todos" as const, label: "Todos", count: baseFiltered.length },
+              ]}
+              valor={leadStage}
+              onChange={setLeadStage}
+            />
             <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
               onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
               emptyMessage={hasActiveFilters ? "Nenhum contacto corresponde aos filtros." : "Sem contactos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />

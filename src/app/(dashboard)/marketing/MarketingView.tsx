@@ -216,7 +216,7 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
               </div>
 
               {diasSemDados != null && diasSemDados > 3 && (
-                <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-3 py-2">
+                <div className="aviso aviso-perigo px-3 py-2">
                   <p className="text-sm font-semibold text-danger">Dados parados há {diasSemDados} dias</p>
                   <p className="text-xs text-text-secondary mt-0.5">
                     O último dia com investimento registado é {spend?.to ? formatDate(spend.to) : "—"}. Enquanto a

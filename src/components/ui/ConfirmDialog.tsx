@@ -80,13 +80,13 @@ export function ConfirmDialog({
       size="sm"
       footer={
         <>
-          <button onClick={close} disabled={working} className="btn-secondary text-sm disabled:opacity-50">{cancelLabel}</button>
+          <button onClick={close} disabled={working} className="btn-secondary">{cancelLabel}</button>
           <button
             onClick={confirm}
             disabled={working || motivoCurto || naoEscreveu}
             className={cn(
-              "text-sm px-3 py-2 rounded-lg font-medium disabled:opacity-50",
-              tone === "danger" ? "bg-danger text-danger-on hover:opacity-90" : "bg-piquet text-ink hover:opacity-90"
+              "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none",
+              tone === "danger" ? "bg-danger text-danger-on hover:bg-danger/90" : "bg-piquet text-ink hover:bg-piquet-300"
             )}
           >
             {working ? "A processar…" : confirmLabel}

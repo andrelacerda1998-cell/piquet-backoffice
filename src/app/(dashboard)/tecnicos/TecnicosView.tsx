@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { Segmentado } from "@/components/ui/Segmentado";
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { DocumentPreview } from "@/components/ui/DocumentPreview";
 import { Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
@@ -24,8 +25,7 @@ import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
-import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -577,10 +577,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
 
   const topColumns: Column<TopVendor>[] = [
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
-    { key: "servicesCompleted", label: "Serviços" },
-    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
-    { key: "piquetRevenue", label: "Receita gerada", render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
+    { key: "servicesCompleted", label: "Serviços", className: "text-right" },
+    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0
+      ? <span className="inline-flex items-center gap-1"><span className="text-warning">★</span>{formatRating(r.averageRating)}</span>
+      : <span className="text-text-muted">—</span> },
+    { key: "piquetRevenue", label: "Receita gerada", className: "text-right", render: (r) => formatCurrency(r.piquetRevenue) },
+    { key: "amountReceived", label: "Valor recebido", className: "text-right", render: (r) => formatCurrency(r.amountReceived) },
   ];
 
   // Colunas do VendorResource::table() do Filament (nif/telefone/preço/
@@ -611,10 +613,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
       return <span title={`Subutilizador AT — ${ui.label}: ${ui.hint}`} className={cn("font-bold", ui.tone)}>{ui.symbol}</span>;
     } },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
+    /* Clicar na linha abre o perfil (saiu o botão "Ver perfil", que fazia o
+       mesmo). Suspender só aparece ao passar o rato: é a ação rara, e em
+       vermelho em todas as linhas era a palavra mais forte da lista. */
     { key: "acao", label: "", render: (r) => (
-      <div className="flex items-center justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); setProfileVendor(r); }} className="btn-secondary text-xs py-1">Ver perfil</button>
-        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); setParaSuspender(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+      <div className="flex items-center justify-end">
+        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); setParaSuspender(r); }} className="btn-ghost text-xs px-2 py-1 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Suspender</button>
       </div>
     ) },
   ];
@@ -666,20 +670,16 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
               abaixo diz onde estão os outros.
             */}
             {metrics && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <MetricCard title="Inscritos" hideDelta
-                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
-                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
-                        <MetricCard title="Prontos a trabalhar" hideDelta
-                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
-                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
-                        <MetricCard title="Online" hideDelta
-                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
-                            "Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo")} />
-                        <MetricCard title="Sem serviços" hideDelta
-                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
-                            "Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço")} />
-              </div>
+              <StatGroup cols={4}>
+                <Stat label="Inscritos" value={formatNumber(metrics.registered)}
+                  info="Todas as contas de técnico, incluindo quem nunca completou a inscrição" />
+                <Stat label="Prontos a trabalhar" value={formatNumber(metrics.eligible)}
+                  info="Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço" />
+                <Stat label="Online" value={formatNumber(metrics.online)}
+                  info="Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo" />
+                <Stat label="Sem serviços" value={formatNumber(metrics.noServices)}
+                  info="Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço" />
+              </StatGroup>
             )}
 
             {semWorkspace && semWorkspace.contagem.total > 0 && (
@@ -687,7 +687,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
             )}
 
             <div>
-              <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
+              <SectionHeader title="Top técnicos por receita gerada" />
               <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
             </div>
           </div>
@@ -729,21 +729,20 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                     Aprovar ou recusar avisa o técnico (email e notificação). <DemoBadge endpoint="/vendor-documents" />
                   </p>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  {([
+                <Segmentado
+                  className="shrink-0"
+                  ariaLabel="Estado dos documentos"
+                  opcoes={[
                     { id: "pending", label: "Por rever" },
                     { id: "approved", label: "Aprovados" },
                     { id: "declined", label: "Recusados" },
-                  ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
-                    <button key={s.id} onClick={() => setDocStatus(s.id)}
-                      className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
+                  ] as { id: VendorDocumentStatus; label: string }[]}
+                  valor={docStatus}
+                  onChange={setDocStatus}
+                />
               </div>
               {docsIncompletos > 0 && (
-                <p className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 px-3 py-2 text-xs text-text-secondary">
+                <p className="aviso aviso-atencao px-3 py-2 text-xs text-text-secondary">
                   O servidor não devolveu cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos. Um técnico
                   que pareça não ter entregado pode ter: confirma no perfil dele.
                 </p>
@@ -896,11 +895,11 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
 
         {tab === "lista" && (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                      <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1 ml-auto order-last">Criar conta de teste</button>
-                      <div className="chip-row">
-                        {([
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-64" placeholder="Pesquisar técnicos…" />
+                      <Segmentado
+                        ariaLabel="Filtrar técnicos"
+                        opcoes={([
                           { id: "", label: "Todos" },
                           { id: "validada", label: "AT validada" },
                           { id: "por_validar", label: "AT por validar" },
@@ -909,24 +908,20 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                           { id: "sem_nif", label: "Sem NIF" },
                           // Era um sub-separador à parte; é um filtro como os outros.
                           { id: "suspensos", label: "Suspensos" },
-                        ] as const).map((f) => (
-                          <button key={f.id} onClick={() => setAtFilter(f.id)}
-                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                              atFilter === f.id
-                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                            {f.label}
-                            {f.id && atFilter && (
-                              <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
-                                {f.id === "validada" ? atCounts.validada
-                                  : f.id === "por_validar" ? atCounts.por_validar
-                                  : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
-                                  : atCounts.sem_nif}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                        ] as const).map((f) => ({
+                          id: f.id,
+                          label: f.label,
+                          ...(f.id && atFilter ? {
+                            count: f.id === "validada" ? atCounts.validada
+                              : f.id === "por_validar" ? atCounts.por_validar
+                              : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
+                              : atCounts.sem_nif,
+                          } : {}),
+                        }))}
+                        valor={atFilter}
+                        onChange={setAtFilter}
+                      />
+                      <button onClick={openTestAccountModal} className="btn-ghost text-[13px] ml-auto">Criar conta de teste</button>
                     </div>
 
                     {atFilter === "suspensos" ? (
@@ -1178,7 +1173,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                   {/* Sem workspace não há fatura possível no fim do serviço --
                       é aviso a sério, e diz a razão que o backend dá. */}
                   {!temWorkspace && (
-                    <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+                    <div className="aviso aviso-atencao px-3 py-2">
                       <p className="text-sm text-text-secondary">
                         <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
                         {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
@@ -1390,7 +1385,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
       >
         {newTestVendor ? (
           <div className="space-y-3">
-            <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 p-3">
+            <div className="aviso aviso-atencao p-3">
               <p className="text-sm font-semibold text-text-primary">Guarda já esta password — só aparece agora.</p>
               <p className="text-xs text-text-secondary mt-0.5">Não fica recuperável depois de fechares esta janela.</p>
             </div>

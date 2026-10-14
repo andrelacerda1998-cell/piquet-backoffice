@@ -64,7 +64,7 @@ export function Sidebar() {
           <Link href="/" className="flex items-baseline gap-0.5">
             <span className="font-semibold text-[17px] tracking-tight text-text-primary">Piquet</span>
             <span className="text-piquet text-xl leading-none">.</span>
-            <span className="ml-2 rounded-md bg-surface-subtle px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">Gestão</span>
+            <span className="ml-2 rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-text-muted">Gestão</span>
           </Link>
         )}
         <button

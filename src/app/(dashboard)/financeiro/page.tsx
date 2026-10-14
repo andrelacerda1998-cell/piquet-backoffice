@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
 import { pedidoHref } from "@/lib/fichas";
@@ -636,7 +637,7 @@ export default function FinancePage() {
                       </button>
                     </div>
                     {treasury?.migracaoEmFalta && (
-                      <div className="mb-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-2.5 text-xs text-text-secondary">
+                      <div className="mb-3 aviso aviso-atencao px-4 py-2.5 text-xs text-text-secondary">
                         Falta aplicar a migração <code>20260821100000_treasury_balances.sql</code> no
                         Supabase — até lá o saldo não pode ser guardado.
                       </div>
@@ -703,20 +704,16 @@ export default function FinancePage() {
               {/* Uma fatura paga sai da lista de trabalho; fica em "Pagas" para
                   se poder corrigir uma marcação errada. */}
               <div className="flex flex-wrap items-center gap-2">
-                {([
-                  { id: "abertas", label: "Por pagar", count: invoices.length - paidInvoices.length },
-                  { id: "pagas", label: "Pagas", count: paidInvoices.length },
-                  { id: "todas", label: "Todas", count: invoices.length },
-                ] as const).map((v) => (
-                  <button key={v.id} onClick={() => setInvoiceView(v.id)}
-                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                      invoiceView === v.id
-                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                    {v.label}
-                    <span className={cn("tabular-nums text-xs", invoiceView === v.id ? "opacity-80" : "text-text-muted")}>{v.count}</span>
-                  </button>
-                ))}
+                <Segmentado
+                  ariaLabel="Faturas"
+                  opcoes={[
+                    { id: "abertas" as const, label: "Por pagar", count: invoices.length - paidInvoices.length },
+                    { id: "pagas" as const, label: "Pagas", count: paidInvoices.length },
+                    { id: "todas" as const, label: "Todas", count: invoices.length },
+                  ]}
+                  valor={invoiceView}
+                  onChange={setInvoiceView}
+                />
                 {invoiceView === "pagas" && (
                   <span className="text-xs text-text-muted">Marcada por engano? Usa &ldquo;Reabrir&rdquo; para voltar a pendente.</span>
                 )}

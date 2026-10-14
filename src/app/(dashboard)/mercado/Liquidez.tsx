@@ -20,7 +20,7 @@ export default function Liquidez() {
   return (
           <div className="space-y-6">
             {opErro && (
-              <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-4 py-3">
+              <div className="aviso aviso-perigo px-4 py-3">
                 <p className="text-sm font-semibold text-danger">Não foi possível medir a operação</p>
                 <p className="text-xs text-text-secondary mt-0.5">{opErro}</p>
               </div>

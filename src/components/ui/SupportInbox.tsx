@@ -227,7 +227,7 @@ export function SupportInbox() {
         Por isso diz-se.
       */}
       {data?.avisoTecnicos && (
-        <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
+        <div className="rounded-xl border border-warning/30 bg-warning-light px-3 py-2">
           <p className="text-sm font-semibold text-warning">Faltam aqui os tickets dos técnicos</p>
           <p className="text-xs text-text-secondary mt-0.5">
             {data.avisoTecnicos} Até isto ficar resolvido, só se veem no Filament — e é lá que chegam as
@@ -323,7 +323,7 @@ export function SupportInbox() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wide text-text-muted">
+                <tr className="border-b border-surface-border bg-surface-subtle/60 text-left text-xs text-text-muted">
                   {/*
                     Cinco colunas. O tempo vive dentro do Assunto e o ícone de
                     origem dentro do De — como colunas próprias empurravam a
@@ -347,11 +347,13 @@ export function SupportInbox() {
                       key={t.id}
                       onClick={() => setSelectedId(t.id)}
                       className={cn(
-                        "group border-b border-surface-border/60 last:border-0 cursor-pointer hover:bg-surface-muted transition-colors",
+                        "group border-b border-surface-border/70 last:border-0 cursor-pointer hover:bg-surface-subtle/60 transition-colors",
                         // Quem espera há mais de um dia sem resposta fica
                         // marcado na própria linha — não basta estar escrito
-                        // numa coluna que se lê de passagem.
-                        espera.tipo === "sem_resposta" && espera.urgente && "bg-danger-light/30",
+                        // numa coluna que se lê de passagem. Um traço vermelho
+                        // à esquerda e não a linha toda pintada: com três
+                        // tickets assim, a tabela ficava às riscas.
+                        espera.tipo === "sem_resposta" && espera.urgente && "shadow-[inset_3px_0_0_0_rgb(var(--danger))]",
                       )}
                     >
                       {/*

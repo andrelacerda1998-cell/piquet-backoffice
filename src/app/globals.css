@@ -175,6 +175,19 @@
   .chip-row > * {
     @apply shrink-0;
   }
+  /*
+   * Avisos dentro das páginas ("faltam 3 faturas", "esta campanha está a
+   * gastar sem converter"). Um contorno fino e o fundo do tom, sem a barra
+   * grossa à esquerda: havia 21 variantes da mesma caixa, cada uma com a sua
+   * opacidade, e todas a parecer mais alarmantes do que eram.
+   */
+  .aviso {
+    @apply rounded-xl border px-4 py-3 text-sm text-text-primary;
+  }
+  .aviso-atencao { @apply border-warning/30 bg-warning-light; }
+  .aviso-perigo { @apply border-danger/30 bg-danger-light; }
+  .aviso-sucesso { @apply border-success/30 bg-success-light; }
+  .aviso-info { @apply border-info/30 bg-info-light; }
   .input-field {
     @apply w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted transition-colors hover:border-surface-strong focus:border-piquet focus:outline-none focus:ring-2 focus:ring-piquet/25;
   }

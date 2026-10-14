@@ -223,7 +223,7 @@ export function Vouchers() {
       </div>
 
       {error && (
-        <p className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-3 py-2 text-sm text-danger">
+        <p className="aviso aviso-perigo px-3 py-2 text-sm text-danger">
           {error || "Não foi possível ler os vouchers."}
         </p>
       )}

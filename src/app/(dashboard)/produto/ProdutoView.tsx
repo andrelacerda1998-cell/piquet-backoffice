@@ -14,7 +14,7 @@ import {
   type StoreRatingInfo, type CustoDownloadApp, type CustoDownload,
 } from "@/services/backofficeService";
 import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatNumber, formatCurrency } from "@/lib/formatters";
+import { formatDate, formatNumber, formatCurrency, formatRating } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { Star, AlertTriangle, Filter, ArrowDownRight } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
@@ -139,8 +139,8 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay,
         </div>
       </div>
       <div className="flex items-center gap-4 border-t border-surface-border px-5 py-2 text-[11px] text-text-muted">
-        <span>App Store {appStore ? `${appStore.rating.toFixed(1)}★` : "—"}</span>
-        <span>Google Play {googlePlay ? `${googlePlay.rating.toFixed(1)}★` : "—"}</span>
+        <span>App Store {appStore ? `${formatRating(appStore.rating)}★` : "—"}</span>
+        <span>Google Play {googlePlay ? `${formatRating(googlePlay.rating)}★` : "—"}</span>
       </div>
     </div>
   );

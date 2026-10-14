@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatNumber, formatCurrency } from "./formatters";
+import { formatNumber, formatCurrency, formatRating } from "./formatters";
 
 describe("agrupamento dos milhares", () => {
   /**
@@ -28,5 +28,18 @@ describe("agrupamento nos valores em euros", () => {
     // Via-se "8596,72 €" ao lado de "42 296,66 €" na mesma coluna.
     expect(formatCurrency(8596.72)).toMatch(/^8\s596,72/);
     expect(formatCurrency(42296.66)).toMatch(/^42\s296,66/);
+  });
+});
+
+describe("formatRating", () => {
+  it("uma casa, com vírgula, sem o lixo do vírgula flutuante", () => {
+    expect(formatRating(4.800000000000001)).toBe("4,8");
+    expect(formatRating(4.66666)).toBe("4,7");
+    expect(formatRating(5)).toBe("5,0");
+  });
+  it("sem avaliação, um traço", () => {
+    expect(formatRating(null)).toBe("—");
+    expect(formatRating(0)).toBe("—");
+    expect(formatRating(Number.NaN)).toBe("—");
   });
 });

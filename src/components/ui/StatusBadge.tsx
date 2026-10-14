@@ -11,10 +11,13 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const displayLabel = label ?? SERVICE_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
+  const bruto = label ?? SERVICE_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
+  // Só a primeira letra: o `capitalize` do CSS punha maiúscula em todas as
+  // palavras ("Cancelado Pelo Cliente").
+  const displayLabel = bruto.charAt(0).toUpperCase() + bruto.slice(1);
   return (
-    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(status), className)}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap", getStatusColor(status), className)}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {displayLabel}
     </span>
   );
@@ -40,7 +43,7 @@ export function AlertTypeBadge({ type }: { type: string }) {
     produto: "Produto",
   };
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-subtle text-text-secondary">
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-surface-subtle text-text-muted">
       {labels[type] ?? type}
     </span>
   );

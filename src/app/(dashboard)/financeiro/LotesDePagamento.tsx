@@ -118,7 +118,7 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
   return (
     <div className="space-y-6">
       {data && !data.ativo && (
-        <p className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 px-4 py-3 text-sm text-text-secondary">
+        <p className="aviso aviso-atencao px-4 py-3 text-sm text-text-secondary">
           Os lotes de pagamento ainda não estão ativos: falta aplicar a migração <code>20261008120000_payout_lotes</code> no Supabase.
         </p>
       )}

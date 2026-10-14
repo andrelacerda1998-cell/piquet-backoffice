@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Segmentado } from "@/components/ui/Segmentado";
 import { UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -23,7 +24,7 @@ import { CreditCard, Smartphone, Trash2 } from "lucide-react";
 import { getLeads, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
 import { getServices } from "@/services/dashboardService";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatDate, formatCurrency, getStatusColor } from "@/lib/formatters";
+import { formatDate, formatCurrency, getStatusColor, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
@@ -272,8 +273,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
       return city && city !== "—" ? <span className="text-text-secondary">{city}</span> : <span className="text-text-muted">—</span>;
     } },
     { key: "origem", label: "Origem", render: (r) => (
-      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        r.kind === "customer" ? "bg-piquet/12 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
+      <span className="inline-flex items-center rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
         {r.kind === "customer" ? "App" : origemLabel(r.lead.source)}
       </span>
     ) },
@@ -281,20 +281,25 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
       r.customer.blocked_at
         ? <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-xs font-medium text-danger">Bloqueado</span>
         : <span title={r.customer.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
-            className={cn("font-bold", r.customer.can_request_service ? "text-success" : "text-text-muted")}>{r.customer.can_request_service ? "✓" : "—"}</span>
+            className={cn("inline-flex items-center gap-1.5 text-[13px]", r.customer.can_request_service ? "text-text-secondary" : "text-text-muted")}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", r.customer.can_request_service ? "bg-success" : "bg-surface-strong")} />
+            {r.customer.can_request_service ? "Pode pedir" : "Não pode"}
+          </span>
     ) : (
       <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.lead.stage))}>{LEAD_STAGE_LABEL[r.lead.stage] ?? r.lead.stage}</span>
     ) },
     { key: "date", label: "Registo", render: (r) => r.date ? formatDate(r.date) : "—" },
     { key: "acao", label: "", render: (r) => r.kind === "customer" ? (
       r.customer.blocked_at
-        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
-        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); setParaBloquear(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
+        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="btn-ghost text-xs px-2 py-1 text-success">Reativar</button>
+        // Bloquear só aparece ao passar o rato: em vermelho em todas as linhas
+        // era a palavra mais forte da lista, e é a ação mais rara.
+        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); setParaBloquear(r.customer); }} className="btn-ghost text-xs px-2 py-1 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Bloquear</button>
     ) : (
       // A lead não se gere aqui — abre-se no CRM, o dono do pipeline. Evita
       // duplicar eliminação/estado nesta tabela (que é só um diretório).
       <a href={`/leads?lead=${r.lead.id}`} onClick={(e) => e.stopPropagation()}
-        className="text-xs text-piquet-700 hover:underline inline-flex items-center gap-1">
+        className="btn-ghost text-xs px-2 py-1">
         Abrir no CRM <ArrowUpRight className="h-3.5 w-3.5" />
       </a>
     ) },
@@ -321,7 +326,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
           subtitle={allCustomers ? `${allCustomers.length} clientes registados` : "Encontrar uma pessoa e ver tudo o que se passou com ela"}
           actions={
-            <a href="/leads" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+            <a href="/leads" className="btn-secondary">
               <UserPlus className="h-4 w-4" /> Contactos
             </a>
           }
@@ -339,28 +344,18 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar nome, telefone, cidade..." />
-                      <div className="chip-row">
-                        {([
-                          { id: "", label: "Todos" },
-                          { id: "pode", label: "Podem pedir serviços" },
-                          { id: "nao_pode", label: "Não podem" },
-                        ] as const).map((f) => (
-                          <button key={f.id} onClick={() => { setReqFilter(f.id); setPage(1); }}
-                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                              reqFilter === f.id
-                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                            {f.label}
-                            {f.id && reqFilter && (
-                              <span className={cn("tabular-nums text-xs", reqFilter === f.id ? "opacity-80" : "text-text-muted")}>
-                                {f.id === "pode" ? reqCounts.pode : reqCounts.nao_pode}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                      <Segmentado
+                        ariaLabel="Quem pode pedir serviços"
+                        opcoes={[
+                          { id: "" as const, label: "Todos" },
+                          { id: "pode" as const, label: "Podem pedir serviços", ...(reqFilter ? { count: reqCounts.pode } : {}) },
+                          { id: "nao_pode" as const, label: "Não podem", ...(reqFilter ? { count: reqCounts.nao_pode } : {}) },
+                        ]}
+                        valor={reqFilter}
+                        onChange={(v) => { setReqFilter(v); setPage(1); }}
+                      />
                     </div>
-                    <p className="text-sm text-text-secondary">
+                    <p className="text-[13px] text-text-muted">
                       <b className="text-text-primary tabular-nums">{unifiedRows.length}</b> {unifiedRows.length === 1 ? "registo" : "registos"}
                       {" · "}clientes da app e leads (landing / WhatsApp) juntos. Clica num cliente para abrir o perfil.
                     </p>
@@ -481,7 +476,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
                           {formatDate(sv.completedAt ?? sv.requestedAt)}
                           {sv.technicianName && ` · ${sv.technicianName}`}
                           {sv.city && ` · ${sv.city}`}
-                          {sv.rating ? ` · ${sv.rating}★` : ""}
+                          {sv.rating ? ` · ${formatRating(sv.rating)}★` : ""}
                           {sv.hasComplaint && " · com reclamação"}
                         </p>
                       </div>

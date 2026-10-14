@@ -13,7 +13,7 @@ import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getServices, getDetalheDoServico } from "@/services/dashboardService";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatRating } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { downloadCsv } from "@/lib/utils";
 import { toast } from "@/stores";
@@ -24,6 +24,7 @@ import { USE_REAL_API } from "@/services/api";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Segmentado } from "@/components/ui/Segmentado";
 import type { ServiceRequest, ServiceStatus } from "@/types";
 import { ESTADOS_SIMPLES, PRECISA_DE_ATENCAO, atencaoPrimeiro, precisaDeAtencao, rotuloSimples } from "@/lib/estados";
 import { pedidoHref } from "@/lib/fichas";
@@ -203,7 +204,7 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     // Secundárias: em "Colunas".
     { key: "matching", label: "Convidados", hidden: true, render: (r) => <ColunaMatching matching={r.matching} /> },
     { key: "rating", label: "Avaliação", hidden: true, render: (r) => r.rating
-      ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
+      ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{formatRating(r.rating)}</span></span>
       : <span className="text-text-muted">—</span> },
     { key: "piquetRevenue", label: "Comissão", hidden: true, render: (r) => formatCurrency(r.piquetRevenue) },
     // As ações de cada linha: ligar, WhatsApp e copiar o n.º, sem abrir o pedido.
@@ -253,26 +254,12 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
                   columnToggle
                   toolbar={<>
                     <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-64" placeholder="N.º, cliente, telefone, técnico…" />
-                    {/* As vistas: um seletor segmentado, como as sub-abas. */}
-                    <div className="inline-flex max-w-full gap-0.5 rounded-lg bg-surface-subtle p-0.5 overflow-x-auto tira-deslizante" role="tablist" aria-label="Vistas rápidas">
-                      {VISTAS.map((v) => {
-                        const ativa = vista === v.id;
-                        const alerta = v.id === "atencao" && quantosComAtencao > 0;
-                        return (
-                          <button
-                            key={v.id}
-                            role="tab"
-                            aria-selected={ativa}
-                            onClick={() => { setVista(v.id); setPage(1); }}
-                            className={cn("inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-colors",
-                              ativa ? "bg-surface text-text-primary shadow-card ring-1 ring-surface-border" : "text-text-secondary hover:text-text-primary")}
-                          >
-                            {v.label}
-                            {alerta && <span className="rounded-full bg-danger/15 px-1.5 text-[11px] font-semibold tabular-nums text-danger">{quantosComAtencao}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <Segmentado
+                      ariaLabel="Vistas rápidas"
+                      opcoes={VISTAS.map((v) => ({ id: v.id, label: v.label, ...(v.id === "atencao" ? { count: quantosComAtencao, tom: "alerta" as const } : {}) }))}
+                      valor={vista}
+                      onChange={(v) => { setVista(v); setPage(1); }}
+                    />
                     <FilterBar />
                   </>}
                   actions={<ExportButton onExport={handleExport} label="Exportar" />}

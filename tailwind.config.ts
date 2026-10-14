@@ -47,18 +47,14 @@ const config: Config = {
           secondary: "rgb(var(--text-secondary) / <alpha-value>)",
           muted: "rgb(var(--text-muted) / <alpha-value>)",
         },
-        // Sidebar / superfícies escuras
+        // Superfícies escuras fixas (o painel do login) e o texto sobre o dourado.
+        // A barra lateral deixou de as usar no redesenho de 14/10/2026: segue o tema.
         ink: {
           DEFAULT: "#1C1A17",
           deep: "#141109",
           soft: "#272219",
           border: "#3D362A",
           muted: "#8C8477",
-          // Vermelho das bolinhas da barra lateral. Fixo de propósito: a barra
-          // é sempre escura, não segue o tema, por isso não pode usar o
-          // `danger` do tema — no claro esse tom é escurecido para se ler sobre
-          // branco e, sobre a barra preta, uma bolinha escura não se vê.
-          alert: "#D6503B",
         },
       },
       boxShadow: {

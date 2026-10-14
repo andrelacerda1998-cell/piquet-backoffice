@@ -32,6 +32,16 @@ export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }
 
+/**
+ * Uma avaliação (média de estrelas) com uma casa e vírgula: "4,8". Uma média
+ * vinda da base de dados chegava ao ecrã como "4.800000000000001★".
+ * Sem avaliação (null, 0 ou NaN), um traço.
+ */
+export function formatRating(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return "—";
+  return (Math.round(value * 10) / 10).toLocaleString("pt-PT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 export function formatPercent(value: number): string {
   return `${decimalFormatter.format(value)}%`;
 }

@@ -24,18 +24,11 @@ export function AlertCard({ alert, onAction, compact }: AlertCardProps) {
   const iconColor = {
     critica: "text-danger",
     alta: "text-warning",
-    media: "text-yellow-600",
+    media: "text-piquet-600",
     baixa: "text-text-muted",
   }[alert.priority] ?? "text-text-muted";
-  const accent = {
-    critica: "border-l-danger",
-    alta: "border-l-warning",
-    media: "border-l-piquet",
-    baixa: "border-l-surface-strong",
-  }[alert.priority] ?? "border-l-surface-strong";
-
   return (
-    <div className={cn("card border-l-[3px] p-4 flex gap-3", accent, compact && "p-3")}>
+    <div className={cn("card p-4 flex gap-3", compact && "p-3")}>
       <Icon className={cn("h-5 w-5 shrink-0 mt-0.5", iconColor)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-1">
@@ -86,10 +79,12 @@ export function LoadingState({ message = "A carregar..." }: { message?: string }
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <AlertTriangle className="h-10 w-10 text-danger mb-3" />
-      <p className="text-sm text-text-primary font-medium">{message}</p>
+      <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-danger-light text-danger">
+        <AlertTriangle className="h-5 w-5" />
+      </span>
+      <p className="text-sm text-text-primary font-medium max-w-md">{message}</p>
       {onRetry && (
-        <button onClick={onRetry} className="btn-primary mt-4 text-sm">
+        <button onClick={onRetry} className="btn-secondary mt-4">
           Tentar novamente
         </button>
       )}
@@ -100,8 +95,10 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 export function PermissionDenied() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="h-12 w-12 text-warning mb-4" />
-      <p className="text-lg font-medium text-text-primary">Permissão insuficiente</p>
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-warning-light text-warning">
+        <AlertCircle className="h-6 w-6" />
+      </span>
+      <p className="text-base font-semibold text-text-primary">Permissão insuficiente</p>
       <p className="text-sm text-text-secondary mt-1">Não tem acesso a esta secção.</p>
     </div>
   );

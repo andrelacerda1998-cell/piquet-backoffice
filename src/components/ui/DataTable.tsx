@@ -298,7 +298,8 @@ export function DataTable<T extends object>({
                     <tr
                       key={key}
                       className={cn(
-                        "border-b border-surface-border/70 last:border-0 transition-colors",
+                        // `group`: as ações de linha podem aparecer só ao passar o rato.
+                        "group border-b border-surface-border/70 last:border-0 transition-colors",
                         onRowClick && "cursor-pointer hover:bg-surface-subtle/60",
                         selected.has(key) && "bg-piquet/5"
                       )}

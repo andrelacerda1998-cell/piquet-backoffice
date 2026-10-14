@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -214,35 +215,29 @@ export function Anuncios({
     <div className="space-y-3">
       {/* Um cabeçalho só: filtro, atualizar e criar. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5">
-          {([
-            { id: "todas" as const, label: "Todas", n: anuncios.length },
-            { id: "meta" as const, label: "Meta", n: contagem("meta") },
-            { id: "google" as const, label: "Google", n: contagem("google") },
-          ]).map((o) => (
-            <button key={o.id} onClick={() => setFiltro(o.id)}
-              className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                filtro === o.id
-                  ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                  : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-              {o.label}
-              <span className={cn("tabular-nums text-xs", filtro === o.id ? "opacity-80" : "text-text-muted")}>{o.n}</span>
-            </button>
-          ))}
-        </div>
+        <Segmentado
+          ariaLabel="Plataforma"
+          opcoes={[
+            { id: "todas" as const, label: "Todas", count: anuncios.length },
+            { id: "meta" as const, label: "Meta", count: contagem("meta") },
+            { id: "google" as const, label: "Google", count: contagem("google") },
+          ]}
+          valor={filtro}
+          onChange={setFiltro}
+        />
         <div className="flex items-center gap-2">
           <SearchInput value={busca} onChange={setBusca} className="w-56" placeholder="Campanha ou anúncio…" />
-          <button onClick={recarregar} className="btn-secondary text-sm" title="Voltar a ler das plataformas">
+          <button onClick={recarregar} className="btn-ghost" title="Voltar a ler das plataformas" aria-label="Voltar a ler das plataformas">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           </button>
-          <button onClick={onCriar} className="btn-primary text-sm">
+          <button onClick={onCriar} className="btn-primary">
             <Plus className="h-4 w-4" /> Criar anúncio
           </button>
         </div>
       </div>
 
       {erros.map((e) => (
-        <div key={e.p} className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/30 px-4 py-2.5">
+        <div key={e.p} className="aviso aviso-perigo px-4 py-2.5">
           <p className="text-sm font-medium text-text-primary flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-danger" /> {e.p} não respondeu
           </p>
