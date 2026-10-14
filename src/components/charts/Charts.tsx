@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Painel } from "@/components/ui/Painel";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, Sector,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label,
@@ -23,21 +24,11 @@ interface ChartCardProps {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-export function ChartCard({ title, subtitle, children, className, action, icon: Icon }: ChartCardProps) {
+export function ChartCard({ title, subtitle, children, className, action, icon }: ChartCardProps) {
   return (
-    <div className={cn("card p-4", className)}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-start gap-2.5 min-w-0">
-          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />}
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary leading-tight">{title}</h3>
-            {subtitle && <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>}
-          </div>
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
+    <Painel titulo={title} descricao={subtitle} aside={action} icon={icon} className={className}>
       {children}
-    </div>
+    </Painel>
   );
 }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Map as MapIcon } from "lucide-react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
