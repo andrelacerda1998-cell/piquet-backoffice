@@ -55,7 +55,7 @@ export function Stat({ label, value, note, tone, info, children }: {
     <div className="bg-surface px-4 py-3.5 min-w-0">
       <p className="flex items-center gap-1.5 text-[13px] text-text-secondary">
         <span className="truncate">{label}</span>
-        {info && <InfoTip texto={info} />}
+        {info && <InfoTip texto={info} lado="esquerda" />}
       </p>
       <p className={cn("mt-1 text-[22px] leading-7 font-semibold tracking-tight tabular-nums",
         tone === "mau" ? "text-danger" : tone === "bom" ? "text-success" : value === "—" ? "text-text-muted" : "text-text-primary")}>

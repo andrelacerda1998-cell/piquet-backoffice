@@ -37,7 +37,7 @@ export function PainelDeIntegracoes() {
             ))}
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Pipelines de dados</p>
+              <p className="text-sm font-semibold text-text-primary mb-3">Pipelines de dados</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(health?.jobs ?? []).map((j) => {
                   const estado = j.estado ?? (j.lastRunOk === null ? "nunca" : j.lastRunOk ? "ok" : "falha");
@@ -75,7 +75,7 @@ export function PainelDeIntegracoes() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Credenciais configuradas</p>
+              <p className="text-sm font-semibold text-text-primary mb-3">Credenciais configuradas</p>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(health?.configured ?? {}).map(([name, on]) => (
                   <span key={name} className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",

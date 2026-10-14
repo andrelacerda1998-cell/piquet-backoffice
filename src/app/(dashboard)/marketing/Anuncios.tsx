@@ -68,7 +68,7 @@ const CANAL: Record<string, string> = {
 /** Selo da plataforma — a cor distingue-as sem precisar de ler. */
 function Selo({ p }: { p: Plataforma }) {
   return (
-    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide",
+    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-medium",
       p === "meta" ? "bg-piquet/15 text-piquet-700" : "bg-info-light text-info")}>
       {p === "meta" ? "Meta" : "Google"}
     </span>

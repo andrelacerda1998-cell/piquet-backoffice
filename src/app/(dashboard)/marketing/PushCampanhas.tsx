@@ -130,7 +130,7 @@ export function PushCampanhas() {
                   { r: "Saíram", v: formatNumber(c.stats.saidas) },
                 ].map((m) => (
                   <div key={m.r}>
-                    <p className="text-[11px] uppercase tracking-[0.08em] text-text-muted font-semibold">{m.r}</p>
+                    <p className="text-xs font-medium text-text-muted">{m.r}</p>
                     <p className="text-sm font-semibold text-text-primary tabular-nums mt-0.5">{m.v}</p>
                   </div>
                 ))}

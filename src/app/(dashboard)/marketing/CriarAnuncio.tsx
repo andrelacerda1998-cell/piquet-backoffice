@@ -318,7 +318,7 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
 
             {/* Pré-visualização — aproximada, não o render da Meta. */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Pré-visualização</p>
+              <p className="text-sm font-semibold text-text-primary">Pré-visualização</p>
               <div className="card overflow-hidden max-w-sm">
                 {imagem ? (
                   <Image src={imagem.url} alt="Criativo" width={400} height={300} unoptimized className="w-full object-cover" />

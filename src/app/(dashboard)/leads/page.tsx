@@ -502,7 +502,7 @@ function LeadsPageInner() {
             {motivosPerda.some((m) => m.id !== "sem_motivo") && (
               <div className="card p-4">
                 <div className="flex items-baseline justify-between gap-3 mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                  <p className="text-sm font-semibold text-text-primary">
                     Porque se perderam
                   </p>
                   <p className="text-[11px] text-text-muted">
@@ -699,7 +699,7 @@ function LeadsPageInner() {
                   mostrava um telefone e mais nada, e nem o estado se via.
                 */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Estado</p>
+                  <p className="text-xs font-medium text-text-muted">Estado</p>
                   <p className="mt-0.5">
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                       getStatusColor(viewing.stage))}>
@@ -708,7 +708,7 @@ function LeadsPageInner() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                  <p className="text-xs font-medium text-text-muted">Serviço</p>
                   {catName || service ? (
                     <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
                   ) : (
@@ -723,13 +723,13 @@ function LeadsPageInner() {
                 </div>
                 {urgency && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Urgência</p>
+                    <p className="text-xs font-medium text-text-muted">Urgência</p>
                     <p className={cn("text-sm mt-0.5", urgent ? "text-danger font-medium" : "text-text-primary")}>{urgency}</p>
                   </div>
                 )}
                 {viewing.city && viewing.city !== "—" && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Cidade</p>
+                    <p className="text-xs font-medium text-text-muted">Cidade</p>
                     <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5 text-text-muted" /> {viewing.city}
                     </p>
@@ -737,7 +737,7 @@ function LeadsPageInner() {
                 )}
                 {viewing.phone && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Telefone</p>
+                    <p className="text-xs font-medium text-text-muted">Telefone</p>
                     <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-2">
                       <Phone className="h-3.5 w-3.5 text-text-muted" /> {viewing.phone}
                       {waNumero && (
@@ -766,7 +766,7 @@ function LeadsPageInner() {
                 precisa.
               */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
+                <p className="text-xs font-medium text-text-muted mb-1">
                   {descricao || !mostrarCrua ? "Descrição" : "Mensagem recebida"}
                 </p>
                 {descricao ? (
@@ -784,7 +784,7 @@ function LeadsPageInner() {
               {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (
                 <div className="rounded-xl border border-surface-border p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
+                  <p className="text-xs font-medium text-text-muted mb-1">Observações internas</p>
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}

@@ -102,7 +102,7 @@ export default function PedidosPersonalizados() {
                 <span className="text-text-secondary">{ESTADO[aberto.status].nota}</span>
               </div>
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-2">O que o cliente pediu</h3>
+                <h3 className="text-sm font-semibold text-text-primary mb-2">O que o cliente pediu</h3>
                 <p className="text-sm text-text-primary whitespace-pre-line">{aberto.description || "Sem descrição."}</p>
               </section>
               <dl className="grid grid-cols-2 gap-3 text-sm">

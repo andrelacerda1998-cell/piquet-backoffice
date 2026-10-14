@@ -26,7 +26,7 @@ import {
 import { toast } from "@/stores";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, FileCheck2, Settings, Pencil } from "lucide-react";
+import { Plus, FileCheck2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 import CatalogPage from "./_tabs/catalogo";
@@ -86,7 +86,7 @@ export default function ConfiguracaoPage() {
           <div className="space-y-8">
             <PainelDeIntegracoes />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Notificações enviadas</p>
+              <p className="text-sm font-semibold text-text-primary mb-3">Notificações enviadas</p>
               <NotificacoesTab />
             </div>
           </div>

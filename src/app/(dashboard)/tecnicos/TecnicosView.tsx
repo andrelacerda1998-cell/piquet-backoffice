@@ -1080,7 +1080,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* ------------------------- Documentos ------------------------- */}
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Documentos obrigatórios</p>
+                  <p className="text-sm font-semibold text-text-primary">Documentos obrigatórios</p>
                   {REQUIRED_DOCS.map((req) => {
                     const st = states?.[req.key] ?? "em_falta";
                     const ui = DOC_STATE_UI[st];
@@ -1145,7 +1145,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                 */}
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Faturação e dados</p>
+                    <p className="text-sm font-semibold text-text-primary">Faturação e dados</p>
                     <div className="flex items-center gap-2">
                       {at === "validado" ? (
                         <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
@@ -1313,12 +1313,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                     serviço vindo de quem os executa.
                   */}
                   <div className="pt-1">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Notas internas</p>
+                    <p className="text-sm font-semibold text-text-primary mb-1">Notas internas</p>
                     <NotasInternas entidade="tecnico" id={String(v.id)} focar={focarNota} />
                   </div>
 
                   <div className="pt-1">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Histórico da equipa</p>
+                    <p className="text-sm font-semibold text-text-primary mb-1">Histórico da equipa</p>
                     <HistoricoDaEquipa entidade="tecnico" id={String(v.id)} />
                   </div>
 

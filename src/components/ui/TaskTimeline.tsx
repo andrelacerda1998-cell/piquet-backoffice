@@ -164,7 +164,7 @@ export function TaskTimeline({ tasks }: { tasks: PersonalTask[] }) {
       {/* Sem prazo: ficam à vista, senão desaparecem do planeamento */}
       {semPrazo.length > 0 && (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Sem prazo definido</p>
+          <p className="text-sm font-semibold text-text-primary mb-2">Sem prazo definido</p>
           <div className="flex flex-wrap gap-2">
             {semPrazo.map((t) => (
               <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border border-surface-border px-2.5 py-1 text-xs text-text-secondary">

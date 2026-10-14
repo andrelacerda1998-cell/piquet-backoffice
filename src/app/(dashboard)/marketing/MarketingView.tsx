@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { useState, useMemo } from "react";
 import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -158,19 +159,7 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
           Dentro de Crescimento o título é o da página; fica só o botão de
           atualizar os anúncios, que é deste separador.
         */}
-        {embutido ? (
-          <div className="flex justify-end">
-            <button
-              onClick={atualizarAnuncios}
-              disabled={aAtualizar}
-              className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-              title="Vai buscar já o desempenho ao Meta e ao Google, sem esperar pelo cron diário"
-            >
-              <RefreshCw className={cn("h-4 w-4", aAtualizar && "animate-spin")} />
-              {aAtualizar ? "A atualizar…" : "Atualizar anúncios"}
-            </button>
-          </div>
-        ) : (
+        {embutido ? null : (
           <PageHeader
             title="Marketing"
             subtitle="O que se gastou em anúncios, quando, e o que rendeu"
@@ -191,7 +180,25 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
         {/* Anúncios sem dados: lembrete de gestão, aqui e não na fila da Visão Geral. */}
         <LembretesDaArea rota="/crescimento" />
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        {/*
+          As sub-abas num seletor segmentado (o separador de cima já é uma
+          barra sublinhada: dois níveis iguais confundiam-se), e o "Atualizar
+          anúncios" na mesma faixa -- sozinho numa linha parecia um engano.
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs tabs={TABS} active={tab} onChange={setTab} variant="pill" />
+          {embutido && (
+            <button
+              onClick={atualizarAnuncios}
+              disabled={aAtualizar}
+              className="btn-ghost text-[13px]"
+              title="Vai buscar já o desempenho ao Meta e ao Google, sem esperar pelo cron diário"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", aAtualizar && "animate-spin")} />
+              {aAtualizar ? "A atualizar…" : "Atualizar anúncios"}
+            </button>
+          )}
+        </div>
 
         {tab === "campanhas" && (
           <div className="space-y-6">
@@ -200,8 +207,8 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
             <div className="card p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="font-semibold text-text-primary">Investimento em anúncios</h2>
-                  <p className="text-xs text-text-secondary">
+                  <h2 className="text-sm font-semibold text-text-primary">Investimento em anúncios</h2>
+                  <p className="text-[13px] text-text-muted">
                     Meta e Google, dia a dia
                     {spend?.from && spend?.to && ` · de ${formatDate(spend.from)} a ${formatDate(spend.to)}`}
                   </p>
@@ -231,27 +238,27 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <p className="text-xs text-text-secondary">Investido</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">{formatCurrency(resumo.spend)}</p>
+                    <p className="text-[13px] text-text-secondary">Investido</p>
+                    <p className="mt-1 text-[22px] leading-7 font-semibold tracking-tight text-text-primary tabular-nums">{formatCurrency(resumo.spend)}</p>
                     {mesesSelecionados.length > 1 && (
                       <p className="text-[11px] text-text-muted">{formatCurrency(resumo.media)}/mês em média</p>
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary">Campanhas a correr</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">{campanhasAtivas.length}</p>
+                    <p className="text-[13px] text-text-secondary">Campanhas a correr</p>
+                    <p className="mt-1 text-[22px] leading-7 font-semibold tracking-tight text-text-primary tabular-nums">{campanhasAtivas.length}</p>
                     <p className="text-[11px] text-text-muted">{campanhasParadas.length} já paradas</p>
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary">Cliques</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">{resumo.clicks.toLocaleString("pt-PT")}</p>
+                    <p className="text-[13px] text-text-secondary">Cliques</p>
+                    <p className="mt-1 text-[22px] leading-7 font-semibold tracking-tight text-text-primary tabular-nums">{resumo.clicks.toLocaleString("pt-PT")}</p>
                     <p className="text-[11px] text-text-muted">
                       em {resumo.impressions.toLocaleString("pt-PT")} impressões · CTR {resumo.ctr.toFixed(2).replace(".", ",")}%
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-text-secondary">Custo por clique</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">
+                    <p className="text-[13px] text-text-secondary">Custo por clique</p>
+                    <p className="mt-1 text-[22px] leading-7 font-semibold tracking-tight text-text-primary tabular-nums">
                       {resumo.clicks > 0 ? formatCurrency(resumo.cpc) : "—"}
                     </p>
                     <p className="text-[11px] text-text-muted">investido ÷ cliques</p>
@@ -263,32 +270,22 @@ export default function MarketingView({ embutido = false }: { embutido?: boolean
             {/* ——— As campanhas, com as datas à frente ——— */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5">
-                  {([
-                    { id: "todas", label: "Todas", n: todas.length },
-                    { id: "ativas", label: "A correr", n: campanhasAtivas.length },
-                    { id: "paradas", label: "Paradas", n: campanhasParadas.length },
-                  ] as const).map((o) => (
-                    <button
-                      key={o.id}
-                      onClick={() => setEstadoCampanhas(o.id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                        estadoCampanhas === o.id
-                          ? "bg-piquet text-white"
-                          : "bg-surface-subtle text-text-secondary hover:text-text-primary",
-                      )}
-                    >
-                      {o.label} <span className="opacity-70">{o.n}</span>
-                    </button>
-                  ))}
-                </div>
+                <Segmentado
+                  ariaLabel="Estado das campanhas"
+                  opcoes={[
+                    { id: "todas" as const, label: "Todas", count: todas.length },
+                    { id: "ativas" as const, label: "A correr", count: campanhasAtivas.length },
+                    { id: "paradas" as const, label: "Paradas", count: campanhasParadas.length },
+                  ]}
+                  valor={estadoCampanhas}
+                  onChange={setEstadoCampanhas}
+                />
                 <p className="text-xs text-text-muted">
                   {formatCurrency(campanhasVisiveis.reduce((s, c) => s + c.investment, 0))} investidos nestas
                 </p>
               </div>
 
-              <p className="rounded-xl bg-surface-subtle/60 px-3 py-2 text-xs text-text-secondary">
+              <p className="px-1 text-xs text-text-muted">
                 Cada objetivo é julgado pela sua métrica — instalações pelo custo por instalação, leads pelo custo por
                 lead, tráfego pelo custo por clique, notoriedade pelo custo por mil pessoas. O{" "}
                 <strong className="text-text-primary">desempenho</strong> compara cada campanha com a mediana das outras

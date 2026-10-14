@@ -431,7 +431,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
 
             {/* Resumo do histórico */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico</p>
+              <p className="text-sm font-semibold text-text-primary mb-2">Histórico</p>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="card p-3">
                   <p className="text-xs text-text-secondary">Serviços</p>
@@ -459,7 +459,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
 
             {/* Serviços pedidos */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Serviços pedidos</p>
+              <p className="text-sm font-semibold text-text-primary mb-2">Serviços pedidos</p>
               {custServicesLoading ? (
                 <p className="text-sm text-text-secondary py-4 text-center">A carregar histórico…</p>
               ) : historico.lista.length === 0 ? (
@@ -496,7 +496,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
 
             {/* Métodos de pagamento */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Métodos de pagamento</p>
+              <p className="text-sm font-semibold text-text-primary mb-2">Métodos de pagamento</p>
               {paymentMethodsLoading ? (
                 <p className="text-sm text-text-secondary">A carregar…</p>
               ) : (paymentMethods ?? []).length === 0 ? (
@@ -533,12 +533,12 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Notas internas</p>
+              <p className="text-sm font-semibold text-text-primary mb-2">Notas internas</p>
               <NotasInternas entidade="cliente" id={String(selectedCustomer.id)} focar={focarNota} />
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico da equipa</p>
+              <p className="text-sm font-semibold text-text-primary mb-2">Histórico da equipa</p>
               <HistoricoDaEquipa entidade="cliente" id={String(selectedCustomer.id)} />
             </div>
           </div>

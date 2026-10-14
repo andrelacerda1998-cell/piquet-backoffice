@@ -83,7 +83,7 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
     <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-border bg-surface-muted/50 shrink-0">
         <MessageCircle className="h-4 w-4 text-success" />
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+        <span className="text-sm font-semibold text-text-primary">
           {eTecnico ? "Mensagens recebidas" : "Conversa de WhatsApp"}
         </span>
       </div>

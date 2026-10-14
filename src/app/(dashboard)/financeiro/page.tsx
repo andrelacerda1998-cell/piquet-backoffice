@@ -1,5 +1,6 @@
 "use client";
 
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { Segmentado } from "@/components/ui/Segmentado";
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
@@ -7,7 +8,7 @@ import { pedidoHref } from "@/lib/fichas";
 import Link from "next/link";
 import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
+import { MetricCard, TrendIndicator } from "@/components/ui/MetricCard";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -505,33 +506,39 @@ export default function FinancePage() {
             <div className="space-y-6">
               {/* GMV: o cobrado no Payshop (ver api/_lib/gmv.ts) — o mesmo da
                   Visão Geral e de todo o Financeiro. */}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard title="GMV do mês" metric={buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão Piquet do mês" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
-                  {/*
-                    Faturas são CUSTOS (company_invoices), não receita -- por isso
-                    ficam a seguir ao GMV e não misturadas com ele. Sem comparação
-                    mensal: o total é acumulado e um "+0%" seria inventado.
-                  */}
-                  <MetricCard title="Faturas por pagar" metric={buildMetricValue(totalOutstanding, totalOutstanding)} format="currency" hideDelta />
-                  <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
-                    className={cn(totalOverdue > 0 && "border-danger/40")} />
-                </div>
-              </div>
+              {(() => {
+                const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0);
+                const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0);
+                return (
+                  <StatGroup title="Negócio do mês" cols={4}>
+                    <Stat label="GMV do mês" value={formatCurrency(gmvMes.value)}>
+                      {gmvMes.changePercent !== 0 && <TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />}
+                    </Stat>
+                    <Stat label="Comissão Piquet do mês" value={formatCurrency(comissaoMes.value)}>
+                      {comissaoMes.changePercent !== 0 && <TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />}
+                    </Stat>
+                    {/*
+                      Faturas são CUSTOS (company_invoices), não receita -- por isso
+                      ficam a seguir ao GMV e não misturadas com ele. Sem comparação
+                      mensal: o total é acumulado e um "+0%" seria inventado.
+                    */}
+                    <Stat label="Faturas por pagar" value={formatCurrency(totalOutstanding)} />
+                    <Stat label="Faturas em atraso" value={formatCurrency(totalOverdue)} tone={totalOverdue > 0 ? "mau" : undefined} />
+                  </StatGroup>
+                );
+              })()}
 
               {/* Próximas faturas a pagar */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Próximas faturas a pagar</p>
-                  <button onClick={() => setTab("custos")} className="text-sm text-piquet-600 font-medium hover:underline">Ver todas →</button>
+              <div className="card overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-surface-border">
+                  <h2 className="text-sm font-semibold text-text-primary">Próximas faturas a pagar</h2>
+                  <button onClick={() => setTab("custos")} className="btn-ghost text-[13px] -mr-1.5">Ver todas →</button>
                 </div>
-                <div className="card divide-y divide-surface-border">
+                <div className="divide-y divide-surface-border">
                   {openInvoices.length === 0 ? (
-                    <p className="p-4 text-sm text-text-secondary">Sem faturas por pagar. 🎉</p>
+                    <p className="px-4 py-4 text-sm text-text-muted">Sem faturas por pagar.</p>
                   ) : openInvoices.slice(0, 6).map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between gap-3 p-3">
+                    <div key={inv.id} className="group flex items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate flex items-center gap-1.5">
                           {inv.vendor}
@@ -548,13 +555,13 @@ export default function FinancePage() {
                           <p className="font-semibold text-sm">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
                           <span className={cn("inline-block text-[11px] px-1.5 py-0.5 rounded-full capitalize", getStatusColor(inv.status))}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
                         </div>
-                        <button onClick={() => markInvoicePaid(inv)} className="text-xs text-success hover:underline whitespace-nowrap">Marcar paga</button>
+                        <button onClick={() => markInvoicePaid(inv)} className="btn-ghost text-xs px-2 py-1 whitespace-nowrap">Marcar paga</button>
                       </div>
                     </div>
                   ))}
                 </div>
                 {openInvoices.length > 6 && (
-                  <p className="text-xs text-text-muted mt-2">
+                  <p className="px-4 py-2.5 border-t border-surface-border text-xs text-text-muted">
                     A mostrar as 6 mais próximas de {openInvoices.length}.
                   </p>
                 )}
@@ -575,14 +582,13 @@ export default function FinancePage() {
               */}
               {summary && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">No período <DemoBadge endpoint="/finance/summary" /></p>
-                  <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                    {/* Do GMV do período (Payshop), como os cartões de cima. Eram a
+                  <StatGroup title={<>No período <DemoBadge endpoint="/finance/summary" /></>} cols={3}>
+                    {/* Do GMV do período (Payshop), como os números de cima. Eram a
                         soma dos serviços concluídos do Laravel: outro total. */}
-                    <MetricCard title="GMV do período" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
-                    <MetricCard title="Comissão Piquet do período" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
-                    <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
-                  </div>
+                    <Stat label="GMV do período" value={formatCurrency(summary.totalServiceValue)} />
+                    <Stat label="Comissão Piquet do período" value={formatCurrency(summary.piquetRevenue)} />
+                    <Stat label="Resultado mensal est." value={formatCurrency(summary.estimatedMonthlyResult)} tone={summary.estimatedMonthlyResult < 0 ? "mau" : undefined} />
+                  </StatGroup>
                   {summary.gmvIgnoraFiltros && (
                     <p className="mt-2 text-xs text-text-secondary">
                       O GMV e a comissão são do período inteiro: o Payshop não sabe a categoria nem a cidade de um pagamento.
@@ -751,7 +757,7 @@ export default function FinancePage() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Próximos 12 meses</p>
+                <p className="text-sm font-semibold text-text-primary mb-3">Próximos 12 meses</p>
                 <div className="card overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -803,7 +809,7 @@ export default function FinancePage() {
                                       { title: "Entradas previstas", entries: m.detail.inflows },
                                     ] as const).filter((g) => g.entries.length > 0).map((g) => (
                                       <div key={g.title}>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-text-muted mb-2">{g.title}</p>
+                                        <p className="text-sm font-semibold text-text-primary mb-2">{g.title}</p>
                                         <ul className="space-y-1">
                                           {g.entries.map((e, j) => (
                                             <li key={j} className={cn("flex items-center justify-between gap-3", e.projected && "text-text-muted")}>
@@ -1020,7 +1026,7 @@ export default function FinancePage() {
                           <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{emParte ? "Cobrado · devolvido em parte" : s.label}</span>
                           {r.isTest && (
                             <span title="Pagamento de teste do programador (<10 €) — fora dos totais e do GMV."
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-surface-subtle text-text-muted">
                               Teste
                             </span>
                           )}
