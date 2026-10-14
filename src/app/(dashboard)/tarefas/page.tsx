@@ -15,29 +15,20 @@ import {
   getTasks, createTask, updateTask, deleteTask, TASK_COLUMNS, RECURRENCE_LABELS,
   type PersonalTask, type TaskStatus, type TaskPriority, type Recurrence,
 } from "@/services/tasksService";
-import { Plus, Trash2, GripVertical, Pencil, CalendarClock, ListTodo, Clock, AlertTriangle, Repeat } from "lucide-react";
+import { Plus, Trash2, GripVertical, Pencil, CalendarClock, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { TaskTimeline } from "@/components/ui/TaskTimeline";
 
-const COLUMN_TONE: Record<TaskStatus, string> = {
-  backlog: "border-surface-border",
-  em_curso: "border-piquet/40",
-  a_espera: "border-warning/40",
-  concluido: "border-success/40",
-};
 const COLUMN_DOT: Record<TaskStatus, string> = {
   backlog: "bg-text-muted",
   em_curso: "bg-piquet",
   a_espera: "bg-warning",
   concluido: "bg-success",
 };
-// Barra colorida à esquerda do cartão — triagem visual por prioridade.
-const PRIORITY_ACCENT: Record<TaskPriority, string> = {
-  critica: "border-l-danger",
-  alta: "border-l-warning",
-  media: "border-l-info/50",
-  baixa: "border-l-transparent",
-};
+// Só as prioridades que mudam o que se faz primeiro levam etiqueta no cartão:
+// "média" em todos os cartões era ruído que se deixava de ler.
+const PRIORIDADE_VISIVEL: TaskPriority[] = ["critica", "alta"];
 const STATUS_LABEL = Object.fromEntries(TASK_COLUMNS.map((c) => [c.id, c.label])) as Record<TaskStatus, string>;
 
 /** Próxima data de uma tarefa recorrente, a partir de uma base (prazo ou hoje). */
@@ -228,22 +219,13 @@ export default function TarefasPage() {
           actions={<button onClick={() => openAdd("backlog")} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Nova tarefa</button>}
         />
 
-        <div className="grid grid-cols-3 gap-3 max-w-xl">
-          <div className="card p-3 flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700 shrink-0"><ListTodo className="h-4 w-4" /></span>
-            <div><p className="text-xl font-bold leading-none">{openTotal}</p><p className="text-xs text-text-muted mt-0.5">por fazer</p></div>
-          </div>
-          <div className="card p-3 flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning-light text-warning shrink-0"><Clock className="h-4 w-4" /></span>
-            <div><p className="text-xl font-bold leading-none">{waitingTotal}</p><p className="text-xs text-text-muted mt-0.5">à espera</p></div>
-          </div>
-          <div className={cn("card p-3 flex items-center gap-2.5", overdueTotal > 0 && "border-danger/40")}>
-            <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl shrink-0", overdueTotal > 0 ? "bg-danger-light text-danger" : "bg-surface-subtle text-text-muted")}><AlertTriangle className="h-4 w-4" /></span>
-            <div><p className={cn("text-xl font-bold leading-none", overdueTotal > 0 && "text-danger")}>{overdueTotal}</p><p className="text-xs text-text-muted mt-0.5">atrasadas</p></div>
-          </div>
-        </div>
+        <StatGroup cols={3} className="max-w-2xl">
+          <Stat label="Por fazer" value={openTotal} />
+          <Stat label="À espera" value={waitingTotal} tone={waitingTotal > 0 ? "atencao" : undefined} />
+          <Stat label="Atrasadas" value={overdueTotal} tone={overdueTotal > 0 ? "mau" : undefined} />
+        </StatGroup>
 
-        <Tabs tabs={subTabs} active={tab} onChange={(id) => setTab(id as "quadro" | "lista" | "cronograma")} />
+        <Tabs variant="pill" tabs={subTabs} active={tab} onChange={(id) => setTab(id as "quadro" | "lista" | "cronograma")} />
 
         {tab === "quadro" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -267,15 +249,15 @@ export default function TarefasPage() {
                 }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver((c) => (c?.status === col.id ? null : c)); }}
                 onDrop={(e) => { e.preventDefault(); if (draggedId && dragOver?.status === col.id) moveToIndex(draggedId, col.id, dragOver.index); setDraggedId(null); setDragOver(null); }}
-                className={cn("rounded-xl border bg-surface-muted/40 p-3 min-h-[200px] transition-colors", COLUMN_TONE[col.id], dragOver?.status === col.id && "bg-piquet/5 border-piquet/40")}
+                className={cn("rounded-xl bg-surface-subtle/70 p-2 min-h-[200px] ring-1 ring-inset ring-transparent transition-colors", dragOver?.status === col.id && "bg-piquet/5 ring-piquet/40")}
               >
-                <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center justify-between mb-2 px-1.5 pt-1">
                   <div className="flex items-center gap-2">
                     <span className={cn("h-2 w-2 rounded-full", COLUMN_DOT[col.id])} />
-                    <span className="text-sm font-semibold">{col.label}</span>
-                    <span className="text-xs text-text-muted">{items.length}</span>
+                    <span className="text-[13px] font-semibold">{col.label}</span>
+                    <span className="text-xs text-text-muted tabular-nums">{items.length}</span>
                   </div>
-                  <button onClick={() => openAdd(col.id)} className="text-text-muted hover:text-piquet-600 transition-colors" title="Nova tarefa"><Plus className="h-4 w-4" /></button>
+                  <button onClick={() => openAdd(col.id)} className="btn-ghost p-1" title="Nova tarefa" aria-label={`Nova tarefa em ${col.label}`}><Plus className="h-4 w-4" /></button>
                 </div>
 
                 <div className="space-y-2">
@@ -292,15 +274,16 @@ export default function TarefasPage() {
                         draggable
                         onDragStart={() => setDraggedId(task.id)}
                         onDragEnd={() => { setDraggedId(null); setDragOver(null); }}
-                        className={cn("group card p-3 cursor-grab active:cursor-grabbing border border-l-4 border-surface-border hover:border-piquet/40 transition-all", PRIORITY_ACCENT[task.priority], draggedId === task.id && "opacity-40")}
+                        className={cn("group relative card p-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-elevated", draggedId === task.id && "opacity-40")}
                       >
-                        <div className="flex items-start gap-2">
-                          <GripVertical className="h-4 w-4 text-text-muted/60 shrink-0 mt-0.5" />
+                        {/* A pega aparece ao passar, por cima da margem: não come largura ao título. */}
+                        <GripVertical className="absolute left-0.5 top-3.5 h-3.5 w-3.5 text-text-muted/60 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden />
+                        <div className="flex items-start gap-1.5">
                           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEdit(task)}>
                             <p className={cn("text-sm font-medium leading-snug", task.status === "concluido" && "line-through text-text-muted")}>{task.title}</p>
                             {task.description && <p className="text-xs text-text-secondary mt-1 line-clamp-2">{task.description}</p>}
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              <PriorityBadge priority={task.priority} />
+                            <div className="flex items-center gap-2 mt-2 flex-wrap empty:hidden">
+                              {PRIORIDADE_VISIVEL.includes(task.priority) && <PriorityBadge priority={task.priority} />}
                               {(() => { const di = dueInfo(task); return di ? (
                                 <span className={cn("inline-flex items-center gap-1 text-[11px]", di.tone)}>
                                   <CalendarClock className="h-3 w-3" />{di.label}
@@ -314,8 +297,8 @@ export default function TarefasPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => openEdit(task)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-piquet-600 transition-all" title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
-                            <button onClick={() => remove(task)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger transition-all" title="Apagar"><Trash2 className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => openEdit(task)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 rounded text-text-muted hover:text-text-primary transition-all" title="Editar" aria-label="Editar tarefa"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => remove(task)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 rounded text-text-muted hover:text-danger transition-all" title="Apagar" aria-label="Apagar tarefa"><Trash2 className="h-3.5 w-3.5" /></button>
                           </div>
                         </div>
                       </div>
@@ -342,7 +325,7 @@ export default function TarefasPage() {
                   ) : (
                     <button
                       onClick={() => { setQuickText(""); setQuickCol(col.id); }}
-                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-text-muted hover:bg-surface-muted hover:text-text-secondary transition-colors"
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-text-muted hover:bg-surface hover:text-text-secondary transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" /> Adicionar
                     </button>
