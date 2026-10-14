@@ -25,6 +25,7 @@ import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, atDateLabel, AT_STATE_UI } from "@/lib/vendorDocs";
+import { filtrarTecnicos, type FiltroCalculado } from "@/lib/filtrosDaListaDeTecnicos";
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -326,34 +327,34 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
   const docsByVendor = useMemo(() => indexDocsByVendor(allDocs ?? []), [allDocs]);
   const docsOfVendor = (vendorId: number) => (allDocs ?? []).filter((d) => d.vendor_id === vendorId);
 
-  // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
-  // filtrar só a página daria contas erradas — com filtro ativo carregamos a
-  // lista toda (todas as páginas: o servidor não dá mais de 100 de cada vez)
-  // e filtramos aqui.
-  const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif" | "suspensos">("");
+  // Filtros da lista: AT validado, só falta AT e falta documentos. A lista
+  // normal é paginada pelo servidor, por isso filtrar só a página daria contas
+  // erradas — com um destes filtros carregamos a lista toda (todas as páginas:
+  // o servidor não dá mais de 100 de cada vez) e filtramos aqui, com a regra de
+  // lib/filtrosDaListaDeTecnicos. "Suspensos" vem do servidor.
+  const [filtroLista, setFiltroLista] = useState<"" | FiltroCalculado | "suspensos">("");
+  const filtroCalculado = filtroLista && filtroLista !== "suspensos" ? filtroLista : null;
   const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
-    () => (atFilter && atFilter !== "suspensos" ? getAllVendors(debouncedSearch || undefined) : Promise.resolve(null)),
-    [atFilter, debouncedSearch]
+    () => (filtroCalculado ? getAllVendors(debouncedSearch || undefined) : Promise.resolve(null)),
+    [filtroCalculado, debouncedSearch]
   );
-  const atFiltered = useMemo(() => {
-    const list = allVendors?.data ?? [];
-    if (!atFilter) return [];
-    // "Sem NIF" não é sobre a AT, mas usa a mesma mecânica (carregar tudo e
-    // filtrar aqui) porque a contagem tem de ser sobre a lista completa.
-    if (atFilter === "sem_nif") return list.filter((v) => !v.nif?.trim());
-    return list.filter((v) => atValidationState(v) === (atFilter === "validada" ? "validado" : "por_validar"));
-  }, [allVendors, atFilter]);
-  const atCounts = useMemo(() => {
+  // Quem já entregou pelo menos um documento, de qualquer tipo e em qualquer
+  // estado: "falta documentos" é para quem já começou.
+  const entregaramAlgum = useMemo(() => new Set((allDocs ?? []).map((d) => d.vendor_id)), [allDocs]);
+  const filtrados = useMemo(
+    () => (filtroCalculado ? filtrarTecnicos(allVendors?.data ?? [], filtroCalculado, entregaramAlgum) : []),
+    [allVendors, filtroCalculado, entregaramAlgum],
+  );
+  const contagensDaLista = useMemo(() => {
     const list = allVendors?.data ?? [];
     return {
-      validada: list.filter((v) => atValidationState(v) === "validado").length,
-      por_validar: list.filter((v) => atValidationState(v) === "por_validar").length,
-      sem_nif: list.filter((v) => !v.nif?.trim()).length,
-      total: allVendors?.total ?? 0,
+      at_validado: filtrarTecnicos(list, "at_validado", entregaramAlgum).length,
+      so_falta_at: filtrarTecnicos(list, "so_falta_at", entregaramAlgum).length,
+      falta_documentos: filtrarTecnicos(list, "falta_documentos", entregaramAlgum).length,
       carregados: list.length,
       falharam: allVendors?.falharam ?? 0,
     };
-  }, [allVendors]);
+  }, [allVendors, entregaramAlgum]);
 
   // Perfil do técnico (documentos entregues, em falta e por validar).
   const [profileVendor, setProfileVendor] = useState<RealVendor | null>(null);
@@ -909,30 +910,27 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
                         ariaLabel="Filtrar técnicos"
                         opcoes={([
                           { id: "", label: "Todos" },
-                          { id: "validada", label: "AT validada" },
-                          { id: "por_validar", label: "AT por validar" },
-                          // Sem NIF não há como faturar em nome do técnico —
-                          // são registos que nunca poderão receber.
-                          { id: "sem_nif", label: "Sem NIF" },
+                          { id: "at_validado", label: "AT validado" },
+                          // Podem trabalhar sem a AT até ao terceiro serviço feito.
+                          { id: "so_falta_at", label: "Só falta AT" },
+                          // Já entregaram algum documento; ainda não estão todos aprovados.
+                          { id: "falta_documentos", label: "Falta documentos" },
                           // Era um sub-separador à parte; é um filtro como os outros.
                           { id: "suspensos", label: "Suspensos" },
                         ] as const).map((f) => ({
                           id: f.id,
                           label: f.label,
-                          ...(f.id && atFilter ? {
-                            count: f.id === "validada" ? atCounts.validada
-                              : f.id === "por_validar" ? atCounts.por_validar
-                              : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
-                              : atCounts.sem_nif,
+                          ...(f.id && filtroLista ? {
+                            count: f.id === "suspensos" ? (suspendedVendors?.total ?? 0) : contagensDaLista[f.id],
                           } : {}),
                         }))}
-                        valor={atFilter}
-                        onChange={setAtFilter}
+                        valor={filtroLista}
+                        onChange={setFiltroLista}
                       />
                       <button onClick={openTestAccountModal} className="btn-ghost text-[13px] ml-auto">Criar conta de teste</button>
                     </div>
 
-                    {atFilter === "suspensos" ? (
+                    {filtroLista === "suspensos" ? (
                       <>
                         <p className="text-sm text-text-secondary">Suspensos: sem acesso a novos serviços até serem reativados.</p>
                     <DataTable
@@ -943,19 +941,26 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
                       emptyMessage="Sem técnicos suspensos 🎉"
                     />
                       </>
-                    ) : atFilter ? (
+                    ) : filtroCalculado ? (
                       <>
                         <p className="text-sm text-text-secondary">
-                          <b className="text-text-primary tabular-nums">{atFiltered.length}</b>{" "}
-                          {atFilter === "validada" ? "com a AT validada" : "com a AT por validar"}
-                          {atCounts.carregados > 0 && ` · de ${atCounts.carregados} técnicos`}
-                          {atCounts.falharam > 0 && (
-                            <span className="text-warning"> · {atCounts.falharam === 1 ? "uma página" : `${atCounts.falharam} páginas`} da lista não chegou: as contas podem estar abaixo do real</span>
+                          <b className="text-text-primary tabular-nums">{filtrados.length}</b>{" "}
+                          {filtroCalculado === "at_validado" ? "com a AT validada"
+                            : filtroCalculado === "so_falta_at" ? "só com a AT em falta: podem fazer até 3 serviços sem ela"
+                            : "com documentos em falta, de quem já entregou algum"}
+                          {contagensDaLista.carregados > 0 && ` · de ${contagensDaLista.carregados} técnicos`}
+                          {contagensDaLista.falharam > 0 && (
+                            <span className="text-warning"> · {contagensDaLista.falharam === 1 ? "uma página" : `${contagensDaLista.falharam} páginas`} da lista não chegou: as contas podem estar abaixo do real</span>
+                          )}
+                          {filtroCalculado === "falta_documentos" && docsIncompletos > 0 && (
+                            <span className="text-warning"> · parte dos documentos não chegou: pode faltar gente nesta lista</span>
                           )}
                         </p>
-                        <DataTable columns={columns} data={atFiltered} keyField="id" loading={allVendorsLoading}
+                        <DataTable columns={columns} data={filtrados} keyField="id" loading={allVendorsLoading}
                           onRowClick={(r) => setProfileVendor(r)}
-                          emptyMessage={atFilter === "validada" ? "Nenhum técnico com a AT validada." : "Nenhum técnico com a AT por validar 🎉"} />
+                          emptyMessage={filtroCalculado === "at_validado" ? "Nenhum técnico com a AT validada."
+                            : filtroCalculado === "so_falta_at" ? "Ninguém está só à espera da AT."
+                            : "Ninguém com documentos a meio 🎉"} />
                       </>
                     ) : (
                       <>
