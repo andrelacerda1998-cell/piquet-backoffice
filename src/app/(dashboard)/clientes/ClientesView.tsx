@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Segmentado } from "@/components/ui/Segmentado";
@@ -32,7 +32,7 @@ import { StatGroup, Stat } from "@/components/ui/Stats";
 import { FichaSeccao, Etiqueta, FichaVazia } from "@/components/ui/Ficha";
 import Link from "next/link";
 
-export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
+function ClientesViewInner({ abrirId }: { abrirId?: string } = {}) {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   const [tab, setTab] = useTabParam("lista");
@@ -557,5 +557,17 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
         loading={deletingMethodId !== null}
       />
     </RouteGuard>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function ClientesView(props: { abrirId?: string } = {}) {
+  return (
+    <Suspense>
+      <ClientesViewInner {...props} />
+    </Suspense>
   );
 }

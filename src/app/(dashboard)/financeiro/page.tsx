@@ -2,7 +2,7 @@
 
 import { StatGroup, Stat } from "@/components/ui/Stats";
 import { Segmentado } from "@/components/ui/Segmentado";
-import { Fragment, useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo, Suspense } from "react";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
 import { pedidoHref } from "@/lib/fichas";
 import Link from "next/link";
@@ -116,7 +116,7 @@ function walletTypeLabel(type: string): string {
 }
 
 
-export default function FinancePage() {
+function FinancePageInner() {
   const filters = useFilters();
   const [tab, setTab] = useTabParam("resultado");
   // A secção do Resultado a abrir (vinda de um separador antigo ou de ?secao=).
@@ -1338,5 +1338,17 @@ function SecaoRecolhida({ id, titulo, resumo, aberta = false, children }: {
       </summary>
       <div className="mt-4">{children}</div>
     </details>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function FinancePage() {
+  return (
+    <Suspense>
+      <FinancePageInner />
+    </Suspense>
   );
 }

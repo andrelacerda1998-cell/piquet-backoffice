@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { DataTable, Pagination, SearchInput, ExportButton, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -51,7 +51,7 @@ const paraWhatsApp = (telefone: string) => {
   return d.length === 9 ? `351${d}` : d;
 };
 
-export default function ServicosView({ abrirId }: { abrirId?: string }) {
+function ServicosViewInner({ abrirId }: { abrirId?: string }) {
   const filters = useFilters();
   const { page, setPage, pageSize, sortField, sortDirection, handleSort, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
@@ -316,5 +316,17 @@ function AcoesDaLinha({ pedido }: { pedido: ServiceRequest }) {
       {tel && <a href={`https://wa.me/${paraWhatsApp(tel)}`} target="_blank" rel="noreferrer" className={botao} title="WhatsApp do cliente" aria-label="WhatsApp do cliente"><MessageCircle className="h-3.5 w-3.5" /></a>}
       <button onClick={copiar} className={botao} title="Copiar o n.º" aria-label="Copiar o número do pedido"><Copy className="h-3.5 w-3.5" /></button>
     </span>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function ServicosView(props: { abrirId?: string } = {}) {
+  return (
+    <Suspense>
+      <ServicosViewInner {...props} />
+    </Suspense>
   );
 }

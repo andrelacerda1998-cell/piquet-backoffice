@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -60,7 +60,7 @@ const ANTIGOS: Record<string, string> = {
 };
 
 /** Configurações: as regras do negócio (catálogo, zonas, preços) e quem tem acesso. */
-export default function ConfiguracaoPage() {
+function ConfiguracaoPageInner() {
   const [tab, setTab] = useTabParam("catalogo");
   useEffect(() => { if (ANTIGOS[tab]) setTab(ANTIGOS[tab]); }, [tab, setTab]);
   return (
@@ -557,3 +557,15 @@ function NotificacoesTab() {
   entrava como qualquer cliente ou técnico. Saiu (08/10/2026), com a rota
   /api/sms-codes. Para "não recebi o SMS", o suporte pede para reenviar.
 */
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function ConfiguracaoPage() {
+  return (
+    <Suspense>
+      <ConfiguracaoPageInner />
+    </Suspense>
+  );
+}

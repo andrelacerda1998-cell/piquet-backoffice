@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
@@ -39,7 +39,7 @@ import { ArrowRight } from "lucide-react";
   LTV, os downloads e os objetivos estão em Crescimento.
 */
 
-export default function OverviewPage() {
+function OverviewPageInner() {
   const { data: gmvData, loading, error, refetch } = useAsyncData(() => getFinanceGmv(), []);
   // Resultado do mês: é a pergunta que traz um CEO a este ecrã ("ganhámos ou
   // perdemos dinheiro?") e a resposta estava só no Financeiro.
@@ -199,5 +199,17 @@ export default function OverviewPage() {
         {tab === "alertas" && <AlertasPage embutido onTotal={setTotalAlertas} />}
       </div>
     </RouteGuard>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function OverviewPage() {
+  return (
+    <Suspense>
+      <OverviewPageInner />
+    </Suspense>
   );
 }

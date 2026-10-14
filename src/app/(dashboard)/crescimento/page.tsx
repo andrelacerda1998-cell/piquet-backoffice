@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -22,7 +23,7 @@ import RelatoriosPage from "../relatorios/Relatorios";
  * - Objetivos e relatórios: eram separadores da Visão Geral, com mais duas
  *   rotas repetidas (/objetivos e /relatorios).
  */
-export default function CrescimentoPage() {
+function CrescimentoPageInner() {
   const role = useAuthStore((s) => s.user?.role);
   const veMarketing = !!role && hasAnyPermission(role, ["view_marketing"]);
   const TABS: TabDef[] = [
@@ -52,5 +53,17 @@ export default function CrescimentoPage() {
         )}
       </div>
     </RouteGuard>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function CrescimentoPage() {
+  return (
+    <Suspense>
+      <CrescimentoPageInner />
+    </Suspense>
   );
 }
