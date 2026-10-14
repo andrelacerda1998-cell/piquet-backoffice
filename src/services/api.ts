@@ -496,7 +496,7 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   */
   /^\/services\/[^/]+\/detalhe$/, // serviço do Laravel + técnicos convidados
   /^\/services\/[^/]+\/fotos$/, // media do Laravel, com URL assinado
-  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
+  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver|cancelar)$/, // ações do pedido (backend #165)
   /^\/customers\/\d+$/, // um cliente pelo id (Laravel)
   /^\/technicians\/\d+$/, // um técnico pelo id (Laravel)
   /^\/marketing\/leads\/[^/]+\/timeline$/, // só acontecimentos com data real
@@ -572,7 +572,7 @@ export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/vendor-no-shows\/[^/]+\/declare$/, // dar como falta (penalização ao técnico, devolução ao cliente)
   /^\/(services|customers|technicians)\/\d+\/notas$/, // notas internas da equipa
   /^\/services\/\d+\/tickets$/, // tickets de Suporte ligados ao pedido
-  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver)$/, // ações do pedido (backend #165)
+  /^\/services\/\d+\/(despachar|fechar|tentar-cobrar|desistir-e-devolver|cancelar)$/, // ações do pedido (backend #165)
   /^\/customers\/\d+$/, // um cliente pelo id
   /^\/technicians\/\d+$/, // um técnico pelo id
   /^\/services\/[^/]+$/, // /services/:id (detalhe/write-back)

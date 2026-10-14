@@ -89,6 +89,8 @@ export const POLITICA: Record<string, Requisito> = {
   "POST /services/[id]/fechar": qualquer("refund_payments"),
   "POST /services/[id]/tentar-cobrar": qualquer("refund_payments"),
   "POST /services/[id]/desistir-e-devolver": qualquer("refund_payments"),
+  // Cancelar devolve ao cliente o que pagou: é de quem gere dinheiro.
+  "POST /services/[id]/cancelar": qualquer("refund_payments"),
   "PUT /services/[id]": qualquer("edit_services"),
   "GET /services/[id]/detalhe": qualquer("view_services"),
   "GET /services/[id]/fotos": qualquer("view_services"),
