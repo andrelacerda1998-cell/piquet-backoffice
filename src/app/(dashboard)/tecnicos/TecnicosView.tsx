@@ -444,12 +444,17 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
     }
   };
 
+  /*
+   * Validar testa as credenciais no InvoiceXpress (backend#185): o resultado é
+   * o que o servidor responde, não o que se pediu. Se forem recusadas, vem um
+   * erro com a razão e a ficha fica como estava.
+   */
   const setAtValidation = async (v: RealVendor, valid: boolean) => {
     setAtSaving(true);
     try {
-      await setVendorAtValidation(v.id, valid);
-      toast(valid ? `Subutilizador AT de ${v.name ?? "técnico"} validado.` : "Validação AT retirada.");
-      setProfileVendor({ ...v, at_valid: valid });
+      const r = await setVendorAtValidation(v.id, valid);
+      toast(valid ? `Credenciais AT de ${v.name ?? "técnico"} válidas no InvoiceXpress.` : "Validação AT retirada.");
+      setProfileVendor({ ...v, at_valid: r.at_valid, at_validated_at: r.at_validated_at });
       refetchVendors();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível gravar a validação AT.", "error");
@@ -1153,7 +1158,7 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
                             className="btn-ghost text-xs px-2 py-1 text-warning hover:text-warning">Retirar AT</button>
                         ) : (
                           <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
-                            title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
+                            title={utilizador ? "Testa o subutilizador no InvoiceXpress e guarda o resultado" : "Sem o identificador à vista, validar seria carimbar às cegas"}
                             className="btn-secondary text-xs px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed">
                             {atSaving ? "A gravar…" : "Validar AT"}
                           </button>
