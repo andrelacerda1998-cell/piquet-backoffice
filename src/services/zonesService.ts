@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPut } from "./api";
+import type { ContagemPelasCidades, SemCidades } from "@/lib/pelasCidades";
 
 /**
  * Zonas — migrado do Filament (AllowedZoneResource) para a API de admin do
@@ -15,13 +16,29 @@ export interface AllowedZone {
   id: number;
   city: string;
   district: string | null;
+  /** Quem marcou a zona no questionário antigo da app, que parou no tempo. */
   vendors_count: number;
+  /**
+   * Quem recebe um pedido no centro da zona, pelas cidades que escolheu na
+   * app, e desses quantos já podem trabalhar (ver lib/pelasCidades). Só vêm
+   * do backend a partir do backend#185 -- até lá, `undefined`.
+   */
+  tecnicos_nas_cidades?: number;
+  podem_trabalhar?: number;
+  contagem?: ContagemPelasCidades;
   created_at: string | null;
 }
 
 export interface AllowedZonesData {
   items: AllowedZone[];
-  meta: { current_page: number; last_page: number; per_page: number; total: number };
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    /** Quem não escolheu cidades: no matching recebe de qualquer zona. */
+    sem_cidades?: SemCidades;
+  };
 }
 
 export async function getZones(search?: string): Promise<AllowedZonesData> {

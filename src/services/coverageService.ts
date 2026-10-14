@@ -1,4 +1,5 @@
 import { apiGet } from "./api";
+import type { ContagemPelasCidades, SemCidades } from "@/lib/pelasCidades";
 
 /**
  * Cobertura geográfica por técnico — não tem equivalente no Filament (lá só
@@ -22,11 +23,27 @@ export interface CoverageTechnician {
   status: string | null;
 }
 
+/** Um técnico das cidades escolhidas na app, e se já pode trabalhar. */
+export interface CoverageTechnicianNasCidades extends CoverageTechnician {
+  podem_trabalhar: boolean;
+}
+
 export interface CoverageOpenZone {
   id: number;
   city: string;
   district: string | null;
+  /** Quem marcou a zona no questionário antigo. */
   technicians: CoverageTechnician[];
+  /**
+   * Quem recebe um pedido no centro da zona, pelas cidades que escolheu na
+   * app: os que já podem trabalhar primeiro. Só vem do backend a partir do
+   * backend#185.
+   */
+  nas_cidades?: {
+    tecnicos: CoverageTechnicianNasCidades[];
+    podem_trabalhar: number;
+    contagem: ContagemPelasCidades;
+  };
 }
 
 export interface CoverageCandidateCity {
@@ -40,6 +57,8 @@ export interface CoverageCandidateCity {
 export interface CoverageData {
   open: CoverageOpenZone[];
   candidate: CoverageCandidateCity[];
+  /** Quem não escolheu cidades: no matching recebe de qualquer zona (backend#185). */
+  sem_cidades?: SemCidades;
 }
 
 export async function getCoverage(): Promise<CoverageData> {
