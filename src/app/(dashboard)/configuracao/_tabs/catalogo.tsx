@@ -19,7 +19,9 @@ import {
 } from "@/services/catalogService";
 import { toast } from "@/stores";
 import { DemoBadge } from "@/components/ui/DemoBadge";
-import { Plus, Wrench, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { SectionHeader } from "@/components/ui/PageHeader";
+import { formatCurrency } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 /**
@@ -166,19 +168,19 @@ function CatalogoContent() {
 
   const columns: Column<ServiceType>[] = [
     { key: "name", label: "Tipo de serviço", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "operation_area_name", label: "Categoria", render: (r) => r.operation_area_name ?? "—" },
-    { key: "time", label: "Duração", render: (r) => (r.time != null ? `${r.time} min` : "—") },
-    { key: "starts_from", label: "A partir de", render: (r) => (r.starts_from != null ? `${r.starts_from} €` : "—") },
-    { key: "vendors_count", label: "Técnicos", render: (r) => r.vendors_count },
+    { key: "operation_area_name", label: "Categoria", render: (r) => <span className="text-text-secondary">{r.operation_area_name ?? "—"}</span> },
+    { key: "time", label: "Duração", className: "text-right", render: (r) => (r.time != null ? <span className="tabular-nums">{r.time} min</span> : "—") },
+    { key: "starts_from", label: "A partir de", className: "text-right", render: (r) => (r.starts_from != null ? <span className="tabular-nums">{formatCurrency(r.starts_from)}</span> : "—") },
+    { key: "vendors_count", label: "Técnicos", className: "text-right", render: (r) => <span className="tabular-nums">{r.vendors_count}</span> },
     {
       key: "actions", label: "",
       render: (r) => (
-        <div className="flex items-center justify-end gap-3">
-          <button onClick={() => openEditType(r)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline">
+        <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+          <button onClick={() => openEditType(r)} className="btn-ghost text-xs px-2 py-1">
             <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
-          <button onClick={() => setTypeToDelete(r)} title="Eliminar tipo de serviço"
-            className="text-text-muted hover:text-danger transition-colors">
+          <button onClick={() => setTypeToDelete(r)} title="Eliminar tipo de serviço" aria-label={`Eliminar ${r.name}`}
+            className="btn-ghost p-1.5 hover:text-danger">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -188,65 +190,66 @@ function CatalogoContent() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Catálogo <DemoBadge endpoint="/services-types" /></h1>
-            <p className="text-text-secondary mt-1">{types.length} tipos de serviço em {areas.length} categorias</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={openNewArea} className="btn-secondary text-sm"><Plus className="h-4 w-4" /> Nova categoria</button>
-            <button onClick={openNewType} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo tipo</button>
-          </div>
-        </div>
-
-        {/* Categorias */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {areas.map((a) => (
-            <button key={a.id} onClick={() => openEditArea(a)} className="card p-4 text-left hover:border-piquet-300 transition-colors">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-piquet/15 text-piquet-700">
-                  <Wrench className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary truncate">{a.name}</p>
-                  <p className="text-xs text-text-secondary">{a.services_types_count} tipos</p>
-                </div>
-              </div>
-              <div className="mt-4 text-xs text-text-secondary">
-                {a.vendors_count} técnico{a.vendors_count === 1 ? "" : "s"}
-              </div>
-            </button>
-          ))}
-          {areas.length === 0 && (
-            <p className="text-sm text-text-secondary col-span-full">Ainda sem categorias.</p>
-          )}
-        </div>
-
-        {/* Tipos de serviço */}
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <h3 className="font-semibold">Tipos de serviço</h3>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
-              <input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Procurar serviço ou categoria…"
-                className="input-field pl-9"
-              />
+      <div className="space-y-8">
+        <section>
+          <SectionHeader
+            title="Categorias"
+            description={`${types.length} tipos de serviço em ${areas.length} categorias. Clica numa categoria para lhe mudar o nome.`}
+            aside={
+              <>
+                <DemoBadge endpoint="/services-types" />
+                <button onClick={openNewArea} className="btn-secondary text-sm"><Plus className="h-4 w-4" /> Nova categoria</button>
+              </>
+            }
+          />
+          {areas.length === 0 ? (
+            <p className="card px-4 py-6 text-center text-sm text-text-muted">Ainda sem categorias.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+              {areas.map((a) => (
+                <button key={a.id} onClick={() => openEditArea(a)}
+                  className="group card px-3.5 py-3 text-left transition-colors hover:bg-surface-subtle/60">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-text-primary truncate">{a.name}</span>
+                    <Pencil className="h-3.5 w-3.5 shrink-0 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </span>
+                  <span className="mt-0.5 block text-xs text-text-muted">
+                    {a.services_types_count} tipos · {a.vendors_count} técnico{a.vendors_count === 1 ? "" : "s"}
+                  </span>
+                </button>
+              ))}
             </div>
-          </div>
+          )}
+        </section>
+
+        <section>
+          <SectionHeader
+            title="Tipos de serviço"
+            description="O que a app mostra em cada categoria: duração, preço de partida e quantos técnicos o fazem."
+            aside={<button onClick={openNewType} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo tipo</button>}
+          />
           <DataTable
             columns={columns}
             data={tiposFiltrados}
             keyField="id"
+            toolbar={
+              <>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
+                  <input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Procurar serviço ou categoria…"
+                    className="input-field pl-9 py-1.5"
+                    aria-label="Procurar no catálogo"
+                  />
+                </div>
+                {busca && <span className="text-xs text-text-muted">{tiposFiltrados.length} de {types.length} tipos</span>}
+              </>
+            }
             emptyMessage={busca ? `Nenhum serviço encontrado para “${busca}”.` : "Ainda sem tipos de serviço."}
           />
-          {busca && (
-            <p className="text-xs text-text-muted mt-2">{tiposFiltrados.length} de {types.length} tipos</p>
-          )}
-        </div>
+        </section>
       </div>
 
       <ConfirmDialog

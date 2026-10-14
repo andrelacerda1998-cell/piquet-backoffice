@@ -9,6 +9,7 @@ import { useAsyncData } from "@/hooks/useDashboard";
 import { createZone, getZones, updateZone, type AllowedZone } from "@/services/zonesService";
 import { toast } from "@/stores";
 import { DemoBadge } from "@/components/ui/DemoBadge";
+import { SectionHeader } from "@/components/ui/PageHeader";
 import { Plus, Pencil } from "lucide-react";
 
 /**
@@ -67,30 +68,36 @@ function ZonasContent() {
   const columns: Column<AllowedZone>[] = [
     { key: "city", label: "Cidade", sortable: true, render: (r) => <span className="font-medium">{r.city}</span> },
     { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
-    { key: "vendors_count", label: "Técnicos", sortable: true, render: (r) => r.vendors_count },
+    { key: "vendors_count", label: "Técnicos", sortable: true, className: "text-right", render: (r) => (
+      <span className={r.vendors_count === 0 ? "font-medium text-danger tabular-nums" : "tabular-nums"}>{r.vendors_count}</span>
+    ) },
     {
       key: "actions", label: "",
       render: (r) => (
-        <button onClick={() => openEdit(r)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline">
-          <Pencil className="h-3.5 w-3.5" /> Editar
-        </button>
+        <div className="flex justify-end md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+          <button onClick={() => openEdit(r)} className="btn-ghost text-xs px-2 py-1">
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </button>
+        </div>
       ),
     },
   ];
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Zonas <DemoBadge endpoint="/allowed-zones" /></h1>
-            <p className="text-text-secondary mt-1">{zones.length} zonas onde a Piquet opera</p>
-          </div>
-          <button onClick={openNew} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova zona</button>
-        </div>
-
+      <section>
+        <SectionHeader
+          title="Zonas"
+          description={`${zones.length} cidades onde a Piquet aceita pedidos. Quem é convidado para cada pedido depende das cidades de cada técnico.`}
+          aside={
+            <>
+              <DemoBadge endpoint="/allowed-zones" />
+              <button onClick={openNew} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova zona</button>
+            </>
+          }
+        />
         <DataTable columns={columns} data={zones} keyField="id" emptyMessage="Ainda sem zonas." />
-      </div>
+      </section>
 
       <Modal
         open={modal.open}
