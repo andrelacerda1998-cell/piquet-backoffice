@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { AnaliseDeClientes } from "@/components/crescimento/AnaliseDeClientes";
+import { FunilDaApp } from "@/components/crescimento/FunilDaApp";
 import { useTabParam } from "@/hooks/useTabParam";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { StatGroup, Stat } from "@/components/ui/Stats";
-import { Painel } from "@/components/ui/Painel";
 
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/charts/Charts";
@@ -16,7 +16,7 @@ import {
 } from "@/services/backofficeService";
 import { formatDate, formatNumber, formatCurrency, formatRating } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowDownRight } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 
@@ -285,7 +285,7 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
           <div className="space-y-4">
             <SectionHeader
               title="Funil da jornada na app"
-              description="Onde os utilizadores param, a partir do Mixpanel."
+              description="Onde as pessoas desistem entre abrir a app e confirmar um pedido. Os dados vêm do Mixpanel."
               aside={
                 <select value={funnelPeriod} onChange={(e) => setFunnelPeriod(e.target.value)} className="input-field w-auto py-1.5" aria-label="Período do funil">
                   {funnelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -298,7 +298,7 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
             ) : !funnel ? null : !funnel.configured ? (
               <div className="aviso aviso-info max-w-2xl">
                 <p className="text-text-secondary">
-                  Mostra onde os utilizadores param (abrir app → ver serviço → reservar → pagar), a partir do Mixpanel.
+                  Mostra onde as pessoas param (abrir a app → ver um serviço → escolher um técnico → pagar), a partir do Mixpanel.
                   Ainda não está ligado. Para ativar, adiciona na Vercel:
                 </p>
                 <ul className="mt-3 space-y-1 text-text-secondary">
@@ -307,7 +307,7 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                   <li>• <code className="text-text-primary">MIXPANEL_FUNNEL_ID</code> — id do funil guardado (opcional; senão usa o primeiro)</li>
                   <li>• <code className="text-text-primary">MIXPANEL_API_HOST</code> — <code>https://eu.mixpanel.com</code> se o projeto for na UE (opcional)</li>
                 </ul>
-                <p className="mt-3 text-xs text-text-muted">Passo-a-passo completo em <code>MIXPANEL_SETUP.md</code>. Cria o funil no Mixpanel com os passos da jornada; aqui aparece o drop-off de cada passo.</p>
+                <p className="mt-3 text-xs text-text-muted">Passo a passo completo em <code>MIXPANEL_SETUP.md</code>. Cria o funil no Mixpanel com os passos da jornada; aqui aparece quantas pessoas se perdem em cada passo.</p>
               </div>
             ) : funnel.error ? (
               <div className="aviso aviso-perigo">
@@ -316,66 +316,9 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                 <p className="text-xs text-text-muted mt-2">Verifica as credenciais e, se o projeto for na UE, define <code>MIXPANEL_API_HOST=https://eu.mixpanel.com</code>. Detalhes em <code>MIXPANEL_SETUP.md</code>.</p>
               </div>
             ) : funnel.steps.length === 0 ? (
-              <div className="card p-6 text-sm text-text-muted">Sem dados do funil neste período. Experimenta outro no seletor.</div>
+              <div className="card p-6 text-sm text-text-muted">O Mixpanel não devolveu passos para este período. Experimenta outro no seletor.</div>
             ) : (
-              (() => {
-                // Uma só vista: barra por passo (largura = % do topo), com
-                // utilizadores, % do topo e queda face ao passo anterior.
-                const top = funnel.steps[0]?.count || 1;
-                const stepLabel = (e: string) => e.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-                const totalConv = (funnel.steps[funnel.steps.length - 1]?.overallConvRatio ?? 0) * 100;
-                return (
-                  <Painel
-                    titulo={funnel.name || "Funil da app"}
-                    descricao={`${formatDate(funnel.from)} → ${formatDate(funnel.to)} · ${formatNumber(top)} utilizadores no topo`}
-                    aside={
-                      <span className="text-right">
-                        <span className="block text-[22px] leading-7 font-semibold text-text-primary tabular-nums">{totalConv.toFixed(1).replace(".", ",")}%</span>
-                        <span className="block text-xs text-text-muted">chegam ao fim</span>
-                      </span>
-                    }
-                    corpo="px-4 py-3 space-y-1"
-                  >
-                    {funnel.steps.map((s, i) => (
-                      <div key={i} className="py-2">
-                        <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                          {/* O nome cru do evento fica à vista: sem ele não se
-                              sabe QUE evento do Mixpanel alimenta cada passo,
-                              e o rótulo bonito esconde exatamente isso. */}
-                          <p className="text-[13px] font-medium text-text-primary truncate">
-                            <span className="text-text-muted mr-1.5 tabular-nums">{i + 1}.</span>{stepLabel(s.event)}
-                            <code className="ml-2 text-[11px] font-normal text-text-muted">{s.event}</code>
-                          </p>
-                          <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
-                            <span className="text-[13px] font-semibold">{formatNumber(s.count)}</span>
-                            <span className="text-xs text-text-muted w-14 text-right">{(s.overallConvRatio * 100).toFixed(1).replace(".", ",")}%</span>
-                            {i === 0 ? (
-                              <span className="text-xs text-text-muted w-16 text-right">início</span>
-                            ) : (
-                              <span className={cn("inline-flex items-center justify-end gap-0.5 text-xs font-medium w-16", s.dropOff > 0.5 ? "text-danger" : s.dropOff > 0.25 ? "text-warning" : "text-success")}>
-                                <ArrowDownRight className="h-3.5 w-3.5" /> −{(s.dropOff * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-surface-subtle overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full transition-all", i === funnel.steps.length - 1 ? "bg-success/80" : "bg-piquet")}
-                            style={{ width: `${Math.max(1.5, (s.count / top) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    <p className="text-xs text-text-muted pt-2">
-                      Os passos são os eventos do Mixpanel listados a cinzento
-                      (<code className="text-text-secondary">{funnel.steps.map((s) => s.event).join(", ")}</code>),
-                      definidos no funil <b className="text-text-secondary">{funnel.name || funnel.funnelId}</b> — para
-                      mudar quais se detetam, edita esse funil no Mixpanel.
-                      A percentagem é sobre o topo; a seta é a queda face ao passo anterior, vermelha quando cai mais de metade.
-                    </p>
-                  </Painel>
-                );
-              })()
+              <FunilDaApp funnel={funnel} />
             )}
           </div>
         )}
