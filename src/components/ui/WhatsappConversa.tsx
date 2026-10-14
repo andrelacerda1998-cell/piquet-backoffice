@@ -89,7 +89,7 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
       </div>
 
       {/* Histórico — cresce para ocupar a altura disponível. */}
-      <div className="flex-1 min-h-[200px] overflow-y-auto px-3 py-3 space-y-2 bg-surface">
+      <div className={cn("flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-surface", msgs.length > 0 && "min-h-[200px]")}>
         {carregando ? (
           <p className="text-sm text-text-muted text-center py-4">A carregar conversa…</p>
         ) : msgs.length === 0 ? (
