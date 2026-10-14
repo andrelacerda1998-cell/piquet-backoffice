@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyDocument, indexDocsByVendor, missingCount, atValidationState, atFlagWithoutProof } from "./vendorDocs";
+import { classifyDocument, indexDocsByVendor, missingCount, atValidationState, atFlagWithoutProof, atDateLabel } from "./vendorDocs";
 import type { VendorDocument } from "@/services/vendorDocumentsService";
 
 const doc = (o: Partial<VendorDocument>): VendorDocument => ({
@@ -71,5 +71,29 @@ describe("atValidationState — a flag do backend não é prova de validação",
 
   it("sem flag e sem data é 'por validar'", () => {
     expect(atValidationState({ at_valid: false, at_validated_at: null })).toBe("por_validar");
+  });
+
+  /**
+   * O defeito de 14/10/2026: "Retirar AT", credenciais recusadas ao validar ou
+   * ao faturar -- o backend desliga a flag e guarda a data da última vez que
+   * funcionou. Contava como validado só pela data.
+   */
+  it("com data mas sem a flag é 'por validar': a AT deixou de valer", () => {
+    expect(atValidationState({ at_valid: false, at_validated_at: "2026-10-14T15:21:01+00:00" })).toBe("por_validar");
+  });
+});
+
+describe("atDateLabel — o que a data quer dizer", () => {
+  it("validado: a data é a da validação, sem mais nada", () => {
+    expect(atDateLabel({ at_valid: true, at_validated_at: "2026-10-14" })).toBe("");
+  });
+
+  it("por validar com data: é a última vez que funcionou", () => {
+    expect(atDateLabel({ at_valid: false, at_validated_at: "2026-10-14" })).toBe("última vez OK a ");
+  });
+
+  it("sem data não há nada a mostrar", () => {
+    expect(atDateLabel({ at_valid: true, at_validated_at: null })).toBeNull();
+    expect(atDateLabel({ at_valid: false, at_validated_at: null })).toBeNull();
   });
 });
