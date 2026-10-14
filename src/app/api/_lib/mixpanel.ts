@@ -43,6 +43,8 @@ export interface FunnelStep {
   stepConvRatio: number;    // conversão face ao passo anterior (0–1)
   overallConvRatio: number; // conversão face ao 1.º passo (0–1)
   dropOff: number;          // % que caiu do passo anterior (0–1)
+  /** Tempo médio (segundos) desde o passo anterior; `null` no 1.º passo ou sem dados. */
+  avgTime: number | null;
 }
 export interface FunnelResult {
   configured: boolean;
@@ -66,7 +68,7 @@ async function resolveFunnel(): Promise<{ id: string; name: string | null }> {
   return { id: String(arr[0].funnel_id), name: arr[0].name ?? null };
 }
 
-interface RawStep { event?: string; step_label?: string; count?: number }
+interface RawStep { event?: string; step_label?: string; count?: number; avg_time?: number | null }
 
 /** Puxa o funil e agrega os passos ao longo do período (soma contagens). */
 export async function fetchAppFunnel(fromDate: string, toDate: string): Promise<FunnelResult> {
@@ -77,20 +79,37 @@ export async function fetchAppFunnel(fromDate: string, toDate: string): Promise<
     data?: Record<string, { steps?: RawStep[] }>;
   };
 
-  // Resposta por mês: { "YYYY-MM-01": { steps: [...] } }. Para um intervalo de
-  // um mês há um só balde; se houver mais, somam-se os passos por índice.
-  const byDate = data.data ?? {};
+  return { configured: true, funnelId: id, name, from: fromDate, to: toDate, steps: agregarPassos(data.data ?? {}) };
+}
+
+/**
+ * Junta os baldes da resposta num funil só.
+ *
+ * Resposta por mês: { "YYYY-MM-01": { steps: [...] } }. Para um intervalo de
+ * um mês há um só balde; se houver mais, somam-se os passos por índice. O
+ * tempo médio entre passos junta-se pesado pelo número de pessoas de cada mês
+ * (a média de um mês com 3 pessoas não vale o mesmo que a de um com 300).
+ */
+export function agregarPassos(byDate: Record<string, { steps?: RawStep[] }>): FunnelStep[] {
   const sums: number[] = [];
   const labels: string[] = [];
+  const tempoPesado: number[] = [];
+  const pesoDoTempo: number[] = [];
   for (const day of Object.values(byDate)) {
     (day.steps ?? []).forEach((s, i) => {
-      sums[i] = (sums[i] ?? 0) + (Number(s.count) || 0);
+      const n = Number(s.count) || 0;
+      sums[i] = (sums[i] ?? 0) + n;
       if (!labels[i]) labels[i] = s.step_label || s.event || `Passo ${i + 1}`;
+      const t = Number(s.avg_time);
+      if (i > 0 && n > 0 && s.avg_time != null && Number.isFinite(t)) {
+        tempoPesado[i] = (tempoPesado[i] ?? 0) + t * n;
+        pesoDoTempo[i] = (pesoDoTempo[i] ?? 0) + n;
+      }
     });
   }
 
   const first = sums[0] || 0;
-  const steps: FunnelStep[] = sums.map((count, i) => {
+  return sums.map((count, i) => {
     const prev = i === 0 ? count : sums[i - 1] || 0;
     return {
       event: labels[i] ?? `Passo ${i + 1}`,
@@ -98,9 +117,9 @@ export async function fetchAppFunnel(fromDate: string, toDate: string): Promise<
       stepConvRatio: i === 0 ? 1 : prev > 0 ? count / prev : 0,
       overallConvRatio: first > 0 ? count / first : 0,
       dropOff: i === 0 ? 0 : prev > 0 ? 1 - count / prev : 0,
+      avgTime: pesoDoTempo[i] ? tempoPesado[i] / pesoDoTempo[i] : null,
     };
   });
 
-  return { configured: true, funnelId: id, name, from: fromDate, to: toDate, steps };
 }
 

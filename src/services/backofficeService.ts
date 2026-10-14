@@ -96,6 +96,8 @@ export interface FunnelStep {
   stepConvRatio: number;    // vs. passo anterior (0–1)
   overallConvRatio: number; // vs. 1.º passo (0–1)
   dropOff: number;          // % que caiu do passo anterior (0–1)
+  /** Tempo médio (segundos) desde o passo anterior; `null` no 1.º passo ou sem dados. */
+  avgTime?: number | null;
 }
 export interface AppFunnel {
   configured: boolean;
