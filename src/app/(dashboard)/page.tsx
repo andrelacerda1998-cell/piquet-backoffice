@@ -6,12 +6,12 @@ import { RouteGuard } from "@/components/layout/RouteGuard";
 import { WelcomeBanner } from "@/components/ui/WelcomeBanner";
 import { TrendIndicator } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { InfoTip } from "@/components/ui/InfoTip";
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getFinanceGmv, getFinanceSummary } from "@/services/financeService";
 import { getOperacoesAoVivo } from "@/services/dashboardService";
-import { pct } from "@/lib/aoVivo";
+import { pct, pctDeFracao } from "@/lib/aoVivo";
 import { PrecisaDeTi } from "@/components/hoje/PrecisaDeTi";
 import { buildMetricValue } from "@/lib/calculations";
 import { useAuthStore } from "@/stores";
@@ -21,8 +21,8 @@ import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import AlertasPage from "./alertas/Alertas";
 import { formatCurrency } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
-import { LayoutDashboard } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+
 
 /*
   A Visão Geral é "Hoje" (auditoria de 08/10/2026, secção 8): responde em
@@ -77,7 +77,7 @@ export default function OverviewPage() {
   const mes = aoVivo?.liquidez.mes;
   const trinta = aoVivo?.liquidez["30d"];
   const servidos = mes
-    ? { valor: pct(mes.taxa), nota: `${mes.servidos} de ${mes.criados} pedidos do mês`, zero: mes.criados > 0 && mes.servidos === 0 }
+    ? { valor: pctDeFracao(mes.taxa), nota: `${mes.servidos} de ${mes.criados} pedidos do mês`, zero: mes.criados > 0 && mes.servidos === 0 }
     : trinta
       ? { valor: pct(trinta.taxa_servidos), nota: `${trinta.servidos} de ${trinta.terminados} terminados (30 dias)`, zero: trinta.terminados > 0 && trinta.servidos === 0 }
       : null;
@@ -106,112 +106,98 @@ export default function OverviewPage() {
 
   return (
     <RouteGuard route="/">
-      <div className="space-y-8">
+      <div className="space-y-6">
         <WelcomeBanner />
 
         <PageHeader
-          icon={LayoutDashboard}
-          eyebrow="Visão geral"
           title="Hoje"
           subtitle={hoje.charAt(0).toUpperCase() + hoje.slice(1)}
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
+        {/*
+          Duas colunas a partir de ecrãs largos: a fila à esquerda (o que
+          fazer) e os números à direita (como está o negócio). Empilhados, os
+          números ficavam por baixo de sete linhas da fila e ninguém lá
+          chegava -- as duas perguntas do ecrã têm de se ver de uma vez.
+        */}
         {tab === "resumo" && (
-          <div className="space-y-8">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <PrecisaDeTi onVerTodos={() => setTab("alertas")} onTotal={setTotalAlertas} />
 
-            {aoVivo && (
-              <section aria-labelledby="agora">
-                <p id="agora" className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                  Agora <Link href="/servicos" className="ml-2 normal-case tracking-normal font-normal text-piquet-600 hover:underline">Pedidos ao vivo →</Link>
-                </p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <AgoraCard titulo="À procura de técnico" valor={String(aoVivo.a_procura.length)} alerta={aoVivo.a_procura.length > 0 && aoVivo.oferta.prontos === 0} />
-                  <AgoraCard titulo="Em curso" valor={String(aoVivo.em_curso.length)} />
+            <div className="space-y-6">
+              {aoVivo && (
+                <StatGroup
+                  cols={2}
+                  title={<>
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:hidden" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+                    </span>
+                    Agora
+                  </>}
+                  aside={<Link href="/servicos" className="btn-ghost text-[13px] -mr-1.5">Ao vivo <ArrowRight className="h-3.5 w-3.5" /></Link>}
+                >
+                  <Stat label="À procura de técnico" value={String(aoVivo.a_procura.length)} tone={aoVivo.a_procura.length > 0 && aoVivo.oferta.prontos === 0 ? "mau" : undefined} />
+                  <Stat label="Em curso" value={String(aoVivo.em_curso.length)} />
                   {aoVivo.agora?.agendados_hoje !== undefined
-                    ? <AgoraCard titulo="Agendados para hoje" valor={String(aoVivo.agora.agendados_hoje)} />
-                    : <AgoraCard titulo="Técnicos prontos" valor={String(aoVivo.oferta.prontos)} alerta={aoVivo.oferta.prontos === 0} />}
-                  <AgoraCard titulo="Técnicos online" valor={String(aoVivo.oferta.online)} nota={notaOnline} alerta={aoVivo.oferta.online === 0} />
-                </div>
-              </section>
-            )}
+                    ? <Stat label="Agendados para hoje" value={String(aoVivo.agora.agendados_hoje)} />
+                    : <Stat label="Técnicos prontos" value={String(aoVivo.oferta.prontos)} tone={aoVivo.oferta.prontos === 0 ? "mau" : undefined} />}
+                  <Stat label="Técnicos online" value={String(aoVivo.oferta.online)} note={notaOnline} tone={aoVivo.oferta.online === 0 ? "mau" : undefined} />
+                </StatGroup>
+              )}
 
-            <section aria-labelledby="este-mes">
-              <p id="este-mes" className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Este mês</p>
-              <div className="card p-4 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-                {servidos && (
-                  <NumeroDoMes
-                    titulo="Pedidos servidos"
-                    info="Dos pedidos criados, quantos tiveram técnico e foram feitos. É o número que diz se o marketplace funciona: um pedido que ninguém aceita é um cliente perdido."
-                    valor={servidos.valor}
-                    nota={servidos.nota}
-                    tom={servidos.zero ? "mau" : undefined}
+              <div>
+                <StatGroup
+                  cols={2}
+                  title="Este mês"
+                  aside={<Link href="/financeiro" className="btn-ghost text-[13px] -mr-1.5">Financeiro <ArrowRight className="h-3.5 w-3.5" /></Link>}
+                >
+                  {servidos && (
+                    <Stat
+                      label="Pedidos servidos"
+                      info="Dos pedidos criados, quantos tiveram técnico e foram feitos. É o número que diz se o marketplace funciona: um pedido que ninguém aceita é um cliente perdido."
+                      value={servidos.valor}
+                      note={servidos.nota}
+                      tone={servidos.zero ? "mau" : undefined}
+                    />
+                  )}
+                  <Stat
+                    label="GMV"
+                    info="Tudo o que o Payshop cobrou este mês (pagamentos de 10 € ou mais; abaixo são testes)."
+                    value={formatCurrency(gmvMes.value)}
+                  >
+                    <TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />
+                  </Stat>
+                  <Stat
+                    label="Comissão Piquet"
+                    info="A parte do GMV que fica para a Piquet (25%)."
+                    value={formatCurrency(comissaoMes.value)}
+                  >
+                    <TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />
+                  </Stat>
+                  <Stat
+                    label="Resultado"
+                    info="Comissão do mês menos os custos imputados ao mês (equipa + média das faturas de fornecedores), contados até hoje."
+                    value={resultado === null ? "—" : `${resultado >= 0 ? "+" : "−"}${formatCurrency(Math.abs(resultado))}`}
+                    note={resultado === null
+                      ? <>Sem custos registados. <Link href="/financeiro?tab=custos" className="link">Registar</Link></>
+                      : `${formatCurrency(fin?.piquetRevenue ?? 0)} − ${formatCurrency(custosDoMes)} de custos`}
+                    tone={resultado === null ? undefined : resultado >= 0 ? "bom" : "mau"}
                   />
-                )}
-                <NumeroDoMes
-                  titulo="GMV"
-                  info="Tudo o que o Payshop cobrou este mês (pagamentos de 10 € ou mais; abaixo são testes)."
-                  valor={formatCurrency(gmvMes.value)}
-                  extra={<TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />}
-                />
-                <NumeroDoMes
-                  titulo="Comissão Piquet"
-                  info="A parte do GMV que fica para a Piquet (25%)."
-                  valor={formatCurrency(comissaoMes.value)}
-                  extra={<TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />}
-                />
-                <NumeroDoMes
-                  titulo="Resultado"
-                  info="Comissão do mês menos os custos imputados ao mês (equipa + média das faturas de fornecedores), contados até hoje."
-                  valor={resultado === null ? "—" : `${resultado >= 0 ? "+" : "−"}${formatCurrency(Math.abs(resultado))}`}
-                  nota={resultado === null ? undefined : `${formatCurrency(fin?.piquetRevenue ?? 0)} − ${formatCurrency(custosDoMes)} de custos`}
-                  tom={resultado === null ? undefined : resultado >= 0 ? "bom" : "mau"}
-                  semValor={resultado === null ? <>Sem custos registados. <Link href="/financeiro?tab=custos" className="text-piquet-600 hover:underline">Registar</Link></> : undefined}
-                />
+                </StatGroup>
+                <p className="mt-2 px-1 text-[13px] text-text-muted">
+                  O ano, o CAC, o LTV e as lojas estão em{" "}
+                  <Link href="/crescimento" className="link">Crescimento</Link>.
+                </p>
               </div>
-              <p className="mt-3 text-sm text-text-secondary">
-                O ano, o CAC, o LTV, os downloads e a avaliação nas lojas estão em{" "}
-                <Link href="/crescimento" className="text-piquet-600 font-medium hover:underline">Crescimento</Link>;
-                o detalhe do dinheiro no <Link href="/financeiro" className="text-piquet-600 font-medium hover:underline">Financeiro</Link>.
-              </p>
-            </section>
+            </div>
           </div>
         )}
 
         {tab === "alertas" && <AlertasPage embutido onTotal={setTotalAlertas} />}
       </div>
     </RouteGuard>
-  );
-}
-
-/** Um número do bloco "Agora": vermelho quando pede ação. */
-function AgoraCard({ titulo, valor, nota, alerta = false }: { titulo: string; valor: string; nota?: string; alerta?: boolean }) {
-  return (
-    <div className={cn("card p-3", alerta && "border-l-[3px] border-l-danger")}>
-      <p className="text-xs text-text-secondary">{titulo}</p>
-      <p className={cn("text-2xl font-bold tabular-nums", alerta ? "text-danger" : "text-text-primary")}>{valor}</p>
-      {nota && <p className="text-[11px] text-text-muted truncate">{nota}</p>}
-    </div>
-  );
-}
-
-/** Um número da linha do mês, com a definição num "ⓘ" que abre com um toque. */
-function NumeroDoMes({ titulo, info, valor, nota, extra, tom, semValor }: {
-  titulo: string; info: string; valor: string; nota?: string; extra?: React.ReactNode;
-  tom?: "bom" | "mau"; semValor?: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-xs text-text-secondary">{titulo} <InfoTip texto={info} lado="esquerda" /></p>
-      <p className={cn("mt-0.5 text-xl font-bold tabular-nums",
-        tom === "bom" ? "text-success" : tom === "mau" ? "text-danger" : valor === "—" ? "text-text-muted" : "text-text-primary")}>
-        {valor}
-      </p>
-      {extra && <div className="mt-0.5">{extra}</div>}
-      {nota && <p className="text-[11px] text-text-muted truncate">{nota}</p>}
-      {semValor && <p className="text-[11px] text-text-muted">{semValor}</p>}
-    </div>
   );
 }

@@ -5,9 +5,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatRating } from "@/lib/formatters";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
+import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, ArrowRight, ChevronDown, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
@@ -95,14 +95,14 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
       daí o `!`.
     */
     <div className="fixed inset-0 z-50 bg-black/40 !mt-0" onClick={onClose}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Pedido ${service.id}`} className="w-full bg-surface h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Pedido ${service.id}`} className="w-full bg-surface-muted h-full overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Cabeçalho: o pedido, as duas pessoas e o que se pode fazer. */}
-        <div className="sticky top-0 bg-surface border-b border-surface-border px-6 py-4 z-10">
+        <div className="sticky top-0 bg-surface border-b border-surface-border px-4 md:px-8 py-4 z-10">
           <div className="mx-auto max-w-[1400px] flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="font-mono text-xs text-text-muted">#{service.id}</p>
-              <h2 className="text-lg font-bold mt-0.5">{nomeDoServico(service, d?.personalizado) ?? "Pedido sem tipo de serviço"}</h2>
-              <div className="mt-1 flex flex-wrap items-start gap-x-3 gap-y-1 text-sm text-text-secondary">
+              <p className="font-mono text-xs text-text-muted">Pedido #{service.id}</p>
+              <h2 className="text-xl font-semibold mt-0.5">{nomeDoServico(service, d?.personalizado) ?? "Pedido sem tipo de serviço"}</h2>
+              <div className="mt-1.5 flex flex-wrap items-start gap-x-3 gap-y-1 text-[13px] text-text-secondary">
                 {/* O estado simples, dito de quem é a vez; o técnico fica por baixo, em cinzento. */}
                 <EstadoDoPedido status={service.status} tecnico estadoLaravel={d?.estadoLaravel} />
                 <span className="pt-0.5">{[service.city, service.requestedAt && `pedido ${formatDateTime(service.requestedAt)}`].filter(Boolean).join(" · ")}</span>
@@ -110,7 +110,7 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <AcoesDoPedido service={service} detalhe={d} aCarregar={detalhe.aCarregar} acaoInicial={acaoInicial} onMudou={() => detalhe.recarregar?.()} />
-              <button onClick={onClose} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <button onClick={onClose} className="p-1.5 rounded-md text-text-muted hover:bg-surface-subtle hover:text-text-primary" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div className="mx-auto max-w-[1400px] mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -131,7 +131,7 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1400px] px-6 pb-6 pt-5 space-y-5">
+        <div className="mx-auto max-w-[1400px] px-4 md:px-8 pb-8 pt-6 space-y-5">
           {passo && <AvisoDoProximoPasso passo={passo} />}
           {/*
             Duas colunas, cada uma uma pilha: à esquerda o que aconteceu
@@ -164,11 +164,11 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
               <Seccao titulo="O que o cliente achou" vazia={!service.rating && !service.hasComplaint ? "Sem avaliação nem reclamação." : null}>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Avaliação</p>
+                    <p className="text-xs text-text-muted mb-1">Avaliação</p>
                     <Avaliacoes service={service} />
                   </div>
                   <div className="pt-3 border-t border-surface-border">
-                    <p className="text-[11px] uppercase tracking-wide text-text-muted mb-1">Reclamação</p>
+                    <p className="text-xs text-text-muted mb-1">Reclamação</p>
                     <Reclamacao service={service} />
                   </div>
                 </div>
@@ -198,9 +198,13 @@ function convidadosDe(lista: CandidatoLaravel[] | undefined, m: ServiceRequest["
 /** O "Próximo passo": âmbar quando alguém tem de agir, cinzento quando o pedido anda sozinho. */
 function AvisoDoProximoPasso({ passo }: { passo: ProximoPasso }) {
   return (
-    <div className={cn("rounded-xl border-l-[3px] px-4 py-3",
-      passo.tom === "agir" ? "border-l-warning bg-warning-light/50" : "border-l-surface-strong bg-surface-subtle")}>
-      <p className="text-sm text-text-primary"><b>Próximo passo:</b> {passo.texto}</p>
+    <div className={cn("flex items-start gap-3 rounded-xl border px-4 py-3",
+      passo.tom === "agir" ? "border-warning/30 bg-warning-light" : "border-surface-border bg-surface")}>
+      <span className={cn("mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+        passo.tom === "agir" ? "bg-warning/20 text-warning" : "bg-surface-subtle text-text-muted")}>
+        <ArrowRight className="h-3 w-3" />
+      </span>
+      <p className="text-sm text-text-primary"><span className="font-semibold">Próximo passo:</span> {passo.texto}</p>
     </div>
   );
 }
@@ -212,22 +216,26 @@ function AvisoDoProximoPasso({ passo }: { passo: ProximoPasso }) {
  * ocupava o mesmo espaço que uma cheia, para dizer que não há nada.
  */
 function Seccao({ titulo, children, fechada = false, vazia }: { titulo: string; children: React.ReactNode; fechada?: boolean; vazia?: string | null }) {
-  const h3 = "text-xs font-semibold uppercase tracking-[0.14em] text-text-muted";
+  const h3 = "text-sm font-semibold text-text-primary";
   if (vazia) {
     return (
       <section className="card px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className={h3}>{titulo}</h3>
-        <p className="text-sm text-text-muted">{vazia}</p>
+        <p className="text-[13px] text-text-muted">{vazia}</p>
       </section>
     );
   }
   if (fechada) {
     return (
-      <details className="card p-4 group">
-        <summary className={cn(h3, "cursor-pointer select-none list-none flex items-center justify-between")}>
-          {titulo}<span className="normal-case tracking-normal font-normal text-text-secondary group-open:hidden">Mostrar</span>
+      <details className="card group">
+        <summary className={cn(h3, "px-4 py-3 cursor-pointer select-none list-none flex items-center justify-between hover:bg-surface-subtle/50 rounded-card")}>
+          {titulo}
+          <span className="inline-flex items-center gap-1 text-[13px] font-normal text-text-muted">
+            <span className="group-open:hidden">Mostrar</span><span className="hidden group-open:inline">Esconder</span>
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+          </span>
         </summary>
-        <div className="mt-3">{children}</div>
+        <div className="px-4 pb-4">{children}</div>
       </details>
     );
   }
@@ -249,12 +257,14 @@ function paraWhatsApp(telefone: string): string {
 function Pessoa({ papel, nome, telefone, semAcesso, ficha }: {
   papel: string; nome: string; telefone?: string | null; semAcesso?: boolean; ficha?: string;
 }) {
-  const botao = "inline-flex items-center gap-1 rounded-md border border-surface-border px-2 py-1 text-xs font-medium hover:bg-surface-muted";
+  const botao = "inline-flex items-center gap-1 rounded-md border border-surface-border bg-surface px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface-subtle hover:text-text-primary";
+  const iniciais = nome.replace(/[()]/g, "").split(" ").filter(Boolean).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   return (
-    <div className="rounded-lg border border-surface-border px-3 py-2 min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-text-muted">{papel}</p>
-      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-2">
+    <div className="rounded-xl border border-surface-border bg-surface-muted/50 px-3 py-2.5 min-w-0 flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-xs font-semibold text-text-secondary" aria-hidden>{iniciais || "?"}</span>
+      <div className="min-w-0 flex-1 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
+          <p className="text-xs text-text-muted">{papel}</p>
           <p className="font-medium text-text-primary truncate">{nome}</p>
           {telefone
             ? <p className="text-sm text-text-secondary select-all tabular-nums">{telefone}</p>
@@ -774,7 +784,7 @@ function Avaliacoes({ service }: { service: ServiceRequest }) {
         {Array.from({ length: 5 }).map((_, i) => (
           <Star key={i} className={cn("h-5 w-5", i < Math.round(service.rating ?? 0) ? "text-piquet fill-piquet" : "text-surface-strong")} />
         ))}
-        <span className="ml-2 font-bold text-text-primary">{service.rating?.toFixed(1)}</span>
+        <span className="ml-2 font-semibold text-text-primary">{formatRating(service.rating)}</span>
       </div>
       {/*
         Aqui estava uma opinião escrita pelo código: "excelente, técnico muito

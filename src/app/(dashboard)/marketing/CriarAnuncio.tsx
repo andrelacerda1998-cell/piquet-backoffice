@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { useState } from "react";
 import Image from "next/image";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -168,7 +169,7 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
         {/* Estado da ligação — o erro mais provável é falta de permissão, e
             dizê-lo aqui evita que se preencha o formulário todo para falhar no fim. */}
         {opcoes?.error && (
-          <div className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/30 px-4 py-3">
+          <div className="aviso aviso-perigo px-4 py-3">
             <p className="text-sm font-medium text-text-primary flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-danger" /> A conta de anúncios não respondeu
             </p>
@@ -176,7 +177,7 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         )}
         {opcoes && !opcoes.configured && (
-          <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-3 text-sm text-text-secondary">
+          <div className="aviso aviso-atencao px-4 py-3 text-sm text-text-secondary">
             Faltam <code>META_ACCESS_TOKEN</code> e <code>META_AD_ACCOUNT_ID</code> na Vercel.
           </div>
         )}
@@ -201,12 +202,12 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
         {/* ---------------------------- 1. CAMPANHA ---------------------------- */}
         {passo === 1 && (
           <div className="space-y-4 max-w-xl">
-            <div className="flex gap-2">
-              <button onClick={() => setNovaCampanha(true)}
-                className={cn("text-xs px-3 py-1.5 rounded-full border", novaCampanha ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary")}>Nova campanha</button>
-              <button onClick={() => setNovaCampanha(false)}
-                className={cn("text-xs px-3 py-1.5 rounded-full border", !novaCampanha ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary")}>Usar existente</button>
-            </div>
+            <Segmentado
+              ariaLabel="Campanha"
+              opcoes={[{ id: "nova" as const, label: "Nova campanha" }, { id: "existente" as const, label: "Usar existente" }]}
+              valor={novaCampanha ? "nova" : "existente"}
+              onChange={(v) => setNovaCampanha(v === "nova")}
+            />
             {novaCampanha ? (
               <>
                 <Field label="Nome da campanha">
@@ -237,12 +238,12 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
         {/* ---------------------------- 2. CONJUNTO ---------------------------- */}
         {passo === 2 && (
           <div className="space-y-4 max-w-xl">
-            <div className="flex gap-2">
-              <button onClick={() => setNovoConjunto(true)}
-                className={cn("text-xs px-3 py-1.5 rounded-full border", novoConjunto ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary")}>Novo conjunto</button>
-              <button onClick={() => setNovoConjunto(false)}
-                className={cn("text-xs px-3 py-1.5 rounded-full border", !novoConjunto ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary")}>Usar existente</button>
-            </div>
+            <Segmentado
+              ariaLabel="Conjunto de anúncios"
+              opcoes={[{ id: "novo" as const, label: "Novo conjunto" }, { id: "existente" as const, label: "Usar existente" }]}
+              valor={novoConjunto ? "novo" : "existente"}
+              onChange={(v) => setNovoConjunto(v === "novo")}
+            />
             {novoConjunto ? (
               <>
                 <Field label="Nome do conjunto">
@@ -317,7 +318,7 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
 
             {/* Pré-visualização — aproximada, não o render da Meta. */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Pré-visualização</p>
+              <p className="text-sm font-semibold text-text-primary">Pré-visualização</p>
               <div className="card overflow-hidden max-w-sm">
                 {imagem ? (
                   <Image src={imagem.url} alt="Criativo" width={400} height={300} unoptimized className="w-full object-cover" />
@@ -347,7 +348,7 @@ export function CriarAnuncio({ open, onClose }: { open: boolean; onClose: () => 
         {/* ------------------------------ 4. REVER ------------------------------ */}
         {passo === 4 && (
           <div className="space-y-4 max-w-xl">
-            <div className="rounded-xl border-l-[3px] border-l-success bg-success-light/25 px-4 py-3">
+            <div className="aviso aviso-sucesso px-4 py-3">
               <p className="text-sm font-medium text-text-primary">Anúncio criado — e está em pausa.</p>
               <p className="text-xs text-text-secondary mt-1">
                 Não gasta nada enquanto não for activado. Vê-o no Ads Manager antes de o pôr a correr.

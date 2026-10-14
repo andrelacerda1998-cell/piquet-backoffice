@@ -26,8 +26,9 @@ import {
 import { toast } from "@/stores";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, FileCheck2, Settings, Pencil } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Plus, FileCheck2, Pencil } from "lucide-react";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { Etiqueta } from "@/components/ui/Ficha";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 import CatalogPage from "./_tabs/catalogo";
 import ZonesPage from "./_tabs/zonas";
@@ -66,8 +67,6 @@ export default function ConfiguracaoPage() {
     <RouteGuard route="/configuracao">
       <div className="space-y-6">
         <PageHeader
-          icon={Settings}
-          eyebrow="Sistema"
           title="Configurações"
           subtitle="Catálogo, zonas, preços, documentos, equipa e o estado das integrações"
         />
@@ -76,21 +75,18 @@ export default function ConfiguracaoPage() {
         {tab === "catalogo" && <CatalogPage />}
         {tab === "zonas" && <ZonesPage />}
         {tab === "precos" && (
-          <div className="space-y-8">
-            <PrecosDeReferencia onEditar={() => setTab("catalogo")} />
+          <div className="space-y-10">
             <TaxasTab />
+            <PrecosDeReferencia onEditar={() => setTab("catalogo")} />
           </div>
         )}
         {tab === "documentos" && <DocumentosTab />}
         {tab === "equipa" && <AdminsTab />}
         {tab === "historico" && <AtividadeTab />}
         {tab === "sistema" && (
-          <div className="space-y-8">
+          <div className="space-y-10">
             <PainelDeIntegracoes />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Notificações enviadas</p>
-              <NotificacoesTab />
-            </div>
+            <NotificacoesTab />
           </div>
         )}
       </div>
@@ -111,21 +107,19 @@ function PrecosDeReferencia({ onEditar }: { onEditar: () => void }) {
   const tipos = [...(data?.items ?? [])].sort((a, b) =>
     (a.operation_area_name ?? "").localeCompare(b.operation_area_name ?? "") || a.name.localeCompare(b.name));
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 className="font-semibold">Preços de referência</h2>
-          <p className="text-xs text-text-secondary">O &quot;a partir de&quot; que a app mostra em cada serviço. O preço final depende do técnico (valor/hora) e da hora do dia (taxas abaixo).</p>
-        </div>
-        <button onClick={onEditar} className="btn-secondary text-sm"><Pencil className="h-4 w-4" /> Mudar no Catálogo</button>
-      </div>
+    <section>
+      <SectionHeader
+        title="Preços de referência"
+        description={<>O &quot;a partir de&quot; que a app mostra em cada serviço. O preço final depende do técnico (valor/hora) e da hora do dia (taxas acima).</>}
+        aside={<button onClick={onEditar} className="btn-secondary text-sm"><Pencil className="h-4 w-4" /> Mudar no Catálogo</button>}
+      />
       <DataTable
         columns={[
-          { key: "operation_area_name", label: "Categoria", render: (r: ServiceType) => r.operation_area_name ?? "—" },
-          { key: "name", label: "Serviço" },
-          { key: "starts_from", label: "A partir de", render: (r: ServiceType) => r.starts_from != null ? formatCurrency(r.starts_from) : <span className="text-text-muted">—</span> },
-          { key: "time", label: "Duração", render: (r: ServiceType) => r.time ? `${r.time} min` : "—" },
-          { key: "vendors_count", label: "Técnicos", render: (r: ServiceType) => r.vendors_count },
+          { key: "operation_area_name", label: "Categoria", render: (r: ServiceType) => <span className="text-text-secondary">{r.operation_area_name ?? "—"}</span> },
+          { key: "name", label: "Serviço", render: (r: ServiceType) => <span className="font-medium">{r.name}</span> },
+          { key: "starts_from", label: "A partir de", className: "text-right", render: (r: ServiceType) => r.starts_from != null ? <span className="tabular-nums">{formatCurrency(r.starts_from)}</span> : <span className="text-text-muted">—</span> },
+          { key: "time", label: "Duração", className: "text-right", render: (r: ServiceType) => r.time ? <span className="tabular-nums">{r.time} min</span> : "—" },
+          { key: "vendors_count", label: "Técnicos", className: "text-right", render: (r: ServiceType) => <span className="tabular-nums">{r.vendors_count}</span> },
         ]}
         data={tipos}
         keyField="id"
@@ -189,65 +183,62 @@ function TaxasTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold">Taxas e comissões</h3>
-        <DemoBadge endpoint="/fee-settings" />
-      </div>
-      <p className="text-sm text-text-secondary">
-        Multiplicadores da tarifa base por período do dia, preço por km e comissão retida pela Piquet — aplicados ao cálculo de todos os serviços.
-      </p>
-
-      <div>
-        <h3 className="font-semibold mb-3">Taxas horárias</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {TIME_PERIODS.map(({ key, label }) => (
-            <div key={key} className="card p-4">
-              <p className="text-xs text-text-secondary mb-2">{label}</p>
-              <div className="flex items-center gap-2">
-                <input type="number" min={0} step={1} value={draft[key]}
-                  onChange={(e) => set(key, Number(e.target.value))}
-                  className="input-field text-sm py-1.5" />
-                <span className="text-sm text-text-muted shrink-0">%</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="font-semibold mb-3">Configurações de taxas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-          <div className="card p-4">
-            <p className="text-xs text-text-secondary mb-2">Preço por km (deslocação)</p>
-            <div className="flex items-center gap-2">
-              <input type="number" min={0} step={0.01} value={draft.kilometer_price}
-                onChange={(e) => set("kilometer_price", Number(e.target.value))}
-                className="input-field text-sm py-1.5" />
-              <span className="text-sm text-text-muted shrink-0">€</span>
+    <section>
+      <SectionHeader
+        title="Taxas e comissões"
+        description="Multiplicadores da tarifa base por período do dia, preço por km e comissão retida pela Piquet — aplicados ao cálculo de todos os serviços."
+        aside={<DemoBadge endpoint="/fee-settings" />}
+      />
+      <div className="card">
+        <div className="p-4 space-y-5">
+          <div>
+            <p className="text-[13px] font-medium text-text-primary mb-2">Taxas horárias</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {TIME_PERIODS.map(({ key, label }) => (
+                <CampoComUnidade key={key} rotulo={label} unidade="%" valor={draft[key]} passo={1}
+                  onChange={(v) => set(key, v)} />
+              ))}
             </div>
           </div>
-          <div className="card p-4">
-            <p className="text-xs text-text-secondary mb-2">Comissão do sistema</p>
-            <div className="flex items-center gap-2">
-              <input type="number" min={0} max={100} step={1} value={draft.system_commission}
-                onChange={(e) => set("system_commission", Number(e.target.value))}
-                className="input-field text-sm py-1.5" />
-              <span className="text-sm text-text-muted shrink-0">%</span>
+          <div className="border-t border-surface-border pt-5">
+            <p className="text-[13px] font-medium text-text-primary mb-2">Deslocação e comissão</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <CampoComUnidade rotulo="Preço por km" unidade="€" valor={draft.kilometer_price} passo={0.01}
+                onChange={(v) => set("kilometer_price", v)} />
+              <CampoComUnidade rotulo="Comissão do sistema" unidade="%" valor={draft.system_commission} passo={1} max={100}
+                onChange={(v) => set("system_commission", v)} />
             </div>
           </div>
         </div>
+        {/* As ações só pedem atenção quando há alguma coisa por gravar. */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-surface-border bg-surface-muted/50 rounded-b-card">
+          {dirty && !saving && <span className="mr-auto text-xs text-warning">Alterações por gravar</span>}
+          {dirty && !saving && (
+            <button onClick={() => setDraft(data ?? null)} className="btn-ghost text-sm">Cancelar</button>
+          )}
+          <button onClick={save} disabled={!dirty || saving} className="btn-primary text-sm disabled:opacity-50">
+            {saving ? "A gravar…" : "Guardar alterações"}
+          </button>
+        </div>
       </div>
+    </section>
+  );
+}
 
-      <div className="flex items-center gap-3">
-        <button onClick={save} disabled={!dirty || saving} className="btn-primary text-sm">
-          {saving ? "A gravar…" : "Guardar alterações"}
-        </button>
-        {dirty && !saving && (
-          <button onClick={() => setDraft(data ?? null)} className="btn-secondary text-sm">Cancelar</button>
-        )}
-      </div>
-    </div>
+/** Um número com a unidade dentro da caixa (8 %, 0,35 €). */
+function CampoComUnidade({ rotulo, unidade, valor, passo, max, onChange }: {
+  rotulo: string; unidade: string; valor: number; passo: number; max?: number; onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs text-text-muted mb-1 block">{rotulo}</span>
+      <span className="relative block">
+        <input type="number" min={0} max={max} step={passo} value={valor}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="input-field py-1.5 pr-8 tabular-nums" />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">{unidade}</span>
+      </span>
+    </label>
   );
 }
 
@@ -301,37 +292,32 @@ function DocumentosTab() {
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold">Documentos</h3>
-              <DemoBadge endpoint="/documents" />
-            </div>
-            <p className="text-sm text-text-secondary mt-1">Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os na aba Técnicos.</p>
-          </div>
-          <button onClick={openNew} className="btn-primary text-sm shrink-0"><Plus className="h-4 w-4" /> Novo documento</button>
-        </div>
-        <div className="space-y-2">
-          {docs.map((d) => (
-            <div key={d.id} className="card px-4 py-3 flex items-center gap-3">
-              <FileCheck2 className={cn("h-5 w-5 shrink-0", d.required ? "text-success" : "text-text-muted")} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-text-primary">{d.name}</p>
-                {d.description && <p className="text-xs text-text-secondary">{d.description}</p>}
-              </div>
-              <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
-                d.required ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
-                {d.required ? "Obrigatório" : "Opcional"}
-              </span>
-              <button onClick={() => openEdit(d)} className="inline-flex items-center gap-1 text-xs text-piquet-600 hover:underline shrink-0">
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </button>
-            </div>
-          ))}
-          {docs.length === 0 && <p className="text-sm text-text-secondary">Ainda sem documentos.</p>}
-        </div>
-      </div>
+      <section>
+        <SectionHeader
+          title="Documentos exigidos"
+          description="Documentos pedidos aos técnicos no registo — o fluxo de aprovação (KYC) valida-os em Técnicos."
+          aside={<><DemoBadge endpoint="/documents" /><button onClick={openNew} className="btn-secondary text-sm"><Plus className="h-4 w-4" /> Novo documento</button></>}
+        />
+        {docs.length === 0 ? (
+          <p className="card px-4 py-6 text-center text-sm text-text-muted">Ainda sem documentos.</p>
+        ) : (
+          <ul className="card divide-y divide-surface-border">
+            {docs.map((d) => (
+              <li key={d.id} className="group flex items-center gap-3 px-4 py-3">
+                <FileCheck2 className={cn("h-4 w-4 shrink-0", d.required ? "text-success" : "text-text-muted")} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-primary">{d.name}</p>
+                  {d.description && <p className="text-xs text-text-muted">{d.description}</p>}
+                </div>
+                <Etiqueta tom={d.required ? "bom" : "neutro"}>{d.required ? "Obrigatório" : "Opcional"}</Etiqueta>
+                <button onClick={() => openEdit(d)} className="btn-ghost text-xs px-2 py-1 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <Modal
         open={modal.open}
@@ -381,12 +367,13 @@ function AdminsTab() {
     { key: "created_at", label: "Acesso desde", render: (r) => formatDateTime(r.created_at) },
   ];
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-text-secondary">
-        Quem consegue entrar no backoffice e com que perfil. Para dar ou tirar acesso, fala com o CTO: hoje faz-se no Supabase.
-      </p>
+    <section>
+      <SectionHeader
+        title="Equipa e acessos"
+        description="Quem consegue entrar no backoffice e com que perfil. Para dar ou tirar acesso, fala com o CTO: hoje faz-se no Supabase."
+      />
       <DataTable columns={columns} data={data ?? []} keyField="id" emptyMessage="Ninguém com acesso registado" />
-    </div>
+    </section>
   );
 }
 
@@ -426,25 +413,25 @@ function AtividadeTab() {
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold">Atividade</h3>
-        <DemoBadge endpoint="/audits" />
-      </div>
-      <p className="text-sm text-text-secondary">Quem fez o quê, e quando.</p>
+    <div className="space-y-10">
+      <section>
+        <SectionHeader title="No backoffice" description="Cada alteração feita aqui, com o nome de quem a fez e o motivo quando há." />
+        <div className="card px-4 py-1">
+          {!daEquipa ? <p className="py-3 text-sm text-text-muted">A carregar…</p>
+            : !daEquipa.ativo ? <p className="py-3 text-sm text-text-muted">Ainda não ligado: falta a tabela acoes_da_equipa no Supabase.</p>
+            : daEquipa.registos.length === 0 ? <p className="py-3 text-sm text-text-muted">Ainda sem ações registadas.</p>
+            : <ListaDoHistorico registos={daEquipa.registos} comRegisto />}
+        </div>
+      </section>
 
-      <div className="card p-4">
-        <h4 className="text-sm font-semibold text-text-primary">No backoffice</h4>
-        <p className="text-xs text-text-secondary mb-2">Cada alteração feita aqui, com o nome de quem a fez e o motivo quando há.</p>
-        {!daEquipa ? <p className="text-sm text-text-muted">A carregar…</p>
-          : !daEquipa.ativo ? <p className="text-sm text-text-muted">Ainda não ligado: falta a tabela acoes_da_equipa no Supabase.</p>
-          : daEquipa.registos.length === 0 ? <p className="text-sm text-text-muted">Ainda sem ações registadas.</p>
-          : <ListaDoHistorico registos={daEquipa.registos} comRegisto />}
-      </div>
-
-      <h4 className="text-sm font-semibold text-text-primary pt-2">No Laravel (Filament e apps)</h4>
-      <p className="text-xs text-text-secondary">O que se faz pelo backoffice chega ao Laravel sem autor; o que se faz no Filament fica com ele.</p>
-      <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
+      <section>
+        <SectionHeader
+          title="No Laravel (Filament e apps)"
+          description="O que se faz pelo backoffice chega ao Laravel sem autor; o que se faz no Filament fica com ele."
+          aside={<DemoBadge endpoint="/audits" />}
+        />
+        <DataTable columns={columns} data={log} keyField="id" emptyMessage="Sem atividade registada" />
+      </section>
     </div>
   );
 }
@@ -481,18 +468,15 @@ function NotificacoesTab() {
       <div>
         <p className="font-medium">{r.recipient?.name ?? "—"}</p>
         {r.recipient_type && (
-          <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium",
-            r.recipient_type === "vendor" ? "bg-warning-light text-warning" : "bg-success-light text-success")}>
-            {r.recipient_type === "vendor" ? "Técnico" : "Cliente"}
-          </span>
+          <span className="text-xs text-text-muted">{r.recipient_type === "vendor" ? "Técnico" : "Cliente"}</span>
         )}
       </div>
     ) },
     { key: "type", label: "Notificação", render: (r) => <span className="font-mono text-xs">{r.type}</span> },
     { key: "title", label: "Título", render: (r) => <span className="line-clamp-1 max-w-[240px] block">{r.title}</span> },
     { key: "read", label: "Estado", render: (r) => (
-      <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-        r.read ? "bg-surface-subtle text-text-secondary" : "bg-success-light text-success")}>
+      <span className={cn("inline-flex items-center gap-1.5 text-xs", r.read ? "text-text-muted" : "font-medium text-text-primary")}>
+        <span className={cn("h-1.5 w-1.5 rounded-full", r.read ? "bg-surface-strong" : "bg-piquet")} />
         {r.read ? "Lida" : "Não lida"}
       </span>
     ) },
@@ -503,32 +487,32 @@ function NotificacoesTab() {
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="font-semibold">Notificações enviadas</h3>
-        <DemoBadge endpoint="/sent-notifications" />
-      </div>
-      <p className="text-sm text-text-secondary">Histórico do que já foi mesmo enviado a clientes e técnicos — clica numa linha para ver a mensagem completa.</p>
-
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar destinatário..." />
-        <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="input-field text-sm max-w-[220px]">
-          <option value="">Todos os tipos</option>
-          {(types ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-        <select value={read} onChange={(e) => { setRead(e.target.value as typeof read); setPage(1); }} className="input-field text-sm max-w-[160px]">
-          <option value="">Todos os estados</option>
-          <option value="unread">Não lidas</option>
-          <option value="read">Lidas</option>
-        </select>
-        <select value={recipientType} onChange={(e) => { setRecipientType(e.target.value as typeof recipientType); setPage(1); }} className="input-field text-sm max-w-[160px]">
-          <option value="">Todos os destinatários</option>
-          <option value="customer">Clientes</option>
-          <option value="vendor">Técnicos</option>
-        </select>
-      </div>
-
-      <DataTable columns={columns} data={data?.data ?? []} keyField="id" onRowClick={setSelected} emptyMessage="Sem notificações enviadas" />
+    <section>
+      <SectionHeader
+        title="Notificações enviadas"
+        description="Histórico do que já foi mesmo enviado a clientes e técnicos — clica numa linha para ver a mensagem completa."
+        aside={<DemoBadge endpoint="/sent-notifications" />}
+      />
+      <DataTable columns={columns} data={data?.data ?? []} keyField="id" onRowClick={setSelected} emptyMessage="Sem notificações enviadas"
+        toolbar={
+          <>
+            <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-56" placeholder="Pesquisar destinatário..." />
+            <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} className="input-field w-auto py-1.5 max-w-[220px]" aria-label="Tipo de notificação">
+              <option value="">Todos os tipos</option>
+              {(types ?? []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <select value={read} onChange={(e) => { setRead(e.target.value as typeof read); setPage(1); }} className="input-field w-auto py-1.5" aria-label="Lida ou não">
+              <option value="">Lidas e não lidas</option>
+              <option value="unread">Não lidas</option>
+              <option value="read">Lidas</option>
+            </select>
+            <select value={recipientType} onChange={(e) => { setRecipientType(e.target.value as typeof recipientType); setPage(1); }} className="input-field w-auto py-1.5" aria-label="Destinatário">
+              <option value="">Clientes e técnicos</option>
+              <option value="customer">Clientes</option>
+              <option value="vendor">Técnicos</option>
+            </select>
+          </>
+        } />
       {data && <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />}
 
       <Modal
@@ -562,7 +546,7 @@ function NotificacoesTab() {
           </div>
         )}
       </Modal>
-    </div>
+    </section>
   );
 }
 

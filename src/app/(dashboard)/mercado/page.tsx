@@ -1,6 +1,5 @@
 "use client";
 
-import { Map as MapIcon } from "lucide-react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -27,8 +26,6 @@ export default function MercadoPage() {
     <RouteGuard route="/mercado">
       <div className="space-y-6">
         <PageHeader
-          icon={MapIcon}
-          eyebrow="Marketplace"
           title="Mercado"
           subtitle="Se os pedidos estão a ser servidos, e onde há ou falta oferta"
         />

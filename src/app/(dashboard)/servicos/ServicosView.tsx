@@ -13,17 +13,17 @@ import { OperacoesAoVivo } from "./OperacoesAoVivo";
 import { ErrorState } from "@/components/ui/States";
 import { useAsyncData, useFilters, usePagination, useDebouncedValue } from "@/hooks/useDashboard";
 import { getServices, getDetalheDoServico } from "@/services/dashboardService";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatRating } from "@/lib/formatters";
 import { SERVICE_STATUS_LABELS } from "@/config/dashboard";
 import { downloadCsv } from "@/lib/utils";
 import { toast } from "@/stores";
-import { ClipboardList, Phone, MessageCircle, Copy } from "lucide-react";
+import { Phone, MessageCircle, Copy } from "lucide-react";
 import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
 import { MOTIVOS } from "@/lib/aoVivo";
 import { USE_REAL_API } from "@/services/api";
 import { todayISO } from "@/lib/today";
-import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Segmentado } from "@/components/ui/Segmentado";
 import type { ServiceRequest, ServiceStatus } from "@/types";
 import { ESTADOS_SIMPLES, PRECISA_DE_ATENCAO, atencaoPrimeiro, precisaDeAtencao, rotuloSimples } from "@/lib/estados";
 import { pedidoHref } from "@/lib/fichas";
@@ -181,14 +181,14 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     { key: "requestedAt", label: "Quando", sortable: true, render: (r) => (
       <span className="whitespace-nowrap">
         {formatDate(r.requestedAt)}
-        {r.scheduledAt && <span className="block text-[11px] text-text-muted">marcado {r.scheduledAt.length > 10 ? formatDateTime(r.scheduledAt) : formatDate(r.scheduledAt)}</span>}
+        {r.scheduledAt && <span className="block text-xs text-text-muted">marcado {r.scheduledAt.length > 10 ? formatDateTime(r.scheduledAt) : formatDate(r.scheduledAt)}</span>}
       </span>
     ) },
-    { key: "customerName", label: "Cliente" },
+    { key: "customerName", label: "Cliente", render: (r) => <span className="block max-w-[170px] truncate" title={r.customerName}>{r.customerName || "—"}</span> },
     { key: "serviceName", label: "Serviço", render: (r) => (
-      <span>
-        {r.serviceName || "—"}
-        {r.categoryName && r.categoryName !== r.serviceName && <span className="block text-[11px] text-text-muted">{r.categoryName}</span>}
+      <span className="block max-w-[230px]">
+        <span className="block truncate" title={r.serviceName}>{r.serviceName || "—"}</span>
+        {r.categoryName && r.categoryName !== r.serviceName && <span className="block truncate text-xs text-text-muted">{r.categoryName}</span>}
       </span>
     ) },
     { key: "city", label: "Cidade", render: (r) => r.city || "—" },
@@ -199,11 +199,11 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
         <EstadoDoPedido status={r.status} />
       </span>
     ) },
-    { key: "totalCustomerValue", label: "Valor", sortable: true, render: (r) => formatCurrency(r.totalCustomerValue) },
+    { key: "totalCustomerValue", label: "Valor", sortable: true, className: "text-right", render: (r) => <span className="font-medium tabular-nums">{formatCurrency(r.totalCustomerValue)}</span> },
     // Secundárias: em "Colunas".
     { key: "matching", label: "Convidados", hidden: true, render: (r) => <ColunaMatching matching={r.matching} /> },
     { key: "rating", label: "Avaliação", hidden: true, render: (r) => r.rating
-      ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{r.rating}</span></span>
+      ? <span className="inline-flex items-center gap-0.5 font-medium text-warning whitespace-nowrap">{"★".repeat(Math.round(r.rating))}<span className="text-text-secondary ml-1">{formatRating(r.rating)}</span></span>
       : <span className="text-text-muted">—</span> },
     { key: "piquetRevenue", label: "Comissão", hidden: true, render: (r) => formatCurrency(r.piquetRevenue) },
     // As ações de cada linha: ligar, WhatsApp e copiar o n.º, sem abrir o pedido.
@@ -223,13 +223,8 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
     <RouteGuard route="/servicos">
       <div className="space-y-6">
         <PageHeader
-          icon={ClipboardList}
-          eyebrow="Operação"
           title="Pedidos"
           subtitle="O que está a acontecer agora, a lista de todos os pedidos e os personalizados"
-          actions={
-            <ExportButton onExport={handleExport} />
-          }
         />
 
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -243,27 +238,7 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
         )}
 
         {tab === "pedidos" && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="N.º, cliente, telefone, técnico…" />
-              <FilterBar className="flex-1 min-w-[240px]" />
-            </div>
-            <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Vistas rápidas">
-              {VISTAS.map((v) => (
-                <button
-                  key={v.id}
-                  role="tab"
-                  aria-selected={vista === v.id}
-                  onClick={() => { setVista(v.id); setPage(1); }}
-                  className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                    vista === v.id ? "border-piquet/30 bg-piquet/15 text-piquet-700" : "border-surface-border text-text-secondary hover:bg-surface-muted",
-                    v.id === "atencao" && quantosComAtencao > 0 && vista !== v.id && "border-danger/40 text-danger")}
-                >
-                  {v.label}
-                  {v.id === "atencao" && quantosComAtencao > 0 && <span className="tabular-nums text-xs">{quantosComAtencao}</span>}
-                </button>
-              ))}
-            </div>
+          <div className="space-y-3">
             {error ? <ErrorState message={error} onRetry={refetch} /> : (
               <>
                 <DataTable
@@ -276,6 +251,17 @@ export default function ServicosView({ abrirId }: { abrirId?: string }) {
                   onRowClick={setSelectedService}
                   loading={loading}
                   columnToggle
+                  toolbar={<>
+                    <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-64" placeholder="N.º, cliente, telefone, técnico…" />
+                    <Segmentado
+                      ariaLabel="Vistas rápidas"
+                      opcoes={VISTAS.map((v) => ({ id: v.id, label: v.label, ...(v.id === "atencao" ? { count: quantosComAtencao, tom: "alerta" as const } : {}) }))}
+                      valor={vista}
+                      onChange={(v) => { setVista(v); setPage(1); }}
+                    />
+                    <FilterBar />
+                  </>}
+                  actions={<ExportButton onExport={handleExport} label="Exportar" />}
                 />
                 {data && (
                   <Pagination page={page} totalPages={data.totalPages} total={data.total} pageSize={pageSize} onPageChange={setPage} />

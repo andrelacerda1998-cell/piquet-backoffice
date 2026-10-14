@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Users, UserPlus, ArrowUpRight } from "lucide-react";
+import { Segmentado } from "@/components/ui/Segmentado";
+import { UserPlus, ArrowUpRight } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { HistoricoDaEquipa } from "@/components/ui/HistoricoDaEquipa";
@@ -23,10 +24,13 @@ import { CreditCard, Smartphone, Trash2 } from "lucide-react";
 import { getLeads, LEAD_STAGE_LABEL, type Lead } from "@/services/extrasService";
 import { getServices } from "@/services/dashboardService";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatDate, formatCurrency, getStatusColor } from "@/lib/formatters";
+import { formatDate, formatCurrency, getStatusColor, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { FichaSeccao, Etiqueta, FichaVazia } from "@/components/ui/Ficha";
+import Link from "next/link";
 
 export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
@@ -272,8 +276,7 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
       return city && city !== "—" ? <span className="text-text-secondary">{city}</span> : <span className="text-text-muted">—</span>;
     } },
     { key: "origem", label: "Origem", render: (r) => (
-      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        r.kind === "customer" ? "bg-piquet/12 text-piquet-700" : "bg-surface-subtle text-text-secondary")}>
+      <span className="inline-flex items-center rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
         {r.kind === "customer" ? "App" : origemLabel(r.lead.source)}
       </span>
     ) },
@@ -281,20 +284,25 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
       r.customer.blocked_at
         ? <span className="inline-flex items-center rounded-full bg-danger-light px-2 py-0.5 text-xs font-medium text-danger">Bloqueado</span>
         : <span title={r.customer.can_request_service ? "Pode pedir serviços" : "Não pode pedir serviços"}
-            className={cn("font-bold", r.customer.can_request_service ? "text-success" : "text-text-muted")}>{r.customer.can_request_service ? "✓" : "—"}</span>
+            className={cn("inline-flex items-center gap-1.5 text-[13px]", r.customer.can_request_service ? "text-text-secondary" : "text-text-muted")}>
+            <span className={cn("h-1.5 w-1.5 rounded-full", r.customer.can_request_service ? "bg-success" : "bg-surface-strong")} />
+            {r.customer.can_request_service ? "Pode pedir" : "Não pode"}
+          </span>
     ) : (
       <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", getStatusColor(r.lead.stage))}>{LEAD_STAGE_LABEL[r.lead.stage] ?? r.lead.stage}</span>
     ) },
     { key: "date", label: "Registo", render: (r) => r.date ? formatDate(r.date) : "—" },
     { key: "acao", label: "", render: (r) => r.kind === "customer" ? (
       r.customer.blocked_at
-        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="text-xs text-success hover:underline disabled:opacity-50">Reativar</button>
-        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); setParaBloquear(r.customer); }} className="text-xs text-danger hover:underline disabled:opacity-50">Bloquear</button>
+        ? <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); handleRestore(r.customer); }} className="btn-ghost text-xs px-2 py-1 text-success">Reativar</button>
+        // Bloquear só aparece ao passar o rato: em vermelho em todas as linhas
+        // era a palavra mais forte da lista, e é a ação mais rara.
+        : <button disabled={actingId === r.customer.id} onClick={(e) => { e.stopPropagation(); setParaBloquear(r.customer); }} className="btn-ghost text-xs px-2 py-1 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Bloquear</button>
     ) : (
       // A lead não se gere aqui — abre-se no CRM, o dono do pipeline. Evita
       // duplicar eliminação/estado nesta tabela (que é só um diretório).
       <a href={`/leads?lead=${r.lead.id}`} onClick={(e) => e.stopPropagation()}
-        className="text-xs text-piquet-700 hover:underline inline-flex items-center gap-1">
+        className="btn-ghost text-xs px-2 py-1">
         Abrir no CRM <ArrowUpRight className="h-3.5 w-3.5" />
       </a>
     ) },
@@ -318,12 +326,10 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
     <RouteGuard route="/clientes">
       <div className="space-y-6">
         <PageHeader
-          icon={Users}
-          eyebrow="Pessoas"
           title={<>Clientes <DemoBadge endpoint="/customers" /></>}
           subtitle={allCustomers ? `${allCustomers.length} clientes registados` : "Encontrar uma pessoa e ver tudo o que se passou com ela"}
           actions={
-            <a href="/leads" className="btn-secondary text-sm inline-flex items-center gap-1.5">
+            <a href="/leads" className="btn-secondary">
               <UserPlus className="h-4 w-4" /> Contactos
             </a>
           }
@@ -341,28 +347,18 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar nome, telefone, cidade..." />
-                      <div className="chip-row">
-                        {([
-                          { id: "", label: "Todos" },
-                          { id: "pode", label: "Podem pedir serviços" },
-                          { id: "nao_pode", label: "Não podem" },
-                        ] as const).map((f) => (
-                          <button key={f.id} onClick={() => { setReqFilter(f.id); setPage(1); }}
-                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                              reqFilter === f.id
-                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                            {f.label}
-                            {f.id && reqFilter && (
-                              <span className={cn("tabular-nums text-xs", reqFilter === f.id ? "opacity-80" : "text-text-muted")}>
-                                {f.id === "pode" ? reqCounts.pode : reqCounts.nao_pode}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                      <Segmentado
+                        ariaLabel="Quem pode pedir serviços"
+                        opcoes={[
+                          { id: "" as const, label: "Todos" },
+                          { id: "pode" as const, label: "Podem pedir serviços", ...(reqFilter ? { count: reqCounts.pode } : {}) },
+                          { id: "nao_pode" as const, label: "Não podem", ...(reqFilter ? { count: reqCounts.nao_pode } : {}) },
+                        ]}
+                        valor={reqFilter}
+                        onChange={(v) => { setReqFilter(v); setPage(1); }}
+                      />
                     </div>
-                    <p className="text-sm text-text-secondary">
+                    <p className="text-[13px] text-text-muted">
                       <b className="text-text-primary tabular-nums">{unifiedRows.length}</b> {unifiedRows.length === 1 ? "registo" : "registos"}
                       {" · "}clientes da app e leads (landing / WhatsApp) juntos. Clica num cliente para abrir o perfil.
                     </p>
@@ -411,142 +407,114 @@ export default function ClientesView({ abrirId }: { abrirId?: string } = {}) {
         footer={<button onClick={() => setSelectedCustomer(null)} className="btn-secondary text-sm">Fechar</button>}
       >
         {selectedCustomer && (
-          <div className="space-y-5">
-            {/* Estado da conta */}
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedCustomer.blocked_at ? (
-                <span className="inline-flex items-center rounded-full bg-danger-light px-2.5 py-0.5 text-xs font-medium text-danger">
-                  Bloqueado {formatDate(selectedCustomer.blocked_at)}
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-success-light px-2.5 py-0.5 text-xs font-medium text-success">Ativo</span>
-              )}
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                selectedCustomer.email_verified ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+          <div className="space-y-6">
+            {/* Estado da conta, de relance. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedCustomer.blocked_at
+                ? <Etiqueta tom="perigo">Bloqueado desde {formatDate(selectedCustomer.blocked_at)}</Etiqueta>
+                : <Etiqueta tom="bom">Ativo</Etiqueta>}
+              <Etiqueta tom={selectedCustomer.email_verified ? "bom" : "neutro"}>
                 Email {selectedCustomer.email_verified ? "verificado" : "por verificar"}
-              </span>
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                selectedCustomer.phone_verified ? "bg-success-light text-success" : "bg-surface-subtle text-text-secondary")}>
+              </Etiqueta>
+              <Etiqueta tom={selectedCustomer.phone_verified ? "bom" : "neutro"}>
                 Telefone {selectedCustomer.phone_verified ? "verificado" : "por verificar"}
-              </span>
-              {!selectedCustomer.can_request_service && (
-                <span className="inline-flex items-center rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning">
-                  Não pode pedir serviços
-                </span>
-              )}
+              </Etiqueta>
+              {!selectedCustomer.can_request_service && <Etiqueta tom="atencao">Não pode pedir serviços</Etiqueta>}
             </div>
 
-            {/* Resumo do histórico */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico</p>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="card p-3">
-                  <p className="text-xs text-text-secondary">Serviços</p>
-                  <p className="text-xl font-bold text-text-primary tabular-nums">{historico.total}</p>
-                  <p className="text-[11px] text-text-muted">{historico.concluidos} concluído{historico.concluidos === 1 ? "" : "s"}</p>
-                </div>
-                <div className="card p-3">
-                  <p className="text-xs text-text-secondary">Total gasto</p>
-                  <p className="text-xl font-bold text-text-primary tabular-nums">{formatCurrency(historico.gasto)}</p>
-                  <p className="text-[11px] text-text-muted">média {formatCurrency(historico.ticket)}</p>
-                </div>
-                <div className="card p-3">
-                  <p className="text-xs text-text-secondary">Último serviço</p>
-                  <p className="text-xl font-bold text-text-primary">{historico.ultimo ? formatDate(historico.ultimo) : "—"}</p>
-                </div>
-                <div className="card p-3">
-                  <p className="text-xs text-text-secondary">Avaliação dada</p>
-                  <p className="text-xl font-bold text-text-primary tabular-nums">
-                    {historico.avaliacao ? `${(Math.round(historico.avaliacao * 10) / 10).toString().replace(".", ",")}★` : "—"}
+            <StatGroup cols={4}>
+              <Stat label="Serviços" value={historico.total}
+                note={`${historico.concluidos} concluído${historico.concluidos === 1 ? "" : "s"}`} />
+              <Stat label="Total gasto" value={formatCurrency(historico.gasto)}
+                note={historico.concluidos ? `média ${formatCurrency(historico.ticket)}` : undefined} />
+              <Stat label="Último serviço" value={historico.ultimo ? formatDate(historico.ultimo) : "—"} />
+              <Stat label="Avaliação dada" value={historico.avaliacao ? `${formatRating(historico.avaliacao)} ★` : "—"}
+                tone={historico.reclamacoes > 0 ? "mau" : undefined}
+                note={historico.reclamacoes > 0 ? `${historico.reclamacoes} reclamaç${historico.reclamacoes === 1 ? "ão" : "ões"}` : undefined} />
+            </StatGroup>
+
+            {/* À esquerda a conta (pedidos e pagamentos), à direita o que a equipa sabe. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-6 min-w-0">
+                <FichaSeccao titulo="Serviços pedidos">
+                  {custServicesLoading ? (
+                    <p className="text-sm text-text-muted py-4 text-center">A carregar histórico…</p>
+                  ) : historico.lista.length === 0 ? (
+                    <FichaVazia>Sem serviços encontrados para este cliente.</FichaVazia>
+                  ) : (
+                    <ul className="card divide-y divide-surface-border max-h-[320px] overflow-y-auto">
+                      {historico.lista.map((sv) => (
+                        <li key={sv.id}>
+                          <Link href={`/servicos/${sv.id}`}
+                            className="flex items-center justify-between gap-3 px-3.5 py-2.5 hover:bg-surface-subtle/60 transition-colors">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-text-primary truncate">{sv.serviceName || sv.categoryName}</p>
+                              <p className="text-xs text-text-muted truncate">
+                                {formatDate(sv.completedAt ?? sv.requestedAt)}
+                                {sv.technicianName && ` · ${sv.technicianName}`}
+                                {sv.city && ` · ${sv.city}`}
+                                {sv.rating ? ` · ${formatRating(sv.rating)} ★` : ""}
+                                {sv.hasComplaint && " · com reclamação"}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className="text-sm font-semibold text-text-primary tabular-nums">{formatCurrency(sv.totalCustomerValue)}</span>
+                              <StatusBadge status={sv.status} />
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-xs text-text-muted mt-2">
+                    Associado pelo nome do cliente: os serviços e as contas vivem em sistemas diferentes, sem um
+                    identificador comum. Homónimos podem aparecer juntos.
                   </p>
-                  {historico.reclamacoes > 0 && <p className="text-[11px] text-danger">{historico.reclamacoes} reclamação(ões)</p>}
-                </div>
+                </FichaSeccao>
+
+                <FichaSeccao titulo="Métodos de pagamento">
+                  {paymentMethodsLoading ? (
+                    <p className="text-sm text-text-muted">A carregar…</p>
+                  ) : (paymentMethods ?? []).length === 0 ? (
+                    <FichaVazia>Sem métodos guardados.</FichaVazia>
+                  ) : (
+                    <ul className="card divide-y divide-surface-border">
+                      {(paymentMethods ?? []).map((m) => (
+                        <li key={m.id} className="group flex items-center gap-3 px-3.5 py-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-subtle text-text-secondary">
+                            {m.type === "mbway" ? <Smartphone className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {m.type === "mbway"
+                                ? <>MB Way · {m.phone_number ?? "—"}</>
+                                : <>{m.brand ?? "Cartão"}{m.brand_description ? ` ${m.brand_description}` : ""} · •••• {m.last4 ?? "----"}</>}
+                            </p>
+                            <p className="text-xs text-text-muted truncate">
+                              {m.holder && <>{m.holder} · </>}
+                              {m.expire_month && m.expire_year && <>exp. {m.expire_month}/{m.expire_year} · </>}
+                              guardado {m.created_at ? formatDate(m.created_at) : "—"}
+                            </p>
+                          </div>
+                          <button onClick={() => setMethodToDelete(m)} disabled={deletingMethodId === m.id}
+                            className="btn-ghost p-1.5 text-text-muted hover:text-danger disabled:opacity-40 shrink-0" title="Remover" aria-label="Remover método de pagamento">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </FichaSeccao>
               </div>
-            </div>
 
-            {/* Serviços pedidos */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Serviços pedidos</p>
-              {custServicesLoading ? (
-                <p className="text-sm text-text-secondary py-4 text-center">A carregar histórico…</p>
-              ) : historico.lista.length === 0 ? (
-                <p className="text-sm text-text-muted py-4 text-center rounded-xl border border-surface-border">
-                  Sem serviços encontrados para este cliente.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {historico.lista.map((sv) => (
-                    <div key={sv.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border p-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-text-primary truncate">{sv.serviceName || sv.categoryName}</p>
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(sv.completedAt ?? sv.requestedAt)}
-                          {sv.technicianName && ` · ${sv.technicianName}`}
-                          {sv.city && ` · ${sv.city}`}
-                          {sv.rating ? ` · ${sv.rating}★` : ""}
-                          {sv.hasComplaint && " · com reclamação"}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-text-primary tabular-nums">{formatCurrency(sv.totalCustomerValue)}</p>
-                        <StatusBadge status={sv.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-[11px] text-text-muted mt-2">
-                Histórico associado pelo nome do cliente — os serviços e as contas de cliente vivem em sistemas
-                diferentes, sem um identificador comum. Homónimos podem aparecer juntos.
-              </p>
-            </div>
-
-            {/* Métodos de pagamento */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Métodos de pagamento</p>
-              {paymentMethodsLoading ? (
-                <p className="text-sm text-text-secondary">A carregar…</p>
-              ) : (paymentMethods ?? []).length === 0 ? (
-                <p className="text-sm text-text-muted py-3 text-center rounded-xl border border-surface-border">Sem métodos guardados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {(paymentMethods ?? []).map((m) => (
-                    <div key={m.id} className="rounded-xl border border-surface-border px-4 py-3 flex items-center gap-3">
-                      {m.type === "mbway"
-                        ? <Smartphone className="h-5 w-5 shrink-0 text-text-secondary" />
-                        : <CreditCard className="h-5 w-5 shrink-0 text-text-secondary" />}
-                      <div className="min-w-0 flex-1">
-                        {m.type === "mbway" ? (
-                          <p className="font-medium text-text-primary">MBWay · {m.phone_number ?? "—"}</p>
-                        ) : (
-                          <p className="font-medium text-text-primary">
-                            {(m.brand ?? "Cartão")}{m.brand_description ? ` ${m.brand_description}` : ""} · **** {m.last4 ?? "----"}
-                          </p>
-                        )}
-                        <p className="text-xs text-text-secondary">
-                          {m.holder && <>{m.holder} · </>}
-                          {m.expire_month && m.expire_year && <>Exp. {m.expire_month}/{m.expire_year} · </>}
-                          Guardado {m.created_at ? formatDate(m.created_at) : "—"}
-                        </p>
-                      </div>
-                      <button onClick={() => setMethodToDelete(m)} disabled={deletingMethodId === m.id}
-                        className="text-danger hover:opacity-70 disabled:opacity-40 shrink-0" title="Remover">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Notas internas</p>
-              <NotasInternas entidade="cliente" id={String(selectedCustomer.id)} focar={focarNota} />
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-2">Histórico da equipa</p>
-              <HistoricoDaEquipa entidade="cliente" id={String(selectedCustomer.id)} />
+              <div className="space-y-6 min-w-0">
+                <FichaSeccao titulo="Notas internas">
+                  <NotasInternas entidade="cliente" id={String(selectedCustomer.id)} focar={focarNota} />
+                </FichaSeccao>
+                <FichaSeccao titulo="Histórico da equipa">
+                  <HistoricoDaEquipa entidade="cliente" id={String(selectedCustomer.id)} />
+                </FichaSeccao>
+              </div>
             </div>
           </div>
         )}

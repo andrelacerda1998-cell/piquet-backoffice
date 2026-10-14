@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { pedidoHref } from "@/lib/fichas";
 import Link from "next/link";
-import { Tabs, type TabDef } from "@/components/ui/Tabs";
+import { Segmentado } from "@/components/ui/Segmentado";
+import { ListaDeDados } from "@/components/ui/Ficha";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getCustomRequests, type CustomRequest, type CustomRequestStatus } from "@/services/extrasService";
@@ -28,6 +29,16 @@ import { DespacharPersonalizado } from "@/components/ui/DespacharPersonalizado";
   está na ficha do pedido.
 */
 
+/** O estado como etiqueta: o mesmo desenho do estado dos pedidos (ponto + nome). */
+function Estado({ s }: { s: CustomRequestStatus }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap", ESTADO[s].tone)}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {ESTADO[s].label}
+    </span>
+  );
+}
+
 const ESTADO: Record<CustomRequestStatus, { label: string; tone: string; nota: string }> = {
   novo: { label: "À espera da Piquet", tone: "bg-danger-light text-danger", nota: "Falta definir a duração e as categorias. Até lá o cliente vê \"Pedido em análise\"." },
   em_analise: { label: "À procura de técnico", tone: "bg-info-light text-info", nota: "Já foi despachado e está no matching normal." },
@@ -49,40 +60,49 @@ export default function PedidosPersonalizados() {
 
   const pedidos = data ?? [];
   const conta = (s: CustomRequestStatus) => pedidos.filter((r) => r.status === s).length;
-  const TABS: TabDef[] = [
-    { id: "todos", label: "Todos", count: pedidos.length },
-    ...(Object.keys(ESTADO) as CustomRequestStatus[]).map((s) => ({ id: s, label: ESTADO[s].label, count: conta(s) || undefined })),
+  const OPCOES = [
+    { id: "todos" as const, label: "Todos", count: pedidos.length },
+    ...(Object.keys(ESTADO) as CustomRequestStatus[]).map((s) => ({
+      id: s, label: ESTADO[s].label, count: conta(s), tom: s === "novo" && conta(s) > 0 ? ("alerta" as const) : undefined,
+    })),
   ];
   const visiveis = pedidos.filter((r) => tab === "todos" || r.status === tab);
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-text-secondary max-w-3xl">
-        O cliente descreve o trabalho na app. Fica <b className="text-text-primary">à espera da Piquet</b> até alguém
-        definir a duração e as categorias (botão <b className="text-text-primary">Despachar</b>); depois segue o matching normal.
+      <p className="text-[13px] text-text-muted max-w-3xl">
+        O cliente descreve o trabalho na app. Fica <b className="font-medium text-text-primary">à espera da Piquet</b> até alguém
+        definir a duração e as categorias (botão <b className="font-medium text-text-primary">Despachar</b>); depois segue o matching normal.
       </p>
 
-      <Tabs tabs={TABS} active={tab} onChange={(t) => setTab(t as typeof tab)} />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {visiveis.map((r) => (
-          <button key={r.id} onClick={() => setAberto(r)} className="card p-4 text-left hover:shadow-elevated transition-shadow">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="font-semibold text-text-primary truncate">{r.customerName}</p>
-                <p className="text-xs text-text-secondary">#{r.id} · {r.category} · {r.city || "—"}</p>
-              </div>
-              <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0", ESTADO[r.status].tone)}>{ESTADO[r.status].label}</span>
-            </div>
-            <p className="mt-2 text-sm text-text-secondary line-clamp-2">{r.description || "Sem descrição."}</p>
-            <div className="mt-3 flex items-center justify-between text-xs text-text-muted">
-              <span>{r.photosCount ? `${r.photosCount} ${r.photosCount === 1 ? "foto" : "fotos"}` : "Sem fotos"}</span>
-              <span>{r.createdAt ? formatDate(r.createdAt) : ""}</span>
-            </div>
-          </button>
-        ))}
-        {visiveis.length === 0 && <p className="text-sm text-text-muted">{tab === "todos" ? "Ainda não há pedidos personalizados." : "Nenhum pedido personalizado neste estado."}</p>}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <Segmentado ariaLabel="Estado dos pedidos personalizados" opcoes={OPCOES} valor={tab} onChange={setTab} />
       </div>
+
+      {visiveis.length === 0 ? (
+        <p className="card px-4 py-8 text-center text-sm text-text-muted">{tab === "todos" ? "Ainda não há pedidos personalizados." : "Nenhum pedido personalizado neste estado."}</p>
+      ) : (
+        <ul className="card divide-y divide-surface-border">
+          {visiveis.map((r) => (
+            <li key={r.id}>
+              <button onClick={() => setAberto(r)} className="w-full flex items-start gap-4 px-4 py-3 text-left hover:bg-surface-subtle/60 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-primary truncate">
+                    {r.customerName} <span className="font-normal text-text-muted">· #{r.id} · {r.category} · {r.city || "—"}</span>
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-text-secondary line-clamp-1">{r.description || "Sem descrição."}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Estado s={r.status} />
+                  <span className="text-xs text-text-muted">
+                    {r.photosCount ? `${r.photosCount} ${r.photosCount === 1 ? "foto" : "fotos"} · ` : ""}{r.createdAt ? formatDate(r.createdAt) : ""}
+                  </span>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {aberto && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setAberto(null)}>
@@ -90,26 +110,26 @@ export default function PedidosPersonalizados() {
             className="w-full max-w-lg bg-surface h-full overflow-y-auto shadow-elevated" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-surface border-b border-surface-border px-6 py-4 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-mono text-xs text-text-muted">#{aberto.id}</p>
-                <h2 className="text-lg font-bold mt-0.5">{aberto.customerName}</h2>
-                <p className="text-sm text-text-secondary">{aberto.category} · {aberto.city || "—"}{aberto.phone ? ` · ${aberto.phone}` : ""}</p>
+                <p className="text-xs text-text-muted">Pedido personalizado #{aberto.id}</p>
+                <h2 className="text-xl font-semibold tracking-tight mt-0.5">{aberto.customerName}</h2>
+                <p className="text-[13px] text-text-muted">{aberto.category} · {aberto.city || "—"}{aberto.phone ? ` · ${aberto.phone}` : ""}</p>
               </div>
-              <button onClick={() => setAberto(null)} className="p-1 hover:bg-surface-muted rounded" aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <button onClick={() => setAberto(null)} className="btn-ghost p-1.5 -mr-1.5" aria-label="Fechar"><X className="h-4 w-4" /></button>
             </div>
-            <div className="p-6 space-y-5">
-              <div className="rounded-lg bg-surface-subtle px-3 py-2 text-sm">
-                <span className={cn("inline-flex px-2 py-0.5 rounded-full text-xs font-medium mr-2", ESTADO[aberto.status].tone)}>{ESTADO[aberto.status].label}</span>
-                <span className="text-text-secondary">{ESTADO[aberto.status].nota}</span>
+            <div className="p-6 space-y-6">
+              <div className="space-y-1.5">
+                <Estado s={aberto.status} />
+                <p className="text-[13px] text-text-secondary">{ESTADO[aberto.status].nota}</p>
               </div>
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-2">O que o cliente pediu</h3>
+                <h3 className="text-sm font-semibold text-text-primary mb-2">O que o cliente pediu</h3>
                 <p className="text-sm text-text-primary whitespace-pre-line">{aberto.description || "Sem descrição."}</p>
               </section>
-              <dl className="grid grid-cols-2 gap-3 text-sm">
-                <div><dt className="text-text-muted">Recebido</dt><dd>{aberto.createdAt ? formatDate(aberto.createdAt) : "—"}</dd></div>
-                <div><dt className="text-text-muted">Duração definida</dt><dd>{aberto.estimatedHours != null ? `${aberto.estimatedHours} h` : "Ainda não"}</dd></div>
-                <div><dt className="text-text-muted">Fotografias</dt><dd>{aberto.photosCount ?? 0}</dd></div>
-              </dl>
+              <ListaDeDados linhas={[
+                ["Recebido", aberto.createdAt ? formatDate(aberto.createdAt) : "—"],
+                ["Duração definida", aberto.estimatedHours != null ? `${aberto.estimatedHours} h` : "Ainda não"],
+                ["Fotografias", String(aberto.photosCount ?? 0)],
+              ]} />
               <div className="flex flex-wrap gap-2">
                 {aberto.status === "novo" && podeDespachar && (
                   <button onClick={() => setADespachar(true)} className="btn-primary text-sm inline-flex">

@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAuthStore, toast } from "@/stores";
 import { formatDateTime } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { Segmentado } from "@/components/ui/Segmentado";
 import {
   getInboxTickets, replyInboxTicket, updateInboxTicketStatus, updateInboxTicketPriority,
   deleteInboxTicket, seedInboxExamples, clearInboxExamples,
@@ -227,8 +228,8 @@ export function SupportInbox() {
         Por isso diz-se.
       */}
       {data?.avisoTecnicos && (
-        <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
-          <p className="text-sm font-semibold text-warning">Faltam aqui os tickets dos técnicos</p>
+        <div className="aviso aviso-atencao">
+          <p className="font-medium">Faltam aqui os tickets dos técnicos</p>
           <p className="text-xs text-text-secondary mt-0.5">
             {data.avisoTecnicos} Até isto ficar resolvido, só se veem no Filament — e é lá que chegam as
             contestações de faltas.
@@ -267,26 +268,36 @@ export function SupportInbox() {
         </p>
       )}
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar ticket, cliente…"
-            className="input-field pl-8 py-1.5 text-sm" />
+      {/* Filtros: o estado num seletor com contagens (vê-se de relance onde
+          está o trabalho), a pesquisa e a ordem ao lado. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="overflow-x-auto -mx-1 px-1 max-w-full">
+          <Segmentado
+            ariaLabel="Filtrar por estado"
+            opcoes={[
+              { id: "todos" as StatusFilter, label: "Todos", count: counts.todos },
+              ...TICKET_STATUS.map((st) => ({
+                id: st.id as StatusFilter, label: st.label, count: counts[st.id as keyof typeof counts] ?? 0,
+                tom: st.id === "novo" && (counts.novo ?? 0) > 0 ? ("alerta" as const) : undefined,
+              })),
+            ]}
+            valor={filter}
+            onChange={setFilter}
+          />
         </div>
-        <select value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)}
-          aria-label="Filtrar por estado" className="input-field py-1.5 text-sm w-auto">
-          <option value="todos">Todos ({counts.todos})</option>
-          {TICKET_STATUS.map((st) => (
-            <option key={st.id} value={st.id}>{st.label} ({counts[st.id as keyof typeof counts] ?? 0})</option>
-          ))}
-        </select>
-        <select value={ordem} onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
-          aria-label="Ordenar" title="Ordena pela última mensagem — a atividade real do ticket"
-          className="input-field py-1.5 text-sm w-auto">
-          <option value="recentes">Recentes primeiro</option>
-          <option value="antigos">Antigos primeiro</option>
-        </select>
+        <div className="flex flex-1 items-center gap-2 min-w-[240px] sm:justify-end">
+          <div className="relative flex-1 sm:max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar ticket, cliente…"
+              className="input-field pl-8 py-1.5 text-sm" aria-label="Procurar tickets" />
+          </div>
+          <select value={ordem} onChange={(e) => setOrdem(e.target.value as "recentes" | "antigos")}
+            aria-label="Ordenar" title="Ordena pela última mensagem — a atividade real do ticket"
+            className="input-field py-1.5 text-sm w-auto">
+            <option value="recentes">Recentes primeiro</option>
+            <option value="antigos">Antigos primeiro</option>
+          </select>
+        </div>
       </div>
 
       {/* Tabela — clicar numa linha abre a conversa */}
@@ -323,7 +334,7 @@ export function SupportInbox() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wide text-text-muted">
+                <tr className="border-b border-surface-border bg-surface-subtle/60 text-left text-xs text-text-muted">
                   {/*
                     Cinco colunas. O tempo vive dentro do Assunto e o ícone de
                     origem dentro do De — como colunas próprias empurravam a
@@ -347,11 +358,13 @@ export function SupportInbox() {
                       key={t.id}
                       onClick={() => setSelectedId(t.id)}
                       className={cn(
-                        "group border-b border-surface-border/60 last:border-0 cursor-pointer hover:bg-surface-muted transition-colors",
+                        "group border-b border-surface-border/70 last:border-0 cursor-pointer hover:bg-surface-subtle/60 transition-colors",
                         // Quem espera há mais de um dia sem resposta fica
                         // marcado na própria linha — não basta estar escrito
-                        // numa coluna que se lê de passagem.
-                        espera.tipo === "sem_resposta" && espera.urgente && "bg-danger-light/30",
+                        // numa coluna que se lê de passagem. Um traço vermelho
+                        // à esquerda e não a linha toda pintada: com três
+                        // tickets assim, a tabela ficava às riscas.
+                        espera.tipo === "sem_resposta" && espera.urgente && "shadow-[inset_3px_0_0_0_rgb(var(--danger))]",
                       )}
                     >
                       {/*
@@ -468,14 +481,14 @@ export function SupportInbox() {
               </span>
               {/* A reclamação é sobre um pedido: abre-se a ficha dele daqui. */}
               {selected.serviceId && /^\d+$/.test(selected.serviceId) && (
-                <Link href={pedidoHref(selected.serviceId)} className="text-xs font-medium text-piquet-600 hover:underline inline-flex items-center gap-0.5">
+                <Link href={pedidoHref(selected.serviceId)} className="btn-ghost text-xs px-2 py-1">
                   Pedido #{selected.serviceId} <ArrowUpRight className="h-3 w-3" />
                 </Link>
               )}
               <button
                 onClick={() => setTicketAApagar(selected)}
                 title="Apagar este ticket (irreversível)"
-                className="ml-auto p-1.5 rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors"
+                className="ml-auto btn-ghost p-1.5 hover:text-danger"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -487,7 +500,7 @@ export function SupportInbox() {
                 const own = m.from === "agente";
                 return (
                   <div key={m.id} className={cn("flex gap-2.5", own && "flex-row-reverse")}>
-                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
                       own ? "bg-piquet/15 text-piquet-700" : "bg-surface-strong text-text-secondary")}>
                       {initials(m.authorName)}
                     </span>
@@ -523,7 +536,7 @@ export function SupportInbox() {
             {/* Resposta */}
             {selected.status === "fechado" ? (
               <div className="pt-3 border-t border-surface-border text-center text-sm text-text-muted">
-                Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="text-piquet-600 hover:underline">Reabrir</button>
+                Ticket fechado. <button onClick={() => changeStatus("em_curso")} className="link">Reabrir</button>
               </div>
             ) : (
               <div className="pt-3 border-t border-surface-border">
@@ -549,12 +562,12 @@ export function SupportInbox() {
                 )}
                 <div className="flex items-center gap-2 mt-2">
                   {selected.status !== "resolvido" && (
-                    <button onClick={() => changeStatus("resolvido")} className="btn-secondary text-xs py-1">Marcar resolvido</button>
+                    <button onClick={() => changeStatus("resolvido")} className="btn-secondary text-xs px-2.5 py-1">Marcar resolvido</button>
                   )}
                   {selected.status !== "aguarda_cliente" && (
-                    <button onClick={() => changeStatus("aguarda_cliente")} className="btn-secondary text-xs py-1">À espera do cliente</button>
+                    <button onClick={() => changeStatus("aguarda_cliente")} className="btn-ghost text-xs px-2.5 py-1">À espera do cliente</button>
                   )}
-                  <button onClick={() => changeStatus("fechado")} className="text-xs text-text-muted hover:text-text-primary ml-auto">Fechar ticket</button>
+                  <button onClick={() => changeStatus("fechado")} className="btn-ghost text-xs px-2.5 py-1 ml-auto">Fechar ticket</button>
                 </div>
               </div>
             )}
@@ -598,7 +611,7 @@ function Origem({ tipo }: { tipo: string }) {
   const tecnico = tipo === "tecnico";
   return (
     <span className={cn(
-      "inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+      "inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium",
       /*
         Os mesmos pares de `bg-*-light` + `text-*` dos selos de importância,
         que são variáveis de tema. Um `bg-piquet-100` fixo daria fundo creme
@@ -637,10 +650,10 @@ function PriorityPicker({ priority, onChange }: { priority: TicketPriority; onCh
         <ChevronDown className="h-3 w-3 opacity-60" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-40 bg-surface border border-surface-border rounded-lg shadow-elevated z-30 py-1">
+        <div className="absolute left-0 top-full mt-1 w-40 bg-surface border border-surface-border rounded-xl shadow-elevated z-30 p-1">
           {PRIORIDADES.map((p) => (
             <button key={p.id} onClick={() => { onChange(p.id); setOpen(false); }}
-              className={cn("w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2", p.id === priority && "font-semibold")}>
+              className={cn("w-full text-left px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2", p.id === priority && "font-semibold")}>
               <span className={cn("h-1.5 w-1.5 rounded-full", p.dot)} />{p.label}
             </button>
           ))}
@@ -667,10 +680,10 @@ function StatusPicker({ status, onChange }: { status: TicketStatus; onChange: (s
         <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />{meta.label}<ChevronDown className="h-3 w-3" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-surface-border rounded-lg shadow-elevated z-30 py-1">
+        <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-surface-border rounded-xl shadow-elevated z-30 p-1">
           {TICKET_STATUS.map((s) => (
             <button key={s.id} onClick={() => { onChange(s.id); setOpen(false); }}
-              className={cn("w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted inline-flex items-center gap-2", s.id === status && "font-semibold")}>
+              className={cn("w-full text-left px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle inline-flex items-center gap-2", s.id === status && "font-semibold")}>
               <span className={cn("h-1.5 w-1.5 rounded-full", s.dot)} />{s.label}
             </button>
           ))}

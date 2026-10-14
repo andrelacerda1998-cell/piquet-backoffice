@@ -33,7 +33,7 @@ export function CronologiaPedido({ leadId }: { leadId: string }) {
 
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted mb-2 inline-flex items-center gap-1.5">
+      <p className="text-sm font-semibold text-text-primary mb-2 inline-flex items-center gap-1.5">
         <Clock className="h-3.5 w-3.5" /> Cronologia
       </p>
       <ol className="space-y-2.5">

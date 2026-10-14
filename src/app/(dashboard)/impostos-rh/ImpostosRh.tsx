@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { Painel } from "@/components/ui/Painel";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs } from "@/components/ui/Tabs";
@@ -17,12 +18,11 @@ import {
 import { Modal, Field } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/stores";
-import { buildMetricValue } from "@/lib/calculations";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { Employee, TaxObligation, ContractType } from "@/types";
-import { X, Plus, Calculator, Landmark } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { X, Plus, Calculator } from "lucide-react";
+import { SectionHeader } from "@/components/ui/PageHeader";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 type Tab = "fiscal" | "colaboradores" | "simulador";
@@ -47,7 +47,6 @@ const EMPTY_EMP_FORM = {
 
 export default function TaxHRPage() {
   const [tab, setTab] = useState<Tab>("fiscal");
-  const [calendarView, setCalendarView] = useState<"lista" | "mensal">("lista");
   const [selectedEmployee, setSelectedEmployee] = useState<(Employee & { cost: ReturnType<typeof computeEmployeeCost> }) | null>(null);
   const [empModal, setEmpModal] = useState<{ open: boolean; editing: Employee | null }>({ open: false, editing: null });
   const [empForm, setEmpForm] = useState(EMPTY_EMP_FORM);
@@ -174,15 +173,15 @@ export default function TaxHRPage() {
     { key: "name", label: "Obrigação" },
     { key: "category", label: "Categoria", render: (r) => r.category.replace(/_/g, " ") },
     { key: "referencePeriod", label: "Período" },
-    { key: "amountEstimated", label: "Estimado", render: (r) => formatCurrency(r.amountEstimated) },
-    { key: "amountConfirmed", label: "Confirmado", render: (r) => r.amountConfirmed ? formatCurrency(r.amountConfirmed) : "—" },
+    { key: "amountEstimated", label: "Estimado", className: "text-right", render: (r) => <span className="tabular-nums">{formatCurrency(r.amountEstimated)}</span> },
+    { key: "amountConfirmed", label: "Confirmado", className: "text-right", render: (r) => r.amountConfirmed ? <span className="tabular-nums">{formatCurrency(r.amountConfirmed)}</span> : "—" },
     { key: "dueDate", label: "Data-limite", render: (r) => formatDate(r.dueDate) },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status} label={r.status.replace(/_/g, " ")} /> },
-    { key: "actions", label: "Ações", render: (r) => r.status !== "pago" ? (
+    { key: "actions", label: "", className: "text-right", render: (r) => r.status !== "pago" ? (
       <PermissionGate permission="mark_taxes_paid">
-        <button onClick={() => handleMarkPaid(r.id)} className="text-xs text-piquet-600 hover:underline">Marcar pago</button>
+        <button onClick={() => handleMarkPaid(r.id)} className="btn-ghost text-xs px-2 py-1">Marcar pago</button>
       </PermissionGate>
-    ) : "✓" },
+    ) : <span className="text-success">✓</span> },
   ];
 
   const empColumns: Column<Employee & { cost: ReturnType<typeof computeEmployeeCost> }>[] = [
@@ -214,14 +213,14 @@ export default function TaxHRPage() {
     )},
     { key: "acoes", label: "", render: (r) => (
       <PermissionGate permission="manage_employees">
-        <div className="flex items-center justify-end gap-2">
-          <button onClick={(e) => { e.stopPropagation(); openEmpModal(r); }} className="text-xs text-piquet-600 hover:underline">Editar</button>
+        <div className="flex items-center justify-end gap-0.5 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+          <button onClick={(e) => { e.stopPropagation(); openEmpModal(r); }} className="btn-ghost text-xs px-2 py-1">Editar</button>
           {/* Saiu da empresa → desativar (mantém o histórico de custos). */}
           {r.employmentStatus === "ativo" && (
-            <button onClick={(e) => { e.stopPropagation(); setEmpToDeactivate(r); }} className="text-xs text-warning hover:underline">Desativar</button>
+            <button onClick={(e) => { e.stopPropagation(); setEmpToDeactivate(r); }} className="btn-ghost text-xs px-2 py-1 text-warning hover:text-warning">Desativar</button>
           )}
           {/* Registo errado → eliminar de vez (só depois de escrever o nome; quem saiu, desativa-se). */}
-          <button onClick={(e) => { e.stopPropagation(); setEmpToDelete(r); }} className="text-xs text-text-muted hover:text-danger">Eliminar</button>
+          <button onClick={(e) => { e.stopPropagation(); setEmpToDelete(r); }} className="btn-ghost text-xs px-2 py-1 hover:text-danger">Eliminar</button>
         </div>
       </PermissionGate>
     )},
@@ -236,96 +235,86 @@ export default function TaxHRPage() {
   return (
     <RouteGuard route="/impostos-rh">
       <div className="space-y-6">
-        <PageHeader
-          icon={Landmark}
-          eyebrow="Financeiro"
-          title={<>Impostos e Recursos Humanos <DemoBadge endpoint="/tax/obligations" /></>}
-          subtitle="Gestão fiscal e equipa interna — valores estimados"
-        />
-
-        <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as Tab)} />
+        {/* Vive dentro do Financeiro › Resultado, numa secção que já tem o
+            título: aqui fica só o que distingue isto do resto. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs variant="pill" tabs={tabs} active={tab} onChange={(id) => setTab(id as Tab)} />
+          <span className="inline-flex items-center gap-2 text-xs text-text-muted">
+            Valores estimados <DemoBadge endpoint="/tax/obligations" />
+          </span>
+        </div>
 
         {tab === "fiscal" && (
           <>
             {taxSummary && (
-              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                <MetricCard title="Previstos (mês)" metric={buildMetricValue(taxSummary.estimatedThisMonth, taxSummary.estimatedThisMonth)} hideDelta format="currency" />
-                <MetricCard title="Pagos (mês)" metric={buildMetricValue(taxSummary.paidThisMonth, taxSummary.paidThisMonth)} hideDelta format="currency" />
-                <MetricCard title="Pendentes" metric={buildMetricValue(taxSummary.pending, taxSummary.pending)} hideDelta format="currency" />
+              <StatGroup cols={6}>
+                <Stat label="Previstos (mês)" value={formatCurrency(taxSummary.estimatedThisMonth)} />
+                <Stat label="Pagos (mês)" value={formatCurrency(taxSummary.paidThisMonth)} />
+                <Stat label="Pendentes" value={formatCurrency(taxSummary.pending)} />
                 {/* IVA REAL do trimestre (comissão cobrada − faturas de custo),
                     não o valor fixo que vinha do resumo fiscal. */}
-                <MetricCard title={vat?.trimestre.aPagar === false ? "IVA a recuperar (trim.)" : "IVA a entregar (trim.)"}
-                  metric={buildMetricValue(Math.abs(vat?.trimestre.aEntregar ?? 0), Math.abs(vat?.trimestre.aEntregar ?? 0))} hideDelta format="currency" />
+                <Stat label={vat?.trimestre.aPagar === false ? "IVA a recuperar (trim.)" : "IVA a entregar (trim.)"}
+                  value={formatCurrency(Math.abs(vat?.trimestre.aEntregar ?? 0))} tone={vat?.trimestre.aPagar === false ? "bom" : undefined} />
                 {/* REAL: TSU da entidade derivada da folha atual dos colaboradores (não do seed fiscal). */}
-                <MetricCard title="TSU equipa (mensal)" metric={buildMetricValue(teamDashboard?.socialSecurityMonthly ?? 0, teamDashboard?.socialSecurityMonthly ?? 0)} format="currency" />
-                <MetricCard title="Vencidas" metric={buildMetricValue(taxSummary.overdueCount, taxSummary.overdueCount)} hideDelta />
-              </div>
+                <Stat label="TSU equipa (mensal)" value={formatCurrency(teamDashboard?.socialSecurityMonthly ?? 0)} />
+                <Stat label="Vencidas" value={taxSummary.overdueCount} tone={taxSummary.overdueCount > 0 ? "mau" : undefined} />
+              </StatGroup>
             )}
 
             {/* IVA calculado dos dados reais: comissão cobrada (liquidado) e
                 faturas de custo registadas (dedutível). */}
             {vat && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {[vat.trimestre, vat.mes].map((p, i) => (
-                  <div key={i} className="card overflow-hidden">
-                    <div className="flex items-baseline justify-between border-b border-surface-border px-4 py-3">
-                      <p className="font-semibold text-text-primary capitalize">{p.label}</p>
-                      <span className="text-xs text-text-muted">{i === 0 ? "período de entrega" : "no mês"}</span>
-                    </div>
-                    <div className="px-4 py-4">
-                      <p className="text-xs text-text-secondary">{p.aPagar ? "IVA a entregar ao Estado" : "IVA a recuperar / reportar"}</p>
-                      <p className={cn("text-3xl font-bold tabular-nums mt-0.5", p.aPagar ? "text-text-primary" : "text-success")}>
-                        {formatCurrency(Math.abs(p.aEntregar))}
-                      </p>
-
-                      <div className="mt-4 space-y-1.5 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-text-secondary">IVA liquidado <span className="text-text-muted">(na comissão de {formatCurrency(p.comissao)})</span></span>
-                          <span className="tabular-nums font-medium">{formatCurrency(p.liquidado)}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-text-secondary">IVA dedutível <span className="text-text-muted">({p.faturasContadas} fatura{p.faturasContadas === 1 ? "" : "s"} de custo)</span></span>
-                          <span className="tabular-nums font-medium">− {formatCurrency(p.dedutivel)}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-surface-border pt-1.5">
-                          <span className="font-medium text-text-primary">{p.aPagar ? "A entregar" : "A recuperar"}</span>
-                          <span className={cn("tabular-nums font-bold", p.aPagar ? "text-text-primary" : "text-success")}>{formatCurrency(Math.abs(p.aEntregar))}</span>
-                        </div>
+                  <Painel key={i} titulo={p.label.charAt(0).toUpperCase() + p.label.slice(1)} aside={i === 0 ? "período de entrega" : "no mês"}>
+                    <p className="text-[13px] text-text-secondary">{p.aPagar ? "IVA a entregar ao Estado" : "IVA a recuperar / reportar"}</p>
+                    <p className={cn("text-[26px] leading-8 font-semibold tracking-tight tabular-nums mt-0.5", p.aPagar ? "text-text-primary" : "text-success")}>
+                      {formatCurrency(Math.abs(p.aEntregar))}
+                    </p>
+                    <dl className="mt-4 space-y-1.5 text-[13px]">
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-text-secondary">IVA liquidado <span className="text-text-muted">(na comissão de {formatCurrency(p.comissao)})</span></dt>
+                        <dd className="tabular-nums font-medium">{formatCurrency(p.liquidado)}</dd>
                       </div>
-                    </div>
-                  </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-text-secondary">IVA dedutível <span className="text-text-muted">({p.faturasContadas} fatura{p.faturasContadas === 1 ? "" : "s"} de custo)</span></dt>
+                        <dd className="tabular-nums font-medium">− {formatCurrency(p.dedutivel)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 border-t border-surface-border pt-1.5">
+                        <dt className="font-medium text-text-primary">{p.aPagar ? "A entregar" : "A recuperar"}</dt>
+                        <dd className={cn("tabular-nums font-semibold", p.aPagar ? "text-text-primary" : "text-success")}>{formatCurrency(Math.abs(p.aEntregar))}</dd>
+                      </div>
+                    </dl>
+                  </Painel>
                 ))}
               </div>
             )}
             <p className="text-xs text-text-muted">
               Calculado a {Math.round((vat?.taxaIva ?? 0.23) * 100)}%: o IVA liquidado sai da comissão efetivamente cobrada;
-              o dedutível é uma <b>estimativa</b> sobre as faturas de custo registadas — despesas isentas
+              o dedutível é uma <b className="font-medium text-text-secondary">estimativa</b> sobre as faturas de custo registadas — despesas isentas
               (salários, seguros, alguns serviços) não têm IVA a deduzir, por isso confirma com a contabilidade antes de entregar.
             </p>
 
-            <div className="flex gap-2 mb-3">
-              <button onClick={() => setCalendarView("lista")} className={`text-sm px-3 py-1 rounded ${calendarView === "lista" ? "bg-piquet" : "bg-surface-muted"}`}>Lista</button>
-              <button onClick={() => setCalendarView("mensal")} className={`text-sm px-3 py-1 rounded ${calendarView === "mensal" ? "bg-piquet" : "bg-surface-muted"}`}>Mensal</button>
-            </div>
-
-            <DataTable columns={taxColumns} data={obligations ?? []} keyField="id" />
+            <section>
+              <SectionHeader title="Obrigações fiscais" description="O que há a entregar ao Estado, com o prazo de cada uma." />
+              <DataTable columns={taxColumns} data={obligations ?? []} keyField="id" />
+            </section>
           </>
         )}
 
         {tab === "colaboradores" && (
           <>
             {teamDashboard && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* previous = current: sem comparação fabricada (são valores atuais). */}
-                <MetricCard title="Total colaboradores" metric={buildMetricValue(teamDashboard.totalEmployees, teamDashboard.totalEmployees)} />
-                <MetricCard title="Ativos" metric={buildMetricValue(teamDashboard.activeEmployees, teamDashboard.activeEmployees)} />
+              <StatGroup cols={6}>
+                <Stat label="Colaboradores" value={teamDashboard.totalEmployees} />
+                <Stat label="Ativos" value={teamDashboard.activeEmployees} />
                 <PermissionGate permission="view_aggregated_costs">
-                  <MetricCard title="Custo mensal equipa" metric={buildMetricValue(teamDashboard.monthlyTeamCost, teamDashboard.monthlyTeamCost)} format="currency" />
-                  <MetricCard title="Custo médio/colaborador" metric={buildMetricValue(teamDashboard.averageCostPerEmployee, teamDashboard.averageCostPerEmployee)} format="currency" />
+                  <Stat label="Custo mensal da equipa" value={formatCurrency(teamDashboard.monthlyTeamCost)} />
+                  <Stat label="Custo médio por pessoa" value={formatCurrency(teamDashboard.averageCostPerEmployee)} />
                 </PermissionGate>
-                <MetricCard title="Novas contratações" metric={buildMetricValue(teamDashboard.newHires, teamDashboard.newHires)} />
-                <MetricCard title="Saídas" metric={buildMetricValue(teamDashboard.departures, teamDashboard.departures)} />
-              </div>
+                <Stat label="Novas contratações" value={teamDashboard.newHires} />
+                <Stat label="Saídas" value={teamDashboard.departures} />
+              </StatGroup>
             )}
 
             {/*
@@ -337,39 +326,45 @@ export default function TaxHRPage() {
               <BarChartComponent data={costByDept ?? []} currency />
             </ChartCard>
 
-            <div className="flex justify-between items-center">
-              <SearchInput value={search} onChange={setSearch} className="max-w-sm" placeholder="Pesquisar colaboradores..." />
-              <PermissionGate permission="manage_employees">
-                <button onClick={() => openEmpModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Adicionar</button>
-              </PermissionGate>
-            </div>
-
-            <DataTable columns={empColumns} data={employees?.data ?? []} keyField="id" onRowClick={setSelectedEmployee} loading={loading}
-              emptyMessage="Ainda não há colaboradores registados. Adiciona-os aqui para o custo mensal da equipa entrar no Planeamento e no resultado operacional." />
-            {employees && <Pagination page={page} totalPages={employees.totalPages} total={employees.total} pageSize={pageSize} onPageChange={setPage} />}
+            <section>
+              <SectionHeader
+                title="Colaboradores"
+                aside={
+                  <PermissionGate permission="manage_employees">
+                    <button onClick={() => openEmpModal(null)} className="btn-secondary text-sm"><Plus className="h-4 w-4" /> Adicionar</button>
+                  </PermissionGate>
+                }
+              />
+              <DataTable columns={empColumns} data={employees?.data ?? []} keyField="id" onRowClick={setSelectedEmployee} loading={loading}
+                toolbar={<SearchInput value={search} onChange={setSearch} className="w-full sm:w-64" placeholder="Pesquisar colaboradores..." />}
+                emptyMessage="Ainda não há colaboradores registados. Adiciona-os aqui para o custo mensal da equipa entrar no Planeamento e no resultado operacional." />
+              {employees && <Pagination page={page} totalPages={employees.totalPages} total={employees.total} pageSize={pageSize} onPageChange={setPage} />}
+            </section>
           </>
         )}
 
         {tab === "simulador" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="card p-6 space-y-4">
-              <h3 className="font-semibold flex items-center gap-2"><Calculator className="h-5 w-5" /> Simular contratação</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <Painel titulo="Simular contratação" icon={Calculator} corpo="p-4 space-y-3">
               <SimField label="Nome do cenário" value={simInput.name} onChange={(v) => setSimInput({ ...simInput, name: v })} />
-              <SimField label="Cargo" value={simInput.jobTitle} onChange={(v) => setSimInput({ ...simInput, jobTitle: v })} />
-              <SimField label="Departamento" value={simInput.department} onChange={(v) => setSimInput({ ...simInput, department: v })} />
-              <SimField label="Salário bruto mensal (€)" value={String(simInput.grossMonthlySalary)} onChange={(v) => setSimInput({ ...simInput, grossMonthlySalary: Number(v) })} type="number" />
-              <SimField label="Remunerações anuais" value={String(simInput.annualSalaryPayments)} onChange={(v) => setSimInput({ ...simInput, annualSalaryPayments: Number(v) })} type="number" />
-              <SimField label="Taxa SS empresa (%)" value={String(simInput.employerSocialSecurityRate * 100)} onChange={(v) => setSimInput({ ...simInput, employerSocialSecurityRate: Number(v) / 100 })} type="number" />
-              <SimField label="Recrutamento (€)" value={String(simInput.recruitmentCost)} onChange={(v) => setSimInput({ ...simInput, recruitmentCost: Number(v) })} type="number" />
+              <div className="grid grid-cols-2 gap-3">
+                <SimField label="Cargo" value={simInput.jobTitle} onChange={(v) => setSimInput({ ...simInput, jobTitle: v })} />
+                <SimField label="Departamento" value={simInput.department} onChange={(v) => setSimInput({ ...simInput, department: v })} />
+                <SimField label="Salário bruto mensal (€)" value={String(simInput.grossMonthlySalary)} onChange={(v) => setSimInput({ ...simInput, grossMonthlySalary: Number(v) })} type="number" />
+                <SimField label="Remunerações anuais" value={String(simInput.annualSalaryPayments)} onChange={(v) => setSimInput({ ...simInput, annualSalaryPayments: Number(v) })} type="number" />
+                <SimField label="Taxa SS empresa (%)" value={String(simInput.employerSocialSecurityRate * 100)} onChange={(v) => setSimInput({ ...simInput, employerSocialSecurityRate: Number(v) / 100 })} type="number" />
+                <SimField label="Recrutamento (€)" value={String(simInput.recruitmentCost)} onChange={(v) => setSimInput({ ...simInput, recruitmentCost: Number(v) })} type="number" />
+              </div>
               <button onClick={handleSimulate} className="btn-primary w-full">Calcular impacto</button>
-            </div>
-            {simResult && (
-              <div className="card p-6 space-y-3">
-                <h3 className="font-semibold">Resultado — {simResult.name}</h3>
+            </Painel>
+            {simResult ? (
+              <Painel titulo={`Resultado — ${simResult.name}`} corpo="px-4 py-1">
                 <ResultRow label="Custo mensal" value={formatCurrency(simResult.monthlyCost)} />
                 <ResultRow label="Custo anual" value={formatCurrency(simResult.annualCost)} />
                 <ResultRow label="Custo 1.º ano (c/ recrutamento)" value={formatCurrency(simResult.firstYearCost)} />
-              </div>
+              </Painel>
+            ) : (
+              <p className="card px-4 py-8 text-center text-sm text-text-muted">Preenche o cenário e carrega em &quot;Calcular impacto&quot;.</p>
             )}
           </div>
         )}
@@ -476,18 +471,18 @@ export default function TaxHRPage() {
 
 function SimField({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
-    <div>
-      <label className="text-xs text-text-secondary mb-1 block">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="input-field" />
-    </div>
+    <label className="block">
+      <span className="text-xs text-text-muted mb-1 block">{label}</span>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="input-field py-1.5" />
+    </label>
   );
 }
 
 function ResultRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-2 border-b border-surface-border">
-      <span className="text-text-secondary">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-surface-border last:border-0 text-[13px]">
+      <span className="text-text-muted">{label}</span>
+      <span className="font-medium text-text-primary tabular-nums text-right">{value}</span>
     </div>
   );
 }
@@ -500,12 +495,15 @@ function EmployeeDrawer({ employee, onClose, onDeactivate, onEdit }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-lg bg-surface h-full overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between mb-6">
-          <h2 className="text-lg font-bold">{employee.fullName}</h2>
-          <button onClick={onClose}><X className="h-5 w-5" /></button>
+      <div className="w-full max-w-lg bg-surface h-full overflow-y-auto p-6 shadow-elevated" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="min-w-0">
+            <p className="text-xs text-text-muted">Colaborador</p>
+            <h2 className="text-xl font-semibold tracking-tight">{employee.fullName}</h2>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1.5 -mr-1.5" aria-label="Fechar"><X className="h-4 w-4" /></button>
         </div>
-        <div className="space-y-3 text-sm">
+        <div className="card px-4 py-1">
           <ResultRow label="Cargo" value={employee.jobTitle} />
           <ResultRow label="Departamento" value={employee.department} />
           <ResultRow label="Contrato" value={employee.contractType.replace(/_/g, " ")} />
@@ -529,8 +527,10 @@ function EmployeeDrawer({ employee, onClose, onDeactivate, onEdit }: {
           </PermissionGate>
         </div>
         <PermissionGate permission="manage_employees">
-          <button onClick={onEdit} className="mt-6 btn-primary text-sm w-full">Editar dados</button>
-          <button onClick={onDeactivate} className="mt-3 btn-secondary text-sm text-danger w-full">Desativar colaborador</button>
+          <div className="mt-6 flex gap-2">
+            <button onClick={onEdit} className="btn-primary text-sm flex-1">Editar dados</button>
+            <button onClick={onDeactivate} className="btn-secondary text-sm text-danger flex-1">Desativar</button>
+          </div>
         </PermissionGate>
       </div>
     </div>

@@ -1,12 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Open_Sans } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { VERSAO_ICONES } from "@/lib/versaoIcones";
 
-const openSans = Open_Sans({
+/*
+  Geist, desde o redesenho de 14/10/2026. A Open Sans tinha a altura-x grande
+  que se queria para ler, mas desenhava números largos e desiguais -- e o
+  backoffice é sobretudo números em colunas. A Geist é igualmente legível em
+  14px, tem algarismos tabulares e fica mais limpa nos títulos. A Mono serve
+  os códigos (n.º de pedido, uuids, NIF) para se lerem caráter a caráter.
+*/
+const geist = Geist({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
+  display: "swap",
+});
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -85,7 +96,7 @@ export const viewport: Viewport = {
     próprio, agora escuro por omissão. Com o telemóvel em claro e a app em
     escuro, a barra ficava clara por cima de um ecrã escuro.
   */
-  themeColor: "#1C1A17",
+  themeColor: "#111010",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -102,7 +113,7 @@ const themeScript = `(function(){try{var t=JSON.parse(localStorage.getItem('piqu
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-PT" className={openSans.variable} suppressHydrationWarning>
+    <html lang="pt-PT" className={`${geist.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

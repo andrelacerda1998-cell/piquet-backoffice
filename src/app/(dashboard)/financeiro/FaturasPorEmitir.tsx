@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SectionHeader } from "@/components/ui/PageHeader";
 import { FileClock } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { useAuthStore, toast } from "@/stores";
@@ -44,16 +45,12 @@ export function FaturasPorEmitir({ recarregarSaldos }: { recarregarSaldos: () =>
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-semibold">Faturas por emitir · {data.total}</h2>
-          <p className="text-xs text-text-secondary">
-            O dinheiro destes serviços só se paga depois de a fatura sair. As que já podem sair saem sozinhas às 06:20.
-          </p>
-        </div>
-        <button className="btn-secondary text-xs py-1" onClick={refetch}>Atualizar</button>
-      </div>
+    <section>
+      <SectionHeader
+        title={`Faturas por emitir · ${data.total}`}
+        description="O dinheiro destes serviços só se paga depois de a fatura sair. As que já podem sair saem sozinhas às 06:20."
+        aside={<button className="btn-ghost text-[13px]" onClick={refetch}>Atualizar</button>}
+      />
 
       <div className="card divide-y divide-surface-border">
         {grupos.map((g) => {
@@ -67,7 +64,7 @@ export function FaturasPorEmitir({ recarregarSaldos }: { recarregarSaldos: () =>
                   {g.itens.length} {g.itens.length === 1 ? "serviço" : "serviços"} · {formatCurrency(g.paraOTecnico)} para o técnico
                 </span>
                 {podeEmitir && g.podeEmitir && (
-                  <button className="btn-primary text-xs py-1 ml-auto" disabled={ocupado === g.vendor_id}
+                  <button className="btn-secondary text-xs px-2.5 py-1 ml-auto" disabled={ocupado === g.vendor_id}
                     onClick={() => emitir(g.vendor_id, nome)}>
                     {ocupado === g.vendor_id ? "A pôr na fila…" : "Emitir agora"}
                   </button>

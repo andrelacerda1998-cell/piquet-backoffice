@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
+import { Segmentado } from "@/components/ui/Segmentado";
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { DocumentPreview } from "@/components/ui/DocumentPreview";
-import { HardHat, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { DataTable, Pagination, SearchInput, type Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -24,11 +25,11 @@ import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
 import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
-import { buildMetricValue } from "@/lib/calculations";
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
+import { FichaSeccao, Etiqueta, ListaDeDados, FichaVazia } from "@/components/ui/Ficha";
 
 
 
@@ -186,7 +187,7 @@ function ResumoDoKyc({ itens, nota }: { itens: Array<{ id: string; rotulo: strin
           <button key={i.rotulo} type="button" disabled={i.n === 0}
             onClick={() => document.getElementById(i.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             className={cn("card p-3 text-left transition-shadow", i.n > 0 ? "hover:shadow-elevated border-piquet/40" : "opacity-60 cursor-default")}>
-            <p className={cn("text-2xl font-bold tabular-nums", i.n > 0 ? "text-text-primary" : "text-text-muted")}>{formatNumber(i.n)}</p>
+            <p className={cn("text-[22px] leading-7 font-semibold tracking-tight tabular-nums", i.n > 0 ? "text-text-primary" : "text-text-muted")}>{formatNumber(i.n)}</p>
             <p className="text-xs text-text-secondary">{i.rotulo}</p>
           </button>
         ))}
@@ -577,10 +578,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
 
   const topColumns: Column<TopVendor>[] = [
     { key: "name", label: "Técnico", render: (r) => <span className="font-medium">{r.name ?? "—"}</span> },
-    { key: "servicesCompleted", label: "Serviços" },
-    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0 ? `${r.averageRating}★` : "—" },
-    { key: "piquetRevenue", label: "Receita gerada", render: (r) => formatCurrency(r.piquetRevenue) },
-    { key: "amountReceived", label: "Valor recebido", render: (r) => formatCurrency(r.amountReceived) },
+    { key: "servicesCompleted", label: "Serviços", className: "text-right" },
+    { key: "averageRating", label: "Avaliação", render: (r) => r.averageRating > 0
+      ? <span className="inline-flex items-center gap-1"><span className="text-warning">★</span>{formatRating(r.averageRating)}</span>
+      : <span className="text-text-muted">—</span> },
+    { key: "piquetRevenue", label: "Receita gerada", className: "text-right", render: (r) => formatCurrency(r.piquetRevenue) },
+    { key: "amountReceived", label: "Valor recebido", className: "text-right", render: (r) => formatCurrency(r.amountReceived) },
   ];
 
   // Colunas do VendorResource::table() do Filament (nif/telefone/preço/
@@ -611,10 +614,12 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
       return <span title={`Subutilizador AT — ${ui.label}: ${ui.hint}`} className={cn("font-bold", ui.tone)}>{ui.symbol}</span>;
     } },
     { key: "status", label: "Estado", render: (r) => <StatusBadge status={r.status ?? "Offline"} /> },
+    /* Clicar na linha abre o perfil (saiu o botão "Ver perfil", que fazia o
+       mesmo). Suspender só aparece ao passar o rato: é a ação rara, e em
+       vermelho em todas as linhas era a palavra mais forte da lista. */
     { key: "acao", label: "", render: (r) => (
-      <div className="flex items-center justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); setProfileVendor(r); }} className="btn-secondary text-xs py-1">Ver perfil</button>
-        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); setParaSuspender(r); }} className="text-xs text-danger hover:underline disabled:opacity-50">Suspender</button>
+      <div className="flex items-center justify-end">
+        <button disabled={actingId === r.id} onClick={(e) => { e.stopPropagation(); setParaSuspender(r); }} className="btn-ghost text-xs px-2 py-1 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Suspender</button>
       </div>
     ) },
   ];
@@ -650,8 +655,6 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
     <RouteGuard route="/tecnicos">
       <div className="space-y-6">
         <PageHeader
-          icon={HardHat}
-          eyebrow="Pessoas"
           title={<>Técnicos <DemoBadge endpoint="/technicians" /></>}
           subtitle="Quem trabalha com a Piquet, quem está a meio da inscrição e onde há cobertura"
         />
@@ -668,20 +671,16 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
               abaixo diz onde estão os outros.
             */}
             {metrics && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <MetricCard title="Inscritos" hideDelta
-                          metric={buildMetricValue(metrics.registered, metrics.registered, false, undefined,
-                            "Todas as contas de técnico, incluindo quem nunca completou a inscrição")} />
-                        <MetricCard title="Prontos a trabalhar" hideDelta
-                          metric={buildMetricValue(metrics.eligible, metrics.eligible, false, undefined,
-                            "Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço")} />
-                        <MetricCard title="Online" hideDelta
-                          metric={buildMetricValue(metrics.online, metrics.online, false, undefined,
-                            "Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo")} />
-                        <MetricCard title="Sem serviços" hideDelta
-                          metric={buildMetricValue(metrics.noServices, metrics.noServices, false, undefined,
-                            "Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço")} />
-              </div>
+              <StatGroup cols={4}>
+                <Stat label="Inscritos" value={formatNumber(metrics.registered)}
+                  info="Todas as contas de técnico, incluindo quem nunca completou a inscrição" />
+                <Stat label="Prontos a trabalhar" value={formatNumber(metrics.eligible)}
+                  info="Documentos válidos, IBAN, workspace e contactos verificados — a AT só é exigida ao 4.º serviço" />
+                <Stat label="Online" value={formatNumber(metrics.online)}
+                  info="Têm o estado Online ligado. Expira ao fim de 72 h sem localização. Quem está pronto para um pedido agora vê-se em Operações › Ao vivo" />
+                <Stat label="Sem serviços" value={formatNumber(metrics.noServices)}
+                  info="Dos prontos a trabalhar, quantos ainda não fecharam nenhum serviço" />
+              </StatGroup>
             )}
 
             {semWorkspace && semWorkspace.contagem.total > 0 && (
@@ -689,7 +688,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
             )}
 
             <div>
-              <h2 className="font-semibold mb-3">Top técnicos por receita gerada</h2>
+              <SectionHeader title="Top técnicos por receita gerada" />
               <DataTable columns={topColumns} data={topVendors ?? []} keyField="id" emptyMessage="Sem serviços concluídos ainda." />
             </div>
           </div>
@@ -731,21 +730,20 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                     Aprovar ou recusar avisa o técnico (email e notificação). <DemoBadge endpoint="/vendor-documents" />
                   </p>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  {([
+                <Segmentado
+                  className="shrink-0"
+                  ariaLabel="Estado dos documentos"
+                  opcoes={[
                     { id: "pending", label: "Por rever" },
                     { id: "approved", label: "Aprovados" },
                     { id: "declined", label: "Recusados" },
-                  ] as { id: VendorDocumentStatus; label: string }[]).map((s) => (
-                    <button key={s.id} onClick={() => setDocStatus(s.id)}
-                      className={cn("text-xs px-2 py-1 rounded", docStatus === s.id ? "bg-piquet text-ink" : "bg-surface-muted text-text-secondary")}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
+                  ] as { id: VendorDocumentStatus; label: string }[]}
+                  valor={docStatus}
+                  onChange={setDocStatus}
+                />
               </div>
               {docsIncompletos > 0 && (
-                <p className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 px-3 py-2 text-xs text-text-secondary">
+                <p className="aviso aviso-atencao px-3 py-2 text-xs text-text-secondary">
                   O servidor não devolveu cerca de <b className="text-text-primary">{docsIncompletos}</b> documentos. Um técnico
                   que pareça não ter entregado pode ter: confirma no perfil dele.
                 </p>
@@ -756,7 +754,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                   { key: "document_type", label: "Documento", render: (r: VendorDocument) => r.document_type ?? "—" },
                   { key: "created_at", label: "Enviado em", render: (r: VendorDocument) => r.created_at ? formatDateTime(r.created_at) : "—" },
                   { key: "file_url", label: "Ficheiro", render: (r: VendorDocument) => r.file_url
-                    ? <button onClick={() => setPreviewDoc(r)} className="inline-flex items-center gap-1.5 text-xs font-medium text-piquet-600 hover:text-piquet-700">
+                    ? <button onClick={() => setPreviewDoc(r)} className="btn-ghost text-xs px-2 py-1">
                         <Eye className="h-3.5 w-3.5" /> Ver
                       </button>
                     : <span className="text-text-muted text-xs">—</span> },
@@ -880,7 +878,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                         </p>
                       </div>
                       {t.telefone && (
-                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-piquet-700">{t.telefone}</a>
+                        <a href={`tel:${t.telefone}`} className="text-xs text-text-secondary hover:text-text-primary hover:underline">{t.telefone}</a>
                       )}
                       <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-xs text-text-secondary">
                         {t.etapa ? ETAPA_LABEL[t.etapa as Etapa] : "—"}
@@ -898,11 +896,11 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
 
         {tab === "lista" && (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="max-w-sm" placeholder="Pesquisar técnicos..." />
-                      <button onClick={openTestAccountModal} className="btn-secondary text-xs py-1 ml-auto order-last">Criar conta de teste</button>
-                      <div className="chip-row">
-                        {([
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} className="w-full sm:w-64" placeholder="Pesquisar técnicos…" />
+                      <Segmentado
+                        ariaLabel="Filtrar técnicos"
+                        opcoes={([
                           { id: "", label: "Todos" },
                           { id: "validada", label: "AT validada" },
                           { id: "por_validar", label: "AT por validar" },
@@ -911,24 +909,20 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                           { id: "sem_nif", label: "Sem NIF" },
                           // Era um sub-separador à parte; é um filtro como os outros.
                           { id: "suspensos", label: "Suspensos" },
-                        ] as const).map((f) => (
-                          <button key={f.id} onClick={() => setAtFilter(f.id)}
-                            className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                              atFilter === f.id
-                                ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                                : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                            {f.label}
-                            {f.id && atFilter && (
-                              <span className={cn("tabular-nums text-xs", atFilter === f.id ? "opacity-80" : "text-text-muted")}>
-                                {f.id === "validada" ? atCounts.validada
-                                  : f.id === "por_validar" ? atCounts.por_validar
-                                  : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
-                                  : atCounts.sem_nif}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                        ] as const).map((f) => ({
+                          id: f.id,
+                          label: f.label,
+                          ...(f.id && atFilter ? {
+                            count: f.id === "validada" ? atCounts.validada
+                              : f.id === "por_validar" ? atCounts.por_validar
+                              : f.id === "suspensos" ? (suspendedVendors?.total ?? 0)
+                              : atCounts.sem_nif,
+                          } : {}),
+                        }))}
+                        valor={atFilter}
+                        onChange={setAtFilter}
+                      />
+                      <button onClick={openTestAccountModal} className="btn-ghost text-[13px] ml-auto">Criar conta de teste</button>
                     </div>
 
                     {atFilter === "suspensos" ? (
@@ -1043,35 +1037,26 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
               : v.invoice_workspace_blocker
                 ?? null;
 
-          /** Rótulo curto do que falta ou está feito — o essencial de relance. */
-          const chip = (ok: boolean, texto: string) => (
-            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-              ok ? "bg-success-light text-success" : "bg-warning-light text-warning")}>
-              <span className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-success" : "bg-warning")} />
-              {texto}
-            </span>
-          );
+          const servicos = [...(v.services_types ?? [])].sort((a, b) => a.localeCompare(b, "pt"));
 
           return (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {/* Estado de relance — substitui as três faixas de aviso que havia. */}
-              <div className="flex flex-wrap items-center gap-2">
-                {chip(emFalta === 0, emFalta === 0
-                  ? "Documentação completa"
-                  : `${emFalta} de ${REQUIRED_DOCS.length} documentos por aprovar`)}
-                {chip(at === "validado", at === "validado" ? "AT validada" : "AT por validar")}
-                {chip(v.can_accept_service, v.can_accept_service ? "Pode aceitar serviços" : "Não pode aceitar serviços")}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Etiqueta tom={emFalta === 0 ? "bom" : "atencao"}>
+                  {emFalta === 0 ? "Documentação completa" : `${emFalta} de ${REQUIRED_DOCS.length} documentos por aprovar`}
+                </Etiqueta>
+                <Etiqueta tom={at === "validado" ? "bom" : "atencao"}>{at === "validado" ? "AT validada" : "AT por validar"}</Etiqueta>
+                <Etiqueta tom={v.can_accept_service ? "bom" : "atencao"}>
+                  {v.can_accept_service ? "Pode aceitar serviços" : "Não pode aceitar serviços"}
+                </Etiqueta>
                 {/* Sem NIF não há fatura possível em nome dele — 168 dos 422
                     técnicos estão assim (medido a 22/08). É bloqueio, não
                     detalhe: por isso aparece a vermelho e não como os outros. */}
                 {!v.nif?.trim() && (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full bg-danger-light px-2.5 py-1 text-xs font-medium text-danger"
-                    title="O técnico registou-se sem NIF. Sem ele não é possível emitir fatura em nome dele."
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-danger" />
+                  <Etiqueta tom="perigo" title="O técnico registou-se sem NIF. Sem ele não é possível emitir fatura em nome dele.">
                     Sem NIF
-                  </span>
+                  </Etiqueta>
                 )}
                 {docsIncompletos > 0 && (
                   <span
@@ -1083,262 +1068,204 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
                 )}
               </div>
 
-              {/* Duas colunas: à esquerda o que se aprova, à direita o que se consulta. */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* ------------------------- Documentos ------------------------- */}
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Documentos obrigatórios</p>
-                  {REQUIRED_DOCS.map((req) => {
-                    const st = states?.[req.key] ?? "em_falta";
-                    const ui = DOC_STATE_UI[st];
-                    const doc = meus.find((d) => classifyDocument(d.document_type) === req.key);
-                    return (
-                      <div key={req.key} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-text-primary">{req.label}</p>
-                          <p className={cn("text-sm", ui.tone)}>
-                            {ui.symbol} {ui.label}
-                            {doc?.created_at && st !== "em_falta" && ` · ${formatDate(doc.created_at)}`}
-                            {doc?.expiration_date && st === "aprovado" && ` · expira ${formatDate(doc.expiration_date)}`}
-                            {doc?.reason && st === "recusado" && ` · ${doc.reason}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {doc?.file_url && (
-                            <button onClick={() => { setProfileVendor(null); setPreviewDoc(doc); }}
-                              className="btn-secondary text-xs py-1" title="Ver documento">
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          {doc && doc.status === "pending" && (
-                            <>
-                              <button onClick={() => { setProfileVendor(null); openApprove(doc); }}
-                                className="text-sm font-medium text-success hover:underline">Aprovar</button>
-                              <button onClick={() => { setProfileVendor(null); openDecline(doc); }}
-                                className="text-xs text-danger hover:underline">Recusar</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/*
+                Duas colunas: à esquerda o que decide se ele pode trabalhar
+                (documentos e faturação, com as ações), à direita o contacto e
+                o que a equipa sabe dele.
+              */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-6 min-w-0">
+                  <FichaSeccao titulo="Documentos obrigatórios">
+                    <ul className="card divide-y divide-surface-border">
+                      {REQUIRED_DOCS.map((req) => {
+                        const st = states?.[req.key] ?? "em_falta";
+                        const ui = DOC_STATE_UI[st];
+                        const doc = meus.find((d) => classifyDocument(d.document_type) === req.key);
+                        return (
+                          <li key={req.key} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-text-primary">{req.label}</p>
+                              <p className={cn("text-xs truncate", ui.tone)}>
+                                {ui.symbol} {ui.label}
+                                {doc?.created_at && st !== "em_falta" && <span className="text-text-muted"> · {formatDate(doc.created_at)}</span>}
+                                {doc?.expiration_date && st === "aprovado" && <span className="text-text-muted"> · expira {formatDate(doc.expiration_date)}</span>}
+                                {doc?.reason && st === "recusado" && ` · ${doc.reason}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc?.file_url && (
+                                <button onClick={() => { setProfileVendor(null); setPreviewDoc(doc); }}
+                                  className="btn-ghost p-1.5" title="Ver documento" aria-label={`Ver ${req.label}`}>
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              )}
+                              {doc && doc.status === "pending" && (
+                                <>
+                                  <button onClick={() => { setProfileVendor(null); openDecline(doc); }}
+                                    className="btn-ghost text-xs px-2 py-1 text-danger hover:text-danger">Recusar</button>
+                                  <button onClick={() => { setProfileVendor(null); openApprove(doc); }}
+                                    className="btn-secondary text-xs px-2.5 py-1 text-success">Aprovar</button>
+                                </>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
 
-                  {outros.length > 0 && (
-                    <details className="pt-1">
-                      <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
-                        Outros documentos ({outros.length})
-                      </summary>
-                      <div className="mt-2 space-y-2">
-                        {outros.map((d) => (
-                          <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border px-3 py-2">
-                            <p className="text-sm text-text-primary truncate">{d.document_type ?? "Documento"}</p>
-                            {d.file_url && (
-                              <button onClick={() => { setProfileVendor(null); setPreviewDoc(d); }}
-                                className="btn-secondary text-xs py-1 shrink-0"><Eye className="h-3.5 w-3.5" /></button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                </div>
-
-                {/* ------------------- Faturação: AT + empresa + dados ------------------ */}
-                {/*
-                  Uma tabela só, não três blocos. O subutilizador AT aparecia em
-                  cima E outra vez nos dados da empresa (identificador, válido,
-                  validado em) -- as mesmas três linhas duas vezes eram metade
-                  do scroll deste painel.
-                */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted">Faturação e dados</p>
-                    <div className="flex items-center gap-2">
-                      {at === "validado" ? (
-                        <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
-                          className="text-sm text-warning hover:underline disabled:opacity-50">Retirar AT</button>
-                      ) : (
-                        <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
-                          title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
-                          className="btn-secondary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
-                          {atSaving ? "A gravar…" : "Validar AT"}
-                        </button>
-                      )}
-                      {!temWorkspace && (
-                        <button
-                          disabled={wsSaving || !podeCriarWs}
-                          onClick={() => criarWorkspace(v)}
-                          title={wsMotivo ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
-                          className="btn-primary text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          {wsSaving ? "A criar…" : "Criar workspace"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sem workspace não há fatura possível no fim do serviço --
-                      é aviso a sério, e diz a razão que o backend dá. */}
-                  {!temWorkspace && (
-                    <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-3 py-2">
-                      <p className="text-sm text-text-secondary">
-                        <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
-                        {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="rounded-xl border border-surface-border divide-y divide-surface-border/60">
-                    {([
-                      ["Workspace de faturação", temWorkspace
-                        ? (v.invoice_workspace ?? "Existe (nome não enviado)")
-                        : "—"],
-                      ["Nome da empresa", v.company_name ?? "—"],
-                      ["Subutilizador AT", utilizador
-                        ? <span key="at-user" className="font-mono">{utilizador}</span>
-                        : "—"],
-                      ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
-                        {v.at_validated_at && <span key="at-date" className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
-                      ["NIF", v.nif || "—"],
-                      ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
-                      ["IBAN", v.iban ? <span key="iban" className="font-mono text-sm">{v.iban}</span> : "—"],
-                      ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
-                      ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
-                    ] as [string, React.ReactNode][]).map(([rotulo, valor]) => (
-                      <div key={rotulo} className="flex items-baseline justify-between gap-4 px-3 py-1.5">
-                        <span className="text-sm text-text-muted shrink-0">{rotulo}</span>
-                        <span className="text-sm text-text-primary text-right truncate">{valor}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/*
-                    Os serviços que o técnico escolheu fazer.
-
-                    Lista própria e não mais uma linha na tabela acima: são
-                    serviços do catálogo, não categorias, e um técnico costuma
-                    ter dezenas -- juntá-los por vírgulas numa linha truncada
-                    dava uma frase cortada que não responde a nada.
-
-                    Fechado por omissão, com a contagem à vista: quem abre a
-                    ficha quer saber QUANTOS e, às vezes, SE faz um em
-                    concreto. Aberto de origem, empurrava o resto do perfil
-                    para fora do ecrã.
-                  */}
-                  {(() => {
-                    const servicos = v.services_types ?? [];
-                    if (servicos.length === 0) {
-                      return (
-                        <p className="text-sm text-text-muted">
-                          Sem serviços escolhidos — este técnico não entra no matching de nenhum pedido.
-                        </p>
-                      );
-                    }
-                    return (
-                      <details open>
-                        <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
-                          Serviços que faz ({servicos.length})
+                    {outros.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                          Outros documentos ({outros.length})
                         </summary>
-                        {/*
-                          Lista e não etiquetas: os nomes são frases ("Limpeza de
-                          Colchão de Casal"), e em etiquetas o olho tem de saltar
-                          entre linhas de larguras diferentes para ler cada uma.
-                          Em coluna, lê-se de cima a baixo.
-
-                          Duas colunas em ecrãs largos porque a maioria dos nomes
-                          é curta e uma coluna só desperdiçava metade da largura
-                          com dezenas de linhas.
-                        */}
-                        <ul className="mt-2 max-h-64 overflow-auto rounded-lg bg-surface-subtle p-3
-                                       columns-1 sm:columns-2 gap-x-6">
-                          {[...servicos].sort((a, b) => a.localeCompare(b, "pt")).map((nome) => (
-                            <li key={nome} className="break-inside-avoid py-1 pl-3 text-sm text-text-secondary
-                                                      relative before:absolute before:left-0 before:top-[0.6em]
-                                                      before:h-1 before:w-1 before:rounded-full before:bg-text-muted">
-                              {nome}
+                        <ul className="mt-2 card divide-y divide-surface-border">
+                          {outros.map((d) => (
+                            <li key={d.id} className="flex items-center justify-between gap-3 px-3.5 py-2">
+                              <p className="text-sm text-text-primary truncate">{d.document_type ?? "Documento"}</p>
+                              {d.file_url && (
+                                <button onClick={() => { setProfileVendor(null); setPreviewDoc(d); }}
+                                  className="btn-ghost p-1.5 shrink-0" title="Ver documento" aria-label="Ver documento"><Eye className="h-4 w-4" /></button>
+                              )}
                             </li>
                           ))}
                         </ul>
                       </details>
-                    );
-                  })()}
+                    )}
+                  </FichaSeccao>
 
                   {/*
-                    Aviso preciso, e só quando se aplica. As colunas existem
-                    todas na BD (company_name, at_user, iban, invoice_workspace
-                    e a morada FISCAL_ADDRESS): o que falta é o
-                    VendorController::present() as devolver, o que já está
-                    escrito na branch feat/admin-payment-refund-cancel e à
-                    espera de deploy da RW Interactive. Dizer "por enviar pelo
-                    backend" sem mais mandava procurar um problema que não
-                    existe.
+                    Uma tabela só, não três blocos. O subutilizador AT aparecia em
+                    cima E outra vez nos dados da empresa (identificador, válido,
+                    validado em) -- as mesmas três linhas duas vezes eram metade
+                    do scroll deste painel.
                   */}
-                  {/*
-                    O que a API devolve MESMO, para este técnico.
-                    Quando um campo aparece vazio no painel, a pergunta é
-                    sempre a mesma -- "o backend não manda, ou manda com outro
-                    nome?" -- e discutir isso de memória não leva a lado
-                    nenhum. Aqui vê-se a resposta crua, sem sair do ecrã.
-                  */}
-                  <details>
-                    <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
-                      Dados brutos da API ({Object.keys(v).length} campos)
-                    </summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2 text-[11px] leading-snug text-text-secondary">
-                      {JSON.stringify(v, null, 2)}
-                    </pre>
-                  </details>
+                  <FichaSeccao
+                    titulo="Faturação e dados"
+                    aside={
+                      <>
+                        {at === "validado" ? (
+                          <button disabled={atSaving} onClick={() => setAtValidation(v, false)}
+                            className="btn-ghost text-xs px-2 py-1 text-warning hover:text-warning">Retirar AT</button>
+                        ) : (
+                          <button disabled={atSaving || !utilizador} onClick={() => setAtValidation(v, true)}
+                            title={utilizador ? "Confirmar que o subutilizador está correto" : "Sem o identificador à vista, validar seria carimbar às cegas"}
+                            className="btn-secondary text-xs px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                            {atSaving ? "A gravar…" : "Validar AT"}
+                          </button>
+                        )}
+                        {!temWorkspace && (
+                          <button
+                            disabled={wsSaving || !podeCriarWs}
+                            onClick={() => criarWorkspace(v)}
+                            title={wsMotivo ?? "Cria o workspace no InvoiceXpress para se poder faturar em nome deste técnico"}
+                            className="btn-primary text-xs px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {wsSaving ? "A criar…" : "Criar workspace"}
+                          </button>
+                        )}
+                      </>
+                    }
+                  >
+                    {/* Sem workspace não há fatura possível no fim do serviço --
+                        é aviso a sério, e diz a razão que o backend dá. */}
+                    {!temWorkspace && (
+                      <div className="aviso aviso-atencao mb-2">
+                        <b className="text-text-primary">Sem workspace de faturação.</b>{" "}
+                        {wsMotivo ?? "A Piquet não pode emitir faturas em nome deste técnico até o workspace ser criado."}
+                      </div>
+                    )}
+                    <ListaDeDados linhas={[
+                      ["Workspace de faturação", temWorkspace ? (v.invoice_workspace ?? "Existe (nome não enviado)") : "—"],
+                      ["Nome da empresa", v.company_name ?? "—"],
+                      ["Subutilizador AT", utilizador ? <span key="at-user" className="font-mono">{utilizador}</span> : "—"],
+                      ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
+                        {v.at_validated_at && <span className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
+                      ["NIF", v.nif || "—"],
+                      ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
+                      ["IBAN", v.iban ? <span key="iban" className="font-mono">{v.iban}</span> : "—"],
+                      ["Preço/hora", v.price_rate !== null ? formatCurrency(v.price_rate) : "—"],
+                      ["Categorias", v.operation_areas.length ? v.operation_areas.join(", ") : "—"],
+                    ]} />
+                    {!temFaturacao && !v.company_name && (
+                      <p className="text-xs text-text-muted mt-2">
+                        Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
+                      </p>
+                    )}
+                  </FichaSeccao>
+                </div>
 
-                  {!temFaturacao && !v.company_name && (
-                    <p className="text-xs text-text-muted cursor-help"
-                      title="Estes dados existem no sistema, mas ainda não chegam a este ecrã. Está a ser tratado.">
-                      Empresa, IBAN e morada fiscal existem no Laravel mas ainda não vêm na API — falta publicar a versão do backend que os expõe.
-                    </p>
-                  )}
-
-                  {/*
-                    Apagar de vez.
-
-                    Ao fundo, isolado por uma linha e em texto discreto: é a
-                    única ação da ficha que não tem volta, e não devia estar ao
-                    lado das que se carregam por engano. Quem o procura,
-                    encontra; quem não o procura, não lhe tropeça.
-                  */}
-                  <div className="border-t border-surface-border pt-3">
-                    <button
-                      onClick={() => setVendorParaApagar(v)}
-                      className="text-sm text-text-muted hover:text-danger transition-colors"
-                    >
-                      Apagar este técnico em definitivo
-                    </button>
-                  </div>
-
+                <div className="space-y-6 min-w-0">
                   {/*
                     O que este técnico escreveu. Vive aqui porque é aqui que
                     pertence: antes, uma mensagem dele só podia existir agarrada
                     a uma lead, e por isso aparecia no CRM como um pedido de
                     serviço vindo de quem os executa.
                   */}
-                  <div className="pt-1">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Notas internas</p>
+                  {/* Altura limitada: o quadro estica para encher o espaço que tem,
+                      e numa coluna sem limite empurrava as notas para fora do ecrã. */}
+                  <div className="flex max-h-[360px] flex-col empty:hidden">
+                  <WhatsappConversa
+                    tecnicoId={String(v.id)}
+                    temTelefone={Boolean(v.phone_number)}
+                    waNumero={(v.phone_number || "").replace(/\D/g, "").length === 9
+                      ? `351${(v.phone_number || "").replace(/\D/g, "")}`
+                      : (v.phone_number || "").replace(/\D/g, "")}
+                  />
+                  </div>
+
+                  <FichaSeccao titulo="Notas internas">
                     <NotasInternas entidade="tecnico" id={String(v.id)} focar={focarNota} />
-                  </div>
+                  </FichaSeccao>
 
-                  <div className="pt-1">
-                    <p className="text-sm font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Histórico da equipa</p>
+                  {/*
+                    Os serviços que o técnico escolheu fazer: são serviços do
+                    catálogo, não categorias, e um técnico costuma ter dezenas.
+                    Em lista (os nomes são frases) e a duas colunas em ecrãs
+                    largos, porque a maioria dos nomes é curta.
+                  */}
+                  <FichaSeccao titulo={<>Serviços que faz <span className="font-normal text-text-muted">· {servicos.length}</span></>}>
+                    {servicos.length === 0 ? (
+                      <FichaVazia>Sem serviços escolhidos — este técnico não entra no matching de nenhum pedido.</FichaVazia>
+                    ) : (
+                      <ul className="card max-h-64 overflow-auto px-3.5 py-2.5 columns-1 sm:columns-2 gap-x-6">
+                        {servicos.map((nome) => (
+                          <li key={nome} className="break-inside-avoid py-1 pl-3 text-[13px] text-text-secondary
+                                                    relative before:absolute before:left-0 before:top-[0.65em]
+                                                    before:h-1 before:w-1 before:rounded-full before:bg-text-muted">
+                            {nome}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </FichaSeccao>
+
+                  <FichaSeccao titulo="Histórico da equipa">
                     <HistoricoDaEquipa entidade="tecnico" id={String(v.id)} />
-                  </div>
-
-                  <div className="pt-1">
-                    <WhatsappConversa
-                      tecnicoId={String(v.id)}
-                      temTelefone={Boolean(v.phone_number)}
-                      waNumero={(v.phone_number || "").replace(/\D/g, "").length === 9
-                        ? `351${(v.phone_number || "").replace(/\D/g, "")}`
-                        : (v.phone_number || "").replace(/\D/g, "")}
-                    />
-                  </div>
+                  </FichaSeccao>
                 </div>
+              </div>
+
+              {/*
+                Ao fundo, separado do resto: os dados crus da API (para quando
+                um campo aparece vazio e a pergunta é "o backend não manda, ou
+                manda com outro nome?") e apagar de vez -- a única ação da
+                ficha que não tem volta, longe das que se carregam por engano.
+              */}
+              <div className="flex flex-wrap items-start justify-between gap-3 border-t border-surface-border pt-4">
+                <details className="min-w-0 flex-1">
+                  <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                    Dados brutos da API ({Object.keys(v).length} campos)
+                  </summary>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-surface-subtle p-2 text-[11px] leading-snug text-text-secondary">
+                    {JSON.stringify(v, null, 2)}
+                  </pre>
+                </details>
+                <button
+                  onClick={() => setVendorParaApagar(v)}
+                  className="text-xs text-text-muted hover:text-danger transition-colors"
+                >
+                  Apagar este técnico em definitivo
+                </button>
               </div>
             </div>
           );
@@ -1392,7 +1319,7 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
       >
         {newTestVendor ? (
           <div className="space-y-3">
-            <div className="rounded-lg border-l-[3px] border-l-warning bg-warning-light/40 p-3">
+            <div className="aviso aviso-atencao p-3">
               <p className="text-sm font-semibold text-text-primary">Guarda já esta password — só aparece agora.</p>
               <p className="text-xs text-text-secondary mt-0.5">Não fica recuperável depois de fechares esta janela.</p>
             </div>

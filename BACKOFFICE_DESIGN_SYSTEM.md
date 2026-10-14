@@ -1,102 +1,108 @@
 # Design System — Backoffice Piquet
 
-Formaliza o que já existe (é bom) e fecha as lacunas. O objetivo é **consistência
-+ tokens reutilizáveis**, eliminando valores hardcoded.
+A gramática visual do backoffice depois do redesenho de outubro de 2026. Serve
+para que um ecrã novo se pareça com os outros sem ninguém ter de adivinhar:
+que componente usar, que cor, que peso de letra.
+
+Princípio: **calmo por omissão, cor só onde muda o que se faz.** O dourado é
+para a ação principal; o vermelho e o âmbar são para o que pede atenção; o
+resto é papel, grafite e cinzentos quentes.
 
 ---
 
-## 1. Fundações (já existentes — manter)
+## 1. Fundações
 
-**Cor (tokens em CSS vars, `globals.css`, claro + escuro):**
-- Superfícies: `--surface`, `--surface-muted`, `--surface-subtle`, `--surface-border`, `--surface-strong`.
-- Texto: `--text-primary`, `--text-secondary`, `--text-muted`.
-- Marca: **Piquet** dourado `#FAB347` (escala 50–900 no `tailwind.config`).
-- Semânticos: `success #1F9D6B`, `warning #E39A1C`, `danger #D6503B`, `info #3E7C8C` (+ `-light` por var, que troca no dark).
+**Tipo de letra:** Geist (texto) e Geist Mono (códigos, IBAN, ids), via
+`next/font` em `src/app/layout.tsx`. Números sempre com algarismos de largura fixa (`tabular-nums`,
+ligado por omissão no `html`), para as colunas de valores alinharem.
 
-**Regra:** usar sempre os tokens (`text-text-secondary`, `bg-surface-subtle`,
-`bg-piquet/15`, `text-success`…). **Não** hardcodar hex nas páginas.
+**Cor:** tokens em CSS vars (`src/app/globals.css`), claro e escuro. Nunca hex
+numa página — só nos gráficos, onde o Recharts precisa de cor concreta.
 
----
+| Token | Uso |
+|---|---|
+| `surface` | cartões, tabelas, janelas |
+| `surface-muted` | fundo da página |
+| `surface-subtle` | cabeçalhos de tabela, hover, segmentados |
+| `surface-border` / `surface-strong` | riscas / riscas com mais peso |
+| `surface-sidebar` | barra lateral (segue o tema) |
+| `text-primary` / `text-secondary` / `text-muted` | texto, por importância |
+| `piquet` (escala 50–900) | marca: botão principal, item ativo, foco |
+| `success` / `warning` / `danger` / `info` (+ `-light`) | estados e avisos |
 
-## 2. Lacunas a fechar (🟠)
+Todos os pares texto/fundo passam AA (4,5:1) nos dois temas —
+`src/lib/contraste.test.ts` verifica-o.
 
-- **Espaçamento / grid / raios / sombras:** normalizar numa escala (ex.: espaço
-  `1/2/3/4/6/8`, raio `md/lg/xl`, sombra `card/elevated`). Hoje há valores
-  soltos (`rounded-lg`, `rounded-xl`, `shadow-elevated`) sem catálogo.
-- **Densidade:** definir "confortável" (default) e "compacto" (tabelas densas).
-- **Deltas de métrica:** um único componente que só mostra variação **quando há
-  histórico real** (mata o P04).
-- **Estados vazios:** há `States`; falta um padrão visual único (ícone + título +
-  ação sugerida) reutilizado em todas as listas.
-
----
-
-## 3. Catálogo de componentes
-
-| Componente | Estado | Ação recomendada |
-|---|---|---|
-| `DataTable` | Existe (sort, paginação, rowClick) | ➕ colunas configuráveis, vistas, seleção, ações em massa, menu "⋯", densidade |
-| `Modal` + `Field` | Bom | ✅ manter; usar para **todas** as confirmações (tirar `window.prompt/confirm`) |
-| `Tabs` / `SubTabs` | Bom | ✅ reutilizar na nova IA |
-| `MetricCard` | Bom | Ajustar aos deltas reais; variante "com drill-down" |
-| `StatusBadge` | Bom (central) | Passar a única fonte de estados (§5); nunca cor local |
-| `DemoBadge` | Bom | Manter enquanto houver demo; remover à medida que liga |
-| `States` (loading/error/vazio) | Existe | Padrão único de estado vazio |
-| `Toaster` / `toast` | Bom | ✅ feedback consistente |
-| Drawers (Service/Customer/Technician/TechApproval/SupportTicket) | Existem, inconsistentes | Unificar estrutura (topo + tabs + timeline) |
-| `Charts` | Bom | Regras do §UX (uma pergunta por gráfico) |
-| **`Timeline`** | ➕ Não existe | Criar (eventos por entidade) |
-| **`FilterBar`** | ➕ Não existe (lógica dispersa) | Criar (rápidos + avançados + vistas + chips) |
-| **`EntitySearch` (⌘K entidades)** | ➕ Não existe | Criar |
-| **`ConfirmDialog`** | ➕ (hoje `window.confirm`) | Criar (consequências + motivo + loading) |
+**Forma:** cartões `rounded-card` (12 px) com `shadow-card` (transparente no
+escuro); janelas `rounded-2xl` com `shadow-elevated`; botões e campos
+`rounded-lg`.
 
 ---
 
-## 4. Estados de componente (obrigatórios)
+## 2. Estrutura de página
 
-Todos os interativos devem ter: **Normal · Hover · Focus (visível) · Active ·
-Disabled · Loading · Error · Success.** O foco visível é crítico para uso por
-teclado (backoffice = muito teclado).
+- **Barra lateral** (`Sidebar`): segue o tema, item ativo com fundo
+  `surface-subtle` e traço dourado à esquerda.
+- **Barra de topo** (`Topbar`): pesquisa (⌘K), "+ Novo", notificações, conta.
+- **`PageHeader`**: título da página (h1) + subtítulo + ações à direita. Um
+  por página — um ecrã embutido noutro (Produto em Crescimento, Impostos e RH
+  no Financeiro) **não** traz o seu.
+- **`Tabs`**: separadores da página, sublinhados. Dentro de um separador, os
+  sub-separadores usam `variant="pill"` (segmentado), nunca outro sublinhado.
+- **`SectionHeader`**: título de secção (h2) em frase normal, com descrição
+  por baixo e ação à direita (`aside`).
 
----
+## 3. Componentes
 
-## 5. Sistema de estados (negócio)
+| Componente | Para quê |
+|---|---|
+| `StatGroup` + `Stat` (`ui/Stats`) | Números lado a lado num só cartão. `tone` pinta o valor (`mau` vermelho, `atencao` âmbar, `bom` verde); `info` põe um ⓘ com a definição; `note` diz de onde sai o número. |
+| `Painel` | Cartão com cabeçalho (título, descrição, ação). Os gráficos (`ChartCard`) usam-no. |
+| `Barra` | Ranking curto (funil, cidades, motivos) — em vez de um gráfico. |
+| `Segmentado` | Filtro de estado com contagens; `tom: "alerta"` pinta a contagem a vermelho. |
+| `DataTable` | Listas. Filtros na `toolbar`, exportar em `actions`. No telemóvel cada linha vira um cartão. |
+| `FichaSeccao`, `Etiqueta`, `ListaDeDados`, `FichaVazia` (`ui/Ficha`) | As fichas (cliente, técnico) e os painéis laterais. |
+| `InfoTip` | A definição de um número; abre por cima de tudo, nunca fica cortada. |
+| `Modal` / `ConfirmDialog` | Janelas; o que não tem volta pede confirmação (e motivo, quando fica registado). |
+| `.aviso` + `.aviso-atencao` / `-perigo` / `-sucesso` / `-info` | Avisos dentro da página. Nada de barras coloridas à esquerda. |
+| `.btn-primary` / `.btn-secondary` / `.btn-ghost` | Uma ação principal por zona; ações de linha em `btn-ghost`. |
+| `.link` | Link no meio de texto: cor do texto e sublinhado discreto. |
 
-Fonte única (`StatusBadge` + um mapa central). Cada estado = **cor + texto +
-ícone + tooltip**, nunca só cor:
+## 4. Regras
 
-| Estado | Tom | Uso |
-|---|---|---|
-| Novo / Pedido recebido | info | serviços, leads |
-| Pendente / A aguardar | warning | pagamentos, orçamentos |
-| Agendado | info | serviços |
-| Aceite / Aprovado | success | técnicos, orçamentos |
-| Em curso / Em execução | piquet | serviços |
-| Concluído / Executado | success | serviços, leads |
-| Cancelado | surface-muted | serviços, leads |
-| Falhou | danger | pagamentos |
-| Reembolsado | warning | pagamentos |
-| Em análise | info | KYC, recrutamento |
-| Bloqueado / Suspenso | danger | clientes, técnicos |
+- **Frase normal, nunca maiúsculas espaçadas** em títulos e rótulos.
+- **Pesos:** `font-semibold` para títulos e valores, `font-medium` para nomes;
+  sem `font-bold`.
+- **Números à direita** nas tabelas, sempre `tabular-nums`; dinheiro com
+  `formatCurrency`, avaliações com `formatRating` ("4,8").
+- **Ações de linha aparecem ao passar o rato** (`md:opacity-0
+  md:group-hover:opacity-100`) — no telemóvel estão sempre à vista. A ação do
+  dia (ex.: "Marcar paga") pode ficar sempre visível.
+- **O que não tem volta fica ao fundo**, separado (ex.: "Apagar este técnico").
+- **Vazio é uma frase**, num cartão calmo — e o ecrã nunca se dá por verificado
+  vazio: confirma-se com dados.
+- **Sem controlos que não fazem nada**: um botão sem efeito sai.
 
-**Regra:** o mesmo estado tem **a mesma cor em todas as páginas** (hoje há
-divergências locais — corrigir).
+## 5. Estados (negócio)
 
----
+Duas formas, para não se confundirem:
+
+- **Estado** (do pedido, do ticket, do pagamento): `StatusBadge` — pílula
+  redonda com ponto e texto (só a primeira letra maiúscula). A cor vem de
+  `getStatusColor`, um mapa central: o mesmo estado tem a mesma cor em todo o
+  lado.
+- **Etiqueta** (características: "Cliente", "Outlook", "Sem NIF", "AT
+  validada"): `Etiqueta` ou `rounded-md` — retângulo, nunca pílula.
+
+| Tom | Quando |
+|---|---|
+| `danger` | falhou, bloqueado, à espera da Piquet, atrasado |
+| `warning` | pede atenção mas não é falha (por validar, à espera do cliente) |
+| `success` | feito, pago, aprovado |
+| `info` | em curso, à procura de técnico |
+| `surface-subtle` | fechado, cancelado, sem serviço |
 
 ## 6. Ícones
 
-`lucide-react` já é o standard. Regra: **um ícone por conceito** (ex.: sempre o
-mesmo para "técnico", "pagamento", "serviço") — catalogar num mapa
-`icons.ts` para evitar divergências.
-
----
-
-## 7. Como aplicar
-
-1. Extrair tokens em falta (espaço/raio/sombra/densidade) para `tailwind.config`
-   + `globals.css`.
-2. Criar os componentes novos (`Timeline`, `FilterBar`, `EntitySearch`,
-   `ConfirmDialog`) e a evolução do `DataTable`.
-3. Substituir usos locais (cores de estado, `window.confirm`, deltas fabricados)
-   pelos componentes/tokens centrais — página a página, sem regressões.
+`lucide-react`. Ícones só onde ajudam a reconhecer (navegação, ações, canais);
+títulos de secção não levam ícone.

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Painel } from "@/components/ui/Painel";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, Sector,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label,
@@ -23,26 +24,23 @@ interface ChartCardProps {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-export function ChartCard({ title, subtitle, children, className, action, icon: Icon }: ChartCardProps) {
+export function ChartCard({ title, subtitle, children, className, action, icon }: ChartCardProps) {
   return (
-    <div className={cn("card p-4", className)}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-start gap-2.5 min-w-0">
-          {Icon && (
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-piquet/12 text-piquet-700">
-              <Icon className="h-4 w-4" />
-            </span>
-          )}
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary leading-tight">{title}</h3>
-            {subtitle && <p className="text-xs text-text-secondary mt-0.5">{subtitle}</p>}
-          </div>
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
+    <Painel titulo={title} descricao={subtitle} aside={action} icon={icon} className={className}>
       {children}
-    </div>
+    </Painel>
   );
+}
+
+/**
+ * O eixo de um gráfico em euros. Dividia sempre por mil e arredondava às
+ * unidades: com valores abaixo de mil, o eixo lia-se "0k 0k 1k 1k 1k". Agora
+ * só passa a "k" a partir de mil, e com uma casa decimal quando é preciso.
+ */
+export function eixoEmEuros(v: number): string {
+  if (Math.abs(v) < 1000) return String(Math.round(v));
+  const k = v / 1000;
+  return `${Number.isInteger(k) ? k : k.toFixed(1).replace(".", ",")}k`;
 }
 
 /**
@@ -100,9 +98,9 @@ export function LineChartComponent({ data, dataKey = "value", height = 280, curr
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--surface-border))" />
-        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
+        <CartesianGrid vertical={false} stroke="rgb(var(--surface-border))" />
+        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? eixoEmEuros : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
         <Legend formatter={rotuloLegivel} />
         {lineConfigs.map((l) => (
@@ -127,9 +125,9 @@ export function BarChartComponent({ data, dataKey = "value", height = 280, curre
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--surface-border))" />
-        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
+        <CartesianGrid vertical={false} stroke="rgb(var(--surface-border))" />
+        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? eixoEmEuros : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
         <Legend formatter={rotuloLegivel} />
         {barConfigs.map((b) => (
@@ -160,9 +158,9 @@ export function AreaChartComponent({ data, dataKey = "value", height = 280, curr
             <stop offset="100%" stopColor={color} stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--surface-border))" />
-        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} stroke="rgb(var(--text-muted))" />
+        <CartesianGrid vertical={false} stroke="rgb(var(--surface-border))" />
+        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
         <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#${gradientId})`} strokeWidth={2.5} />
       </AreaChart>
@@ -316,7 +314,7 @@ export function HeatMapGrid({ data }: { data: Array<{ name: string; value: numbe
             style={{ backgroundColor: `rgba(250, 187, 91, ${0.15 + intensity * 0.75})` }}
           >
             <p className="text-sm font-medium text-text-primary">{item.name}</p>
-            <p className="text-lg font-bold">{formatNumber(item.value)}</p>
+            <p className="text-lg font-semibold tabular-nums">{formatNumber(item.value)}</p>
             {item.ratio !== undefined && (
               <p className="text-xs text-text-secondary">Rácio: {item.ratio.toFixed(1)}</p>
             )}

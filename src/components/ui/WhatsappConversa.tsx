@@ -83,13 +83,13 @@ export function WhatsappConversa({ leadId, tecnicoId, temTelefone, modelo, waNum
     <div className="rounded-xl border border-surface-border overflow-hidden flex flex-col h-full min-h-0">
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-border bg-surface-muted/50 shrink-0">
         <MessageCircle className="h-4 w-4 text-success" />
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+        <span className="text-sm font-semibold text-text-primary">
           {eTecnico ? "Mensagens recebidas" : "Conversa de WhatsApp"}
         </span>
       </div>
 
       {/* Histórico — cresce para ocupar a altura disponível. */}
-      <div className="flex-1 min-h-[200px] overflow-y-auto px-3 py-3 space-y-2 bg-surface">
+      <div className={cn("flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-surface", msgs.length > 0 && "min-h-[200px]")}>
         {carregando ? (
           <p className="text-sm text-text-muted text-center py-4">A carregar conversa…</p>
         ) : msgs.length === 0 ? (

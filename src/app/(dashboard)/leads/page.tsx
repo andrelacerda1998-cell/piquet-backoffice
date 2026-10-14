@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmentado } from "@/components/ui/Segmentado";
 import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { RouteGuard } from "@/components/layout/RouteGuard";
@@ -14,8 +15,12 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatPercent, formatDate, getStatusColor } from "@/lib/formatters";
 import { cn, downloadCsv } from "@/lib/utils";
-import { Trash2, Search, MessageCircle, Headphones, Phone, MapPin, Pencil } from "lucide-react";
+import { Trash2, Search, MessageCircle, Phone, MapPin, Pencil, Download } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Painel } from "@/components/ui/Painel";
+import { Barra } from "@/components/ui/Barra";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { CronologiaPedido } from "@/components/ui/CronologiaPedido";
 import { mensagemBoasVindas } from "@/lib/leadReply";
@@ -372,7 +377,7 @@ function LeadsPageInner() {
           {r.technicianContact && (
             <span
               title={`É um técnico (${r.technicianContact}), não um cliente. A conversa dele está no perfil, em Técnicos.`}
-              className="ml-2 inline-flex items-center rounded-full bg-surface-subtle px-1.5 py-0.5 text-[11px] font-semibold text-text-secondary align-middle"
+              className="ml-2 inline-flex items-center rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary align-middle"
             >
               técnico
             </span>
@@ -380,7 +385,7 @@ function LeadsPageInner() {
         </p>
         {r.phone && (
           <div className="mt-0.5 flex items-center gap-1.5">
-            <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-piquet-700 hover:underline">{r.phone}</a>
+            <a href={`tel:${r.phone.replace(/\s/g, "")}`} onClick={(e) => e.stopPropagation()} className="text-xs text-text-secondary hover:text-text-primary hover:underline">{r.phone}</a>
             <a href={waHref(r.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Abrir conversa no WhatsApp" className="text-success hover:text-success/80">
               <MessageCircle className="h-3.5 w-3.5" />
             </a>
@@ -393,7 +398,7 @@ function LeadsPageInner() {
         {r.createdAt ? formatDate(r.createdAt) : "—"}
         {isDuplicate(r) && (
           <span title="O mesmo telefone e a mesma mensagem de outro contacto — possível duplicado"
-            className="inline-flex items-center rounded-full bg-warning-light px-1.5 py-0.5 text-[11px] font-semibold text-warning">
+            className="inline-flex items-center rounded-md bg-warning-light px-1.5 py-0.5 text-[11px] font-medium text-warning">
             dup?
           </span>
         )}
@@ -408,8 +413,8 @@ function LeadsPageInner() {
         <div className="max-w-[300px]">
           {(catName || urgent) && (
             <div className="chip-row">
-              {catName && <span className="inline-flex items-center rounded-full bg-piquet/12 px-2 py-0.5 text-xs font-medium text-piquet-700">{catName}</span>}
-              {urgent && <span title={urgency} className="inline-flex items-center rounded-full bg-danger-light px-1.5 py-0.5 text-[11px] font-semibold text-danger">Urgente</span>}
+              {catName && <span className="inline-flex items-center rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">{catName}</span>}
+              {urgent && <span title={urgency} className="inline-flex items-center rounded-md bg-danger-light px-1.5 py-0.5 text-[11px] font-medium text-danger">Urgente</span>}
             </div>
           )}
           {primary
@@ -434,11 +439,11 @@ function LeadsPageInner() {
       </select>
     ) },
     { key: "acoes", label: "", render: (r) => (
-      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-        {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1">✓ serviço</span>}
-        <button onClick={() => openEdit(r)} className="btn-secondary text-xs py-1">Editar</button>
-        <button onClick={() => removeLead(r)} title="Eliminar contacto"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-danger-light hover:text-danger transition-colors">
+      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        {r.serviceId && <span title="Serviço criado em Operações" className="text-xs text-success mr-1 whitespace-nowrap">✓ serviço</span>}
+        <button onClick={() => openEdit(r)} className="btn-ghost text-xs px-2 py-1 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Editar</button>
+        <button onClick={() => removeLead(r)} title="Eliminar contacto" aria-label="Eliminar contacto"
+          className="btn-ghost p-1.5 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -449,179 +454,129 @@ function LeadsPageInner() {
     <RouteGuard route="/leads">
       <div className="space-y-6">
         <PageHeader
-          icon={Headphones}
-          eyebrow="Operação"
           title="Contactos"
           subtitle="Tudo o que entrou, e em que ponto está: à procura de técnico, com técnico, ou fechado."
+          actions={<button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar contacto</button>}
         />
 
-          <div className="space-y-4">
-            {/* Ações da página. A vista "Base de dados" foi removida: esses
-                registos vivem agora em Clientes → Todos os registos. */}
-            <div className="flex items-center justify-end gap-3">
-              <div className="flex items-center gap-2 shrink-0">
-                <button onClick={exportLeads} className="btn-secondary text-sm">Exportar CSV</button>
-                <button onClick={() => setShowLead(true)} className="btn-primary text-sm">Registar contacto</button>
-              </div>
-            </div>
+        {/*
+          Números do período, num bloco só. O que exige ação ("por responder")
+          vem primeiro e a âmbar; o resto é contexto e lê-se de relance.
+          (A vista "Base de dados" foi removida: esses registos vivem agora
+          em Clientes → Todos os registos.)
+        */}
+        <StatGroup cols={4}>
+          <Stat label="Por responder" value={crm.porResponder} tone={crm.porResponder > 0 ? "atencao" : undefined} />
+          <Stat label="Em pipeline" value={formatCurrency(crm.pipeline)} />
+          <Stat label="Comissão prevista" value={formatCurrency(crm.comissao)} tone={crm.comissao > 0 ? "bom" : undefined} />
+          <Stat label="Conversão" value={formatPercent(Math.round(crm.conversao * 10) / 10)} note={`${crm.executadas} de ${crm.total} executadas`} />
+        </StatGroup>
 
-            {/* ── Vista CRM ────────────────────────────────────────────── */}
-            <>
-            {/*
-              Números do período, numa faixa só. Eram quatro cartões altos que
-              empurravam a lista para fora do ecrã — e três deles mostram 0
-              enquanto não houver orçamentos. O que exige ação ("por responder")
-              fica destacado; o resto é contexto e lê-se de relance.
-            */}
-            <div className="card px-4 py-3 flex flex-wrap items-center gap-x-8 gap-y-3">
-              <div className={cn("flex items-baseline gap-2", crm.porResponder > 0 && "order-first")}>
-                <span className={cn("text-xl font-bold tabular-nums", crm.porResponder > 0 ? "text-warning" : "text-text-primary")}>
-                  {crm.porResponder}
-                </span>
-                <span className="text-xs text-text-secondary">por responder</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-text-primary tabular-nums">{formatCurrency(crm.pipeline)}</span>
-                <span className="text-xs text-text-secondary">em pipeline</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-success tabular-nums">{formatCurrency(crm.comissao)}</span>
-                <span className="text-xs text-text-secondary">comissão prevista</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-text-primary tabular-nums">{formatPercent(Math.round(crm.conversao * 10) / 10)}</span>
-                <span className="text-xs text-text-secondary">conversão · {crm.executadas}/{crm.total}</span>
-              </div>
-            </div>
-
-            {/*
-              Onde se perde o negócio. Só aparece quando há pelo menos um motivo
-              REAL registado: enquanto tudo o que existe são pedidos antigos "sem
-              motivo", o painel ocupava meio ecrã para dizer "100% sem motivo" —
-              informação nenhuma. Volta sozinho assim que se registarem motivos.
-            */}
-            {motivosPerda.some((m) => m.id !== "sem_motivo") && (
-              <div className="card p-4">
-                <div className="flex items-baseline justify-between gap-3 mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                    Porque se perderam
-                  </p>
-                  <p className="text-[11px] text-text-muted">
-                    {motivosPerda.reduce((n, m) => n + m.total, 0)} contactos perdidos no período
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  {motivosPerda.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setLeadStage(leadStage === "perdido" ? "" : "perdido")}
-                      className="w-full flex items-center gap-3 group"
-                      title="Ver os contactos perdidos"
-                    >
-                      <span className={cn("text-xs w-44 shrink-0 text-left truncate",
-                        m.id === "sem_motivo" ? "text-text-muted italic" : "text-text-secondary")}>
-                        {m.label}
-                      </span>
-                      <span className="flex-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
-                        <span
-                          className={cn("block h-full rounded-full transition-all",
-                            m.id === "sem_motivo" ? "bg-text-muted/30" : "bg-piquet")}
-                          style={{ width: `${m.percentagem}%` }}
-                        />
-                      </span>
-                      <span className="text-xs tabular-nums text-text-primary w-14 text-right shrink-0">
-                        {m.total} · {m.percentagem}%
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {motivosPerda.some((m) => m.id === "sem_motivo") && (
-                  <p className="mt-2.5 text-[11px] text-text-muted">
-                    Os contactos sem motivo são de antes de este campo existir. A partir de agora, marcar
-                    como recusado pergunta porquê.
-                  </p>
-                )}
-              </div>
+        {/*
+          Onde se perde o negócio. Só aparece quando há pelo menos um motivo
+          REAL registado: enquanto tudo o que existe são pedidos antigos "sem
+          motivo", o painel ocupava meio ecrã para dizer "100% sem motivo" —
+          informação nenhuma. Volta sozinho assim que se registarem motivos.
+        */}
+        {motivosPerda.some((m) => m.id !== "sem_motivo") && (
+          <Painel titulo="Porque se perderam"
+            aside={`${motivosPerda.reduce((n, m) => n + m.total, 0)} contactos perdidos no período`}
+            corpo="p-2">
+            {motivosPerda.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setLeadStage(leadStage === "perdido" ? "" : "perdido")}
+                className="block w-full rounded-lg px-2 py-1.5 text-left hover:bg-surface-subtle/70 transition-colors"
+                title="Ver os contactos perdidos"
+              >
+                <Barra
+                  nome={<span className={cn(m.id === "sem_motivo" && "font-normal italic text-text-muted")}>{m.label}</span>}
+                  valor={<>{m.total} <span className="text-text-muted">· {m.percentagem}%</span></>}
+                  largura={m.percentagem}
+                  cor={m.id === "sem_motivo" ? "bg-text-muted/30" : "bg-piquet"} />
+              </button>
+            ))}
+            {motivosPerda.some((m) => m.id === "sem_motivo") && (
+              <p className="px-2 pt-1 pb-1.5 text-xs text-text-muted">
+                Os contactos sem motivo são de antes de este campo existir. A partir de agora, marcar
+                como recusado pergunta porquê.
+              </p>
             )}
+          </Painel>
+        )}
 
-            {/* Barra de filtros: pesquisa + mês + estado + categoria + origem. */}
-            <div className="card p-3 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative flex-1 min-w-[200px]">
+        <div className="space-y-3">
+          {/*
+            Estados como seletor. Eram seis cartões altos (duas filas, quase
+            todos a zero) que empurravam a lista para baixo e repetiam o
+            dropdown de estado. Assim, o mesmo filtro e as mesmas contagens
+            cabem numa linha — e são o único sítio onde se escolhe o estado.
+          */}
+          <div className="overflow-x-auto -mx-1 px-1">
+            <Segmentado
+              ariaLabel="Estado dos contactos"
+              opcoes={[
+                { id: "" as const, label: "A trabalhar", count: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
+                ...LEAD_STAGES.map((st) => ({ id: st.id, label: st.label, count: baseFiltered.filter((l) => l.stage === st.id).length })),
+                { id: "todos" as const, label: "Todos", count: baseFiltered.length },
+              ]}
+              valor={leadStage}
+              onChange={setLeadStage}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-muted">
+            <span>
+              <b className="font-medium text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "contacto" : "contactos"}
+              {hasActiveFilters ? " (filtrado)" : leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
+            </span>
+            {dupCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-warning-light px-2 py-0.5 text-xs font-medium text-warning" title="Contactos com o mesmo telefone e a mesma mensagem de outro — provavelmente o formulário enviou duas vezes.">
+                {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {escondidas > 0 && (
+              <button onClick={() => setLeadStage("todos")}
+                className="text-xs hover:text-text-primary underline decoration-dotted underline-offset-2">
+                +{escondidas} noutros estados (aceites, executados, recusados…) — mostrar todos
+              </button>
+            )}
+          </div>
+
+          <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
+            onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
+            toolbar={
+              <>
+                {/* Pesquisa + mês + categoria + origem. O estado filtra-se no
+                    seletor por cima — um dropdown a fazer o mesmo era escolha a dobrar. */}
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, mensagem…" className="input-field pl-9" aria-label="Pesquisar contactos" />
+                  <input value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} placeholder="Pesquisar nome, telefone, mensagem…" className="input-field pl-9 py-1.5" aria-label="Pesquisar contactos" />
                 </div>
-                <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto" aria-label="Filtrar por mês">
+                <select value={leadMonth} onChange={(e) => setLeadMonth(e.target.value)} className="input-field w-auto py-1.5" aria-label="Filtrar por mês">
                   <option value="">Todos os meses</option>
                   {leadMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
                 </select>
-                {/* O estado filtra-se pelos chips por baixo — um dropdown a
-                    fazer o mesmo era escolha a dobrar. */}
-                <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto" aria-label="Filtrar por categoria">
+                <select value={leadCategory} onChange={(e) => setLeadCategory(e.target.value)} className="input-field w-auto py-1.5" aria-label="Filtrar por categoria">
                   <option value="">Todas as categorias</option>
                   {DEFAULT_SETTINGS.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {leadSources.length > 1 && (
-                  <select value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="input-field w-auto" aria-label="Filtrar por origem">
+                  <select value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="input-field w-auto py-1.5" aria-label="Filtrar por origem">
                     <option value="">Todas as origens</option>
                     {leadSources.map((s) => <option key={s} value={s} className="capitalize">{s}</option>)}
                   </select>
                 )}
                 {hasActiveFilters && (
-                  <button onClick={clearFilters} className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary">
-                    <Trash2 className="h-3.5 w-3.5" /> Limpar filtros
-                  </button>
+                  <button onClick={clearFilters} className="btn-ghost text-xs px-2 py-1">Limpar filtros</button>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="text-text-secondary">
-                  <b className="text-text-primary tabular-nums">{filteredLeads.length}</b> {filteredLeads.length === 1 ? "contacto" : "contactos"}
-                  {hasActiveFilters ? " (filtrado)" : leadMonth ? ` em ${monthLabel(leadMonth)}` : " no total"}
-                </span>
-                {dupCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-0.5 text-xs font-medium text-warning" title="Contactos com o mesmo telefone e a mesma mensagem de outro — provavelmente o formulário enviou duas vezes.">
-                    {dupCount} possíve{dupCount === 1 ? "l" : "is"} duplicado{dupCount === 1 ? "" : "s"}
-                  </span>
-                )}
-                {escondidas > 0 && (
-                  <button onClick={() => setLeadStage("todos")}
-                    className="text-xs text-text-muted hover:text-text-primary underline decoration-dotted underline-offset-2">
-                    +{escondidas} noutros estados (aceites, executados, recusados…) — mostrar todos
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/*
-              Estados como chips. Eram seis cartões altos (duas filas, quase
-              todos a zero) que empurravam a lista para baixo e repetiam o
-              dropdown de estado. Em chip, o mesmo filtro e as mesmas contagens
-              cabem numa linha — e são o único sítio onde se escolhe o estado.
-            */}
-            <div className="chip-row">
-              {([
-                { id: "" as const, label: "A trabalhar", total: baseFiltered.filter((l) => ESTADOS_ATIVOS.includes(l.stage)).length },
-                ...LEAD_STAGES.map((s) => ({ id: s.id, label: s.label, total: baseFiltered.filter((l) => l.stage === s.id).length })),
-                { id: "todos" as const, label: "Todos", total: baseFiltered.length },
-              ]).map((c) => {
-                const active = leadStage === c.id;
-                return (
-                  <button key={c.id || "ativos"} onClick={() => setLeadStage(c.id)}
-                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
-                      active
-                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                    {c.label}
-                    <span className={cn("tabular-nums text-xs", active ? "opacity-80" : "text-text-muted")}>{c.total}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <DataTable columns={leadColumns} data={filteredLeads} keyField="id"
-              onRowClick={(l) => { setEntradasWa(null); setViewing(l); }}
-              emptyMessage={hasActiveFilters ? "Nenhum contacto corresponde aos filtros." : "Sem contactos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
-            </>
-          </div>
+              </>
+            }
+            actions={
+              <button onClick={exportLeads} className="btn-ghost text-[13px]"><Download className="h-3.5 w-3.5" /> Exportar</button>
+            }
+            emptyMessage={hasActiveFilters ? "Nenhum contacto corresponde aos filtros." : "Sem contactos ainda — chegam aqui assim que a landing ou o WhatsApp enviarem."} />
+        </div>
       </div>
 
       {/*
@@ -709,16 +664,13 @@ function LeadsPageInner() {
                   mostrava um telefone e mais nada, e nem o estado se via.
                 */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Estado</p>
+                  <p className="text-xs font-medium text-text-muted">Estado</p>
                   <p className="mt-0.5">
-                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                      getStatusColor(viewing.stage))}>
-                      {LEAD_STAGE_LABEL[viewing.stage] ?? viewing.stage}
-                    </span>
+                    <StatusBadge status={viewing.stage} label={LEAD_STAGE_LABEL[viewing.stage] ?? viewing.stage} />
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Serviço</p>
+                  <p className="text-xs font-medium text-text-muted">Serviço</p>
                   {catName || service ? (
                     <p className="text-sm text-text-primary mt-0.5">{catName || service}</p>
                   ) : (
@@ -733,13 +685,13 @@ function LeadsPageInner() {
                 </div>
                 {urgency && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Urgência</p>
+                    <p className="text-xs font-medium text-text-muted">Urgência</p>
                     <p className={cn("text-sm mt-0.5", urgent ? "text-danger font-medium" : "text-text-primary")}>{urgency}</p>
                   </div>
                 )}
                 {viewing.city && viewing.city !== "—" && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Cidade</p>
+                    <p className="text-xs font-medium text-text-muted">Cidade</p>
                     <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5 text-text-muted" /> {viewing.city}
                     </p>
@@ -747,7 +699,7 @@ function LeadsPageInner() {
                 )}
                 {viewing.phone && (
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Telefone</p>
+                    <p className="text-xs font-medium text-text-muted">Telefone</p>
                     <p className="text-sm text-text-primary mt-0.5 inline-flex items-center gap-2">
                       <Phone className="h-3.5 w-3.5 text-text-muted" /> {viewing.phone}
                       {waNumero && (
@@ -755,7 +707,7 @@ function LeadsPageInner() {
                           href={`https://wa.me/${waNumero}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-piquet-700 hover:underline text-xs"
+                          className="link text-xs"
                         >
                           WhatsApp
                         </a>
@@ -776,7 +728,7 @@ function LeadsPageInner() {
                 precisa.
               */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">
+                <p className="text-xs font-medium text-text-muted mb-1">
                   {descricao || !mostrarCrua ? "Descrição" : "Mensagem recebida"}
                 </p>
                 {descricao ? (
@@ -794,7 +746,7 @@ function LeadsPageInner() {
               {/* Observações internas da equipa (não é o que o cliente escreveu). */}
               {viewing.notes?.trim() && (
                 <div className="rounded-xl border border-surface-border p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted mb-1">Observações internas</p>
+                  <p className="text-xs font-medium text-text-muted mb-1">Observações internas</p>
                   <p className="whitespace-pre-wrap text-sm text-text-secondary">{viewing.notes}</p>
                 </div>
               )}
@@ -955,7 +907,7 @@ function LeadsPageInner() {
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-piquet/10 border border-piquet/20 px-4 py-3">
               <div>
                 <p className="text-xs text-text-muted">Comissão da Piquet (calculada automaticamente)</p>
-                <p className="text-xl font-bold text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
+                <p className="text-xl font-semibold tracking-tight text-text-primary">{formatCurrency(margin)} <span className="text-sm font-normal text-text-secondary">· {pct.toFixed(0)}%</span></p>
               </div>
               <p className="text-xs text-text-secondary text-right leading-relaxed">
                 Orçamento {formatCurrency(q)}<br />− Técnico {formatCurrency(tech)}

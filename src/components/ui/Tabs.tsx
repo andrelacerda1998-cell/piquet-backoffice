@@ -17,26 +17,32 @@ interface TabsProps {
   variant?: "underline" | "pill";
 }
 
-/** Barra de abas. `underline` para abas de secção; `pill` para sub-abas aninhadas. */
+/**
+ * Barra de abas. `underline` para as abas de secção (um traço dourado debaixo
+ * da ativa); `pill` para sub-abas, desenhadas como um seletor segmentado --
+ * assim nunca se confundem os dois níveis no mesmo ecrã.
+ */
 export function Tabs({ tabs, active, onChange, className, variant = "underline" }: TabsProps) {
   if (variant === "pill") {
     return (
-      <div className={cn("flex gap-1.5 flex-wrap", className)}>
+      <div className={cn("inline-flex max-w-full gap-0.5 rounded-lg bg-surface-subtle p-0.5 overflow-x-auto tira-deslizante", className)} role="tablist">
         {tabs.map((t) => {
           const isActive = active === t.id;
           return (
             <button
               key={t.id}
+              role="tab"
+              aria-selected={isActive}
               onClick={() => onChange(t.id)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                "px-3 py-1.5 rounded-md text-[13px] font-medium whitespace-nowrap transition-colors",
                 isActive
-                  ? "bg-piquet/15 text-piquet-700"
-                  : "text-text-secondary hover:bg-surface-muted hover:text-text-primary"
+                  ? "bg-surface text-text-primary shadow-card ring-1 ring-surface-border"
+                  : "text-text-secondary hover:text-text-primary"
               )}
             >
               {t.label}
-              {t.count !== undefined && <span className="ml-1.5 text-xs opacity-70">{t.count}</span>}
+              {t.count !== undefined && <span className={cn("ml-1.5 text-xs tabular-nums", isActive ? "text-text-muted" : "opacity-70")}>{t.count}</span>}
             </button>
           );
         })}
@@ -45,26 +51,28 @@ export function Tabs({ tabs, active, onChange, className, variant = "underline" 
   }
 
   return (
-    <div className={cn("flex gap-1 border-b border-surface-border overflow-x-auto tira-deslizante", className)}>
+    <div className={cn("flex gap-6 border-b border-surface-border overflow-x-auto tira-deslizante", className)} role="tablist">
       {tabs.map((t) => {
         const isActive = active === t.id;
         return (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onChange(t.id)}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors",
+              "inline-flex items-center gap-2 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors",
               isActive
                 ? "border-piquet text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
+                : "border-transparent text-text-muted hover:text-text-primary hover:border-surface-strong"
             )}
           >
             {t.label}
             {t.count !== undefined && (
               <span
                 className={cn(
-                  "ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                  isActive ? "bg-piquet/15 text-piquet-700" : "bg-surface-subtle text-text-secondary"
+                  "rounded-md px-1.5 py-px text-[11px] font-semibold tabular-nums",
+                  isActive ? "bg-piquet/15 text-piquet-700" : "bg-surface-subtle text-text-muted"
                 )}
               >
                 {t.count}

@@ -16,32 +16,30 @@ export default function LoginPage() {
       {/* Painel esquerdo — autenticação */}
       <div className="flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md">
-          <div className="flex items-center gap-1.5 mb-10">
-            <span className="text-2xl font-bold tracking-tight text-text-primary">Piquet</span>
-            <span className="text-piquet text-3xl leading-none">.</span>
+          <div className="flex items-center gap-2 mb-12">
+            <span className="text-xl font-semibold tracking-tight text-text-primary">Piquet</span>
+            <span className="rounded-md bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-text-muted">Gestão</span>
           </div>
 
-          <h1 className="text-3xl font-bold text-text-primary">Área de administração</h1>
+          <h1 className="text-[28px] leading-9 font-semibold tracking-tight text-text-primary">Área de administração</h1>
           {USE_REAL_API || SUPABASE_AUTH_ENABLED ? <RealLoginForm /> : <DemoProfileSelector />}
         </div>
       </div>
 
       {/* Painel direito — marca (escuro) */}
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-ink-deep p-12 text-white">
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#111010] p-12 text-white">
         <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-piquet/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-10 h-80 w-80 rounded-full bg-piquet/10 blur-3xl" />
 
-        <div className="relative flex items-center gap-1.5">
-          <span className="text-xl font-bold tracking-tight text-white">Piquet</span>
-          <span className="text-piquet text-2xl leading-none">.</span>
-        </div>
+        {/* A marca já está à esquerda, por cima do formulário: aqui ficava repetida. */}
+        <div />
 
         <div className="relative">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-medium text-white/90">
             <span className="h-1.5 w-1.5 rounded-full bg-piquet" />
             Plataforma de serviços ao domicílio
           </span>
-          <h2 className="mt-5 text-5xl font-extrabold leading-[1.05] tracking-tight">
+          <h2 className="mt-5 text-5xl font-semibold leading-[1.05] tracking-tight">
             Deixa para<br />quem sabe.
           </h2>
           <p className="mt-5 max-w-md text-white/70 leading-relaxed">
@@ -91,11 +89,11 @@ function RealLoginForm() {
 
   return (
     <>
-      <p className="text-text-secondary mt-2">Inicia sessão para gerir a operação da Piquet.</p>
+      <p className="text-text-muted mt-2">Inicia sessão para gerir a operação da Piquet.</p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <div>
-          <label htmlFor="email" className="text-sm font-medium text-text-secondary mb-1 block">E-mail</label>
+          <label htmlFor="email" className="text-[13px] font-medium text-text-primary mb-1.5 block">E-mail</label>
           <input
             id="email"
             type="email"
@@ -109,7 +107,7 @@ function RealLoginForm() {
         </div>
 
         <div>
-          <label htmlFor="password" className="text-sm font-medium text-text-secondary mb-1 block">Palavra-passe</label>
+          <label htmlFor="password" className="text-[13px] font-medium text-text-primary mb-1.5 block">Palavra-passe</label>
           <div className="relative">
             <input
               id="password"
@@ -132,16 +130,13 @@ function RealLoginForm() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="inline-flex items-center gap-2 text-text-secondary">
-            <input type="checkbox" defaultChecked className="accent-piquet" />
-            Manter sessão iniciada
-          </label>
-          <a href="#" className="text-piquet-600 font-medium hover:underline">Recuperar palavra-passe</a>
-        </div>
-
+        {/*
+          Aqui havia "Manter sessão iniciada" (uma caixa que nada lia) e
+          "Recuperar palavra-passe" (um link para "#"). Dois controlos que não
+          faziam nada; fica o que é verdade: os acessos tratam-se no Supabase.
+        */}
         {error && (
-          <p className="text-sm text-danger bg-danger-light rounded-lg px-3 py-2">{error}</p>
+          <p className="aviso aviso-perigo py-2">{error}</p>
         )}
 
         <button type="submit" disabled={loading} className="btn-primary w-full py-2.5">
@@ -151,7 +146,7 @@ function RealLoginForm() {
       </form>
 
       <p className="text-xs text-text-muted mt-8">
-        Acesso reservado à equipa Piquet.
+        Acesso reservado à equipa Piquet. Esqueceste-te da palavra-passe? Fala com o CTO — os acessos tratam-se no Supabase.
       </p>
     </>
   );
@@ -177,9 +172,9 @@ function DemoProfileSelector() {
 
   return (
     <>
-      <p className="text-text-secondary mt-2">Escolhe um perfil e introduz a palavra-passe para entrar.</p>
-      <span className="inline-flex items-center gap-1.5 mt-4 px-2.5 py-1 rounded-full bg-piquet/15 text-piquet-700 text-xs font-semibold">
-        <span className="h-1.5 w-1.5 rounded-full bg-piquet-500" />
+      <p className="text-text-muted mt-2">Escolhe um perfil e introduz a palavra-passe para entrar.</p>
+      <span className="inline-flex items-center gap-1.5 mt-4 px-2 py-0.5 rounded-md bg-warning-light text-warning text-xs font-medium">
+        <span className="h-1.5 w-1.5 rounded-full bg-warning" />
         Ambiente de demonstração
       </span>
 
@@ -190,22 +185,21 @@ function DemoProfileSelector() {
             onClick={() => { setSelected(role); setError(null); }}
             aria-pressed={selected === role}
             className={cn(
-              "group w-full flex items-center justify-between p-3 rounded-xl border bg-surface transition-colors text-left",
-              selected === role ? "border-piquet bg-piquet/5 ring-1 ring-piquet" : "border-surface-border hover:border-piquet hover:bg-piquet/5"
+              "group w-full flex items-center justify-between px-3 py-2.5 rounded-xl border bg-surface transition-colors text-left",
+              selected === role ? "border-piquet ring-1 ring-piquet" : "border-surface-border hover:border-surface-strong"
             )}
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-piquet/15 text-piquet-700 text-sm font-bold">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-piquet/20 text-text-primary text-[13px] font-semibold">
                 {demoUser.name.charAt(0)}
               </span>
               <div>
-                <p className="font-medium text-text-primary">{demoUser.name}</p>
-                <p className="text-sm text-text-secondary">{ROLE_LABELS[role]}</p>
+                <p className="text-sm font-medium text-text-primary">{demoUser.name}</p>
+                <p className="text-xs text-text-muted">{ROLE_LABELS[role]}</p>
               </div>
             </div>
-            <span className={cn("text-sm font-semibold", selected === role ? "text-piquet-700" : "text-text-muted")}>
-              {selected === role ? "Selecionado" : "Escolher"}
-            </span>
+            <span className={cn("h-4 w-4 shrink-0 rounded-full border transition-colors",
+              selected === role ? "border-[5px] border-piquet" : "border-surface-strong group-hover:border-text-muted")} aria-hidden />
           </button>
         ))}
       </div>
@@ -220,7 +214,7 @@ function DemoProfileSelector() {
           className="input-field"
           aria-label="Palavra-passe"
         />
-        {error && <p className="text-sm text-danger bg-danger-light rounded-lg px-3 py-2">{error}</p>}
+        {error && <p className="aviso aviso-perigo py-2">{error}</p>}
         <button type="submit" className="btn-primary w-full py-2.5">Iniciar sessão</button>
       </form>
 
@@ -234,7 +228,7 @@ function DemoProfileSelector() {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <p className="text-3xl font-extrabold text-white">{value}</p>
+      <p className="text-3xl font-semibold tracking-tight text-white tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-white/60 leading-snug">{label}</p>
     </div>
   );

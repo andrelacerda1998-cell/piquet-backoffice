@@ -32,26 +32,28 @@ export function LembretesDaArea({ rota }: { rota: "/financeiro" | "/crescimento"
   };
 
   return (
-    <section aria-label="Lembretes" className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted inline-flex items-center gap-1.5">
-        <BellRing className="h-3.5 w-3.5" /> Lembretes
-      </p>
-      <ul className="space-y-2">
+    <section aria-label="Lembretes" className="card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-border">
+        <BellRing className="h-4 w-4 text-text-muted" />
+        <h2 className="text-sm font-semibold text-text-primary">Lembretes</h2>
+        <span className="rounded-md bg-surface-subtle px-1.5 py-px text-xs font-semibold tabular-nums text-text-secondary">{lembretes.length}</span>
+      </div>
+      <ul className="divide-y divide-surface-border">
         {lembretes.map((a) => {
           const d = destinoDoAlerta(a);
           return (
-            <li key={a.id} className={cn("card border-l-[3px] px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2",
-              a.priority === "critica" ? "border-l-danger" : "border-l-warning")}>
-              <div className="min-w-0 flex-1 basis-64">
-                <p className="font-medium text-text-primary">{a.title}</p>
-                <p className="text-sm text-text-secondary truncate">{a.description}</p>
+            <li key={a.id} className="group px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", a.priority === "critica" ? "bg-danger" : "bg-warning")} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-text-primary truncate">{a.title}</p>
+                <p className="text-[13px] text-text-muted truncate">{a.description}</p>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <button onClick={() => adiar(a.id)} disabled={aAdiar === a.id} className="text-xs text-text-muted hover:text-text-primary disabled:opacity-50">
+              <div className="ml-5 sm:ml-0 flex items-center gap-1 shrink-0">
+                <button onClick={() => adiar(a.id)} disabled={aAdiar === a.id} className="btn-ghost text-xs px-2 py-1 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100">
                   Adiar
                 </button>
-                <Link href={d.href} className="btn-secondary text-sm py-1.5 inline-flex items-center gap-1">
-                  {d.label} <ArrowRight className="h-4 w-4" />
+                <Link href={d.href} className="btn-secondary py-1 px-2.5 text-[13px]">
+                  {d.label} <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             </li>

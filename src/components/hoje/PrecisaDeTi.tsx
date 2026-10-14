@@ -26,13 +26,18 @@ const MAXIMO = 7;
 
 const URGENCIA: Record<AlertPriority, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
 
-/** Vermelho para agir já, âmbar para estar atento, cinzento para o resto. */
+/**
+ * Vermelho para agir já, âmbar para estar atento, cinzento para o resto.
+ * Um ponto e não uma barra a toda a altura: com sete linhas, sete barras
+ * vermelhas eram a coisa mais forte do ecrã e todas pareciam iguais.
+ */
 const COR: Record<AlertPriority, string> = {
-  critica: "border-l-danger",
-  alta: "border-l-warning",
-  media: "border-l-info",
-  baixa: "border-l-surface-strong",
+  critica: "bg-danger",
+  alta: "bg-warning",
+  media: "bg-info",
+  baixa: "bg-surface-strong",
 };
+const NOME_DA_URGENCIA: Record<AlertPriority, string> = { critica: "Crítico", alta: "Alta", media: "Média", baixa: "Baixa" };
 
 /** "há 4 min", "há 3 h", "há 2 dias". */
 function haQuanto(iso: string): string {
@@ -90,58 +95,62 @@ export function PrecisaDeTi({ onVerTodos, onTotal }: { onVerTodos?: () => void; 
     }
   };
 
-  if (loading && !data) return <div className="card p-4 text-sm text-text-muted">A ver o que está à tua espera…</div>;
+  if (loading && !data) return <div className="card p-5 text-sm text-text-muted">A ver o que está à tua espera…</div>;
   // Uma fila que não se conseguiu ler NÃO é uma fila vazia: dizê-lo.
   if (error) {
     return (
-      <div className="card p-4 flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-l-warning">
-        <p className="text-sm text-text-primary">Não foi possível ver a fila agora. Pode haver coisas à tua espera.</p>
-        <button onClick={refetch} className="btn-secondary text-xs py-1.5"><RefreshCw className="h-3.5 w-3.5" /> Tentar de novo</button>
+      <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-text-primary"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-warning align-middle" />Não foi possível ver a fila agora. Pode haver coisas à tua espera.</p>
+        <button onClick={refetch} className="btn-secondary py-1.5 text-[13px]"><RefreshCw className="h-3.5 w-3.5" /> Tentar de novo</button>
       </div>
     );
   }
 
   return (
-    <section aria-labelledby="precisa-de-ti">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 id="precisa-de-ti" className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-          Precisa de ti{alertas.length > 0 && <span className="ml-1.5 text-text-primary">{alertas.length}</span>}
+    <section aria-labelledby="precisa-de-ti" className="card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-surface-border">
+        <h2 id="precisa-de-ti" className="text-[15px] font-semibold text-text-primary flex items-center gap-2">
+          Precisa de ti
+          {alertas.length > 0 && <span className="rounded-md bg-surface-subtle px-1.5 py-px text-xs font-semibold tabular-nums text-text-secondary">{alertas.length}</span>}
         </h2>
         {alertas.length > 0 && (onVerTodos ? (
-          <button onClick={onVerTodos} className="text-sm text-piquet-600 hover:underline">
-            {alertas.length > MAXIMO ? `Ver todos (${alertas.length})` : "Ver em Alertas"} →
+          <button onClick={onVerTodos} className="btn-ghost text-[13px] -mr-1.5">
+            {alertas.length > MAXIMO ? `Ver todos` : "Ver em Alertas"} <ArrowRight className="h-3.5 w-3.5" />
           </button>
         ) : (
-          <Link href="/?tab=alertas" className="text-sm text-piquet-600 hover:underline">
-            {alertas.length > MAXIMO ? `Ver todos (${alertas.length})` : "Ver em Alertas"} →
+          <Link href="/?tab=alertas" className="btn-ghost text-[13px] -mr-1.5">
+            {alertas.length > MAXIMO ? `Ver todos` : "Ver em Alertas"} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         ))}
       </div>
-
       {fila.length === 0 ? (
-        <div className="card p-4 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-          <p className="text-sm text-text-primary"><b>Nada pendente.</b> Bom trabalho.</p>
+        <div className="px-4 py-8 flex flex-col items-center gap-2 text-center">
+          <CheckCircle2 className="h-6 w-6 text-success" />
+          <p className="text-sm text-text-primary font-medium">Nada pendente.</p>
+          <p className="text-[13px] text-text-muted">Quando alguma coisa precisar de ti, aparece aqui.</p>
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="divide-y divide-surface-border">
           {fila.map((a) => {
             const d = destinoDoAlerta(a);
             return (
-              <li key={a.id} className={cn("card border-l-[3px] px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2", COR[a.priority])}>
-                <div className="min-w-0 flex-1 basis-64">
-                  <p className="font-medium text-text-primary">{a.title}</p>
-                  <p className="text-sm text-text-secondary truncate">
+              <li key={a.id} className="group flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-surface-subtle/50 transition-colors">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", COR[a.priority])} title={NOME_DA_URGENCIA[a.priority]} aria-label={`Urgência ${NOME_DA_URGENCIA[a.priority]}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-primary truncate">{a.title}</p>
+                  <p className="text-[13px] text-text-muted truncate" title={a.recommendedAction || undefined}>
                     {a.description}
-                    {a.createdAt && temHoraPropria(a) && <span className="text-text-muted"> · {haQuanto(a.createdAt)}</span>}
+                    {a.createdAt && temHoraPropria(a) && <span> · {haQuanto(a.createdAt)}</span>}
                   </p>
-                  <p className="text-xs text-text-muted mt-0.5">{a.recommendedAction}</p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                {/* Adiar e "não é preciso" aparecem ao passar o rato: são a
+                    saída de emergência da fila, não o caminho normal. No
+                    telemóvel (sem rato) ficam sempre visíveis. */}
+                <div className="ml-5 sm:ml-0 flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => adiar(a)}
                     disabled={aMexer === a.id}
-                    className="text-xs text-text-muted hover:text-text-primary disabled:opacity-50"
+                    className="btn-ghost text-xs px-2 py-1 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
                     title="Tirar da fila até amanhã às 9:00 (volta se ainda for preciso)"
                   >
                     Adiar
@@ -149,14 +158,14 @@ export function PrecisaDeTi({ onVerTodos, onTotal }: { onVerTodos?: () => void; 
                   {podeDispensar(a) && (
                     <button
                       onClick={() => setADispensar(a)}
-                      className="text-xs text-text-muted hover:text-text-primary"
+                      className="btn-ghost text-xs px-2 py-1 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
                       title="Tirar da fila de vez, com o motivo"
                     >
                       Não é preciso
                     </button>
                   )}
-                  <Link href={d.href} className="btn-primary text-sm py-1.5 inline-flex items-center gap-1">
-                    {d.label} <ArrowRight className="h-4 w-4" />
+                  <Link href={d.href} className="btn-secondary py-1 px-2.5 text-[13px]" title={a.recommendedAction || undefined}>
+                    {d.label} <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
               </li>
@@ -164,7 +173,6 @@ export function PrecisaDeTi({ onVerTodos, onTotal }: { onVerTodos?: () => void; 
           })}
         </ul>
       )}
-
       <ConfirmDialog
         open={aDispensar !== null}
         onClose={() => setADispensar(null)}

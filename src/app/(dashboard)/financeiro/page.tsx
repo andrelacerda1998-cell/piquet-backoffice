@@ -1,12 +1,16 @@
 "use client";
 
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { Segmentado } from "@/components/ui/Segmentado";
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
 import { pedidoHref } from "@/lib/fichas";
 import Link from "next/link";
 import { LembretesDaArea } from "@/components/ui/LembretesDaArea";
 import { RouteGuard, PermissionGate } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
+import { TrendIndicator } from "@/components/ui/MetricCard";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Painel } from "@/components/ui/Painel";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 import { DataTable, Pagination, type Column } from "@/components/ui/DataTable";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -42,12 +46,12 @@ import { FaturasPorEmitir } from "./FaturasPorEmitir";
 import { pagavel } from "@/lib/lotesPagamento";
 import { buildMetricValue, semIVA } from "@/lib/calculations";
 import { DEFAULT_TAX_CONFIG } from "@/config/dashboard";
-import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPercent, getStatusColor } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { MonthSelect } from "@/components/ui/MonthSelect";
 import { todayISO } from "@/lib/today";
 import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, Clock, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, Wallet } from "lucide-react";
+import { Plus, RefreshCw, CreditCard, Smartphone, Receipt, ChevronRight, ChevronDown } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 /*
@@ -428,16 +432,19 @@ export default function FinancePage() {
       <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize", getStatusColor(r.status))}>{r.status}</span>
     ) },
     { key: "anexo", label: "Anexo", render: (r) => r.attachmentUrl
-      ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-piquet-600 hover:underline">{r.attachmentName || "abrir"}</a>
+      ? <a href={r.attachmentUrl} target="_blank" rel="noopener noreferrer" className="link text-xs">{r.attachmentName || "abrir"}</a>
       : <span className="text-text-muted text-xs">—</span> },
     { key: "actions", label: "", render: (r) => (
-      <div className="flex items-center gap-2 justify-end">
-        {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="text-xs text-success hover:underline">Marcar paga</button>}
-        {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="text-xs text-info hover:underline">Parcial</button>}
-        {/* Corrigir uma marcação errada: volta a pendente. */}
-        {r.status === "pago" && <button onClick={() => setInvToReopen(r)} className="text-xs text-warning hover:underline">Reabrir</button>}
-        <button onClick={() => openInvoiceModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => setInvToRemove(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      <div className="flex items-center gap-0.5 justify-end">
+        {/* A ação do dia (pagar) fica sempre à vista; as outras aparecem ao passar. */}
+        {r.status !== "pago" && <button onClick={() => markInvoicePaid(r)} className="btn-ghost text-xs px-2 py-1 text-success hover:text-success">Marcar paga</button>}
+        <span className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+          {r.status !== "pago" && <button onClick={() => registerPartial(r)} className="btn-ghost text-xs px-2 py-1">Parcial</button>}
+          {/* Corrigir uma marcação errada: volta a pendente. */}
+          {r.status === "pago" && <button onClick={() => setInvToReopen(r)} className="btn-ghost text-xs px-2 py-1">Reabrir</button>}
+          <button onClick={() => openInvoiceModal(r)} className="btn-ghost text-xs px-2 py-1">Editar</button>
+          <button onClick={() => setInvToRemove(r)} className="btn-ghost text-xs px-2 py-1 hover:text-danger">Remover</button>
+        </span>
       </div>
     ) },
   ];
@@ -466,9 +473,9 @@ export default function FinancePage() {
       </button>
     ) },
     { key: "actions", label: "", render: (r) => (
-      <div className="flex items-center gap-2 justify-end">
-        <button onClick={() => openBudgetModal(r)} className="text-xs text-piquet-600 hover:underline">Editar</button>
-        <button onClick={() => setLinhaARemover(r)} className="text-xs text-text-muted hover:text-danger">Remover</button>
+      <div className="flex items-center gap-0.5 justify-end md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100">
+        <button onClick={() => openBudgetModal(r)} className="btn-ghost text-xs px-2 py-1">Editar</button>
+        <button onClick={() => setLinhaARemover(r)} className="btn-ghost text-xs px-2 py-1 hover:text-danger">Remover</button>
       </div>
     ) },
   ];
@@ -489,8 +496,6 @@ export default function FinancePage() {
       <PermissionGate permission="view_finance">
         <div className="space-y-6">
           <PageHeader
-            icon={Wallet}
-            eyebrow="Financeiro"
             title="Financeiro"
             subtitle="Receita, custos e tesouraria"
             actions={tab === "resultado" ? <MonthSelect /> : undefined}
@@ -506,37 +511,43 @@ export default function FinancePage() {
             <div className="space-y-6">
               {/* GMV: o cobrado no Payshop (ver api/_lib/gmv.ts) — o mesmo da
                   Visão Geral e de todo o Financeiro. */}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Negócio do mês</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard title="GMV do mês" metric={buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0)} format="currency" />
-                  <MetricCard title="Comissão Piquet do mês" metric={buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0)} format="currency" />
-                  {/*
-                    Faturas são CUSTOS (company_invoices), não receita -- por isso
-                    ficam a seguir ao GMV e não misturadas com ele. Sem comparação
-                    mensal: o total é acumulado e um "+0%" seria inventado.
-                  */}
-                  <MetricCard title="Faturas por pagar" metric={buildMetricValue(totalOutstanding, totalOutstanding)} format="currency" hideDelta />
-                  <MetricCard title="Faturas em atraso" metric={buildMetricValue(totalOverdue, totalOverdue)} format="currency" hideDelta
-                    className={cn(totalOverdue > 0 && "border-danger/40")} />
-                </div>
-              </div>
+              {(() => {
+                const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0);
+                const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0);
+                return (
+                  <StatGroup title="Negócio do mês" cols={4}>
+                    <Stat label="GMV do mês" value={formatCurrency(gmvMes.value)}>
+                      {gmvMes.changePercent !== 0 && <TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />}
+                    </Stat>
+                    <Stat label="Comissão Piquet do mês" value={formatCurrency(comissaoMes.value)}>
+                      {comissaoMes.changePercent !== 0 && <TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />}
+                    </Stat>
+                    {/*
+                      Faturas são CUSTOS (company_invoices), não receita -- por isso
+                      ficam a seguir ao GMV e não misturadas com ele. Sem comparação
+                      mensal: o total é acumulado e um "+0%" seria inventado.
+                    */}
+                    <Stat label="Faturas por pagar" value={formatCurrency(totalOutstanding)} />
+                    <Stat label="Faturas em atraso" value={formatCurrency(totalOverdue)} tone={totalOverdue > 0 ? "mau" : undefined} />
+                  </StatGroup>
+                );
+              })()}
 
               {/* Próximas faturas a pagar */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">Próximas faturas a pagar</p>
-                  <button onClick={() => setTab("custos")} className="text-sm text-piquet-600 font-medium hover:underline">Ver todas →</button>
+              <div className="card overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-surface-border">
+                  <h2 className="text-sm font-semibold text-text-primary">Próximas faturas a pagar</h2>
+                  <button onClick={() => setTab("custos")} className="btn-ghost text-[13px] -mr-1.5">Ver todas →</button>
                 </div>
-                <div className="card divide-y divide-surface-border">
+                <div className="divide-y divide-surface-border">
                   {openInvoices.length === 0 ? (
-                    <p className="p-4 text-sm text-text-secondary">Sem faturas por pagar. 🎉</p>
+                    <p className="px-4 py-4 text-sm text-text-muted">Sem faturas por pagar.</p>
                   ) : openInvoices.slice(0, 6).map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between gap-3 p-3">
+                    <div key={inv.id} className="group flex items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate flex items-center gap-1.5">
                           {inv.vendor}
-                          {inv.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[11px] px-1 py-0.5 rounded bg-surface-subtle text-text-muted shrink-0">Outlook</span>}
+                          {inv.source === "outlook" && <span title="Recebida por email (Outlook)" className="text-[11px] px-1.5 py-0.5 rounded-md bg-surface-subtle text-text-muted shrink-0">Outlook</span>}
                         </p>
                         <p className="text-xs text-text-muted">
                           {inv.dueDate
@@ -546,16 +557,16 @@ export default function FinancePage() {
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
-                          <p className="font-semibold text-sm">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
-                          <span className={cn("inline-block text-[11px] px-1.5 py-0.5 rounded-full capitalize", getStatusColor(inv.status))}>{inv.status === "parcial" ? "em falta" : inv.status}</span>
+                          <p className="font-semibold text-sm tabular-nums">{formatCurrency(inv.status === "parcial" ? inv.outstanding : inv.amount)}</p>
+                          <StatusBadge status={inv.status} label={inv.status === "parcial" ? "em falta" : inv.status} className="text-[11px]" />
                         </div>
-                        <button onClick={() => markInvoicePaid(inv)} className="text-xs text-success hover:underline whitespace-nowrap">Marcar paga</button>
+                        <button onClick={() => markInvoicePaid(inv)} className="btn-ghost text-xs px-2 py-1 whitespace-nowrap">Marcar paga</button>
                       </div>
                     </div>
                   ))}
                 </div>
                 {openInvoices.length > 6 && (
-                  <p className="text-xs text-text-muted mt-2">
+                  <p className="px-4 py-2.5 border-t border-surface-border text-xs text-text-muted">
                     A mostrar as 6 mais próximas de {openInvoices.length}.
                   </p>
                 )}
@@ -576,14 +587,13 @@ export default function FinancePage() {
               */}
               {summary && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">No período <DemoBadge endpoint="/finance/summary" /></p>
-                  <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-                    {/* Do GMV do período (Payshop), como os cartões de cima. Eram a
+                  <StatGroup title={<>No período <DemoBadge endpoint="/finance/summary" /></>} cols={3}>
+                    {/* Do GMV do período (Payshop), como os números de cima. Eram a
                         soma dos serviços concluídos do Laravel: outro total. */}
-                    <MetricCard title="GMV do período" metric={buildMetricValue(summary.totalServiceValue, summary.totalServiceValue)} hideDelta format="currency" />
-                    <MetricCard title="Comissão Piquet do período" metric={buildMetricValue(summary.piquetRevenue, summary.piquetRevenue)} hideDelta format="currency" />
-                    <MetricCard title="Resultado mensal est." metric={buildMetricValue(summary.estimatedMonthlyResult, summary.estimatedMonthlyResult)} hideDelta format="currency" />
-                  </div>
+                    <Stat label="GMV do período" value={formatCurrency(summary.totalServiceValue)} />
+                    <Stat label="Comissão Piquet do período" value={formatCurrency(summary.piquetRevenue)} />
+                    <Stat label="Resultado mensal est." value={formatCurrency(summary.estimatedMonthlyResult)} tone={summary.estimatedMonthlyResult < 0 ? "mau" : undefined} />
+                  </StatGroup>
                   {summary.gmvIgnoraFiltros && (
                     <p className="mt-2 text-xs text-text-secondary">
                       O GMV e a comissão são do período inteiro: o Payshop não sabe a categoria nem a cidade de um pagamento.
@@ -608,67 +618,57 @@ export default function FinancePage() {
               </div>
 
               {/* Tesouraria (fundida no Resumo) */}
-              <div className="pt-2">
-                <h2 className="font-semibold mb-3">Tesouraria</h2>
+              <section>
+                {/*
+                  Saldo, saldo previsto e runway dependem do dinheiro em
+                  conta, e o backoffice não tem ligação bancária nem
+                  registo de tesouraria. Mostravam 185 000 € — uma
+                  constante no código. Passa a dizer-se o que falta.
+                */}
+                <SectionHeader
+                  title="Tesouraria"
+                  description={summary?.currentBalance === null || !summary ? (
+                    <>Sem saldo registado. Não há ligação bancária — regista o saldo da conta para o &quot;Saldo previsto&quot; e o &quot;Runway&quot; passarem a fazer sentido.</>
+                  ) : (
+                    <>Saldo lido a <span className="font-medium text-text-primary">{summary.balanceDate ? formatDate(summary.balanceDate) : "—"}</span>. Regista de novo sempre que consultares a conta.</>
+                  )}
+                  aside={<button onClick={() => setShowSaldo(true)} className="btn-secondary text-sm">Registar saldo</button>}
+                />
+                {treasury?.migracaoEmFalta && (
+                  <div className="mb-3 aviso aviso-atencao text-xs text-text-secondary">
+                    Falta aplicar a migração <code>20260821100000_treasury_balances.sql</code> no
+                    Supabase — até lá o saldo não pode ser guardado.
+                  </div>
+                )}
                 {summary && (
-                  <>
-                    {/*
-                      Saldo, saldo previsto e runway dependem do dinheiro em
-                      conta, e o backoffice não tem ligação bancária nem
-                      registo de tesouraria. Mostravam 185 000 € — uma
-                      constante no código. Passa a dizer-se o que falta.
-                    */}
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs text-text-secondary">
-                        {summary.currentBalance === null ? (
-                          <>
-                            <span className="font-medium text-text-primary">Sem saldo registado.</span>{" "}
-                            Não há ligação bancária — regista o saldo da conta para o
-                            &quot;Saldo previsto&quot; e o &quot;Runway&quot; passarem a fazer sentido.
-                          </>
-                        ) : (
-                          <>
-                            Saldo lido a <strong className="text-text-primary">{summary.balanceDate ? formatDate(summary.balanceDate) : "—"}</strong>.
-                            {" "}Regista de novo sempre que consultares a conta.
-                          </>
-                        )}
-                      </p>
-                      <button onClick={() => setShowSaldo(true)} className="btn-secondary text-xs">
-                        Registar saldo
-                      </button>
-                    </div>
-                    {treasury?.migracaoEmFalta && (
-                      <div className="mb-3 rounded-xl border-l-[3px] border-l-warning bg-warning-light/30 px-4 py-2.5 text-xs text-text-secondary">
-                        Falta aplicar a migração <code>20260821100000_treasury_balances.sql</code> no
-                        Supabase — até lá o saldo não pode ser guardado.
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <MetricCard title="Saldo atual" metric={buildMetricValue(summary.currentBalance ?? 0, summary.currentBalance ?? 0)} hideDelta format="currency" empty={summary.currentBalance === null} emptyHint="falta ligar a conta" />
-                      <MetricCard title="Saldo previsto" metric={buildMetricValue(summary.projectedBalance ?? 0, summary.projectedBalance ?? 0)} hideDelta format="currency" empty={summary.projectedBalance === null} emptyHint="depende do saldo" />
-                      <MetricCard title="Burn rate" metric={buildMetricValue(summary.burnRate, summary.burnRate)} hideDelta format="currency" />
-                      <MetricCard title="Runway" metric={buildMetricValue(summary.runwayMonths ?? 0, summary.runwayMonths ?? 0)} hideDelta empty={summary.runwayMonths === null} emptyHint="depende do saldo" />
-                    </div>
-                    {(treasury?.items.length ?? 0) > 1 && (
-                      <details className="mt-3">
-                        <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
-                          Histórico de saldos ({treasury!.items.length})
-                        </summary>
-                        <div className="mt-2 space-y-1">
-                          {treasury!.items.map((b) => (
-                            <div key={b.id} className="flex items-center justify-between text-xs border-b border-surface-border/60 py-1.5 last:border-0">
-                              <span className="text-text-secondary">
-                                {formatDate(b.balance_date)}
-                                {b.account && <span className="text-text-muted"> · {b.account}</span>}
-                                {b.note && <span className="text-text-muted"> · {b.note}</span>}
-                              </span>
-                              <span className="font-medium text-text-primary tabular-nums">{formatCurrency(b.amount)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    )}
-                  </>
+                  <StatGroup cols={4}>
+                    <Stat label="Saldo atual" value={summary.currentBalance === null ? "—" : formatCurrency(summary.currentBalance)}
+                      note={summary.currentBalance === null ? "falta ligar a conta" : undefined} />
+                    <Stat label="Saldo previsto" value={summary.projectedBalance === null ? "—" : formatCurrency(summary.projectedBalance)}
+                      note={summary.projectedBalance === null ? "depende do saldo" : undefined} />
+                    <Stat label="Burn rate" value={formatCurrency(summary.burnRate)} note="por mês" />
+                    <Stat label="Runway" value={summary.runwayMonths === null ? "—" : `${formatNumber(summary.runwayMonths)} meses`}
+                      note={summary.runwayMonths === null ? "depende do saldo" : undefined} />
+                  </StatGroup>
+                )}
+                {(treasury?.items.length ?? 0) > 1 && (
+                  <details className="mt-3">
+                    <summary className="text-xs text-text-muted cursor-pointer hover:text-text-primary">
+                      Histórico de saldos ({treasury!.items.length})
+                    </summary>
+                    <ul className="mt-2 card divide-y divide-surface-border">
+                      {treasury!.items.map((b) => (
+                        <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-2 text-xs">
+                          <span className="text-text-secondary">
+                            {formatDate(b.balance_date)}
+                            {b.account && <span className="text-text-muted"> · {b.account}</span>}
+                            {b.note && <span className="text-text-muted"> · {b.note}</span>}
+                          </span>
+                          <span className="font-medium text-text-primary tabular-nums">{formatCurrency(b.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 )}
                 {/*
                   Saiu a "Previsão de tesouraria — 90 dias". Partia de um saldo
@@ -677,7 +677,7 @@ export default function FinancePage() {
                   gráfico ficava a zeros. Uma previsão a sério parte do saldo
                   registado acima e das faturas por pagar em Custos.
                 */}
-              </div>
+              </section>
             </div>
           )}
 
@@ -687,47 +687,42 @@ export default function FinancePage() {
               custos operacionais foram removidos até haver integração real que os alimente. */}
           {tab === "custos" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* previous = current: sem comparação fabricada (são contagens atuais). */}
-                <MetricCard title="Por pagar (total)" metric={buildMetricValue(invKpis?.totalOutstanding ?? 0, invKpis?.totalOutstanding ?? 0)} format="currency" />
-                <MetricCard title="Pendentes" metric={buildMetricValue(invKpis?.pendingCount ?? 0, invKpis?.pendingCount ?? 0)} />
-                <MetricCard title="Parciais" metric={buildMetricValue(invKpis?.partialCount ?? 0, invKpis?.partialCount ?? 0)} />
-                <MetricCard title="Vencidas" metric={buildMetricValue(invKpis?.overdueCount ?? 0, invKpis?.overdueCount ?? 0)} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold">Faturas a pagar</h2>
-                  <p className="text-xs text-text-secondary">Manuais e recebidas por email (Outlook) · estados Pendente / Parcial / Pago</p>
-                </div>
-                <button onClick={() => openInvoiceModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>
-              </div>
-
-              {/* Uma fatura paga sai da lista de trabalho; fica em "Pagas" para
-                  se poder corrigir uma marcação errada. */}
-              <div className="flex flex-wrap items-center gap-2">
-                {([
-                  { id: "abertas", label: "Por pagar", count: invoices.length - paidInvoices.length },
-                  { id: "pagas", label: "Pagas", count: paidInvoices.length },
-                  { id: "todas", label: "Todas", count: invoices.length },
-                ] as const).map((v) => (
-                  <button key={v.id} onClick={() => setInvoiceView(v.id)}
-                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                      invoiceView === v.id
-                        ? "border-piquet/30 bg-piquet/15 text-piquet-700"
-                        : "border-surface-border text-text-secondary hover:bg-surface-muted")}>
-                    {v.label}
-                    <span className={cn("tabular-nums text-xs", invoiceView === v.id ? "opacity-80" : "text-text-muted")}>{v.count}</span>
-                  </button>
-                ))}
-                {invoiceView === "pagas" && (
-                  <span className="text-xs text-text-muted">Marcada por engano? Usa &ldquo;Reabrir&rdquo; para voltar a pendente.</span>
-                )}
-              </div>
+              <StatGroup cols={4}>
+                <Stat label="Por pagar (total)" value={formatCurrency(invKpis?.totalOutstanding ?? 0)} />
+                <Stat label="Pendentes" value={invKpis?.pendingCount ?? 0} />
+                <Stat label="Parciais" value={invKpis?.partialCount ?? 0} />
+                <Stat label="Vencidas" value={invKpis?.overdueCount ?? 0} tone={(invKpis?.overdueCount ?? 0) > 0 ? "mau" : undefined} />
+              </StatGroup>
+              <SectionHeader
+                title="Faturas a pagar"
+                description="Manuais e recebidas por email (Outlook) · estados Pendente / Parcial / Pago"
+                aside={<button onClick={() => openInvoiceModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova fatura</button>}
+                className="mb-0 pt-2"
+              />
 
               <DataTable
                 columns={invoiceColumns}
                 data={visibleInvoices}
                 keyField="id"
+                toolbar={
+                  <>
+                    {/* Uma fatura paga sai da lista de trabalho; fica em "Pagas" para
+                        se poder corrigir uma marcação errada. */}
+                    <Segmentado
+                      ariaLabel="Faturas"
+                      opcoes={[
+                        { id: "abertas" as const, label: "Por pagar", count: invoices.length - paidInvoices.length },
+                        { id: "pagas" as const, label: "Pagas", count: paidInvoices.length },
+                        { id: "todas" as const, label: "Todas", count: invoices.length },
+                      ]}
+                      valor={invoiceView}
+                      onChange={setInvoiceView}
+                    />
+                    {invoiceView === "pagas" && (
+                      <span className="text-xs text-text-muted">Marcada por engano? Usa &ldquo;Reabrir&rdquo; para voltar a pendente.</span>
+                    )}
+                  </>
+                }
                 selectable
                 columnToggle
                 bulkActions={invoiceView === "pagas" ? [] : [{ label: "Marcar pagas", onClick: bulkMarkPaid }]}
@@ -746,22 +741,20 @@ export default function FinancePage() {
               tabela budget_items) projetadas 12 meses, somadas às faturas reais a pagar. */}
           {tab === "resultado" && (
             <div className="space-y-6" id="planeamento">
-              <SectionHeader title="Planeamento" aside={<span className="text-xs text-text-muted">Quanto dinheiro é preciso em cada mês, com as faturas a pagar</span>} />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* previous = current: são projeções do próprio plano, sem comparação fabricada. */}
-                <MetricCard title="Necessidade este mês" metric={buildMetricValue(plan.months[0]?.net ?? 0, plan.months[0]?.net ?? 0)} format="currency" />
-                <MetricCard title="Custos este mês" metric={buildMetricValue(plan.months[0]?.totalCosts ?? 0, plan.months[0]?.totalCosts ?? 0)} format="currency" />
-                <MetricCard title="Média mensal (12m)" metric={buildMetricValue(plan.totals.net / 12, plan.totals.net / 12)} format="currency" />
-                <MetricCard title={`Pico · ${peakMonth?.label ?? "—"}`} metric={buildMetricValue(peakMonth?.net ?? 0, peakMonth?.net ?? 0)} format="currency" />
-              </div>
+              <SectionHeader title="Planeamento" description="Quanto dinheiro é preciso em cada mês, com as faturas a pagar" className="mb-0" />
+              <StatGroup cols={4}>
+                <Stat label="Necessidade este mês" value={formatCurrency(plan.months[0]?.net ?? 0)} tone={(plan.months[0]?.net ?? 0) > 0 ? "mau" : undefined} />
+                <Stat label="Custos este mês" value={formatCurrency(plan.months[0]?.totalCosts ?? 0)} />
+                <Stat label="Média mensal (12 meses)" value={formatCurrency(plan.totals.net / 12)} />
+                <Stat label={`Pico · ${peakMonth?.label ?? "—"}`} value={formatCurrency(peakMonth?.net ?? 0)} />
+              </StatGroup>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted mb-3">Próximos 12 meses</p>
-                <div className="card overflow-x-auto">
+                <Painel titulo="Próximos 12 meses" descricao="Clica num mês para ver a composição" corpo="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-text-muted border-b border-surface-border">
-                        <th className="p-3 font-medium">Mês</th>
+                      <tr className="text-left text-xs text-text-muted border-b border-surface-border bg-surface-subtle/60">
+                        <th className="p-3 pl-4 font-medium">Mês</th>
                         <th className="p-3 font-medium text-right">Custos recorrentes</th>
                         <th className="p-3 font-medium text-right">Equipa</th>
                         <th className="p-3 font-medium text-right">Faturas a pagar</th>
@@ -778,12 +771,12 @@ export default function FinancePage() {
                             title="Clica para ver a composição do mês"
                             className={cn("border-b border-surface-border last:border-0 cursor-pointer hover:bg-surface-subtle/40", i === 0 && "bg-surface-subtle/60")}
                           >
-                            <td className="p-3 font-medium capitalize whitespace-nowrap">
+                            <td className="p-3 pl-4 font-medium capitalize whitespace-nowrap">
                               <span className="inline-flex items-center gap-1">
                                 <ChevronRight className={cn("h-3.5 w-3.5 text-text-muted transition-transform", openMonth === m.month && "rotate-90")} />
                                 {m.label}
                               </span>
-                              {i === 0 && <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-piquet/15 text-piquet-700">atual</span>}
+                              {i === 0 && <span className="ml-1.5 text-[11px] font-medium normal-case px-1.5 py-0.5 rounded-md bg-piquet/20 text-text-primary">atual</span>}
                             </td>
                             <td className="p-3 text-right tabular-nums">{formatCurrency(m.recurringCosts)}</td>
                             <td className="p-3 text-right tabular-nums">{m.teamCosts > 0 ? formatCurrency(m.teamCosts) : <span className="text-text-muted">—</span>}</td>
@@ -808,7 +801,7 @@ export default function FinancePage() {
                                       { title: "Entradas previstas", entries: m.detail.inflows },
                                     ] as const).filter((g) => g.entries.length > 0).map((g) => (
                                       <div key={g.title}>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-text-muted mb-2">{g.title}</p>
+                                        <p className="text-sm font-semibold text-text-primary mb-2">{g.title}</p>
                                         <ul className="space-y-1">
                                           {g.entries.map((e, j) => (
                                             <li key={j} className={cn("flex items-center justify-between gap-3", e.projected && "text-text-muted")}>
@@ -829,7 +822,7 @@ export default function FinancePage() {
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-surface-border text-xs">
-                        <td className="p-3 font-semibold">Total 12 meses</td>
+                        <td className="p-3 pl-4 font-semibold">Total 12 meses</td>
                         <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.recurringCosts)}</td>
                         <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.teamCosts)}</td>
                         <td className="p-3 text-right tabular-nums">{formatCurrency(plan.totals.invoices)}</td>
@@ -839,20 +832,18 @@ export default function FinancePage() {
                       </tr>
                     </tfoot>
                   </table>
-                </div>
+                </Painel>
                 <p className="text-xs text-text-muted mt-2">
-                  Clica num mês para ver a composição. Necessidade líquida = custos do mês (recorrentes + equipa + faturas por pagar) − entradas previstas. A equipa vem dos colaboradores em Impostos e RH (custo mensal p/ empresa, desde o início do contrato). As faturas vencidas contam no mês atual; as recorrentes projetam-se nos meses seguintes pelo valor total (previstas). As entradas incluem as linhas do plano e a comissão dos orçamentos aceites no CRM (mês da execução).
+                  Necessidade líquida = custos do mês (recorrentes + equipa + faturas por pagar) − entradas previstas. A equipa vem dos colaboradores em Impostos e RH (custo mensal p/ empresa, desde o início do contrato). As faturas vencidas contam no mês atual; as recorrentes projetam-se nos meses seguintes pelo valor total (previstas). As entradas incluem as linhas do plano e a comissão dos orçamentos aceites no CRM (mês da execução).
                 </p>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h2 className="font-semibold">Linhas do plano</h2>
-                    <p className="text-xs text-text-secondary">Custos recorrentes e entradas previstas — definidos por ti, com periodicidade</p>
-                  </div>
-                  <button onClick={() => openBudgetModal(null)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Nova linha</button>
-                </div>
+                <SectionHeader
+                  title="Linhas do plano"
+                  description="Custos recorrentes e entradas previstas — definidos por ti, com periodicidade"
+                  aside={<button onClick={() => openBudgetModal(null)} className="btn-secondary text-sm"><Plus className="h-4 w-4" /> Nova linha</button>}
+                />
                 <DataTable
                   columns={budgetColumns}
                   data={budgetItems ?? []}
@@ -886,33 +877,24 @@ export default function FinancePage() {
                 const comComissao = itens.filter((v) => v.commission != null);
                 const comissao = comComissao.reduce((s, v) => s + (v.commission ?? 0), 0);
                 /*
-                  Uma faixa só, em vez de duas filas de cartões mais dois
-                  parágrafos. Os seis números liam-se todos da mesma maneira e
+                  Um bloco só, em vez de duas filas de cartões mais dois
+                  parágrafos: os números liam-se todos da mesma maneira e
                   ocupavam meio ecrã antes da lista — que é onde está o trabalho.
-                  O "c/ IVA" fica em destaque e o líquido logo por baixo.
+                  O "c/ IVA" é o valor; o líquido fica na nota.
                 */
-                const stat = (label: string, comIva: number, destaque = false) => (
-                  <div key={label} className="min-w-[130px]">
-                    <p className="text-xs text-text-secondary">{label}</p>
-                    <p className={cn("text-xl font-bold tabular-nums leading-tight",
-                      destaque ? "text-success" : "text-text-primary")}>{formatCurrency(comIva)}</p>
-                    <p className="text-[11px] text-text-muted tabular-nums">{formatCurrency(semIVA(comIva, iva))} s/ IVA</p>
-                  </div>
-                );
+                const sIva = (v: number) => `${formatCurrency(semIVA(v, iva))} s/ IVA`;
                 return (
-                  <div className="card px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-4">
-                    <div className="min-w-[110px]">
-                      <p className="text-xs text-text-secondary">Técnicos com saldo</p>
-                      <p className="text-xl font-bold text-text-primary tabular-nums leading-tight">{itens.length}</p>
-                      <p className="text-[11px] text-text-muted">a aguardar transferência</p>
-                    </div>
-                    {stat("A pagar", aPagar)}
-                    {aEsperaDaFatura > 0 && stat("À espera de fatura", aEsperaDaFatura)}
-                    {comComissao.length > 0 && stat("Comissão Piquet", comissao, true)}
-                    {comTotais.length > 0 && stat("Faturado via Piquet", faturado)}
-                    <p className="text-[11px] text-text-muted max-w-xs ml-auto">
-                      Paga-se por lotes: uma pessoa cria, outra aprova, a
-                      transferência sai do banco e só então se debita a carteira. <DemoBadge endpoint="/vendor-payments" />
+                  <div className="space-y-2">
+                    <StatGroup cols={(3 + (comComissao.length > 0 ? 1 : 0) + (comTotais.length > 0 ? 1 : 0)) as 3 | 4 | 5}
+                      title="A pagar a técnicos" aside={<DemoBadge endpoint="/vendor-payments" />}>
+                      <Stat label="Técnicos com saldo" value={itens.length} note="a aguardar transferência" />
+                      <Stat label="A pagar" value={formatCurrency(aPagar)} note={sIva(aPagar)} />
+                      <Stat label="À espera de fatura" value={formatCurrency(aEsperaDaFatura)} note={sIva(aEsperaDaFatura)} />
+                      {comComissao.length > 0 && <Stat label="Comissão Piquet" value={formatCurrency(comissao)} note={sIva(comissao)} tone="bom" />}
+                      {comTotais.length > 0 && <Stat label="Faturado via Piquet" value={formatCurrency(faturado)} note={sIva(faturado)} />}
+                    </StatGroup>
+                    <p className="text-xs text-text-muted">
+                      Paga-se por lotes: uma pessoa cria, outra aprova, a transferência sai do banco e só então se debita a carteira.
                     </p>
                   </div>
                 );
@@ -929,8 +911,8 @@ export default function FinancePage() {
           {/* -------------------------------- TESOURARIA -------------------------------- */}
           {tab === "pagamentos" && appPay && (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-sm text-text-secondary max-w-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <p className="text-[13px] text-text-muted max-w-2xl">
                   Pagamentos processados na app via Payshop Online Payments. Cada pagamento é
                   cativado na reserva e cobrado quando o serviço se confirma.
                   {(appPay.kpis.testCount ?? 0) > 0 && (
@@ -942,40 +924,30 @@ export default function FinancePage() {
                 </span>
               </div>
 
-              {/* Destaque: os dois números que interessam */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card p-5 border-l-4 border-l-success">
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
-                    <span className="text-sm font-medium">Cobrado</span>
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(appPay.kpis.pagoCents / 100)}</p>
-                  <p className="mt-1 text-xs text-text-muted">{appPay.kpis.pagoCount} pagamentos confirmados — dinheiro efetivamente recebido</p>
-                </div>
-                <div className="card p-5 border-l-4 border-l-info">
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <Clock className="h-4 w-4 text-info" />
-                    <span className="text-sm font-medium">Cativo</span>
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(appPay.kpis.cativadoCents / 100)}</p>
-                  <p className="mt-1 text-xs text-text-muted">{appPay.kpis.cativadoCount} pré-autorizações à espera de confirmação</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard title="Ticket médio" metric={buildMetricValue(appPay.kpis.avgTicketCents / 100, appPay.kpis.avgTicketCents / 100)} format="currency" />
-                <MetricCard title="Taxa de sucesso" metric={buildMetricValue(appPay.kpis.successRate, appPay.kpis.successRate, false, undefined, "Pagamentos que avançaram (cobrados ou cativados) do total de tentativas")} format="percent" />
-                <MetricCard title="Libertados" metric={buildMetricValue(appPay.kpis.canceladoCount, appPay.kpis.canceladoCount, true, undefined, "Cativos devolvidos sem cobrar — a reserva não avançou")} />
-                <MetricCard title="Falharam" metric={buildMetricValue(appPay.kpis.recusadoCount, appPay.kpis.recusadoCount, true, undefined, "Pagamentos que o Payshop recusou (cartão, MB WAY…)")} />
-              </div>
+              {/* Os dois números que interessam primeiro, e o resto a seguir, num bloco só. */}
+              <StatGroup cols={6}>
+                <Stat label="Cobrado" value={formatCurrency(appPay.kpis.pagoCents / 100)} tone="bom"
+                  note={`${appPay.kpis.pagoCount} confirmados`}
+                  info="Dinheiro efetivamente recebido: pagamentos confirmados no Payshop." />
+                <Stat label="Cativo" value={formatCurrency(appPay.kpis.cativadoCents / 100)}
+                  note={`${appPay.kpis.cativadoCount} pré-autorizações`}
+                  info="Pré-autorizações à espera de o serviço se confirmar para serem cobradas." />
+                <Stat label="Ticket médio" value={formatCurrency(appPay.kpis.avgTicketCents / 100)} />
+                <Stat label="Taxa de sucesso" value={formatPercent(appPay.kpis.successRate)}
+                  info="Pagamentos que avançaram (cobrados ou cativados) do total de tentativas." />
+                <Stat label="Libertados" value={appPay.kpis.canceladoCount}
+                  info="Cativos devolvidos sem cobrar — a reserva não avançou." />
+                <Stat label="Falharam" value={appPay.kpis.recusadoCount} tone={appPay.kpis.recusadoCount > 0 ? "mau" : undefined}
+                  info="Pagamentos que o Payshop recusou (cartão, MB WAY…)." />
+              </StatGroup>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <ChartCard title="Volume mensal" subtitle="Cobrado vs cativado, por mês (€)">
                   <BarChartComponent
                     data={appPay.monthly.map((m) => ({ name: m.name.slice(2), cobrado: m.cobrado, cativado: m.cativado }))}
                     bars={[
-                      { key: "cobrado", color: "#16A34A", name: "Cobrado" },
-                      { key: "cativado", color: "#3B82F6", name: "Cativado" },
+                      { key: "cobrado", color: "#FAB347", name: "Cobrado" },
+                      { key: "cativado", color: "#3E7C8C", name: "Cativado" },
                     ]}
                     currency
                   />
@@ -986,18 +958,16 @@ export default function FinancePage() {
               </div>
 
               <div>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div>
-                    <h2 className="font-semibold">Pagamentos</h2>
-                    <span className="text-xs text-text-muted">Um por reserva. Primeiro os que falharam e os cativos há mais de 3 dias; depois os mais recentes.</span>
-                  </div>
-                  {(appPay.kpis.testCount ?? 0) > 0 && (
+                <SectionHeader
+                  title="Pagamentos"
+                  description="Um por reserva. Primeiro os que falharam e os cativos há mais de 3 dias; depois os mais recentes."
+                  aside={(appPay.kpis.testCount ?? 0) > 0 ? (
                     <label className="inline-flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
                       <input type="checkbox" checked={verTestes} onChange={(e) => setVerTestes(e.target.checked)} />
                       Mostrar os {appPay.kpis.testCount} de teste
                     </label>
-                  )}
-                </div>
+                  ) : undefined}
+                />
                 <DataTable
                   columns={[
                     { key: "created", label: "Data", render: (r: AppPayment) => r.created ? formatDateTime(r.created) : "—" },
@@ -1006,15 +976,15 @@ export default function FinancePage() {
                       const Icon = r.methodKind === "mbway" ? Smartphone : r.methodKind === "referencia" ? Receipt : CreditCard;
                       return <span className="inline-flex items-center gap-1.5"><Icon className="h-3.5 w-3.5 text-text-muted" />{r.method}</span>;
                     } },
-                    { key: "amount", label: "Valor", sortable: true, render: (r: AppPayment) => (
-                      <span className="font-semibold">{formatCurrency(r.amount)}</span>
+                    { key: "amount", label: "Valor", sortable: true, className: "text-right", render: (r: AppPayment) => (
+                      <span className="font-semibold tabular-nums">{formatCurrency(r.amount)}</span>
                     ) },
-                    { key: "refunded", label: "Reembolsado", render: (r: AppPayment) => r.refunded > 0
-                      ? <span className="text-danger">−{formatCurrency(r.refunded)}</span>
+                    { key: "refunded", label: "Reembolsado", className: "text-right", render: (r: AppPayment) => r.refunded > 0
+                      ? <span className="text-danger tabular-nums">−{formatCurrency(r.refunded)}</span>
                       : <span className="text-text-muted">—</span> },
                     // O pedido do pagamento: é lá que se resolve (reembolsar, tentar cobrar, falar com o cliente).
                     { key: "servicoId", label: "Pedido", render: (r: AppPayment) => r.servicoId
-                      ? <Link href={pedidoHref(r.servicoId)} className="text-piquet-600 hover:underline whitespace-nowrap">#{r.servicoId}</Link>
+                      ? <Link href={pedidoHref(r.servicoId)} className="font-mono text-xs text-text-secondary hover:text-text-primary hover:underline whitespace-nowrap">#{r.servicoId}</Link>
                       : <span className="text-text-muted">—</span> },
                     { key: "state", label: "Estado", render: (r: AppPayment) => {
                       const s = PAY_STATE[r.state];
@@ -1022,10 +992,13 @@ export default function FinancePage() {
                       const emParte = r.state === "pago" && r.refunded > 0;
                       return (
                         <span className="inline-flex items-center gap-1.5">
-                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", s.tone)}>{emParte ? "Cobrado · devolvido em parte" : s.label}</span>
+                          <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap", s.tone)}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {emParte ? "Cobrado · devolvido em parte" : s.label}
+                          </span>
                           {r.isTest && (
                             <span title="Pagamento de teste do programador (<10 €) — fora dos totais e do GMV."
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold uppercase bg-surface-subtle text-text-muted border border-surface-border">
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-surface-subtle text-text-muted">
                               Teste
                             </span>
                           )}
@@ -1034,12 +1007,12 @@ export default function FinancePage() {
                     } },
                     { key: "acoes", label: "", render: (r: AppPayment) => (
                       r.state === "pago" && r.refunded < r.amount ? (
-                        <button onClick={() => setPayToRefund(r)} className="text-xs text-danger hover:underline whitespace-nowrap">Reembolsar</button>
+                        <button onClick={() => setPayToRefund(r)} className="btn-ghost text-xs px-2 py-1 text-danger hover:text-danger whitespace-nowrap">Reembolsar</button>
                       ) : r.state === "cativado" ? (
-                        <button onClick={() => setPayToRelease(r)} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Libertar cativo</button>
+                        <button onClick={() => setPayToRelease(r)} className="btn-ghost text-xs px-2 py-1 whitespace-nowrap">Libertar cativo</button>
                       ) : r.state === "recusado" && r.servicoId ? (
                         /* A nova tentativa faz-se no pedido, com a mesma confirmação do botão de lá. */
-                        <Link href={`${pedidoHref(r.servicoId)}?acao=tentar-cobrar`} className="text-xs text-piquet-600 hover:underline whitespace-nowrap">Tentar cobrar</Link>
+                        <Link href={`${pedidoHref(r.servicoId)}?acao=tentar-cobrar`} className="btn-ghost text-xs px-2 py-1 whitespace-nowrap">Tentar cobrar</Link>
                       ) : <span className="text-text-muted">—</span>
                     ) },
                   ]}
@@ -1062,7 +1035,7 @@ export default function FinancePage() {
           {tab === "resultado" && (
             <SecaoRecolhida id="lucro" titulo="Lucro do sistema" resumo="A carteira da Piquet: comissões e taxas retidas em cada serviço" aberta={secao === "lucro"}>
             <div className="space-y-6">
-              <p className="text-sm text-text-secondary max-w-2xl">
+              <p className="text-[13px] text-text-muted max-w-2xl">
                 Saldo e livro de transações da wallet do sistema — comissões e taxas retidas pela Piquet em cada serviço.
               </p>
 
@@ -1071,13 +1044,10 @@ export default function FinancePage() {
 
               {systemProfit && (
                 <>
-                  <div className="card p-5 border-l-4 border-l-piquet max-w-sm">
-                    <div className="flex items-center gap-2 text-text-secondary">
-                      <Wallet className="h-4 w-4 text-piquet-600" />
-                      <span className="text-sm font-medium">Saldo do sistema</span>
-                    </div>
-                    <p className="mt-2 text-3xl font-bold text-text-primary">{formatCurrency(systemProfit.wallet_balance)}</p>
-                  </div>
+                  <StatGroup cols={2} className="max-w-xl">
+                    <Stat label="Saldo do sistema" value={formatCurrency(systemProfit.wallet_balance)} />
+                    <Stat label="Transações no período" value={systemProfit.meta.total} />
+                  </StatGroup>
 
                   <div className="flex flex-wrap items-end gap-3">
                     <Field label="De">
@@ -1356,10 +1326,15 @@ function SecaoRecolhida({ id, titulo, resumo, aberta = false, children }: {
   id: string; titulo: string; resumo?: string; aberta?: boolean; children: React.ReactNode;
 }) {
   return (
-    <details id={id} open={aberta || undefined} className="card p-4 group">
-      <summary className="cursor-pointer select-none list-none flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-semibold text-text-primary">{titulo}</span>
-        <span className="text-xs text-text-muted">{resumo} <span className="group-open:hidden">· abrir</span></span>
+    <details id={id} open={aberta || undefined} className="group">
+      {/* O título é uma faixa que se clica; o conteúdo abre por baixo, fora
+          do cartão -- um cartão com cartões lá dentro era caixa sobre caixa. */}
+      <summary className="card cursor-pointer select-none list-none flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-subtle/60 transition-colors [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-text-primary">{titulo}</span>
+          {resumo && <span className="block text-xs text-text-muted">{resumo}</span>}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-text-muted transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="mt-4">{children}</div>
     </details>

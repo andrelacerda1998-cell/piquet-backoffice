@@ -96,35 +96,25 @@ describe("tema escuro — contraste do texto", () => {
 
 describe("bolinhas da barra lateral", () => {
   /**
-   * A barra lateral é sempre escura, nos dois temas. Se as bolinhas usassem o
-   * `danger` do tema, no claro ficariam com o tom escurecido (feito para se ler
-   * sobre branco) em cima de um fundo quase preto — uma bolinha de aviso que
-   * não se vê. Por isso o vermelho da barra é fixo, e este teste guarda-o.
+   * Até ao redesenho de 14/10/2026 a barra lateral era sempre escura, e as
+   * bolinhas tinham um vermelho fixo: o `danger` do tema claro (escurecido
+   * para se ler sobre branco) desaparecia em cima do fundo quase preto.
+   *
+   * Agora a barra segue o tema (`surface-sidebar`), e o certo passa a ser o
+   * contrário: usar o `danger` do tema, que já foi escolhido para se ler sobre
+   * as superfícies desse tema. Este teste guarda as duas coisas: que a barra
+   * não voltou às cores fixas e que o vermelho se vê sobre ela.
    */
-  const hex = (h: string): [number, number, number] =>
-    [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+  const sidebar = readFileSync(join(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
 
-  const config = readFileSync(join(process.cwd(), "tailwind.config.ts"), "utf8");
-  const bloco = config.slice(config.indexOf("ink: {"), config.indexOf("}", config.indexOf("ink: {")));
-  const alerta = bloco.match(/alert:\s*"(#[0-9A-Fa-f]{6})"/)?.[1];
-  const fundoBarra = bloco.match(/deep:\s*"(#[0-9A-Fa-f]{6})"/)?.[1];
-
-  it("o vermelho da barra está definido e é fixo (não é uma variável de tema)", () => {
-    expect(alerta).toBeTruthy();
-    expect(fundoBarra).toBeTruthy();
+  it("a barra usa as superfícies do tema, e não as cores fixas da barra escura", () => {
+    expect(sidebar).toMatch(/bg-surface-sidebar/);
+    expect(sidebar).not.toMatch(/bg-ink-deep|bg-ink-alert/);
   });
 
-  it("vê-se sobre o fundo da barra", () => {
-    expect(contraste(hex(alerta!), hex(fundoBarra!))).toBeGreaterThanOrEqual(4);
-  });
-
-  it("o número branco lê-se dentro da bolinha", () => {
-    expect(contraste([255, 255, 255], hex(alerta!))).toBeGreaterThanOrEqual(4);
-  });
-
-  it("a barra lateral não usa o `danger` do tema nas bolinhas", () => {
-    const sidebar = readFileSync(join(process.cwd(), "src/components/layout/Sidebar.tsx"), "utf8");
-    expect(sidebar).not.toMatch(/bg-danger/);
+  it.each([[":root"], [".dark"]] as const)("o vermelho dos avisos lê-se sobre a barra em %s", (bloco) => {
+    // O número do aviso é texto `danger` sobre a barra: mínimo de texto (AA).
+    expect(contraste(token(bloco, "danger"), token(bloco, "surface-sidebar"))).toBeGreaterThanOrEqual(AA);
   });
 });
 

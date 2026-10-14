@@ -7,11 +7,12 @@ import { Modal, Field } from "@/components/ui/Modal";
 import { toast } from "@/stores";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Plus, TicketPercent } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   getVouchers, criarVoucher, alterarVoucher, apagarVoucher,
   type Voucher,
 } from "@/services/marketingService";
+import { SectionHeader } from "@/components/ui/PageHeader";
 
 /**
  * Vouchers — os que existem mesmo.
@@ -183,7 +184,8 @@ export function Vouchers() {
       render: (v) => {
         const e = estadoDe(v);
         return (
-          <span title={e.ajuda} className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-help", e.tom)}>
+          <span title={e.ajuda} className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium cursor-help whitespace-nowrap", e.tom)}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
             {e.label}
           </span>
         );
@@ -193,11 +195,11 @@ export function Vouchers() {
       key: "acoes",
       label: "",
       render: (v) => (
-        <div className="flex items-center gap-3">
-          <button onClick={() => alternar(v)} className={cn("text-xs hover:underline", v.active ? "text-text-secondary" : "text-success")}>
+        <div className="flex items-center justify-end gap-0.5">
+          <button onClick={() => alternar(v)} className={cn("btn-ghost text-xs px-2 py-1", !v.active && "text-success hover:text-success")}>
             {v.active ? "Desligar" : "Ligar"}
           </button>
-          <button onClick={() => apagar(v)} className="text-xs text-danger hover:underline">Apagar</button>
+          <button onClick={() => apagar(v)} className="btn-ghost text-xs px-2 py-1 hover:text-danger md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100">Apagar</button>
         </div>
       ),
     },
@@ -214,22 +216,21 @@ export function Vouchers() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-text-secondary inline-flex items-center gap-2">
-          <TicketPercent className="h-4 w-4 text-piquet-600" />
-          Códigos que o cliente escreve na app — leem e escrevem no Laravel.
-        </p>
-        <button onClick={() => setAberto(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo voucher</button>
-      </div>
+      <SectionHeader
+        title="Vouchers"
+        description="Códigos que o cliente escreve na app — leem e escrevem no Laravel."
+        aside={<button onClick={() => setAberto(true)} className="btn-primary text-sm"><Plus className="h-4 w-4" /> Novo voucher</button>}
+        className="mb-0"
+      />
 
       {error && (
-        <p className="rounded-xl border-l-[3px] border-l-danger bg-danger-light/40 px-3 py-2 text-sm text-danger">
+        <p className="aviso aviso-perigo text-danger">
           {error || "Não foi possível ler os vouchers."}
         </p>
       )}
 
       {!temTotais && vouchers.length > 0 && (
-        <p className="rounded-lg bg-surface-subtle px-3 py-2 text-[11px] text-text-muted">
+        <p className="text-xs text-text-muted">
           A coluna do desconto dado aparece quando o backend passar a somá-lo (PR dos totais dos vouchers). Até lá
           fica-se pelas utilizações, que são reais.
         </p>
@@ -282,8 +283,8 @@ export function Vouchers() {
                   title={t.ajuda}
                   onClick={() => alternarTipo(t.id)}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                    tipoLigado(t.id) ? "bg-piquet text-white" : "bg-surface-subtle text-text-secondary hover:text-text-primary",
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ring-1 ring-inset",
+                    tipoLigado(t.id) ? "bg-piquet/20 text-text-primary ring-piquet" : "bg-surface text-text-secondary ring-surface-border hover:text-text-primary",
                   )}
                 >
                   {t.label}

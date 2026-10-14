@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Bell, ArrowRight, CheckCircle2, RefreshCw, Clock, Undo2 } from "lucide-react";
-import { PriorityBadge, AlertTypeBadge } from "@/components/ui/StatusBadge";
+import { ArrowRight, CheckCircle2, RefreshCw, Clock, Undo2 } from "lucide-react";
+import { AlertTypeBadge } from "@/components/ui/StatusBadge";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getAlerts, adiarAlerta, reporAlerta, dispensarAlerta, amanhaAsNove } from "@/services/supportService";
 import { podeDispensar } from "@/components/hoje/PrecisaDeTi";
@@ -59,6 +59,9 @@ const PRAZOS: Array<{ label: string; dias: number }> = [
  * (a Visão Geral já tem o dela) -- fica só a frase e o "Verificar agora".
  * `onTotal` diz à Visão Geral quantos há, para o número no separador.
  */
+/** O ponto ao lado do título de cada grupo, na cor da urgência. */
+const PONTO: Record<string, string> = { critica: "bg-danger", alta: "bg-warning", media: "bg-info", baixa: "bg-surface-strong" };
+
 export default function AlertasPage({ embutido = false, onTotal }: { embutido?: boolean; onTotal?: (n: number) => void } = {}) {
   const { data, loading, refetch } = useAsyncData(() => getAlerts(1, 200), []);
   const alertas = useMemo(() => data?.data ?? [], [data]);
@@ -115,8 +118,6 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
           </div>
         ) : (
           <PageHeader
-            icon={Bell}
-            eyebrow="Operação"
             title="Alertas"
             subtitle="O que precisa de ação, apurado a partir dos dados reais do negócio"
             actions={
@@ -129,7 +130,7 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
         )}
 
         {fontesEmFalta.length > 0 && (
-          <div className="rounded-xl border-l-[3px] border-l-warning bg-warning-light/40 px-4 py-3 text-sm">
+          <div className="aviso aviso-atencao px-4 py-3 text-sm">
             <p className="font-medium text-text-primary">Verificação incompleta</p>
             <p className="text-text-secondary">
               Não foi possível consultar: {fontesEmFalta.join(", ")}. Podem existir alertas por mostrar.
@@ -153,24 +154,25 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
         )}
 
         {porGrupo.map((g) => (
-          <section key={g.p} className="space-y-2">
-            <div className="flex items-baseline gap-2">
-              <h2 className="font-semibold text-text-primary">{g.titulo}</h2>
-              <span className="text-xs text-text-muted">
+          <section key={g.p}>
+            <div className="mb-2 flex items-baseline gap-2">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full self-center", PONTO[g.p])} aria-hidden />
+              <h2 className="text-[15px] font-semibold text-text-primary">{g.titulo}</h2>
+              <span className="text-[13px] text-text-muted">
                 {g.itens.length} {g.itens.length === 1 ? "alerta" : "alertas"}
                 {g.nota && ` · ${g.nota}`}
               </span>
             </div>
-            <div className="space-y-2">
+            {/* Uma lista por urgência, num cartão só: a urgência já está no
+                título do grupo, não precisa de se repetir em cada linha. */}
+            <ul className="card divide-y divide-surface-border">
               {g.itens.map((a) => {
                 const d = destino(a);
                 return (
-                  <div
+                  <li
                     key={a.id}
                     className={cn(
-                      "card p-4 flex flex-col sm:flex-row sm:items-center gap-3 relative",
-                      a.priority === "critica" && "border-l-[3px] border-l-danger",
-                      a.priority === "alta" && "border-l-[3px] border-l-warning",
+                      "px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 relative",
                       aGravar === a.id && "opacity-60",
                     )}
                   >
@@ -181,32 +183,34 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
                     */}
                     <Link href={d.href} className="min-w-0 flex-1 group">
                       <div className="flex flex-wrap items-center gap-2">
-                        <PriorityBadge priority={a.priority} />
+                        <p className="font-medium text-text-primary group-hover:text-piquet-700 transition-colors">{a.title}</p>
                         <AlertTypeBadge type={a.type} />
-                        <span className="text-[11px] text-text-muted">{formatDateTime(a.createdAt)}</span>
                       </div>
-                      <p className="mt-1.5 font-medium text-text-primary group-hover:text-piquet-700 transition-colors">{a.title}</p>
-                      <p className="text-sm text-text-secondary">{a.description}</p>
-                      <p className="text-xs text-text-muted mt-1">→ {a.recommendedAction}</p>
+                      <p className="mt-0.5 text-[13px] text-text-secondary">{a.description}</p>
+                      <p className="mt-1 text-xs text-text-muted">
+                        {a.recommendedAction}
+                        <span className="mx-1.5">·</span>
+                        {formatDateTime(a.createdAt)}
+                      </p>
                     </Link>
-                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                    <div className="flex items-center gap-1 shrink-0 self-start sm:self-auto">
                       <div className="relative">
                         <button
                           onClick={() => setMenuAberto(menuAberto === a.id ? null : a.id)}
                           disabled={aGravar === a.id}
-                          className="btn-secondary inline-flex items-center gap-1.5"
+                          className="btn-ghost text-[13px]"
                           title="Voltar a mostrar mais tarde"
                         >
                           <Clock className="h-3.5 w-3.5" />
                           Adiar
                         </button>
                         {menuAberto === a.id && (
-                          <div className="absolute right-0 top-full mt-1 z-20 w-44 card p-1 shadow-elevated">
+                          <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-xl border border-surface-border bg-surface p-1 shadow-elevated">
                             {PRAZOS.map((p) => (
                               <button
                                 key={p.dias}
                                 onClick={() => adiar(a.id, p.dias)}
-                                className="w-full text-left px-3 py-1.5 text-sm rounded-lg hover:bg-surface-muted"
+                                className="w-full text-left px-2.5 py-1.5 text-sm rounded-md hover:bg-surface-subtle"
                               >
                                 {p.label}
                               </button>
@@ -218,21 +222,21 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
                         <button
                           onClick={() => setADispensar(a)}
                           disabled={aGravar === a.id}
-                          className="btn-secondary"
+                          className="btn-ghost text-[13px]"
                           title="Tirar da fila de vez, com o motivo"
                         >
                           Não é preciso
                         </button>
                       )}
-                      <Link href={d.href} className="btn-secondary inline-flex items-center gap-1.5">
+                      <Link href={d.href} className="btn-secondary py-1.5 text-[13px] ml-1">
                         {d.label}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </section>
         ))}
 
@@ -249,7 +253,7 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
             {verAdiados && (
               <div className="space-y-2">
                 {adiados.map((a) => (
-                  <div key={a.id} className="card p-3 flex items-center gap-3 opacity-80">
+                  <div key={a.id} className="card px-4 py-3 flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary truncate">{a.title}</p>
                       {/* "Não é preciso" não tem data de volta: mostra-se porquê e quem decidiu. */}
@@ -261,7 +265,7 @@ export default function AlertasPage({ embutido = false, onTotal }: { embutido?: 
                     <button
                       onClick={() => repor(a.id)}
                       disabled={aGravar === a.id}
-                      className="btn-secondary inline-flex items-center gap-1.5 shrink-0"
+                      className="btn-ghost text-[13px] shrink-0"
                     >
                       <Undo2 className="h-3.5 w-3.5" />
                       Mostrar já
