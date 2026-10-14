@@ -140,30 +140,31 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 rounded-lg hover:bg-surface-muted"
+        className="relative p-2 rounded-lg text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
         aria-label={`Notificações${unread > 0 ? ` (${unread} por ler)` : ""}`}
+        aria-expanded={open}
       >
-        <Bell className="h-5 w-5 text-text-secondary" />
+        <Bell className="h-[18px] w-[18px]" />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-danger text-danger-on rounded-full text-[11px] font-bold flex items-center justify-center">
+          <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 bg-danger text-danger-on rounded-full text-[11px] font-semibold flex items-center justify-center ring-2 ring-surface-muted tabular-nums">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-80 bg-surface border border-surface-border rounded-lg shadow-elevated z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-surface-border">
+        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-24px)] bg-surface border border-surface-border rounded-xl shadow-elevated z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-surface-border">
             <p className="text-sm font-semibold">Notificações</p>
             {unread > 0 && (
-              <button onClick={markAllRead} className="text-xs text-piquet-600 hover:underline inline-flex items-center gap-1">
-                <Check className="h-3 w-3" /> Marcar todas lidas
+              <button onClick={markAllRead} className="btn-ghost text-xs px-2 py-1">
+                <Check className="h-3.5 w-3.5" /> Marcar todas como lidas
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-[420px] overflow-y-auto p-1">
             {notifications.length === 0 && (
-              <p className="px-3 py-6 text-sm text-text-muted text-center">Sem notificações</p>
+              <p className="px-3 py-8 text-sm text-text-muted text-center">Sem notificações.</p>
             )}
             {notifications.map((n) => {
               const Icon = KIND_ICON[n.kind] ?? Info;
@@ -175,20 +176,17 @@ export function NotificationBell() {
                     setOpen(false);
                     if (n.href) router.push(n.href);
                   }}
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-surface-muted border-b border-surface-border/60 last:border-0",
-                    !n.read && "bg-piquet/5"
-                  )}
+                  className="w-full text-left px-2.5 py-2.5 flex gap-2.5 rounded-lg hover:bg-surface-subtle transition-colors"
                 >
-                  <span className={cn("mt-0.5 flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center", KIND_TONE[n.kind] ?? KIND_TONE.sistema)}>
-                    <Icon className="h-4 w-4" />
+                  <span className={cn("mt-0.5 flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center", KIND_TONE[n.kind] ?? KIND_TONE.sistema)}>
+                    <Icon className="h-3.5 w-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-text-primary truncate">{n.title}</span>
-                      {!n.read && <span className="h-2 w-2 bg-piquet rounded-full flex-shrink-0" />}
+                      <span className={cn("text-[13px] truncate", n.read ? "text-text-secondary" : "font-medium text-text-primary")}>{n.title}</span>
+                      {!n.read && <span className="h-2 w-2 bg-piquet rounded-full flex-shrink-0" aria-label="Por ler" />}
                     </span>
-                    <span className="block text-xs text-text-secondary line-clamp-2">{n.body}</span>
+                    <span className="block text-xs text-text-muted line-clamp-2">{n.body}</span>
                     <span className="block text-[11px] text-text-muted mt-0.5">{timeAgo(n.at)}</span>
                   </span>
                 </button>

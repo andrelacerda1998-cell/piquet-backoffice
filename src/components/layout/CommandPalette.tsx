@@ -317,7 +317,7 @@ export function CommandPalette() {
       onClick={() => setCommandOpen(false)}
     >
       <div
-        className="w-full max-w-xl card overflow-hidden shadow-elevated"
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-surface-border bg-surface shadow-elevated"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onListKey}
         role="dialog"
@@ -325,19 +325,19 @@ export function CommandPalette() {
         aria-label="Pesquisar e comandos"
       >
         <div className="flex items-center gap-2 px-4 border-b border-surface-border">
-          {modoComando ? <ChevronRight className="h-4 w-4 text-piquet-600 shrink-0" /> : <Search className="h-4 w-4 text-text-muted shrink-0" />}
+          {modoComando ? <ChevronRight className="h-4 w-4 text-text-primary shrink-0" /> : <Search className="h-4 w-4 text-text-muted shrink-0" />}
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActive(0); }}
             placeholder="Pedido, cliente, técnico, telefone, NIF… ou > para comandos"
-            className="w-full bg-transparent py-3.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+            className="w-full bg-transparent py-4 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none"
             aria-label="Pesquisar ou escrever um comando"
           />
           <kbd className="hidden sm:block text-[11px] font-medium text-text-muted border border-surface-border rounded px-1.5 py-0.5">ESC</kbd>
         </div>
 
-        <div ref={listaRef} className="max-h-[60vh] sm:max-h-[26rem] overflow-y-auto py-1">
+        <div ref={listaRef} className="max-h-[60vh] sm:max-h-[26rem] overflow-y-auto p-1.5">
           {vazio ? (
             <p className="px-4 py-6 text-center text-sm text-text-muted">
               {searching ? "A pesquisar…"
@@ -348,7 +348,7 @@ export function CommandPalette() {
           ) : (
             grupos.map((g) => (
               <div key={g.titulo} className="py-1">
-                <p className="px-4 pt-2.5 pb-1 text-xs font-medium text-text-muted">{g.titulo}</p>
+                <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-text-muted">{g.titulo}</p>
                 {g.itens.map((c) => {
                   indice += 1;
                   const i = indice;
@@ -359,19 +359,19 @@ export function CommandPalette() {
                       onMouseEnter={() => setActive(i)}
                       onClick={() => runAt(i)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-2 text-left text-sm transition-colors",
-                        i === active ? "bg-piquet/15 text-text-primary" : "text-text-secondary",
+                        "w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                        i === active ? "bg-surface-subtle text-text-primary" : "text-text-secondary",
                       )}
                     >
                       {g.titulo === "Abertos recentemente"
-                        ? <History className={cn("h-4 w-4 shrink-0", i === active ? "text-piquet-600" : "text-text-muted")} />
-                        : <c.Icon className={cn("h-4 w-4 shrink-0", i === active ? "text-piquet-600" : "text-text-muted")} />}
+                        ? <History className={cn("h-4 w-4 shrink-0", i === active ? "text-text-primary" : "text-text-muted")} />
+                        : <c.Icon className={cn("h-4 w-4 shrink-0", i === active ? "text-text-primary" : "text-text-muted")} />}
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium text-text-primary truncate">{c.label}</span>
                         {c.sublabel && <span className="block text-xs text-text-muted truncate">{c.sublabel}</span>}
                       </span>
                       {c.estado && (
-                        <span className={cn("hidden sm:inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", toneClass(c.tom ?? "neutral"))}>
+                        <span className={cn("hidden sm:inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap", toneClass(c.tom ?? "neutral"))}>
                           {c.estado}
                         </span>
                       )}

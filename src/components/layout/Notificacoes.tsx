@@ -118,12 +118,12 @@ export function Notificacoes() {
       </button>
 
       {ligado && (
-        <button onClick={testar} disabled={aTrabalhar} className="text-sm text-piquet-700 hover:underline disabled:opacity-60">
+        <button onClick={testar} disabled={aTrabalhar} className="btn-ghost text-sm disabled:opacity-60">
           Enviar um teste
         </button>
       )}
 
-      <p className="text-xs text-text-secondary w-full">
+      <p className="text-xs text-text-muted w-full">
         {ligado
           ? "Este dispositivo recebe avisos de pedidos urgentes, faltas de técnicos e tickets novos."
           : "Ligadas, avisam-te quando alguém fica à espera — sem teres de abrir o backoffice."}{" "}
@@ -135,8 +135,8 @@ export function Notificacoes() {
 
 function Caixa({ tom, titulo, children }: { tom: "info" | "aviso"; titulo: string; children: React.ReactNode }) {
   return (
-    <div className={cn("rounded-xl border-l-[3px] px-3 py-2", tom === "aviso" ? "border-l-warning bg-warning-light/30" : "border-l-piquet bg-surface-subtle")}>
-      <p className={cn("text-sm font-semibold", tom === "aviso" ? "text-warning" : "text-text-primary")}>{titulo}</p>
+    <div className={cn("aviso py-2.5", tom === "aviso" ? "aviso-atencao" : "aviso-info")}>
+      <p className="font-medium">{titulo}</p>
       <p className="text-xs text-text-secondary mt-0.5">{children}</p>
     </div>
   );
