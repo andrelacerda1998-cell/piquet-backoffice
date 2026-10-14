@@ -1,4 +1,5 @@
 import { todasAsPaginas } from "@/lib/paginas";
+import type { ContagemPelasCidades } from "@/lib/pelasCidades";
 import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import type { PaginatedResult } from "@/types";
 
@@ -154,15 +155,23 @@ export async function restoreVendor(id: number): Promise<RealVendor> {
 }
 
 /**
- * Marca o subutilizador AT do técnico como validado (ou retira a validação).
- * Depende de `PUT /v1/admin/vendors/{id}/at-validation` no Laravel — enquanto
- * essa rota não existir, o erro devolvido diz-o de forma explícita, em vez de
+ * Valida o subutilizador AT do técnico, ou retira a validação.
+ *
+ * Validar não é um carimbo: o Laravel testa as credenciais no InvoiceXpress
+ * (como o "Validar AT" do Filament) e responde com o resultado. Se forem
+ * recusadas, vem um erro com a razão, e a AT fica por validar.
+ *
+ * Depende de `PUT /v1/admin/vendors/{id}/at-validation` (backend#185).
+ * Enquanto essa rota não estiver publicada, o erro diz isso mesmo, em vez de
  * fingir que gravou.
  */
-export async function setVendorAtValidation(id: number, valid: boolean): Promise<void> {
-  await apiPut(`/technicians/${id}/at-validation`, { valid }, () => {
+export async function setVendorAtValidation(
+  id: number,
+  valid: boolean,
+): Promise<{ at_valid: boolean; at_validated_at: string | null }> {
+  return apiPut<{ at_valid: boolean; at_validated_at: string | null }>(`/technicians/${id}/at-validation`, { valid }, () => {
     throw new Error("Validar o subutilizador AT precisa da API de admin do Laravel configurada.");
-  });
+  }).then((r) => r.data);
 }
 
 /**
@@ -342,12 +351,22 @@ export async function getVendorMetrics(): Promise<VendorMetrics> {
 }
 
 /**
- * Técnicos por categoria -- conta cada vendor nas áreas de operação
- * (qualificação/oferta registada) para que está registado, não trabalho
- * realmente feito.
+ * Técnicos por categoria.
+ *
+ * - `value`: registados, em qualquer estado -- pelos tipos de serviço que
+ *   fazem ou pela ligação direta à categoria (a regra do filtro da lista).
+ * - `podem_trabalhar`: fazem um tipo de serviço da categoria (é por aí que o
+ *   matching escolhe) e já podem trabalhar; falta-lhes só estar Online. Só vem
+ *   do backend a partir do backend#185 -- até lá, `undefined`.
  */
+export interface TecnicosPorCategoria {
+  name: string;
+  value: number;
+  podem_trabalhar?: number;
+}
+
 export async function getVendorsByCategory() {
-  return apiGet<Array<{ name: string; value: number }>>("/technicians/by-category", () => []).then((r) => r.data);
+  return apiGet<TecnicosPorCategoria[]>("/technicians/by-category", () => []).then((r) => r.data);
 }
 
 /**
@@ -372,11 +391,26 @@ export async function getTopVendors(limit = 10) {
 }
 
 /**
- * Procura vs oferta por zona -- oferta = zonas de cobertura declaradas
- * (AllowedZone); procura = pedidos de serviço reais nessa cidade.
+ * Procura vs oferta por cidade, as 20 com mais pedidos.
+ *
+ * - `procura`: pedidos de serviço reais na cidade.
+ * - `oferta`: quem a marcou no questionário antigo da app, que parou no tempo.
+ * - `oferta_cidades`, `podem_trabalhar`, `contagem`: quem recebe um pedido no
+ *   centro da cidade, pelas cidades escolhidas na app (ver lib/pelasCidades).
+ *   Só vêm do backend a partir do backend#185.
  */
+export interface ProcuraEOferta {
+  name: string;
+  procura: number;
+  oferta: number;
+  ratio: number;
+  oferta_cidades?: number;
+  podem_trabalhar?: number;
+  contagem?: ContagemPelasCidades;
+}
+
 export async function getVendorCoverage() {
-  return apiGet<Array<{ name: string; procura: number; oferta: number; ratio: number }>>("/technicians/coverage", () => []).then((r) => r.data);
+  return apiGet<ProcuraEOferta[]>("/technicians/coverage", () => []).then((r) => r.data);
 }
 
 /**

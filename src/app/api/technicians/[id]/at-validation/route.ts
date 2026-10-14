@@ -7,9 +7,14 @@ import { ApiError } from "@/services/http";
  * subutilizador do Portal das Finanças que o técnico deu à Piquet para emitir
  * faturas em nome dele.
  *
- * Depende de `PUT /v1/admin/vendors/{id}/at-validation` no Laravel. Se essa
- * rota ainda não existir, devolvemos uma mensagem que o diz claramente — o
- * backoffice não deve fingir que gravou uma validação fiscal.
+ * Validar testa as credenciais no InvoiceXpress, como o "Validar AT" do
+ * Filament: se forem recusadas, o Laravel responde com a razão (409, 422 ou
+ * 502) e a mensagem passa tal e qual.
+ *
+ * Depende de `PUT /v1/admin/vendors/{id}/at-validation` no Laravel
+ * (backend#185). Se essa rota ainda não existir, devolvemos uma mensagem que
+ * o diz claramente — o backoffice não deve fingir que gravou uma validação
+ * fiscal.
  */
 export const PUT = withStaff(async (req, { params }) => {
   const body = (await req.json().catch(() => ({}))) as { valid?: boolean };

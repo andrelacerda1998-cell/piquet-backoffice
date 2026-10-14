@@ -261,6 +261,12 @@ tiveres na base de dados, não é preciso renomear nada.
 
 ### 2. Criar `PUT /v1/admin/vendors/{id}/at-validation`
 
+> **Feito no backend#185 (14/10/2026).** Validar testa as credenciais no
+> InvoiceXpress, como o "Validar AT" do Filament (é a mesma classe,
+> `ValidacaoDaAt`), e responde 409/422/502 com a razão quando não dá. Retirar
+> mantém a data da última validação. Quem carregou no botão fica no Histórico
+> da equipa ("Mudou a validação AT"). O pedido original fica abaixo.
+
 ```jsonc
 // body
 { "valid": true }   // ou false, para retirar a validação
@@ -278,6 +284,13 @@ Assim que existir, funciona sem mais alterações do lado do Next.
 ---
 
 ## Cobertura por zona — falta a morada do técnico ⚠️
+
+> **Resolvido de outra forma no backend#185 (14/10/2026).** A app do técnico
+> passou a gravar as cidades onde ele trabalha (`/vendor/cities` →
+> `vendor_available_cities`), e é por elas que o matching distribui os pedidos.
+> As Zonas, a Cobertura e a procura vs oferta contam agora por essas cidades,
+> com a regra do matching, e dizem quantos já podem trabalhar. Ver
+> `src/lib/pelasCidades.ts`. O que está abaixo é o histórico de agosto.
 
 Medido na API real (13/08/2026): **a `oferta` vem a zero em todas as cidades**,
 enquanto a procura é real e substancial:
