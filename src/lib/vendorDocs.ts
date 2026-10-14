@@ -77,15 +77,30 @@ export function missingCount(states: Record<RequiredDocKey, DocState> | undefine
  *
  * Por isso: "validado" exige `at_validated_at`. Com a flag ligada mas sem data,
  * o estado é "por confirmar" — não se mente com um ✓.
+ *
+ * E a data sozinha também não chega: é a da ÚLTIMA vez que funcionou. Quando o
+ * InvoiceXpress recusa as credenciais (ao validar ou ao faturar) ou a equipa
+ * carrega em "Retirar AT", o backend desliga a flag e guarda a data — o
+ * Filament mostra-a como "Última vez OK". Contar só a data dava "✓ Validado" a
+ * quem já não consegue faturar (visto a 14/10/2026, no ensaio do "Retirar AT").
  */
 export type AtState = "validado" | "por_validar";
 
 /**
- * Ou está validado (há data), ou está por validar. Sem meio-termo: a flag
- * `at_valid` ligada sem data não é validação nenhuma, é o valor de origem.
+ * Validado = a flag ligada E a data. Sem meio-termo: a flag sem data é o valor
+ * de origem, e a data sem a flag é só a última vez que funcionou.
  */
 export function atValidationState(v: { at_valid: boolean; at_validated_at: string | null }): AtState {
-  return v.at_validated_at ? "validado" : "por_validar";
+  return v.at_valid && v.at_validated_at ? "validado" : "por_validar";
+}
+
+/**
+ * A data a mostrar ao lado do estado, e o que ela quer dizer. Por validar com
+ * data é quem já esteve validado e deixou de estar.
+ */
+export function atDateLabel(v: { at_valid: boolean; at_validated_at: string | null }): string | null {
+  if (!v.at_validated_at) return null;
+  return atValidationState(v) === "validado" ? "" : "última vez OK a ";
 }
 
 /** `true` quando o registo diz válido mas ninguém o validou — útil para explicar. */
@@ -95,7 +110,7 @@ export function atFlagWithoutProof(v: { at_valid: boolean; at_validated_at: stri
 
 export const AT_STATE_UI: Record<AtState, { symbol: string; tone: string; label: string; hint: string }> = {
   validado: { symbol: "✓", tone: "text-success", label: "Validado", hint: "Subutilizador conferido — há registo da data de validação." },
-  por_validar: { symbol: "—", tone: "text-text-muted", label: "Por validar", hint: "Sem validação registada do subutilizador AT." },
+  por_validar: { symbol: "—", tone: "text-text-muted", label: "Por validar", hint: "Sem validação em vigor do subutilizador AT." },
 };
 
 /** Aparência de cada estado na tabela (símbolo + tom + descrição). */

@@ -24,7 +24,7 @@ import { getMotivos } from "@/services/acoesDaEquipaService";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { WhatsappConversa } from "@/components/ui/WhatsappConversa";
 import { ETAPA_LABEL, ESPERA_POR_NOS, type Etapa } from "@/lib/onboardingTecnicos";
-import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, AT_STATE_UI } from "@/lib/vendorDocs";
+import { REQUIRED_DOCS, DOC_STATE_UI, indexDocsByVendor, missingCount, classifyDocument, atValidationState, atDateLabel, AT_STATE_UI } from "@/lib/vendorDocs";
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatRating } from "@/lib/formatters";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -1189,7 +1189,7 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
                       ["Nome da empresa", v.company_name ?? "—"],
                       ["Subutilizador AT", utilizador ? <span key="at-user" className="font-mono">{utilizador}</span> : "—"],
                       ["AT", <span key="at" className={atUi.tone}>{atUi.symbol} {atUi.label}
-                        {v.at_validated_at && <span className="text-text-muted"> · {formatDate(v.at_validated_at)}</span>}</span>],
+                        {atDateLabel(v) !== null && <span className="text-text-muted"> · {atDateLabel(v)}{formatDate(v.at_validated_at!)}</span>}</span>],
                       ["NIF", v.nif || "—"],
                       ["Morada fiscal", [morada, v.postal_code, v.city].filter(Boolean).join(", ") || "—"],
                       ["IBAN", v.iban ? <span key="iban" className="font-mono">{v.iban}</span> : "—"],
