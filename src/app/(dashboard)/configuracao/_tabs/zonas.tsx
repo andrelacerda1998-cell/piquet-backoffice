@@ -68,8 +68,14 @@ function ZonasContent() {
   const columns: Column<AllowedZone>[] = [
     { key: "city", label: "Cidade", sortable: true, render: (r) => <span className="font-medium">{r.city}</span> },
     { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
-    { key: "vendors_count", label: "Técnicos", sortable: true, className: "text-right", render: (r) => (
-      <span className={r.vendors_count === 0 ? "font-medium text-danger tabular-nums" : "tabular-nums"}>{r.vendors_count}</span>
+    /*
+      Quem marcou a zona no questionário antigo da app do técnico
+      (`vendor_allowed_zones`). A app já não o mostra -- grava as cidades por
+      /vendor/cities --, por isso este número parou no tempo e NÃO é quem
+      recebe pedidos aqui. Chamava-se "Técnicos", e lia-se como cobertura.
+    */
+    { key: "vendors_count", label: "No questionário", sortable: true, className: "text-right", render: (r) => (
+      <span className="tabular-nums text-text-secondary">{r.vendors_count}</span>
     ) },
     {
       key: "actions", label: "",
@@ -88,7 +94,7 @@ function ZonasContent() {
       <section>
         <SectionHeader
           title="Zonas"
-          description={`${zones.length} cidades onde a Piquet aceita pedidos. Quem é convidado para cada pedido depende das cidades de cada técnico.`}
+          description={`${zones.length} cidades onde a Piquet aceita pedidos. Quem é convidado para cada pedido depende das cidades que cada técnico escolhe na app; «No questionário» conta só quem marcou a zona no questionário antigo, que a app já não mostra.`}
           aside={
             <>
               <DemoBadge endpoint="/allowed-zones" />

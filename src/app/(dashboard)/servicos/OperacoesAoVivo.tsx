@@ -150,7 +150,12 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
 
         {/* Oferta */}
         <section>
-          <SectionHeader title="Oferta por categoria" icon={Users} aside={<>Online · prontos</>} />
+          {/* Só quem está Online agora, e pela categoria dos tipos de serviço que
+              faz (é por eles que o matching convida). Por isso fica tão abaixo
+              dos "registados por categoria" do Mercado › Cobertura. */}
+          <SectionHeader title="Oferta por categoria" icon={Users}
+            description="Só quem está Online agora, pela categoria dos serviços que faz"
+            aside={<>Online · prontos</>} />
           <div className="card p-4 space-y-3">
             {data.oferta.por_area.length === 0 ? (
               <p className="text-sm text-text-muted">Nenhum técnico Online.</p>
