@@ -5,14 +5,16 @@ import Link from "next/link";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
-import { MetricCard } from "@/components/ui/MetricCard";
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { Painel } from "@/components/ui/Painel";
+import { Barra } from "@/components/ui/Barra";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { LoadingState } from "@/components/ui/States";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getQuality, type Qualidade } from "@/services/extrasService";
-import { buildMetricValue } from "@/lib/calculations";
-import { formatDate, formatDateTime, formatCurrency } from "@/lib/formatters";
+import { useRouter } from "next/navigation";
+import { formatDate, formatDateTime, formatCurrency, formatRating } from "@/lib/formatters";
 import { getVendorNoShows, declareVendorNoShow, type NoShowService } from "@/services/noShowsService";
 import { toast } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -38,8 +40,19 @@ import { MOTIVO_MINIMO } from "@/lib/motivo";
   sempre foram reais.
 */
 
+/** O número do pedido, que abre o pedido. */
+function IdDoPedido({ id }: { id: number }) {
+  return (
+    <Link href={`/servicos/${id}`} onClick={(e) => e.stopPropagation()}
+      className="font-mono text-xs text-text-secondary hover:text-text-primary hover:underline">
+      #{id}
+    </Link>
+  );
+}
+
 export default function QualityPage() {
   const [tab, setTab] = useState("visao");
+  const router = useRouter();
   const { data: q, loading, error } = useAsyncData(() => getQuality(), []);
 
   // Faltas de técnicos — endpoint real do Laravel, sem mock: isto tira
@@ -82,7 +95,7 @@ export default function QualityPage() {
     : "—";
 
   const suspectedColumns: Column<NoShowService>[] = [
-    { key: "service_id", label: "Serviço", render: (r) => <span className="font-mono text-xs">#{r.service_id}</span> },
+    { key: "service_id", label: "Serviço", render: (r) => <IdDoPedido id={r.service_id} /> },
     { key: "service_type", label: "Tipo", render: (r) => <span className="font-medium">{r.service_type ?? "—"}</span> },
     { key: "when", label: "Marcado para", render: when },
     { key: "vendor", label: "Técnico", render: (r) => (
@@ -94,12 +107,12 @@ export default function QualityPage() {
     { key: "on_the_way", label: "A caminho?", render: (r) => r.on_the_way_at
       ? <span className="text-warning">{formatDateTime(r.on_the_way_at)}</span>
       : <span className="text-danger font-medium">Nunca saiu</span> },
-    { key: "penalty", label: "Penalização", render: (r) => <span className="whitespace-nowrap font-semibold">{formatCurrency(r.penalty_if_declared / 100)}</span> },
+    { key: "penalty", label: "Penalização", className: "text-right", render: (r) => <span className="whitespace-nowrap font-semibold tabular-nums">{formatCurrency(r.penalty_if_declared / 100)}</span> },
     { key: "acao", label: "", render: (r) => (
       <button
         disabled={declaringId === r.service_id}
         onClick={() => setADeclarar(r)}
-        className="btn-primary text-xs py-1 disabled:opacity-50 whitespace-nowrap"
+        className="btn-secondary text-xs px-2.5 py-1 disabled:opacity-50 whitespace-nowrap"
       >
         {declaringId === r.service_id ? "A registar…" : "Dar como falta"}
       </button>
@@ -107,20 +120,20 @@ export default function QualityPage() {
   ];
 
   const declaredColumns: Column<NoShowService>[] = [
-    { key: "service_id", label: "Serviço", render: (r) => <span className="font-mono text-xs">#{r.service_id}</span> },
+    { key: "service_id", label: "Serviço", render: (r) => <IdDoPedido id={r.service_id} /> },
     { key: "service_type", label: "Tipo", render: (r) => <span className="font-medium">{r.service_type ?? "—"}</span> },
     { key: "when", label: "Marcado para", render: when },
     { key: "vendor", label: "Técnico", render: (r) => r.vendor.name ?? "—" },
     { key: "customer", label: "Cliente", render: (r) => r.customer?.name ?? "—" },
     { key: "declared", label: "Declarada em", render: (r) => r.vendor_no_show_at ? formatDateTime(r.vendor_no_show_at) : "—" },
-    { key: "penalty", label: "Cobrado", render: (r) => <span className="whitespace-nowrap font-semibold text-danger">{formatCurrency((r.vendor_no_show_penalty ?? 0) / 100)}</span> },
+    { key: "penalty", label: "Cobrado", className: "text-right", render: (r) => <span className="whitespace-nowrap font-semibold tabular-nums text-danger">{formatCurrency((r.vendor_no_show_penalty ?? 0) / 100)}</span> },
   ];
 
   const lowRatedColumns: Column<Qualidade["porTecnico"][number]>[] = [
     { key: "nome", label: "Técnico", render: (r) => <span className="font-medium">{r.nome}</span> },
     { key: "media", label: "Média", render: (r) => (
-      <span className={cn("font-semibold", r.media < 3 ? "text-danger" : "text-warning")}>
-        {r.media.toFixed(2).replace(".", ",")}★
+      <span className={cn("font-semibold tabular-nums", r.media < 3 ? "text-danger" : "text-warning")}>
+        {formatRating(r.media)} ★
       </span>
     ) },
     { key: "avaliacoes", label: "Avaliações", render: (r) => (
@@ -131,9 +144,9 @@ export default function QualityPage() {
   ];
 
   const insatisfeitosColumns: Column<Qualidade["insatisfeitos"][number]>[] = [
-    { key: "id", label: "Serviço", render: (r) => <span className="font-mono text-xs">#{r.id}</span> },
+    { key: "id", label: "Serviço", render: (r) => <span className="font-mono text-xs text-text-secondary">#{r.id}</span> },
     { key: "nota", label: "Nota", render: (r) => (
-      <span className={cn("font-semibold", r.nota <= 1 ? "text-danger" : "text-warning")}>{r.nota}★</span>
+      <span className={cn("font-semibold", r.nota <= 1 ? "text-danger" : "text-warning")}>{r.nota} ★</span>
     ) },
     { key: "tecnico", label: "Técnico", render: (r) => r.tecnico ?? "—" },
     { key: "cliente", label: "Cliente", render: (r) => r.cliente ?? "—" },
@@ -154,8 +167,8 @@ export default function QualityPage() {
         {tab === "visao" && (
           <div className="space-y-6">
             {error && (
-              <div className="aviso aviso-perigo px-4 py-3">
-                <p className="text-sm font-semibold text-danger">Não foi possível ler as avaliações</p>
+              <div className="aviso aviso-perigo">
+                <p className="font-medium">Não foi possível ler as avaliações</p>
                 <p className="text-xs text-text-secondary mt-0.5">{error}</p>
               </div>
             )}
@@ -164,92 +177,61 @@ export default function QualityPage() {
 
             {q && (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="card p-4">
-                    <p className="text-xs text-text-secondary">Avaliação média</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">
-                      {q.media == null ? "—" : `${q.media.toFixed(2).replace(".", ",")}★`}
-                    </p>
-                    <p className="text-[11px] text-text-muted">
-                      {q.avaliados > 0 ? `de ${q.avaliados} avaliações` : "ainda sem avaliações"}
-                    </p>
-                  </div>
-                  <div className="card p-4">
-                    <p className="text-xs text-text-secondary">Serviços concluídos</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">{q.concluidos}</p>
-                    <p className="text-[11px] text-text-muted">no histórico todo</p>
-                  </div>
-                  <div className="card p-4">
-                    <p className="text-xs text-text-secondary">Avaliados</p>
-                    <p className="text-2xl font-bold text-text-primary tabular-nums">
-                      {q.concluidos > 0 ? `${Math.round((q.avaliados / q.concluidos) * 100)}%` : "—"}
-                    </p>
-                    <p className="text-[11px] text-text-muted">
-                      {q.concluidos - q.avaliados} sem nota do cliente
-                    </p>
-                  </div>
-                  <div className={cn("card p-4", q.insatisfeitos.length > 0 && "border-l-[3px] border-l-danger")}>
-                    <p className="text-xs text-text-secondary">1 ou 2 estrelas</p>
-                    <p className={cn("text-2xl font-bold tabular-nums", q.insatisfeitos.length > 0 ? "text-danger" : "text-text-primary")}>
-                      {q.insatisfeitos.length}
-                    </p>
-                    <p className="text-[11px] text-text-muted">clientes a quem correu mal</p>
-                  </div>
-                </div>
+                <StatGroup cols={4}>
+                  <Stat label="Avaliação média" value={q.media == null ? "—" : `${formatRating(q.media)} ★`}
+                    note={q.avaliados > 0 ? `de ${q.avaliados} avaliações` : "ainda sem avaliações"} />
+                  <Stat label="Serviços concluídos" value={q.concluidos} note="no histórico todo" />
+                  <Stat label="Avaliados" value={q.concluidos > 0 ? `${Math.round((q.avaliados / q.concluidos) * 100)}%` : "—"}
+                    note={`${q.concluidos - q.avaliados} sem nota do cliente`} />
+                  <Stat label="1 ou 2 estrelas" value={q.insatisfeitos.length} tone={q.insatisfeitos.length > 0 ? "mau" : undefined}
+                    note="clientes a quem correu mal" />
+                </StatGroup>
 
-                {/* Distribuição: barras simples, para zero ser visivelmente zero. */}
-                <div className="card p-4 space-y-3">
-                  <SectionHeader title="Como avaliaram" />
-                  {q.avaliados === 0 ? (
-                    <p className="py-4 text-center text-sm text-text-muted">
-                      Ainda ninguém avaliou um serviço. Não há média a mostrar — e inventar uma seria pior.
-                    </p>
-                  ) : (
-                    [...q.distribuicao].reverse().map((d) => (
-                      <div key={d.estrelas}>
-                        <div className="flex items-baseline justify-between text-sm">
-                          <span className="font-medium text-text-primary">{d.estrelas}★</span>
-                          <span className="tabular-nums text-text-secondary">
-                            {d.quantos} ({q.avaliados > 0 ? Math.round((d.quantos / q.avaliados) * 100) : 0}%)
-                          </span>
-                        </div>
-                        <div className="mt-1 h-2 rounded-full bg-surface-subtle overflow-hidden">
-                          <div
-                            className={cn("h-full rounded-full", d.estrelas <= 2 ? "bg-danger" : d.estrelas === 3 ? "bg-warning" : "bg-success")}
-                            style={{ width: `${q.avaliados > 0 ? (d.quantos / q.avaliados) * 100 : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Distribuição: barras simples, para zero ser visivelmente zero. */}
+                  <Painel titulo="Como avaliaram" corpo="p-4 space-y-3">
+                    {q.avaliados === 0 ? (
+                      <p className="py-4 text-center text-sm text-text-muted">
+                        Ainda ninguém avaliou um serviço. Não há média a mostrar — e inventar uma seria pior.
+                      </p>
+                    ) : (
+                      [...q.distribuicao].reverse().map((d) => (
+                        <Barra key={d.estrelas} nome={`${d.estrelas} ★`}
+                          valor={<>{d.quantos} <span className="text-text-muted">({Math.round((d.quantos / q.avaliados) * 100)}%)</span></>}
+                          largura={(d.quantos / q.avaliados) * 100}
+                          cor={d.estrelas <= 2 ? "bg-danger/80" : d.estrelas === 3 ? "bg-piquet/50" : "bg-success/80"} />
+                      ))
+                    )}
+                  </Painel>
 
-                {q.porMes.length > 0 && (
-                  <div>
-                    <SectionHeader title="Mês a mês" />
-                    <p className="text-xs text-text-secondary -mt-1 mb-3">
-                      Só aparecem meses com avaliações. Um mês a zero seria lido como uma queda, quando o que houve foi silêncio.
-                    </p>
-                    <DataTable
-                      columns={[
-                        { key: "mes", label: "Mês" },
-                        { key: "media", label: "Média", render: (m: Qualidade["porMes"][number]) => `${m.media.toFixed(2).replace(".", ",")}★` },
-                        { key: "avaliados", label: "Avaliações" },
-                      ]}
-                      data={q.porMes}
-                      keyField="mes"
-                    />
-                  </div>
-                )}
+                  {/* Só meses com avaliações: um mês a zero seria lido como uma
+                      queda, quando o que houve foi silêncio. */}
+                  <Painel titulo="Mês a mês" descricao="Só aparecem meses com avaliações" corpo="">
+                    {q.porMes.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-sm text-text-muted">Sem avaliações ainda.</p>
+                    ) : (
+                      <ul className="divide-y divide-surface-border">
+                        {q.porMes.map((m) => (
+                          <li key={m.mes} className="flex items-baseline justify-between gap-3 px-4 py-2 text-[13px]">
+                            <span className="text-text-secondary">{m.mes}</span>
+                            <span className="tabular-nums">
+                              <span className="font-semibold text-text-primary">{formatRating(m.media)} ★</span>
+                              <span className="text-text-muted"> · {m.avaliados} avaliaç{m.avaliados === 1 ? "ão" : "ões"}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Painel>
+                </div>
 
                 {q.insatisfeitos.length > 0 && (
-                  <div>
-                    <SectionHeader title="A quem correu mal" />
-                    <p className="text-xs text-text-secondary -mt-1 mb-3">
-                      Uma ou duas estrelas, do mais recente para trás. São estes os clientes que vale a pena contactar.
-                    </p>
-                    <DataTable columns={insatisfeitosColumns} data={q.insatisfeitos} keyField="id" />
-                  </div>
+                  <section>
+                    <SectionHeader title="A quem correu mal"
+                      description="Uma ou duas estrelas, do mais recente para trás. São estes os clientes que vale a pena contactar." />
+                    <DataTable columns={insatisfeitosColumns} data={q.insatisfeitos} keyField="id"
+                      onRowClick={(r) => router.push(`/servicos/${r.id}`)} />
+                  </section>
                 )}
               </>
             )}
@@ -258,44 +240,44 @@ export default function QualityPage() {
 
         {tab === "baixa" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <MetricCard title="Abaixo de 4★" metric={buildMetricValue(lowRated.length, lowRated.length)} hideDelta />
-              <MetricCard title="Abaixo de 3★" metric={buildMetricValue(below3, below3)} hideDelta />
-              <MetricCard title="Serviços com 1 ou 2★" metric={buildMetricValue(q?.insatisfeitos.length ?? 0, q?.insatisfeitos.length ?? 0)} hideDelta />
-            </div>
-            <p className="text-sm text-text-secondary">
+            <StatGroup cols={3}>
+              <Stat label="Abaixo de 4 ★" value={lowRated.length} />
+              <Stat label="Abaixo de 3 ★" value={below3} tone={below3 > 0 ? "mau" : undefined} />
+              <Stat label="Serviços com 1 ou 2 ★" value={q?.insatisfeitos.length ?? 0} />
+            </StatGroup>
+            <p className="text-[13px] text-text-muted max-w-3xl">
               Técnicos com média abaixo de 4 estrelas — candidatos a formação, acompanhamento ou suspensão.
               A média sai das notas reais dos serviços de cada um. Repara sempre no número de avaliações antes de
               agir: duas estrelas de um cliente só não é o mesmo que duas estrelas de trinta.
             </p>
-            <DataTable columns={lowRatedColumns} data={lowRated} keyField="nome" emptyMessage="Nenhum técnico abaixo de 4★ 🎉" />
+            <DataTable columns={lowRatedColumns} data={lowRated} keyField="nome" emptyMessage="Nenhum técnico abaixo de 4 ★ 🎉" />
           </div>
         )}
 
         {tab === "faltas" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <MetricCard title="Suspeitas por rever" metric={buildMetricValue(noShows?.suspected.length ?? 0, noShows?.suspected.length ?? 0)} hideDelta />
-              <MetricCard title="Faltas declaradas" metric={buildMetricValue(noShows?.declared.length ?? 0, noShows?.declared.length ?? 0)} hideDelta />
-              <MetricCard title="Penalização" metric={buildMetricValue(Math.round((noShows?.penalty_ratio ?? 0.5) * 100), Math.round((noShows?.penalty_ratio ?? 0.5) * 100))} hideDelta format="percent" />
-            </div>
+            <StatGroup cols={3}>
+              <Stat label="Suspeitas por rever" value={noShows?.suspected.length ?? 0}
+                tone={(noShows?.suspected.length ?? 0) > 0 ? "mau" : undefined} />
+              <Stat label="Faltas declaradas" value={noShows?.declared.length ?? 0} />
+              <Stat label="Penalização" value={`${Math.round((noShows?.penalty_ratio ?? 0.5) * 100)}%`} note="do que o técnico ia receber" />
+            </StatGroup>
 
-            <div>
-              <h3 className="font-semibold mb-1">Suspeitas de falta</h3>
-              <p className="text-sm text-text-secondary mb-3">
+            <section>
+              <SectionHeader title="Suspeitas de falta" description={<>
                 Serviços cuja hora passou e o técnico nunca marcou &quot;Cheguei&quot; (últimos 7 dias). Antes de dar como falta, liga ao técnico e ao cliente:
                 metade destes casos é o cliente que não estava em casa ou uma morada errada — e a penalização não se desfaz.
-              </p>
+              </>} />
               <DataTable columns={suspectedColumns} data={noShows?.suspected ?? []} keyField="service_id" emptyMessage="Nenhuma suspeita por rever 🎉" />
-            </div>
+            </section>
 
-            <div>
-              <h3 className="font-semibold mb-1">Faltas declaradas</h3>
-              <p className="text-sm text-text-secondary mb-3">
-                O técnico foi cobrado em metade do que ia receber, o serviço cancelado e o cliente reembolsado. As contestações chegam como tickets em <Link href="/suporte" className="text-piquet-700 hover:underline">Suporte</Link>, com o número do serviço no assunto.
-              </p>
+            <section>
+              <SectionHeader title="Faltas declaradas" description={<>
+                O técnico foi cobrado em metade do que ia receber, o serviço cancelado e o cliente reembolsado. As contestações chegam como tickets em{" "}
+                <Link href="/suporte" className="font-medium text-text-primary underline decoration-surface-strong underline-offset-2 hover:decoration-text-primary">Suporte</Link>, com o número do serviço no assunto.
+              </>} />
               <DataTable columns={declaredColumns} data={noShows?.declared ?? []} keyField="service_id" emptyMessage="Sem faltas declaradas" />
-            </div>
+            </section>
           </div>
         )}
       </div>
