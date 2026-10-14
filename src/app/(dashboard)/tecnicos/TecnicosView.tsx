@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 import { Segmentado } from "@/components/ui/Segmentado";
@@ -197,7 +197,7 @@ function ResumoDoKyc({ itens, nota }: { itens: Array<{ id: string; rotulo: strin
   );
 }
 
-export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
+function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
   const { page, setPage, pageSize, search, setSearch } = usePagination();
   const debouncedSearch = useDebouncedValue(search);
   // ?tab=aprovacoes — deep-link vindo dos avisos da Visão executiva.
@@ -1422,5 +1422,17 @@ export default function TecnicosView({ abrirId }: { abrirId?: string } = {}) {
         }
       />
     </RouteGuard>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function TecnicosView(props: { abrirId?: string } = {}) {
+  return (
+    <Suspense>
+      <TecnicosViewInner {...props} />
+    </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { RouteGuard } from "@/components/layout/RouteGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
@@ -20,7 +21,7 @@ const TABS: TabDef[] = [
   { id: "cobertura", label: "Cobertura" },
 ];
 
-export default function MercadoPage() {
+function MercadoPageInner() {
   const [tab, setTab] = useTabParam("liquidez");
   return (
     <RouteGuard route="/mercado">
@@ -34,5 +35,17 @@ export default function MercadoPage() {
         {tab === "cobertura" && <Cobertura />}
       </div>
     </RouteGuard>
+  );
+}
+
+/**
+ * O separador vem do endereço (`useTabParam` → `useSearchParams`), e o Next
+ * pede um limite de Suspense por cima para compilar a página estática.
+ */
+export default function MercadoPage() {
+  return (
+    <Suspense>
+      <MercadoPageInner />
+    </Suspense>
   );
 }
