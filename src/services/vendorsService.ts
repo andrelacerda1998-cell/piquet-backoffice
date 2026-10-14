@@ -364,11 +364,15 @@ export async function getVendorMetrics(): Promise<VendorMetrics> {
  * - `podem_trabalhar`: fazem um tipo de serviço da categoria (é por aí que o
  *   matching escolhe) e já podem trabalhar; falta-lhes só estar Online. Só vem
  *   do backend a partir do backend#185 -- até lá, `undefined`.
+ * - `podem_trabalhar_com_at`: desses, os que têm a AT validada (a regra de
+ *   `atValidationState`). Os outros só têm a AT em falta e trabalham até ao
+ *   3.º serviço. Só vem do backend a partir do backend#188 -- até lá, `undefined`.
  */
 export interface TecnicosPorCategoria {
   name: string;
   value: number;
   podem_trabalhar?: number;
+  podem_trabalhar_com_at?: number;
 }
 
 export async function getVendorsByCategory() {

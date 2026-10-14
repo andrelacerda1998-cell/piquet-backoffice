@@ -128,6 +128,7 @@ export default function Cobertura() {
     ? resumoDasContagens((technicianCoverage?.open ?? []).map((z) => z.nas_cidades?.contagem), { um: "zona", varios: "zonas" })
     : [];
   const comProntos = (byCategory ?? []).some((c) => c.podem_trabalhar !== undefined);
+  const prontosPelaAt = (byCategory ?? []).some((c) => c.podem_trabalhar_com_at !== undefined);
 
   // A maior procura da lista, e não a da primeira linha: as zonas sem ninguém
   // vêm à frente mesmo com menos pedidos, e a barra delas enchia-se toda.
@@ -347,6 +348,12 @@ export default function Cobertura() {
             um tipo de serviço dela e já podem trabalhar -- falta-lhes só estar
             Online. Quem está Online agora vê-se em Pedidos › Ao vivo, e por isso
             os números diferem tanto.
+
+            Os prontos são a soma de dois grupos, os mesmos dos filtros da lista
+            de técnicos: AT validada, e só falta a AT (trabalham até ao 3.º
+            serviço). Por baixo do total vai a soma, "3 + 40". Quem tem a AT
+            validada mas está travado por outra razão não recebe pedidos e não
+            conta.
           */}
           <Painel titulo={comProntos ? "Técnicos por categoria" : "Registados por categoria"}
             descricao={comProntos ? "Registados em qualquer estado, e os prontos a trabalhar. Online agora: Pedidos › Ao vivo" : "Em qualquer estado — disponíveis agora: Pedidos › Ao vivo"}
@@ -364,12 +371,28 @@ export default function Cobertura() {
                 )}
                 {[...(byCategory ?? [])].sort((a, b) => b.value - a.value).map((c) => (
                   <li key={c.name} className="flex items-baseline gap-3 px-4 py-2 text-[13px]">
-                    <span className="flex-1 text-text-secondary">{c.name}</span>
+                    {/* min-w-0 + hífen: "ELETRODOMÉSTICOS" não cabe na coluna e empurrava os números. */}
+                    <span className="min-w-0 flex-1 break-words hyphens-auto text-text-secondary">{c.name}</span>
                     <span className={comProntos ? "w-20 text-right font-medium tabular-nums text-text-primary" : "font-medium tabular-nums text-text-primary"}>{c.value}</span>
-                    {comProntos && <span className="w-14 text-right tabular-nums text-text-secondary">{c.podem_trabalhar ?? 0}</span>}
+                    {comProntos && (
+                      <span className="w-14 text-right tabular-nums text-text-secondary">
+                        {c.podem_trabalhar ?? 0}
+                        {c.podem_trabalhar_com_at !== undefined && (
+                          <span className="block text-[11px] text-text-muted"
+                            title={`${c.podem_trabalhar_com_at} com a AT validada + ${(c.podem_trabalhar ?? 0) - c.podem_trabalhar_com_at} só com a AT em falta`}>
+                            {c.podem_trabalhar_com_at} + {(c.podem_trabalhar ?? 0) - c.podem_trabalhar_com_at}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
+            )}
+            {prontosPelaAt && (byCategory ?? []).length > 0 && (
+              <p className="border-t border-surface-border px-4 py-3 text-xs text-text-muted">
+                Prontos = AT validada + só falta a AT (até 3 serviços).
+              </p>
             )}
           </Painel>
         </div>
