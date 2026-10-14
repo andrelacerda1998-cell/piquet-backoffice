@@ -32,6 +32,12 @@ export interface RealVendor {
   */
   services_types?: string[];
   can_accept_service: boolean;
+  /**
+   * Os documentos obrigatórios (e as certificações das categorias dele) estão
+   * todos aprovados e dentro da validade. É a regra do servidor
+   * (`all_documents_verified`), a mesma que o deixa ou não trabalhar.
+   */
+  all_documents_verified?: boolean;
   at_valid: boolean;
   at_validated_at: string | null;
   /**
