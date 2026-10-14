@@ -1,3 +1,4 @@
+import { todasAsPaginas } from "@/lib/paginas";
 import { apiGet, apiPut, apiPost, apiDelete } from "./api";
 import type { PaginatedResult } from "@/types";
 
@@ -112,6 +113,25 @@ export async function getVendors(
     pageSize: raw.meta.per_page,
     totalPages: raw.meta.last_page,
   };
+}
+
+/**
+ * TODOS os técnicos, página a página.
+ *
+ * O Laravel devolve no máximo 100 por página (`min(per_page, 100)` no
+ * VendorController): pedir 500 de uma vez devolvia só os 100 mais recentes, e
+ * os filtros que contam sobre a lista toda (AT validada, Sem NIF) contavam só
+ * esses. Os técnicos mais antigos -- justamente os que validaram a AT quando
+ * ela ainda era exigida a todos -- ficavam de fora.
+ *
+ * Sem repetidos: quem se regista a meio das páginas empurra a lista e o
+ * mesmo técnico podia vir em duas.
+ */
+export async function getAllVendors(search?: string): Promise<{ data: RealVendor[]; total: number; falharam: number }> {
+  const r = await todasAsPaginas((pagina) =>
+    getVendors(pagina, 100, search).then((p) => ({ itens: p.data, paginas: p.totalPages, total: p.total })));
+  const unicos = [...new Map(r.itens.map((v) => [v.id, v])).values()];
+  return { data: unicos, total: r.total, falharam: r.falharam };
 }
 
 /**

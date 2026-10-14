@@ -16,7 +16,6 @@ import { getVendorsByCategory, getVendorCoverage, getVendorLiveLocations } from 
 const TechnicianMap = dynamic(() => import("@/components/ui/TechnicianMap").then((m) => m.TechnicianMap), { ssr: false });
 import { getCoverage, type CoverageTechnician, type CoverageOpenZone } from "@/services/coverageService";
 import { Modal } from "@/components/ui/Modal";
-import { cn } from "@/lib/utils";
 import { DemoBadge } from "@/components/ui/DemoBadge";
 
 /**
@@ -92,6 +91,21 @@ export default function Cobertura() {
   return (
     <>
       <div className="space-y-6">
+        {/*
+          De onde vêm as zonas e as cidades candidatas. O questionário da app
+          do técnico (vendor_allowed_zones, vendor_city_votes) deixou de existir:
+          a app grava agora as cidades por /vendor/cities, que é o que o
+          matching usa. Sem isto dito, "nenhum técnico cobre esta zona" lia-se
+          como facto.
+        */}
+        <div className="aviso aviso-info">
+          <p className="font-medium">As zonas e as cidades candidatas vêm do questionário antigo da app do técnico</p>
+          <p className="text-text-secondary mt-1">
+            A app já não o mostra: só contam os técnicos que responderam antes da mudança. Quem recebe pedidos é decidido
+            pelas cidades que cada técnico escolhe hoje na app, que ainda não aparecem aqui. A procura (pedidos por cidade) é real.
+          </p>
+        </div>
+
         {/* Sem cobertura declarada não se pode falar de oferta —
             dizê-lo em vez de mostrar zeros que parecem factos. */}
         {coberturaPorMedir && (
@@ -109,17 +123,17 @@ export default function Cobertura() {
         {/* O que decide: onde falta gente e onde vale a pena abrir. */}
         <StatGroup cols={4}>
           <Stat label="Zonas abertas" value={coberturaResumo.zonasAbertas} />
-          <Stat label={coberturaPorMedir ? "Zonas por medir" : "Zonas sem técnicos"} value={coberturaResumo.zonasSemTecnicos}
-            tone={!coberturaPorMedir && coberturaResumo.zonasSemTecnicos > 0 ? "mau" : undefined} />
+          <Stat label={coberturaPorMedir ? "Zonas por medir" : "Zonas sem respostas"} value={coberturaResumo.zonasSemTecnicos}
+            note="no questionário" />
           <Stat label="Cidades candidatas" value={coberturaResumo.candidatas} />
-          <Stat label="Técnicos a cobrir zonas" value={coberturaResumo.tecnicosDistintos} />
+          <Stat label="No questionário" value={coberturaResumo.tecnicosDistintos} note="técnicos" />
         </StatGroup>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Onde falta gente — procura acima da oferta, o mais urgente primeiro. */}
           <Painel
             titulo={coberturaPorMedir ? "Onde há mais procura" : "Onde falta gente"}
-            descricao={coberturaPorMedir ? "Pedidos de serviço por cidade (dados reais)" : "Zonas com mais pedidos do que técnicos a cobri-las"}
+            descricao={coberturaPorMedir ? "Pedidos de serviço por cidade (dados reais)" : "Pedidos por cidade e quantos técnicos a marcaram no questionário"}
             corpo="p-4 space-y-3.5"
           >
             {zonasEmFalta.length === 0 ? (
@@ -128,8 +142,8 @@ export default function Cobertura() {
               <Barra key={z.name} nome={z.name}
                 valor={<>{z.procura} pedido{z.procura === 1 ? "" : "s"}{!coberturaPorMedir && ` · ${z.oferta} técnico${z.oferta === 1 ? "" : "s"}`}</>}
                 largura={(z.procura / maisProcura) * 100}
-                cor={z.oferta === 0 && !coberturaPorMedir ? "bg-danger/80" : "bg-piquet"}
-                nota={z.oferta === 0 && !coberturaPorMedir ? <span className="text-danger">Nenhum técnico cobre esta zona</span> : undefined} />
+                cor="bg-piquet"
+                nota={z.oferta === 0 && !coberturaPorMedir ? <span className="text-text-muted">Ninguém a marcou no questionário</span> : undefined} />
             ))}
           </Painel>
 
@@ -157,19 +171,17 @@ export default function Cobertura() {
         {/* Zonas já abertas — quem as cobre. */}
         <section>
           <SectionHeader title="Zonas abertas"
-            description="Cada técnico indica na própria app onde pode atuar. Clica numa zona para ver quem a marcou."
+            description="Quem marcou cada zona no questionário antigo da app. Clica numa zona para ver quem a marcou."
             aside={<DemoBadge endpoint="/coverage" />} />
           <DataTable<CoverageOpenZone>
             columns={[
               { key: "city", label: "Cidade", render: (r) => <span className="font-medium">{r.city}</span> },
               { key: "district", label: "Distrito", render: (r) => r.district ?? "—" },
-              { key: "technicians", label: "Técnicos", className: "text-right", render: (r) => (
-                <span className={cn("tabular-nums font-medium", r.technicians.length === 0 && "text-danger")}>
-                  {r.technicians.length}
-                </span>
+              { key: "technicians", label: "No questionário", className: "text-right", render: (r) => (
+                <span className="tabular-nums font-medium">{r.technicians.length}</span>
               ) },
               { key: "estado", label: "", className: "text-right", render: (r) => r.technicians.length === 0
-                ? <span className="text-xs text-danger">sem cobertura</span>
+                ? <span className="text-xs text-text-muted">ninguém marcou</span>
                 : <span className="text-xs text-text-muted group-hover:text-text-primary">Ver técnicos →</span> },
             ]}
             data={zonasAbertasOrdenadas}
@@ -200,7 +212,13 @@ export default function Cobertura() {
           </Painel>
 
           {/* Por categoria: uma lista e não um gráfico circular num separador só para ele. */}
-          <Painel titulo="Técnicos por categoria" corpo="">
+          {/*
+            Todos os técnicos registados com a categoria, em qualquer estado
+            (registo a meio, documentos em falta, suspensos, sem entrar há
+            meses). Não é quem está disponível: esse vê-se em Pedidos › Ao vivo,
+            e por isso os dois números diferem tanto.
+          */}
+          <Painel titulo="Registados por categoria" descricao="Em qualquer estado — disponíveis agora: Pedidos › Ao vivo" corpo="">
             {(byCategory ?? []).length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-text-muted">Sem dados.</p>
             ) : (

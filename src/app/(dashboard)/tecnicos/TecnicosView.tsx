@@ -14,7 +14,7 @@ import { useAsyncData, usePagination, useDebouncedValue } from "@/hooks/useDashb
 import { useTabParam } from "@/hooks/useTabParam";
 import { useAbrirPeloEndereco, useAcaoPeloEndereco } from "@/hooks/useAbrirPeloEndereco";
 import { NotasInternas } from "@/components/ui/NotasInternas";
-import { getVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getTopVendors, getOnboardingTecnicos, setVendorAtValidation, createVendorInvoiceWorkspace, createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces, getTecnicosSemWorkspace, type TecnicoSemWorkspace, getResumoDocumentos, type TecnicoComDocumento, getVendor } from "@/services/vendorsService";
+import { getVendors, getAllVendors, suspendVendor, restoreVendor, deleteVendorPermanently, getVendorMetrics, getTopVendors, getOnboardingTecnicos, setVendorAtValidation, createVendorInvoiceWorkspace, createTestVendor, type RealVendor, type TopVendor, type NewTestVendor, type ContagemWorkspaces, getTecnicosSemWorkspace, type TecnicoSemWorkspace, getResumoDocumentos, type TecnicoComDocumento, getVendor } from "@/services/vendorsService";
 
 import { getVendorDocuments, getAllVendorDocuments, approveVendorDocument, declineVendorDocument, type VendorDocument, type VendorDocumentStatus } from "@/services/vendorDocumentsService";
 import { Modal, Field } from "@/components/ui/Modal";
@@ -328,10 +328,11 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
 
   // Filtro por validação AT. A lista normal é paginada pelo servidor, por isso
   // filtrar só a página daria contas erradas — com filtro ativo carregamos a
-  // lista toda de uma vez e filtramos aqui.
+  // lista toda (todas as páginas: o servidor não dá mais de 100 de cada vez)
+  // e filtramos aqui.
   const [atFilter, setAtFilter] = useState<"" | "validada" | "por_validar" | "sem_nif" | "suspensos">("");
   const { data: allVendors, loading: allVendorsLoading } = useAsyncData(
-    () => (atFilter && atFilter !== "suspensos" ? getVendors(1, 500, debouncedSearch || undefined) : Promise.resolve(null)),
+    () => (atFilter && atFilter !== "suspensos" ? getAllVendors(debouncedSearch || undefined) : Promise.resolve(null)),
     [atFilter, debouncedSearch]
   );
   const atFiltered = useMemo(() => {
@@ -350,6 +351,7 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
       sem_nif: list.filter((v) => !v.nif?.trim()).length,
       total: allVendors?.total ?? 0,
       carregados: list.length,
+      falharam: allVendors?.falharam ?? 0,
     };
   }, [allVendors]);
 
@@ -942,6 +944,9 @@ function TecnicosViewInner({ abrirId }: { abrirId?: string } = {}) {
                           <b className="text-text-primary tabular-nums">{atFiltered.length}</b>{" "}
                           {atFilter === "validada" ? "com a AT validada" : "com a AT por validar"}
                           {atCounts.carregados > 0 && ` · de ${atCounts.carregados} técnicos`}
+                          {atCounts.falharam > 0 && (
+                            <span className="text-warning"> · {atCounts.falharam === 1 ? "uma página" : `${atCounts.falharam} páginas`} da lista não chegou: as contas podem estar abaixo do real</span>
+                          )}
                         </p>
                         <DataTable columns={columns} data={atFiltered} keyField="id" loading={allVendorsLoading}
                           onRowClick={(r) => setProfileVendor(r)}
