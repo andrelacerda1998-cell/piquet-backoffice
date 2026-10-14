@@ -41,12 +41,12 @@ export function StatGroup({ title, aside, children, className, cols = 4 }: {
   );
 }
 
-/** Um número do grupo. `tom` pinta o valor: vermelho pede ação, verde é bom sinal. */
+/** Um número do grupo. `tom` pinta o valor: vermelho é mau sinal, âmbar pede atenção, verde é bom sinal. */
 export function Stat({ label, value, note, tone, info, demoEndpoint, children }: {
   label: ReactNode;
   value: ReactNode;
   note?: ReactNode;
-  tone?: "bom" | "mau" | "neutro";
+  tone?: "bom" | "mau" | "atencao" | "neutro";
   /** A definição, num "ⓘ" ao lado do rótulo. */
   info?: string;
   /** Endpoint da fonte: sem integração real, aparece o selo "Sem integração". */
@@ -62,7 +62,7 @@ export function Stat({ label, value, note, tone, info, demoEndpoint, children }:
         {demoEndpoint && <DemoBadge endpoint={demoEndpoint} />}
       </p>
       <p className={cn("mt-1 text-[22px] leading-7 font-semibold tracking-tight tabular-nums",
-        tone === "mau" ? "text-danger" : tone === "bom" ? "text-success" : value === "—" ? "text-text-muted" : "text-text-primary")}>
+        tone === "mau" ? "text-danger" : tone === "atencao" ? "text-warning" : tone === "bom" ? "text-success" : value === "—" ? "text-text-muted" : "text-text-primary")}>
         {value}
       </p>
       {children && <div className="mt-0.5">{children}</div>}

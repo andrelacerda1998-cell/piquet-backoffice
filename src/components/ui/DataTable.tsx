@@ -227,8 +227,10 @@ export function DataTable<T extends object>({
                   )}
                   {/* A primeira coluna é o título do cartão: é ela que
                       identifica a linha (data, nome, número). */}
+                  {/* div e não p: muitas colunas desenham blocos (nome + telefone),
+                      e um bloco dentro de um parágrafo é HTML inválido. */}
                   {principal && (
-                    <p className="font-semibold text-text-primary min-w-0 flex-1">{conteudo(principal)}</p>
+                    <div className="font-semibold text-text-primary min-w-0 flex-1">{conteudo(principal)}</div>
                   )}
                 </div>
                 {resto.length > 0 && (
