@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { SectionHeader } from "@/components/ui/PageHeader";
+import { StatGroup, Stat } from "@/components/ui/Stats";
 import { ChartCard, BarChartComponent, DonutChartComponent } from "@/components/charts/Charts";
 import { useAsyncData } from "@/hooks/useDashboard";
-import { buildMetricValue } from "@/lib/calculations";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { getCustomerMetrics, getCustomersByLocation, getRetentionData, getNewVsRecurringTrend } from "@/services/customersService";
 import { getLeads } from "@/services/extrasService";
 
@@ -37,16 +36,15 @@ export function AnaliseDeClientes() {
 
   return (
     <section className="space-y-4">
-      <SectionHeader title="Clientes" />
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <MetricCard compact title="Registados" metric={buildMetricValue(metrics.registered, metrics.registered)} hideDelta />
-          <MetricCard compact title="Novos (30 dias)" metric={buildMetricValue(metrics.newCustomers, metrics.newCustomers)} hideDelta />
-          <MetricCard compact title="Ativos" metric={buildMetricValue(metrics.active, metrics.active)} hideDelta />
-          <MetricCard compact title="Recorrentes" metric={buildMetricValue(metrics.recurring, metrics.recurring)} hideDelta />
-          <MetricCard compact title="Taxa recompra" metric={buildMetricValue(metrics.repurchaseRate, metrics.repurchaseRate)} hideDelta format="percent" />
-          <MetricCard compact title="LTV estimado" metric={buildMetricValue(metrics.estimatedLTV, metrics.estimatedLTV)} hideDelta format="currency" />
-        </div>
+        <StatGroup cols={6} title="Clientes">
+          <Stat label="Registados" value={formatNumber(metrics.registered)} />
+          <Stat label="Novos (30 dias)" value={formatNumber(metrics.newCustomers)} />
+          <Stat label="Ativos" value={formatNumber(metrics.active)} />
+          <Stat label="Recorrentes" value={formatNumber(metrics.recurring)} />
+          <Stat label="Taxa de recompra" value={formatPercent(metrics.repurchaseRate)} />
+          <Stat label="LTV estimado" value={formatCurrency(metrics.estimatedLTV)} />
+        </StatGroup>
       )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="Novos vs recorrentes">

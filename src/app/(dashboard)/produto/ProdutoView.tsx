@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { AnaliseDeClientes } from "@/components/crescimento/AnaliseDeClientes";
 import { useTabParam } from "@/hooks/useTabParam";
 import { RouteGuard } from "@/components/layout/RouteGuard";
-import { MetricCard } from "@/components/ui/MetricCard";
+import { StatGroup, Stat } from "@/components/ui/Stats";
+import { Painel } from "@/components/ui/Painel";
 
 import { Tabs, type TabDef } from "@/components/ui/Tabs";
 import { ChartCard, LineChartComponent, BarChartComponent } from "@/components/charts/Charts";
@@ -13,10 +14,9 @@ import {
   getAppGrowth, getStoreRatings, getAppFunnel, getCustoPorDownload,
   type StoreRatingInfo, type CustoDownloadApp, type CustoDownload,
 } from "@/services/backofficeService";
-import { buildMetricValue } from "@/lib/calculations";
 import { formatDate, formatNumber, formatCurrency, formatRating } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
-import { Star, AlertTriangle, Filter, ArrowDownRight } from "lucide-react";
+import { AlertTriangle, ArrowDownRight } from "lucide-react";
 import { PageHeader, SectionHeader } from "@/components/ui/PageHeader";
 
 
@@ -40,14 +40,14 @@ function CoberturaDoInvestimento({ custo }: { custo: CustoDownload | null }) {
     : "todo o histórico";
 
   return (
-    <div className="card p-4 sm:p-5 space-y-3">
+    <div className="aviso aviso-atencao space-y-3">
       <div className="flex items-start gap-2.5">
         <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-text-primary">
+          <p className="font-medium text-text-primary">
             {fora}% do investimento não entra nestas contas
           </p>
-          <p className="text-xs text-text-secondary mt-1">
+          <p className="text-[13px] text-text-secondary mt-1">
             O custo por instalação de cada app só conta campanhas cujo nome diz para que app são.
             As restantes — tráfego para o site, angariação de pedidos, notoriedade — valem{" "}
             <b className="text-text-primary">{formatCurrency(custo.gastoNaoAtribuido)}</b> de{" "}
@@ -56,21 +56,21 @@ function CoberturaDoInvestimento({ custo }: { custo: CustoDownload | null }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 border-t border-surface-border pt-3">
+      <div className="grid grid-cols-2 gap-3 border-t border-warning/20 pt-3 pl-[26px]">
         <div>
           <p className="text-xs text-text-secondary">Com tudo incluído</p>
-          <p className="text-xl font-bold text-text-primary tabular-nums mt-0.5">
+          <p className="text-lg font-semibold text-text-primary tabular-nums mt-0.5">
             {custo.custoPorDownloadTudoIncluido != null
               ? formatCurrency(custo.custoPorDownloadTudoIncluido) : "—"}
           </p>
           {/* É o número para comparar com outro canal: o dinheiro do PMAX
               saiu da mesma conta, atribuído ou não. */}
-          <p className="text-[11px] text-text-muted">todo o investimento ÷ todas as instalações</p>
+          <p className="text-xs text-text-muted">todo o investimento ÷ todas as instalações</p>
         </div>
         <div>
           <p className="text-xs text-text-secondary">Período</p>
-          <p className="text-sm font-semibold text-text-primary mt-1.5">{periodo}</p>
-          <p className="text-[11px] text-text-muted">
+          <p className="text-sm font-medium text-text-primary mt-1.5">{periodo}</p>
+          <p className="text-xs text-text-muted">
             a janela é a da despesa; as instalações contam-se só dentro dela
           </p>
         </div>
@@ -94,55 +94,27 @@ function AppAdoptionCard({ app, accent, total, novos, pct, appStore, googlePlay,
   const notas = [appStore, googlePlay].filter(Boolean) as StoreRatingInfo[];
   const media = notas.length ? notas.reduce((s, r) => s + r.rating, 0) / notas.length : 0;
   const avaliacoes = notas.reduce((s, r) => s + (r.count ?? 0), 0);
+  const lojas = [
+    appStore && `App Store ${formatRating(appStore.rating)}`,
+    googlePlay && `Google Play ${formatRating(googlePlay.rating)}`,
+  ].filter(Boolean).join(" · ");
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center gap-2.5 border-b border-surface-border px-5 py-3">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
-        <p className="font-semibold text-text-primary">{app}</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-4">
-        <div>
-          <p className="text-xs text-text-secondary">Instalações</p>
-          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">{formatNumber(total)}</p>
-          <p className="text-[11px] text-text-muted">acumuladas</p>
-        </div>
-        <div>
-          <p className="text-xs text-text-secondary">Novas no mês</p>
-          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">+{formatNumber(novos)}</p>
-          <p className={cn("text-[11px] font-medium", pct > 0 ? "text-success" : "text-text-muted")}>
-            {pct > 0 ? "+" : ""}{formatNumber(Math.round(pct * 10) / 10)}% vs. mês anterior
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-text-secondary">Avaliação</p>
-          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5 inline-flex items-center gap-1">
-            {media ? (Math.round(media * 10) / 10).toString().replace(".", ",") : "—"}
-            {media > 0 && <Star className="h-4 w-4 fill-piquet-500 text-piquet-500" />}
-          </p>
-          <p className="text-[11px] text-text-muted">{avaliacoes > 0 ? `${formatNumber(avaliacoes)} avaliações` : "nas duas lojas"}</p>
-        </div>
-        <div>
-          <p className="text-xs text-text-secondary">Custo/instalação</p>
-          <p className="text-2xl font-bold text-text-primary tabular-nums mt-0.5">
-            {custo?.custoPorDownload != null ? formatCurrency(custo.custoPorDownload) : "—"}
-          </p>
-          {/*
-            O denominador ao lado do número. "0,36 €" sozinho não diz se saiu
-            de duas instalações ou de quatrocentas, e a diferença entre as
-            duas coisas é toda.
-          */}
-          <p className="text-[11px] text-text-muted">
-            {custo && custo.downloads > 0
-              ? `${formatCurrency(custo.gastoAtribuido)} ÷ ${formatNumber(custo.downloads)} no período`
-              : "sem investimento atribuído"}
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-4 border-t border-surface-border px-5 py-2 text-[11px] text-text-muted">
-        <span>App Store {appStore ? `${formatRating(appStore.rating)}★` : "—"}</span>
-        <span>Google Play {googlePlay ? `${formatRating(googlePlay.rating)}★` : "—"}</span>
-      </div>
-    </div>
+    <StatGroup cols={4} title={<><span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />{app}</>}>
+      <Stat label="Instalações" value={formatNumber(total)} note="acumuladas" />
+      <Stat label="Novas no mês" value={`+${formatNumber(novos)}`}
+        note={<span className={cn(pct > 0 && "text-success")}>{pct > 0 ? "+" : ""}{formatNumber(Math.round(pct * 10) / 10)}% vs. mês anterior</span>} />
+      <Stat label="Avaliação" value={media ? `${formatRating(media)} ★` : "—"}
+        note={lojas || (avaliacoes > 0 ? `${formatNumber(avaliacoes)} avaliações` : "nas duas lojas")} />
+      {/*
+        O denominador ao lado do número. "0,36 €" sozinho não diz se saiu
+        de duas instalações ou de quatrocentas, e a diferença entre as
+        duas coisas é toda.
+      */}
+      <Stat label="Custo/instalação" value={custo?.custoPorDownload != null ? formatCurrency(custo.custoPorDownload) : "—"}
+        note={custo && custo.downloads > 0
+          ? `${formatCurrency(custo.gastoAtribuido)} ÷ ${formatNumber(custo.downloads)}`
+          : "sem investimento atribuído"} />
+    </StatGroup>
   );
 }
 
@@ -242,14 +214,16 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
           />
         )}
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        <Tabs tabs={TABS} active={tab} onChange={setTab} variant={embutido ? "pill" : undefined} />
 
         {tab === "apps" && (
           <div className="space-y-6">
-            {/* Uma linha por app: instalações, novas do mês e avaliação juntas. */}
-            <div>
-              <SectionHeader title={`Adoção das apps${latestMonthLabel ? ` · ${latestMonthLabel}` : ""}`} />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Um bloco por app: instalações, novas do mês, avaliação e custo juntos. */}
+            <section className="space-y-3">
+              <SectionHeader title="Adoção das apps" aside={latestMonthLabel || undefined} className="mb-0" />
+              {/* Uma app por linha: a meia largura, as notas de cada número
+                  (de onde sai a média, o denominador do custo) ficavam cortadas. */}
+              <div className="space-y-3">
                 <AppAdoptionCard app="App Cliente" accent="#FAB347"
                   total={dlLast?.Cliente ?? 0} novos={newCliente} pct={growthPct(newCliente, dlPrev?.Cliente ?? 0)}
                   appStore={ratings?.cliente.appStore ?? null} googlePlay={ratings?.cliente.googlePlay ?? null}
@@ -263,20 +237,14 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                   appStore={ratings?.profissional.appStore ?? null} googlePlay={ratings?.profissional.googlePlay ?? null}
                   custo={custoDe("profissional")} />
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-                <MetricCard title="Instalações totais" hideDelta
-                  metric={buildMetricValue(dlTotalLast, dlTotalLast, false, undefined, "As duas apps somadas")} />
-                <MetricCard title="Novas no mês (total)" hideDelta
-                  metric={buildMetricValue(newTotal, newTotal, false, undefined, "Novas instalações das duas apps no último mês")} />
-                <MetricCard title="Novos clientes (mês)" demoEndpoint="/customers" hideDelta
-                  metric={buildMetricValue(regLast?.Clientes ?? 0, regLast?.Clientes ?? 0)} />
-                <MetricCard title="Novos técnicos (mês)" demoEndpoint="/technicians" hideDelta
-                  metric={buildMetricValue(regLast?.Técnicos ?? 0, regLast?.Técnicos ?? 0)} />
-              </div>
-              <div className="mt-3">
-                <CoberturaDoInvestimento custo={custo ?? null} />
-              </div>
-            </div>
+              <StatGroup cols={4} title="As duas apps">
+                <Stat label="Instalações totais" value={formatNumber(dlTotalLast)} info="As duas apps somadas." />
+                <Stat label="Novas no mês" value={formatNumber(newTotal)} info="Novas instalações das duas apps no último mês." />
+                <Stat label="Novos clientes (mês)" value={formatNumber(regLast?.Clientes ?? 0)} demoEndpoint="/customers" />
+                <Stat label="Novos técnicos (mês)" value={formatNumber(regLast?.Técnicos ?? 0)} demoEndpoint="/technicians" />
+              </StatGroup>
+              <CoberturaDoInvestimento custo={custo ?? null} />
+            </section>
 
             <ChartCard title="Crescimento mensal de downloads" subtitle="Novas instalações em cada mês, por app">
               <BarChartComponent
@@ -314,29 +282,26 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
         {tab === "clientes" && <AnaliseDeClientes />}
 
         {tab === "funil" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-5 w-5 text-piquet-600" />
-                <div>
-                  <h2 className="text-lg font-bold text-text-primary">Funil da jornada na app</h2>
-                  <p className="text-xs text-text-muted">Onde os utilizadores param, a partir do Mixpanel.</p>
-                </div>
-              </div>
-              <select value={funnelPeriod} onChange={(e) => setFunnelPeriod(e.target.value)} className="input-field w-auto">
-                {funnelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
+          <div className="space-y-4">
+            <SectionHeader
+              title="Funil da jornada na app"
+              description="Onde os utilizadores param, a partir do Mixpanel."
+              aside={
+                <select value={funnelPeriod} onChange={(e) => setFunnelPeriod(e.target.value)} className="input-field w-auto py-1.5" aria-label="Período do funil">
+                  {funnelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              }
+            />
 
             {funnelLoading && !funnel ? (
-              <div className="card p-6 text-sm text-text-secondary">A carregar o funil…</div>
+              <div className="card p-6 text-sm text-text-muted">A carregar o funil…</div>
             ) : !funnel ? null : !funnel.configured ? (
-              <div className="card p-6 max-w-2xl">
-                <p className="text-sm text-text-secondary">
+              <div className="aviso aviso-info max-w-2xl">
+                <p className="text-text-secondary">
                   Mostra onde os utilizadores param (abrir app → ver serviço → reservar → pagar), a partir do Mixpanel.
                   Ainda não está ligado. Para ativar, adiciona na Vercel:
                 </p>
-                <ul className="mt-3 space-y-1 text-sm text-text-secondary">
+                <ul className="mt-3 space-y-1 text-text-secondary">
                   <li>• <code className="text-text-primary">MIXPANEL_SA_USERNAME</code> e <code className="text-text-primary">MIXPANEL_SA_SECRET</code> — Service Account (Organization Settings → Service Accounts)</li>
                   <li>• <code className="text-text-primary">MIXPANEL_PROJECT_ID</code> — id do projeto (Project Settings)</li>
                   <li>• <code className="text-text-primary">MIXPANEL_FUNNEL_ID</code> — id do funil guardado (opcional; senão usa o primeiro)</li>
@@ -345,13 +310,13 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                 <p className="mt-3 text-xs text-text-muted">Passo-a-passo completo em <code>MIXPANEL_SETUP.md</code>. Cria o funil no Mixpanel com os passos da jornada; aqui aparece o drop-off de cada passo.</p>
               </div>
             ) : funnel.error ? (
-              <div className="card p-6 border-l-4 border-danger bg-danger-light/40">
-                <p className="font-semibold text-text-primary">Não foi possível ler o funil do Mixpanel</p>
-                <p className="text-sm text-text-secondary mt-1 break-words">{funnel.error}</p>
+              <div className="aviso aviso-perigo">
+                <p className="font-medium">Não foi possível ler o funil do Mixpanel</p>
+                <p className="text-text-secondary mt-1 break-words">{funnel.error}</p>
                 <p className="text-xs text-text-muted mt-2">Verifica as credenciais e, se o projeto for na UE, define <code>MIXPANEL_API_HOST=https://eu.mixpanel.com</code>. Detalhes em <code>MIXPANEL_SETUP.md</code>.</p>
               </div>
             ) : funnel.steps.length === 0 ? (
-              <div className="card p-6 text-sm text-text-secondary">Sem dados do funil neste período. Experimenta outro no seletor.</div>
+              <div className="card p-6 text-sm text-text-muted">Sem dados do funil neste período. Experimenta outro no seletor.</div>
             ) : (
               (() => {
                 // Uma só vista: barra por passo (largura = % do topo), com
@@ -360,42 +325,42 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                 const stepLabel = (e: string) => e.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
                 const totalConv = (funnel.steps[funnel.steps.length - 1]?.overallConvRatio ?? 0) * 100;
                 return (
-                  <div className="card p-5 space-y-1">
-                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-surface-border mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-text-primary">{funnel.name || "Funil da app"}</p>
-                        <p className="text-xs text-text-muted">{formatDate(funnel.from)} → {formatDate(funnel.to)} · {formatNumber(top)} utilizadores no topo</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-3xl font-bold text-text-primary">{totalConv.toFixed(1)}%</p>
-                        <p className="text-xs text-text-muted">chegam ao fim</p>
-                      </div>
-                    </div>
+                  <Painel
+                    titulo={funnel.name || "Funil da app"}
+                    descricao={`${formatDate(funnel.from)} → ${formatDate(funnel.to)} · ${formatNumber(top)} utilizadores no topo`}
+                    aside={
+                      <span className="text-right">
+                        <span className="block text-[22px] leading-7 font-semibold text-text-primary tabular-nums">{totalConv.toFixed(1).replace(".", ",")}%</span>
+                        <span className="block text-xs text-text-muted">chegam ao fim</span>
+                      </span>
+                    }
+                    corpo="px-4 py-3 space-y-1"
+                  >
                     {funnel.steps.map((s, i) => (
                       <div key={i} className="py-2">
-                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                        <div className="flex items-baseline justify-between gap-3 mb-1.5">
                           {/* O nome cru do evento fica à vista: sem ele não se
                               sabe QUE evento do Mixpanel alimenta cada passo,
                               e o rótulo bonito esconde exatamente isso. */}
-                          <p className="text-sm font-medium text-text-primary truncate">
-                            <span className="text-text-muted mr-1.5">{i + 1}.</span>{stepLabel(s.event)}
+                          <p className="text-[13px] font-medium text-text-primary truncate">
+                            <span className="text-text-muted mr-1.5 tabular-nums">{i + 1}.</span>{stepLabel(s.event)}
                             <code className="ml-2 text-[11px] font-normal text-text-muted">{s.event}</code>
                           </p>
                           <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
-                            <span className="text-sm font-semibold">{formatNumber(s.count)}</span>
-                            <span className="text-xs text-text-muted w-14 text-right">{(s.overallConvRatio * 100).toFixed(1)}%</span>
+                            <span className="text-[13px] font-semibold">{formatNumber(s.count)}</span>
+                            <span className="text-xs text-text-muted w-14 text-right">{(s.overallConvRatio * 100).toFixed(1).replace(".", ",")}%</span>
                             {i === 0 ? (
                               <span className="text-xs text-text-muted w-16 text-right">início</span>
                             ) : (
-                              <span className={cn("inline-flex items-center justify-end gap-0.5 text-xs font-semibold w-16", s.dropOff > 0.5 ? "text-danger" : s.dropOff > 0.25 ? "text-warning" : "text-success")}>
+                              <span className={cn("inline-flex items-center justify-end gap-0.5 text-xs font-medium w-16", s.dropOff > 0.5 ? "text-danger" : s.dropOff > 0.25 ? "text-warning" : "text-success")}>
                                 <ArrowDownRight className="h-3.5 w-3.5" /> −{(s.dropOff * 100).toFixed(0)}%
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="h-3 rounded-full bg-surface-subtle overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-surface-subtle overflow-hidden">
                           <div
-                            className={cn("h-full rounded-full transition-all", i === funnel.steps.length - 1 ? "bg-success" : "bg-piquet")}
+                            className={cn("h-full rounded-full transition-all", i === funnel.steps.length - 1 ? "bg-success/80" : "bg-piquet")}
                             style={{ width: `${Math.max(1.5, (s.count / top) * 100)}%` }}
                           />
                         </div>
@@ -408,7 +373,7 @@ export default function ProdutoView({ embutido = false }: { embutido?: boolean }
                       mudar quais se detetam, edita esse funil no Mixpanel.
                       A percentagem é sobre o topo; a seta é a queda face ao passo anterior, vermelha quando cai mais de metade.
                     </p>
-                  </div>
+                  </Painel>
                 );
               })()
             )}

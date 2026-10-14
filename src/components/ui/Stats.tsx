@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import type { ReactNode } from "react";
 
 /**
@@ -41,13 +42,15 @@ export function StatGroup({ title, aside, children, className, cols = 4 }: {
 }
 
 /** Um número do grupo. `tom` pinta o valor: vermelho pede ação, verde é bom sinal. */
-export function Stat({ label, value, note, tone, info, children }: {
+export function Stat({ label, value, note, tone, info, demoEndpoint, children }: {
   label: ReactNode;
   value: ReactNode;
   note?: ReactNode;
   tone?: "bom" | "mau" | "neutro";
   /** A definição, num "ⓘ" ao lado do rótulo. */
   info?: string;
+  /** Endpoint da fonte: sem integração real, aparece o selo "Sem integração". */
+  demoEndpoint?: string;
   /** Algo por baixo do valor (uma tendência, um link). */
   children?: ReactNode;
 }) {
@@ -56,6 +59,7 @@ export function Stat({ label, value, note, tone, info, children }: {
       <p className="flex items-center gap-1.5 text-[13px] text-text-secondary">
         <span className="truncate">{label}</span>
         {info && <InfoTip texto={info} lado="esquerda" />}
+        {demoEndpoint && <DemoBadge endpoint={demoEndpoint} />}
       </p>
       <p className={cn("mt-1 text-[22px] leading-7 font-semibold tracking-tight tabular-nums",
         tone === "mau" ? "text-danger" : tone === "bom" ? "text-success" : value === "—" ? "text-text-muted" : "text-text-primary")}>
