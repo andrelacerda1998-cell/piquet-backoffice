@@ -33,6 +33,17 @@ export function ChartCard({ title, subtitle, children, className, action, icon }
 }
 
 /**
+ * O eixo de um gráfico em euros. Dividia sempre por mil e arredondava às
+ * unidades: com valores abaixo de mil, o eixo lia-se "0k 0k 1k 1k 1k". Agora
+ * só passa a "k" a partir de mil, e com uma casa decimal quando é preciso.
+ */
+export function eixoEmEuros(v: number): string {
+  if (Math.abs(v) < 1000) return String(Math.round(v));
+  const k = v / 1000;
+  return `${Number.isInteger(k) ? k : k.toFixed(1).replace(".", ",")}k`;
+}
+
+/**
  * Legenda do Recharts com o rótulo em texto legível.
  *
  * Por omissão, o Recharts pinta o rótulo com a cor da série: no dourado da
@@ -89,7 +100,7 @@ export function LineChartComponent({ data, dataKey = "value", height = 280, curr
       <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
         <CartesianGrid vertical={false} stroke="rgb(var(--surface-border))" />
         <XAxis dataKey="name" tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
+        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? eixoEmEuros : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
         <Legend formatter={rotuloLegivel} />
         {lineConfigs.map((l) => (
@@ -116,7 +127,7 @@ export function BarChartComponent({ data, dataKey = "value", height = 280, curre
       <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
         <CartesianGrid vertical={false} stroke="rgb(var(--surface-border))" />
         <XAxis dataKey="name" tick={{ fontSize: 11, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined} />
+        <YAxis tick={{ fontSize: 12, fill: "rgb(var(--text-muted))" }} axisLine={false} tickLine={false} tickFormatter={currency ? eixoEmEuros : undefined} />
         <Tooltip content={<ChartTooltip formatter={currency ? formatCurrency : formatNumber} />} />
         <Legend formatter={rotuloLegivel} />
         {barConfigs.map((b) => (

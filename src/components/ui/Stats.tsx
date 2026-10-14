@@ -36,7 +36,15 @@ export function StatGroup({ title, aside, children, className, cols = 4 }: {
           {aside && <div className="shrink-0">{aside}</div>}
         </div>
       )}
-      <div className={cn("grid gap-px bg-surface-border", grelha)}>{children}</div>
+      {/*
+        As riscas entre números são desenhadas por cada célula (à direita e por
+        baixo), e não pelo fundo da grelha a espreitar entre elas: com o fundo,
+        uma última linha incompleta -- três números em duas colunas, no
+        telemóvel -- ficava com um retângulo cinzento no lugar que sobrava.
+        As riscas da última coluna e da última linha caem fora do cartão e o
+        `overflow-hidden` corta-as.
+      */}
+      <div className={cn("grid", grelha)}>{children}</div>
     </section>
   );
 }
@@ -55,7 +63,7 @@ export function Stat({ label, value, note, tone, info, demoEndpoint, children }:
   children?: ReactNode;
 }) {
   return (
-    <div className="bg-surface px-4 py-3.5 min-w-0">
+    <div className="px-4 py-3.5 min-w-0 [box-shadow:1px_0_0_0_rgb(var(--surface-border)),0_1px_0_0_rgb(var(--surface-border))]">
       <p className="flex items-center gap-1.5 text-[13px] text-text-secondary">
         <span className="truncate">{label}</span>
         {info && <InfoTip texto={info} lado="esquerda" />}

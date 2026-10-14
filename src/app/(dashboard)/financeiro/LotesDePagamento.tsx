@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SectionHeader } from "@/components/ui/PageHeader";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CheckCircle2, Copy, Download, FileCheck2, ShieldCheck } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
@@ -118,18 +119,19 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
   return (
     <div className="space-y-6">
       {data && !data.ativo && (
-        <p className="aviso aviso-atencao px-4 py-3 text-sm text-text-secondary">
+        <p className="aviso aviso-atencao text-text-secondary">
           Os lotes de pagamento ainda não estão ativos: falta aplicar a migração <code>20261008120000_payout_lotes</code> no Supabase.
         </p>
       )}
 
       {/* Saldos por pagar, com seleção para um lote novo */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Saldos por pagar</h2>
-          {podePagar && (
+      <section>
+        <SectionHeader
+          title="Saldos por pagar"
+          description="Escolhe os técnicos a pagar e cria um lote; outra pessoa aprova antes de as transferências saírem."
+          aside={podePagar ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button className="btn-secondary text-xs py-1" disabled={elegiveis.length === 0}
+              <button className="btn-ghost text-[13px]" disabled={elegiveis.length === 0}
                 onClick={() => setEscolhidos(escolhidos.size === elegiveis.length ? new Set() : new Set(elegiveis.map((v) => v.id)))}>
                 {escolhidos.size === elegiveis.length && elegiveis.length > 0 ? "Limpar seleção" : "Escolher todos os que se podem pagar"}
               </button>
@@ -137,17 +139,17 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
                 {ocupado === "criar" ? "A criar…" : `Criar lote${escolhidos.size ? ` · ${escolhidos.size} · ${formatCurrency(totalEscolhido)}` : ""}`}
               </button>
             </div>
-          )}
-        </div>
+          ) : undefined}
+        />
         <div className="card divide-y divide-surface-border">
           {aCarregar && saldos.length === 0 ? (
             <p className="p-4 text-sm text-text-muted">A carregar…</p>
           ) : saldos.length === 0 ? (
-            <p className="p-4 text-sm text-text-secondary">Sem técnicos com saldo por pagar. 🎉</p>
+            <p className="px-4 py-6 text-center text-sm text-text-muted">Sem técnicos com saldo por pagar. 🎉</p>
           ) : saldos.map((v) => {
             const imp = impedimento(v);
             return (
-              <label key={v.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-sm", imp ? "opacity-60" : "cursor-pointer hover:bg-surface-subtle")}>
+              <label key={v.id} className={cn("flex items-center gap-3 px-4 py-2.5 text-sm", imp ? "opacity-60" : "cursor-pointer hover:bg-surface-subtle/60")}>
                 {podePagar && (
                   <input type="checkbox" className="rounded border-surface-border" disabled={!!imp}
                     checked={escolhidos.has(v.id)}
@@ -176,20 +178,20 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
 
       {/* Conferir com o banco */}
       {podePagar && data?.ativo && (
-        <section className="card p-4 space-y-2">
+        <section className="card p-4 space-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <FileCheck2 className="h-5 w-5 text-piquet-600" />
-            <div className="min-w-0">
-              <p className="font-medium text-text-primary">Conferir com o extrato do banco</p>
-              <p className="text-xs text-text-secondary">Exporta os movimentos da conta em CSV no homebanking e escolhe o ficheiro. Cada pagamento casa com a transferência do mesmo valor (ao cêntimo), pelo nome ou pelo IBAN do técnico.</p>
+            <FileCheck2 className="h-5 w-5 text-text-muted" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-text-primary">Conferir com o extrato do banco</p>
+              <p className="text-xs text-text-muted">Exporta os movimentos da conta em CSV no homebanking e escolhe o ficheiro. Cada pagamento casa com a transferência do mesmo valor (ao cêntimo), pelo nome ou pelo IBAN do técnico.</p>
             </div>
-            <label className={cn("btn-secondary text-sm ml-auto cursor-pointer", ocupado === "conferir" && "opacity-60 pointer-events-none")}>
+            <label className={cn("btn-secondary text-sm cursor-pointer", ocupado === "conferir" && "opacity-60 pointer-events-none")}>
               {ocupado === "conferir" ? "A conferir…" : "Escolher extrato (CSV)"}
               <input type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={(e) => { lerFicheiro(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
           </div>
           {conferencia && conferencia.porConferir.length > 0 && (
-            <div className="rounded-lg bg-danger-light/40 px-3 py-2 text-xs">
+            <div className="aviso aviso-perigo py-2.5 text-xs">
               <p className="font-medium text-danger">Pagos no backoffice sem transferência no extrato:</p>
               <ul className="mt-1 space-y-0.5 text-text-secondary">
                 {conferencia.porConferir.map((l) => (
@@ -203,9 +205,9 @@ export function LotesDePagamento({ saldos, aCarregar, recarregarSaldos }: {
 
       {/* Os lotes */}
       <section className="space-y-3">
-        <h2 className="font-semibold">Lotes</h2>
+        <SectionHeader title="Lotes" description="Criados, aprovados e pagos — do mais recente para trás." className="mb-0" />
         {lotes.length === 0 ? (
-          <p className="card p-4 text-sm text-text-secondary">Ainda não há lotes de pagamento.</p>
+          <p className="card px-4 py-6 text-center text-sm text-text-muted">Ainda não há lotes de pagamento.</p>
         ) : lotes.map((l) => (
           <CartaoDoLote key={l.id} lote={l} userId={user?.id ?? ""} podePagar={podePagar} ocupado={ocupado}
             aprovar={() => setAConfirmar({ tipo: "aprovar", lote: l })}
@@ -256,7 +258,7 @@ function Iban({ iban, nome }: { iban: string | null; nome: string | null }) {
           const ok = await copiarParaAreaDeTransferencia(iban.replace(/\s/g, ""));
           toast(ok ? "IBAN copiado." : "Não foi possível copiar o IBAN.", ok ? "success" : "error");
         }}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-text-primary shrink-0">
+        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-surface-subtle hover:text-text-primary shrink-0">
         <Copy className="h-3.5 w-3.5" />
       </button>
     </span>
