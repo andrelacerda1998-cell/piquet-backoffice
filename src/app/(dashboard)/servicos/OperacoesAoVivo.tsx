@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Radio, RefreshCw, AlertTriangle, Clock, Users } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getOperacoesAoVivo } from "@/services/dashboardService";
+import { getVendorNoShows, type NoShowService } from "@/services/noShowsService";
+import { deLisboa } from "@/lib/periodo";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { SectionHeader } from "@/components/ui/PageHeader";
 import { StatGroup, Stat, Segmentos } from "@/components/ui/Stats";
@@ -32,6 +34,11 @@ import {
  */
 
 const ATUALIZAR_A_CADA_MS = 30_000;
+/**
+ * O bloco "A começar" é sobre agora: um atrasado de ontem já não se salva com
+ * uma chamada (fica nos alertas e em Qualidade › Faltas, para dar como falta).
+ */
+const ATRASADOS_ATE_MS = 6 * 3_600_000;
 
 /* Um ponto colorido à frente do pedido e a frase do alerta na cor dele. Os
    fundos pintados (vermelho, âmbar, dourado) ficavam a disputar a atenção
@@ -54,23 +61,37 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
   const [agora, setAgora] = useState(() => Date.now());
 
   const { data, loading, error, refetch } = useAsyncData(() => getOperacoesAoVivo(incluirTestes), [incluirTestes]);
+  /*
+    Os serviços marcados que estão a começar sem o técnico ter saído, e os que
+    já deviam ter começado: as mesmas faltas que os alertas leem. Não estavam
+    em lado nenhum deste ecrã -- ainda não estão "em curso" -- e é nesses
+    minutos que uma chamada ao técnico salva o serviço. Quem não pode ver as
+    faltas (perfil sem técnicos nem suporte) não vê o bloco.
+  */
+  const { data: faltas, refetch: refetchFaltas } = useAsyncData(() => getVendorNoShows().catch(() => null), []);
 
   // O relógio do ecrã (prazos e idades) e a nova leitura ao servidor.
   useEffect(() => {
     const relogio = setInterval(() => setAgora(Date.now()), 1000);
-    const leitura = setInterval(() => { refetch(); }, ATUALIZAR_A_CADA_MS);
+    const leitura = setInterval(() => { refetch(); refetchFaltas(); }, ATUALIZAR_A_CADA_MS);
     return () => { clearInterval(relogio); clearInterval(leitura); };
-  }, [refetch]);
+  }, [refetch, refetchFaltas]);
 
   const fila = useMemo(() => ordenarPorUrgencia(data?.a_procura ?? []), [data]);
   const emCurso = useMemo(() => ordenarPorUrgencia(data?.em_curso ?? []), [data]);
   const criticos = fila.filter((p) => p.alerta?.nivel === "critico").length + emCurso.filter((p) => p.alerta?.nivel === "critico").length;
+  const atrasados = useMemo(() => ordenarPelaHora(faltas?.suspected ?? []), [faltas]);
+  const aComecar = useMemo(() => ordenarPelaHora(faltas?.avisos ?? []), [faltas]);
 
   if (!data && loading) return <LoadingState message="A ler o marketplace…" />;
   if (!data && error) return <ErrorState message={error} onRetry={refetch} />;
   if (!data) return null;
 
   const liq = data.liquidez[janela];
+  const atrasadosAgora = atrasados.filter((f) => {
+    const inicio = horaMarcada(f);
+    return inicio != null && agora - inicio <= ATRASADOS_ATE_MS;
+  });
 
   return (
     <div className="space-y-6">
@@ -134,6 +155,18 @@ export function OperacoesAoVivo({ onAbrir }: { onAbrir: (id: string) => void }) 
           </ul>
         )}
       </section>
+
+      {/* A começar sem técnico a caminho: primeiro os atrasados, depois os que estão a começar. */}
+      {(atrasadosAgora.length > 0 || aComecar.length > 0) && (
+        <section>
+          <SectionHeader title="A começar sem técnico a caminho" icon={AlertTriangle}
+            aside={<>{atrasadosAgora.length + aComecar.length}</>} />
+          <ul className="card divide-y divide-surface-border overflow-hidden">
+            {atrasadosAgora.map((f) => <LinhaAComecar key={`atrasado-${f.service_id}`} f={f} atrasado agora={agora} onAbrir={onAbrir} />)}
+            {aComecar.map((f) => <LinhaAComecar key={`a-comecar-${f.service_id}`} f={f} atrasado={false} agora={agora} onAbrir={onAbrir} />)}
+          </ul>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Em curso */}
@@ -298,6 +331,48 @@ function LinhaEmCurso({ p, agora, onAbrir }: { p: PedidoEmCurso; agora: number; 
           {p.chegou_em ? ` · no local há ${haQuanto(p.chegou_em, agora)}` : p.a_caminho_em ? ` · a caminho há ${haQuanto(p.a_caminho_em, agora)}` : ""}
         </p>
         {p.alerta && <AvisoDoAlerta alerta={p.alerta} />}
+        </div>
+      </button>
+    </li>
+  );
+}
+
+/** A hora marcada, em Lisboa, ou null se faltar. */
+function horaMarcada(f: NoShowService): number | null {
+  if (!f.scheduled_day) return null;
+  const [a, m, d] = f.scheduled_day.slice(0, 10).split("-").map(Number);
+  const [h, min] = (f.scheduled_time ?? "00:00").split(":").map(Number);
+  if (!a || !m || !d) return null;
+  return deLisboa(a, m - 1, d, h || 0, min || 0).getTime();
+}
+
+function ordenarPelaHora(lista: readonly NoShowService[]): NoShowService[] {
+  return [...lista].sort((x, y) => (horaMarcada(x) ?? Infinity) - (horaMarcada(y) ?? Infinity));
+}
+
+function LinhaAComecar({ f, atrasado, agora, onAbrir }: { f: NoShowService; atrasado: boolean; agora: number; onAbrir: (id: string) => void }) {
+  const inicio = horaMarcada(f);
+  const hora = f.scheduled_time ? f.scheduled_time.slice(0, 5) : null;
+  const quando = inicio == null
+    ? null
+    : atrasado
+      ? `Devia ter começado às ${hora} — há ${duracao((agora - inicio) / 1000)}`
+      : inicio > agora ? `Começa às ${hora} — daqui a ${duracao((inicio - agora) / 1000)}` : `Devia ter começado às ${hora}`;
+  return (
+    <li>
+      <button onClick={() => onAbrir(String(f.service_id))}
+        className="w-full text-left px-4 py-3.5 hover:bg-surface-subtle/60 transition-colors flex gap-3">
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-danger" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-text-primary">
+            <span className="text-text-muted">#{f.service_id}</span>{" "}
+            <span className="font-medium">{f.service_type ?? "Serviço"}</span>
+            {f.customer?.name && <span className="text-text-secondary"> · {f.customer.name}</span>}
+          </p>
+          <p className="mt-1 text-[13px] text-text-secondary">
+            {f.vendor.name ?? "O técnico"} ainda não marcou &quot;a caminho&quot;
+          </p>
+          {quando && <p className="mt-1 text-[13px] font-medium text-danger">{quando}. Ligar ao técnico.</p>}
         </div>
       </button>
     </li>

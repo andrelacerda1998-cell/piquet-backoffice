@@ -6,6 +6,7 @@ import { CheckCircle2, ArrowRight, RefreshCw } from "lucide-react";
 import { useAsyncData } from "@/hooks/useDashboard";
 import { getAlerts, adiarAlerta, dispensarAlerta, amanhaAsNove } from "@/services/supportService";
 import { destinoDoAlerta } from "@/lib/alertLinks";
+import { ordenarAlertas } from "@/lib/ordemDosAlertas";
 import { MOTIVO_MINIMO } from "@/lib/motivo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/stores";
@@ -23,8 +24,6 @@ import type { AlertPriority, DashboardAlert } from "@/types";
  * -- faturas, impostos, anúncios -- não vêm para aqui: estão nas áreas deles.
  */
 const MAXIMO = 7;
-
-const URGENCIA: Record<AlertPriority, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
 
 /**
  * Vermelho para agir já, âmbar para estar atento, cinzento para o resto.
@@ -64,9 +63,9 @@ export function PrecisaDeTi({ onVerTodos, onTotal }: { onVerTodos?: () => void; 
   const [aMexer, setAMexer] = useState<string | null>(null);
   const [aDispensar, setADispensar] = useState<DashboardAlert | null>(null);
 
-  // O mais urgente primeiro e, dentro da mesma urgência, o mais antigo.
-  const alertas = [...(data?.data ?? [])].sort((a, b) =>
-    URGENCIA[a.priority] - URGENCIA[b.priority] || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+  // O mais urgente primeiro; dentro da mesma urgência, o prazo mais curto e
+  // depois o mais antigo (a mesma ordem do motor: ver ordemDosAlertas).
+  const alertas = ordenarAlertas(data?.data ?? []);
   const fila = alertas.slice(0, MAXIMO);
   useEffect(() => { if (data) onTotal?.(alertas.length); }, [data, alertas.length, onTotal]);
 

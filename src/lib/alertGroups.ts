@@ -1,4 +1,5 @@
 import type { DashboardAlert, AlertPriority } from "@/types";
+import { compararAlertas, ORDEM_DA_URGENCIA } from "@/lib/ordemDosAlertas";
 
 /**
  * Agrupa alertas repetidos do mesmo tipo numa linha só.
@@ -69,7 +70,7 @@ const FAMILIAS: Familia[] = [
   },
 ];
 
-const ORDEM: Record<AlertPriority, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+const ORDEM = ORDEM_DA_URGENCIA;
 
 const maisUrgente = (as: DashboardAlert[]): AlertPriority =>
   as.reduce<AlertPriority>((p, a) => (ORDEM[a.priority] < ORDEM[p] ? a.priority : p), "baixa");
@@ -106,8 +107,7 @@ export function agruparAlertas(
   }
 
   const soltos = alertas.filter((a) => !usados.has(a.id));
-  return [...grupos, ...soltos].sort((a, b) =>
-    ORDEM[a.priority] - ORDEM[b.priority] || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  return [...grupos, ...soltos].sort(compararAlertas);
 }
 
 /**
@@ -124,12 +124,10 @@ export function umPorPedido(alertas: DashboardAlert[]): DashboardAlert[] {
     else resto.push(a);
   }
   const pedidos = [...porPedido.values()].map((lista) => {
-    const [principal, ...outros] = [...lista].sort((x, y) =>
-      ORDEM[x.priority] - ORDEM[y.priority] || Date.parse(x.createdAt) - Date.parse(y.createdAt));
+    const [principal, ...outros] = [...lista].sort(compararAlertas);
     if (outros.length === 0) return principal;
     const tambem = outros.map((o) => o.title.replace(/^Pedido #\S+:?\s*/, "").replace(/^Possível falta no pedido #\S+/, "possível falta")).join("; ");
     return { ...principal, description: `${principal.description} · também: ${tambem}` };
   });
-  return [...pedidos, ...resto].sort((a, b) =>
-    ORDEM[a.priority] - ORDEM[b.priority] || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  return [...pedidos, ...resto].sort(compararAlertas);
 }

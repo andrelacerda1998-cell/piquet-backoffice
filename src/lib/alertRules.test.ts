@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gerarAlertas, LIMITES, type SinaisDoNegocio, DONOS } from "./alertRules";
+import { gerarAlertas, LIMITES, quandoEmLisboa, type SinaisDoNegocio, DONOS } from "./alertRules";
 
 const AGORA = Date.parse("2026-08-20T12:00:00Z");
 const haDias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString();
@@ -247,6 +247,8 @@ describe("alertas com dono, lembretes e as regras da auditoria (12/10/2026)", ()
     expect(gerarAlertas({ ...base, documentosPendentes: 3, documentosAntigos: { quantos: 0, maisAntigo: null } }, AGORA)).toHaveLength(0);
     const a = gerarAlertas({ ...base, documentosPendentes: 3, documentosAntigos: { quantos: 2, maisAntigo: antes(60 * 30) } }, AGORA);
     expect(a[0].title).toContain("há mais de 24 h");
+    // A bola é nossa: um técnico parado por nossa causa é "Tratar hoje", nem que seja um.
+    expect(a[0].priority).toBe("alta");
   });
 
   it("integração do painel: atrasada ou com duas falhas seguidas", () => {
@@ -265,5 +267,58 @@ describe("alertas com dono, lembretes e as regras da auditoria (12/10/2026)", ()
       faltasIminentes: [{ servicoId: "300", tecnico: "Rui", cliente: "Ana", comecaEm: new Date(AGORA + 10 * 60_000).toISOString() }],
     }, AGORA);
     expect(a.map((x) => x.id).sort()).toEqual(["cidade-sem-oferta-porto", "falta-iminente-300"]);
+  });
+});
+
+describe("a fila depois da simulação de 15/10/2026", () => {
+  const AGORA = Date.parse("2026-10-15T09:00:00Z"); // 10:00 em Lisboa
+  const antes = (min: number) => new Date(AGORA - min * 60_000).toISOString();
+  const daqui = (min: number) => new Date(AGORA + min * 60_000).toISOString();
+  const base: SinaisDoNegocio = {
+    leadsPorResponder: [], cronsFalhados: [], ticketsAbertos: [], documentosPendentes: 0,
+    faturasVencidas: [], impostosVencidos: [], diasSemDadosDeAnuncios: null, pagamentosRecusados: 0,
+  };
+
+  it("um serviço a começar sem o técnico ter saído é crítico e vem à frente das críticas antigas", () => {
+    const r = gerarAlertas({
+      ...base,
+      leadsPorResponder: [{ id: "12", nome: "Condomínio", recebidaEm: antes(4 * 24 * 60) }],
+      faltasIminentes: [{ servicoId: "420", tecnico: "Rui", cliente: "Ana", comecaEm: daqui(7) }],
+    }, AGORA);
+    expect(r[0].id).toBe("falta-iminente-420");
+    expect(r[0].priority).toBe("critica");
+    expect(r[0].prazo).toBe(daqui(7));
+    expect(r[1].id).toBe("lead-sem-resposta-12");
+  });
+
+  it("uma falta provável (já passou da hora) vem à frente de tudo, incluindo o que está a começar", () => {
+    const r = gerarAlertas({
+      ...base,
+      leadsPorResponder: [{ id: "12", nome: "Condomínio", recebidaEm: antes(4 * 24 * 60) }],
+      faltasIminentes: [{ servicoId: "420", tecnico: "Rui", cliente: "Ana", comecaEm: daqui(7) }],
+      faltasProvaveis: [{ servicoId: "405", tecnico: "Rui", cliente: "Inês", marcadoPara: antes(60) }],
+    }, AGORA);
+    expect(r.map((a) => a.id)).toEqual(["falta-405", "falta-iminente-420", "lead-sem-resposta-12"]);
+  });
+
+  it("entre pedidos com prazo, o mais curto primeiro", () => {
+    const pedido = { cliente: "C", tipo: "Canalização", cidade: "Lisboa", nivel: "critico" as const, motivo: "prazo_a_acabar", desde: antes(5) };
+    const r = gerarAlertas({
+      ...base,
+      pedidosComAlerta: [{ ...pedido, id: "401", prazo: daqui(5) }, { ...pedido, id: "402", prazo: daqui(2) }],
+    }, AGORA);
+    expect(r.map((a) => a.entityId)).toEqual(["402", "401"]);
+  });
+
+  it("a falta provável diz a hora como se lê: hoje, ontem ou o dia", () => {
+    const descricao = (marcadoPara: string) =>
+      gerarAlertas({ ...base, faltasProvaveis: [{ servicoId: "405", tecnico: "Rui", cliente: "Inês", marcadoPara }] }, AGORA)[0].description;
+    expect(descricao("2026-10-15T08:00:00Z")).toContain("estava marcado para hoje às 09:00");
+    expect(descricao("2026-10-14T17:30:00Z")).toContain("estava marcado para ontem às 18:30");
+    expect(descricao("2026-10-13T08:00:00Z")).toContain("estava marcado para 13/10 às 09:00");
+  });
+
+  it("uma hora que não se lê fica como veio", () => {
+    expect(quandoEmLisboa("amanhã de manhã", AGORA)).toBe("amanhã de manhã");
   });
 });

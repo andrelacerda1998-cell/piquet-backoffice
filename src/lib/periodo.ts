@@ -79,6 +79,20 @@ export function inicioDoMesSeguinteLisboa(d: Date): Date {
   return deLisboa(ano, mes0 + 1, 1);
 }
 
+/**
+ * O mesmo momento no mês anterior: o mesmo tempo decorrido desde o dia 1.
+ * É com ele que se compara um mês que ainda vai a meio. Num mês anterior mais
+ * curto pára no fim dele (31/03 compara com fevereiro inteiro).
+ */
+export function mesmoMomentoNoMesAnteriorLisboa(agora: Date): Date {
+  const inicioMes = inicioDoMesLisboa(agora);
+  const inicioMesAnterior = inicioDoMesLisboa(new Date(inicioMes.getTime() - 1));
+  return new Date(Math.min(
+    inicioMesAnterior.getTime() + (agora.getTime() - inicioMes.getTime()),
+    inicioMes.getTime(),
+  ));
+}
+
 export function inicioDoTrimestreLisboa(d: Date): Date {
   const { ano, mes0 } = partesLisboa(d);
   return deLisboa(ano, Math.floor(mes0 / 3) * 3, 1);
