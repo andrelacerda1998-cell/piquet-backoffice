@@ -2,6 +2,7 @@ import { delay } from "@/lib/utils";
 import { mockData } from "@/mocks/data";
 import type { ApiResponse } from "@/types";
 import { httpRequest, ApiError, type QueryParams } from "./http";
+import { chaveDoPedido, esquecerLeituras, registarPedido } from "@/lib/leiturasGuardadas";
 
 // Reexporta para retrocompatibilidade (código antigo importa daqui).
 export { ApiError };
@@ -41,6 +42,9 @@ export function setAuthToken(token: string): void {
 
 export function clearAuthToken(): void {
   if (typeof window !== "undefined") window.localStorage.removeItem(TOKEN_KEY);
+  // Sair (ou a sessão expirar) não pode deixar o próximo a entrar ver, nem por
+  // um instante, o que este leu.
+  esquecerLeituras();
 }
 
 /**
@@ -628,6 +632,25 @@ export function isLiveEndpoint(endpoint: string): boolean {
 }
 
 async function request<T>(endpoint: string, options: RequestOptions<T>): Promise<ApiResponse<T>> {
+  const { method = "GET", params } = options;
+
+  // Antes de qualquer `await`: é assim que o useAsyncData fica a saber que
+  // pedidos a leitura dele fez (ver src/lib/leiturasGuardadas.ts).
+  if (method === "GET") {
+    registarPedido(chaveDoPedido(endpoint, params));
+    return pedir(endpoint, options);
+  }
+
+  // Uma escrita muda o que as leituras guardadas mostrariam: esquecem-se
+  // todas, mesmo que a escrita falhe (não se sabe o que ficou feito).
+  try {
+    return await pedir(endpoint, options);
+  } finally {
+    esquecerLeituras();
+  }
+}
+
+async function pedir<T>(endpoint: string, options: RequestOptions<T>): Promise<ApiResponse<T>> {
   const { method = "GET", body, params, fetcher } = options;
 
   // Zero em vez de ficção: só leituras — as escritas devolvem o que o chamador
