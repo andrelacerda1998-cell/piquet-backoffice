@@ -95,7 +95,10 @@ export const ESCRITAS: Record<string, Escrita> = {
   "PUT /marketing/leads/[id]": { acao: "Alterou o contacto", entidade: "contacto", id: "id" },
   "DELETE /marketing/leads/[id]": { acao: "Eliminou o contacto", entidade: "contacto", id: "id" },
   "POST /marketing/attribution/match": { acao: "Associou contactos a campanhas", entidade: "campanha" },
-  "PUT /marketing/push-campaigns/[id]/active": { acao: "Ligou ou desligou uma campanha push", entidade: "campanha", id: "id" },
+  "PUT /marketing/push-campaigns/[id]/active": { acao: "Ligou ou desligou uma campanha push", entidade: "campanha", id: "id", registoProprio: true },
+  "POST /marketing/push-campaigns": { acao: "Criou uma campanha push (desligada)", entidade: "campanha" },
+  "PUT /marketing/push-campaigns/[id]": { acao: "Alterou o rascunho de uma campanha push", entidade: "campanha", id: "id" },
+  "DELETE /marketing/push-campaigns/[id]": { acao: "Apagou o rascunho de uma campanha push", entidade: "campanha", id: "id" },
   "POST /marketing/ads/campaigns": { acao: "Criou uma campanha na Meta", entidade: "campanha" },
   "POST /marketing/ads/adsets": { acao: "Criou um conjunto de anúncios na Meta", entidade: "campanha" },
   "POST /marketing/ads/ads": { acao: "Criou um anúncio na Meta", entidade: "campanha" },
@@ -128,6 +131,9 @@ export const ESCRITAS: Record<string, Escrita> = {
 export const NAO_REGISTAR: Record<string, string> = {
   // A nota é ela própria o registo: guarda quem a escreveu e quando.
   "POST /services/[id]/notas": "a nota guarda o autor",
+  // Leem, não gravam: são POST só porque levam o público ou o texto no corpo.
+  "POST /marketing/push-campaigns/publico": "conta o público, não grava nada",
+  "POST /marketing/push-campaigns/traduzir": "devolve um rascunho de tradução, não grava nada",
   "POST /customers/[id]/notas": "a nota guarda o autor",
   "POST /technicians/[id]/notas": "a nota guarda o autor",
   "POST /alerts/snooze": "adiar um alerta é arrumar a própria fila",
@@ -161,6 +167,8 @@ const ACOES_COM_NOME: Record<string, string> = {
   declarar_falta: "Declarou falta do técnico",
   cancelar_pedido: "Cancelou o pedido (o cliente não paga)",
   ler_conversa: "Leu a conversa cliente-técnico",
+  ligar_campanha_push: "Ligou uma campanha push",
+  desligar_campanha_push: "Desligou uma campanha push",
 };
 
 /** Como se lê uma ação gravada (pela chave da rota ou pelo nome próprio). */

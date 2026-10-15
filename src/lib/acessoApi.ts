@@ -201,6 +201,14 @@ export const POLITICA: Record<string, Requisito> = {
   "POST /marketing/attribution/match": qualquer("view_marketing"),
   "GET /marketing/push-campaigns": qualquer("view_marketing"),
   "PUT /marketing/push-campaigns/[id]/active": qualquer("view_marketing"),
+  // Criar é do Marketing e da direção (quem tem view_marketing): nasce
+  // desligada, e ligar pede motivo (ver src/lib/campanhasPush.ts).
+  "POST /marketing/push-campaigns": qualquer("view_marketing"),
+  "PUT /marketing/push-campaigns/[id]": qualquer("view_marketing"),
+  "DELETE /marketing/push-campaigns/[id]": qualquer("view_marketing"),
+  "POST /marketing/push-campaigns/publico": qualquer("view_marketing"),
+  "GET /marketing/push-campaigns/[id]/publico": qualquer("view_marketing"),
+  "POST /marketing/push-campaigns/traduzir": qualquer("view_marketing"),
   "GET /marketing/google-access": qualquer("view_marketing"),
   "GET /marketing/ads/list": qualquer("view_marketing"),
   "GET /marketing/ads/options": qualquer("view_marketing"),
