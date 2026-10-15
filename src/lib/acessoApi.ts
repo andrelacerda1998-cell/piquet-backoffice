@@ -100,6 +100,10 @@ export const POLITICA: Record<string, Requisito> = {
   // Tickets ligados ao pedido: são Suporte.
   "GET /services/[id]/tickets": qualquer("view_support"),
   "POST /services/[id]/tickets": qualquer("view_support"),
+  // A conversa cliente-técnico: só quem trata de reclamações (Suporte,
+  // Operações, direção), e só com um caso aberto (lib/conversaEmDisputa).
+  "GET /services/[id]/conversa": todas("view_support", "view_personal_data"),
+  "POST /services/[id]/conversa": todas("view_support", "view_personal_data"),
   "GET /custom-requests": qualquer("view_services"),
   "GET /operacoes/ao-vivo": qualquer("view_services"),
 

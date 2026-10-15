@@ -7,7 +7,7 @@ import { useDrawerA11y } from "@/hooks/useDrawerA11y";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime, formatRating } from "@/lib/formatters";
 import type { ServiceRequest } from "@/types";
-import { X, Star, Lock, Phone, MessageCircle, ArrowUpRight, ArrowRight, ChevronDown, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
+import { X, Star, Phone, MessageCircle, ArrowUpRight, ArrowRight, ChevronDown, Link2, Undo2, Send, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useAuthStore, toast } from "@/stores";
 import { hasPermission } from "@/lib/permissions";
 import { ReembolsoDialog } from "@/components/ui/ReembolsoDialog";
@@ -24,6 +24,7 @@ import { clienteHref, tecnicoHref, pedidoHref } from "@/lib/fichas";
 import { EstadoDoPedido } from "@/components/ui/EstadoDoPedido";
 import { NotasInternas } from "@/components/ui/NotasInternas";
 import { TicketsDoPedido } from "@/components/ui/TicketsDoPedido";
+import { ConversaDoPedido } from "@/components/ui/ConversaDoPedido";
 
 /*
   ——— O que saiu deste painel, e porquê ———
@@ -151,7 +152,7 @@ export function ServiceDetailDrawer({ service, onClose, acaoInicial = null, foca
                 <Fotos estado={fotos} />
               </Seccao>
               <Seccao titulo="Histórico da equipa"><HistoricoDaEquipa key={detalhe.versao} entidade="pedido" id={service.id} /></Seccao>
-              <Seccao titulo="Conversa" fechada><Conversa service={service} /></Seccao>
+              <Seccao titulo="Conversa" fechada><ConversaDoPedido servicoId={service.id} tecnico={service.technicianName ?? null} /></Seccao>
             </div>
             <div className="space-y-5 min-w-0">
               <Seccao titulo="Pedido"><Resumo service={service} detalhe={d} /></Seccao>
@@ -716,41 +717,6 @@ function Fotos({ estado: { fotos, erro } }: { estado: EstadoDasFotos }) {
       </div>
       <p className="text-[11px] text-text-muted">
         As ligações expiram ao fim de uma hora. Se alguma deixar de abrir, fecha e volta a abrir o painel.
-      </p>
-    </div>
-  );
-}
-
-/**
- * Onde está a conversa — e porque é que não está aqui.
- *
- * Aqui estavam três frases escritas no código ("Boa tarde, o problema é
- * urgente. Conseguem hoje?"), iguais em todos os serviços, com uma caixa de
- * escrever que não enviava para lado nenhum.
- *
- * A conversa existe mesmo, mas é entre o cliente e o técnico ATRIBUÍDO, nas
- * apps, cifrada com a chave do próprio serviço. Não há hoje forma de a ler
- * daqui: a API de admin não expõe mensagens. Dizer isto é mais útil do que
- * um separador que finge.
- */
-function Conversa({ service }: { service: ServiceRequest }) {
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl bg-surface-subtle px-4 py-3">
-        <p className="text-sm font-medium text-text-primary inline-flex items-center gap-2">
-          <Lock className="h-4 w-4 text-text-muted" />
-          A conversa deste serviço não passa por aqui
-        </p>
-        <p className="mt-1 text-sm text-text-secondary">
-          {service.technicianName
-            ? <>É entre o cliente e <strong className="text-text-primary">{service.technicianName}</strong>, dentro das apps, cifrada com a chave deste serviço.</>
-            : <>Só existe depois de haver técnico atribuído — sem segunda pessoa não há conversa. Este pedido ainda não tem técnico.</>}
-        </p>
-      </div>
-      <p className="text-xs text-text-secondary">
-        O backoffice não tem forma de a ler: a API de admin não expõe as mensagens. Se precisares delas para resolver
-        uma disputa, é preciso criar esse acesso de propósito — e decidir antes se o staff deve poder ler conversas
-        privadas entre duas pessoas.
       </p>
     </div>
   );
