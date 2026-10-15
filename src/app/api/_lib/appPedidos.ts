@@ -4,6 +4,7 @@ import { laravelAdminRequest } from "@/lib/laravelAdmin";
 import { servicesFromLaravel, type LaravelServiceRow } from "./laravelServices";
 import { resolveCategoryId } from "@/lib/categories";
 import type { LeadStageId } from "@/lib/leadStages";
+import type { LeadLossReasonId } from "@/lib/leadLossReasons";
 
 /**
  * Traz para o backoffice os pedidos feitos na app.
@@ -31,9 +32,13 @@ import type { LeadStageId } from "@/lib/leadStages";
  */
 const ESTADO: Record<string, LeadStageId> = {
   Pending: "novo",
+  // Pedido personalizado à espera de o backoffice definir tempo e categorias.
+  PendingReview: "novo",
   Matching: "a_procurar",
   MatchingFailed: "perdido",
   Accepted: "com_tecnico",
+  Scheduled: "com_tecnico",
+  Arrived: "com_tecnico",
   AwaitingPayment: "com_tecnico",
   Pending3DS: "com_tecnico",
   ClosedPendingPayment: "com_tecnico",
@@ -41,12 +46,28 @@ const ESTADO: Record<string, LeadStageId> = {
   Finished: "concluido",
   Canceled: "perdido",
   Refused: "perdido",
+  Archived: "perdido",
+  // O pagamento não chegou a acontecer: o pedido morreu no checkout.
+  RefusedMbway: "perdido",
+  ExpiredMbway: "perdido",
+  CanceledMbway: "perdido",
+  Expired3DS: "perdido",
 };
 
-const MOTIVO_PERDA: Record<string, string> = {
-  MatchingFailed: "sem_tecnico",
-  Canceled: "desistiu",
-  Refused: "sem_tecnico",
+/**
+ * O motivo da perda, da lista fechada do CRM (lib/leadLossReasons), e uma nota
+ * quando "outro" não diz o suficiente. Era "desistiu" no cancelamento, que
+ * não está na lista: o ecrã mostrava o motivo em branco.
+ */
+const MOTIVO_PERDA: Record<string, { motivo: LeadLossReasonId; nota?: string }> = {
+  MatchingFailed: { motivo: "sem_tecnico" },
+  Refused: { motivo: "sem_tecnico" },
+  Canceled: { motivo: "outro", nota: "Cancelado na app" },
+  Archived: { motivo: "outro", nota: "Arquivado no backoffice" },
+  RefusedMbway: { motivo: "outro", nota: "MB Way recusado pelo cliente" },
+  ExpiredMbway: { motivo: "outro", nota: "MB Way não confirmado a tempo" },
+  CanceledMbway: { motivo: "outro", nota: "Cancelou no ecrã do MB Way" },
+  Expired3DS: { motivo: "outro", nota: "Cartão sem a confirmação 3DS" },
 };
 
 export interface ResultadoSync {
@@ -61,6 +82,13 @@ export interface ResultadoSync {
   */
   semEstado: number;
   semContacto: number;
+  /**
+   * Os que o Supabase recusou gravar, e o primeiro motivo. Contavam-se só os
+   * que gravavam: com duas colunas por migrar, 71 de 100 falhavam sem que
+   * nada o dissesse (15/10/2026).
+   */
+  falhados: number;
+  primeiraFalha?: string;
   /** Quantos serviços o Laravel diz ter no total, além da página lida. */
   total?: number;
   erro?: string;
@@ -102,7 +130,13 @@ export function resumo(r: ResultadoSync): string {
   ];
   if (r.semEstado) partes.push(`${r.semEstado} com estado desconhecido`);
   if (r.semContacto) partes.push(`${r.semContacto} sem nome nem telefone`);
+  if (r.falhados) partes.push(`${r.falhados} falharam ao gravar${r.primeiraFalha ? ` (${r.primeiraFalha})` : ""}`);
   return partes.join(" · ");
+}
+
+/** Correu bem só se leu e gravou tudo: uma gravação falhada também é falha. */
+export function correuBem(r: ResultadoSync): boolean {
+  return !r.erro && r.falhados === 0;
 }
 
 export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | null> {
@@ -121,10 +155,12 @@ export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | n
     // Sem registo não se sabe quando foi a última: sincroniza.
   }
 
-  const r = await sincronizarPedidosDaApp();
+  // Ao abrir a lista basta a primeira página (os mais recentes); a corrida
+  // diária é que lê tudo.
+  const r = await sincronizarPedidosDaApp({ paginas: 1 });
   try {
     await supabaseAdmin().from("cron_runs").insert({
-      job: "app-requests", ok: !r.erro,
+      job: "app-requests", ok: correuBem(r),
       detail: (r.erro ?? resumo(r)).slice(0, 900),
       upserted: r.criados + r.atualizados,
     });
@@ -132,34 +168,67 @@ export async function sincronizarSeVelho(minutos = 3): Promise<ResultadoSync | n
   return r;
 }
 
-export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSync> {
-  const vazio: ResultadoSync = { lidos: 0, criados: 0, atualizados: 0, ignorados: 0, semEstado: 0, semContacto: 0 };
+/** O Laravel não dá mais de 100 por página; 30 páginas chegam para 3000 pedidos. */
+const POR_PAGINA = 100;
+const MAXIMO_DE_PAGINAS = 30;
+
+/**
+ * @param paginas quantas páginas ler, das mais recentes para as mais antigas.
+ *                Por omissão todas: lia-se só a primeira, e os pedidos para lá
+ *                dos 100 mais recentes nunca chegavam aos Contactos.
+ */
+export async function sincronizarPedidosDaApp({ paginas = MAXIMO_DE_PAGINAS }: { paginas?: number } = {}): Promise<ResultadoSync> {
+  const vazio: ResultadoSync = { lidos: 0, criados: 0, atualizados: 0, ignorados: 0, semEstado: 0, semContacto: 0, falhados: 0 };
   if (!servicesFromLaravel()) {
     return { ...vazio, erro: "LARAVEL_SERVICES_ENABLED não está ligado." };
   }
 
-  let itens: LaravelServiceRow[] = [];
-  try {
-    const r = await laravelAdminRequest<{ items: LaravelServiceRow[]; meta?: { total?: number } }>(
-      `/v1/admin/services?per_page=${limite}`,
-    );
-    itens = r.items ?? [];
-    vazio.total = r.meta?.total;
-  } catch (e) {
-    return { ...vazio, erro: e instanceof Error ? e.message : "Falha ao ler os serviços." };
+  const res: ResultadoSync = { ...vazio };
+  const limite = Math.min(paginas, MAXIMO_DE_PAGINAS);
+
+  for (let pagina = 1; pagina <= limite; pagina++) {
+    let itens: LaravelServiceRow[];
+    let ultima = 1;
+    try {
+      const r = await laravelAdminRequest<{ items: LaravelServiceRow[]; meta?: { total?: number; last_page?: number } }>(
+        `/v1/admin/services?per_page=${POR_PAGINA}&page=${pagina}`,
+      );
+      itens = r.items ?? [];
+      res.total = r.meta?.total;
+      ultima = r.meta?.last_page ?? 1;
+    } catch (e) {
+      // A primeira página a falhar é erro; uma das seguintes deixa o que já
+      // se gravou e diz onde parou.
+      const motivo = e instanceof Error ? e.message : "Falha ao ler os serviços.";
+      return { ...res, erro: pagina === 1 ? motivo : `parou na página ${pagina}: ${motivo}` };
+    }
+
+    res.lidos += itens.length;
+    await gravarPagina(itens, res);
+    if (pagina >= ultima || itens.length === 0) break;
   }
 
-  const db = supabaseAdmin();
-  const res: ResultadoSync = { ...vazio, lidos: itens.length };
+  return res;
+}
 
-  // Quais já cá estão. Uma leitura só, em vez de uma por serviço.
+async function gravarPagina(itens: LaravelServiceRow[], res: ResultadoSync): Promise<void> {
+  const db = supabaseAdmin();
+
+  // Quais já cá estão. Uma leitura por página, em vez de uma por serviço.
   const ids = itens.map((r) => String(r.id));
   const { data: existentes } = await db
-    .from("leads").select("id, laravel_service_id, stage").in("laravel_service_id", ids);
+    .from("leads").select("id, laravel_service_id, stage, loss_reason").in("laravel_service_id", ids);
   const porServico = new Map(
-    ((existentes ?? []) as { id: string; laravel_service_id: string; stage: string }[])
+    ((existentes ?? []) as { id: string; laravel_service_id: string; stage: string; loss_reason: string | null }[])
       .map((l) => [l.laravel_service_id, l]),
   );
+
+  const falhou = (error: { message?: string } | null) => {
+    if (!error) return false;
+    res.falhados++;
+    res.primeiraFalha ??= error.message ?? "erro desconhecido";
+    return true;
+  };
 
   for (const r of itens) {
     const estadoLaravel = String(r.status ?? "");
@@ -184,22 +253,25 @@ export async function sincronizarPedidosDaApp(limite = 100): Promise<ResultadoSy
     };
     const categoria = resolveCategoryId(r.category_name ?? r.service_name);
     if (categoria) linha.category_id = categoria;
-    if (MOTIVO_PERDA[estadoLaravel]) linha.loss_reason = MOTIVO_PERDA[estadoLaravel];
 
     const ja = porServico.get(String(r.id));
+    /*
+      O motivo da perda só se escreve quando ainda não há nenhum: o que a
+      equipa escreveu à mão não pode ser apagado por uma sincronização (como
+      as notas e a conversa de WhatsApp, que nem se tocam).
+    */
+    const perda = MOTIVO_PERDA[estadoLaravel];
+    if (perda && !ja?.loss_reason) {
+      linha.loss_reason = perda.motivo;
+      if (perda.nota) linha.loss_note = perda.nota;
+    }
+
     if (ja) {
-      /*
-        Só se actualiza o que vem do Laravel. As notas internas, o motivo de
-        perda escrito à mão e a conversa de WhatsApp são trabalho feito aqui e
-        não podem ser apagados por uma sincronização.
-      */
       const { error } = await db.from("leads").update(linha).eq("id", ja.id);
-      if (!error) res.atualizados++;
+      if (!falhou(error)) res.atualizados++;
     } else {
       const { error } = await db.from("leads").insert({ ...linha, created_at: r.requested_at ?? undefined });
-      if (!error) res.criados++;
+      if (!falhou(error)) res.criados++;
     }
   }
-
-  return res;
 }

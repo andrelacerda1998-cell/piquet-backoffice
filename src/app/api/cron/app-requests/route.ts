@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verificarChave } from "../../_lib/webhookAuth";
 import { SUPABASE_ENABLED } from "@/lib/supabase/server";
-import { sincronizarPedidosDaApp, resumo } from "../../_lib/appPedidos";
+import { sincronizarPedidosDaApp, resumo, correuBem } from "../../_lib/appPedidos";
 import { logCronRun } from "../../_lib/cronlog";
 
 /**
@@ -32,6 +32,6 @@ export async function GET(req: Request) {
   }
 
   const r = await sincronizarPedidosDaApp();
-  await logCronRun("app-requests", !r.erro, r.erro ?? resumo(r), r.criados + r.atualizados);
+  await logCronRun("app-requests", correuBem(r), r.erro ? `${r.erro} · ${resumo(r)}` : resumo(r), r.criados + r.atualizados);
   return NextResponse.json(r, { status: r.erro ? 503 : 200 });
 }
