@@ -57,6 +57,7 @@ export const ESCRITAS: Record<string, Escrita> = {
   "POST /services/[id]/tentar-cobrar": { acao: "Tentou cobrar de novo", entidade: "pedido", id: "id" },
   "POST /services/[id]/desistir-e-devolver": { acao: "Desistiu da cobrança e devolveu ao cliente", entidade: "pedido", id: "id", registoProprio: true },
   "POST /services/[id]/cancelar": { acao: "Cancelou o pedido (o cliente não paga)", entidade: "pedido", id: "id", registoProprio: true },
+  "POST /services/[id]/conversa": { acao: "Leu a conversa cliente-técnico", entidade: "pedido", id: "id", registoProprio: true },
 
   // Técnicos
   "POST /technicians/test-account": { acao: "Criou uma conta de teste", entidade: "tecnico" },
@@ -159,6 +160,7 @@ const ACOES_COM_NOME: Record<string, string> = {
   desistir_e_devolver: "Desistiu da cobrança e devolveu ao cliente",
   declarar_falta: "Declarou falta do técnico",
   cancelar_pedido: "Cancelou o pedido (o cliente não paga)",
+  ler_conversa: "Leu a conversa cliente-técnico",
 };
 
 /** Como se lê uma ação gravada (pela chave da rota ou pelo nome próprio). */

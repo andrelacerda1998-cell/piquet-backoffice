@@ -16,7 +16,16 @@ const TOKEN = process.env.LARAVEL_ADMIN_API_TOKEN ?? "";
 /** `true` quando a API de admin do Laravel está configurada. */
 export const LARAVEL_ADMIN_ENABLED = BASE.length > 0 && TOKEN.length > 0;
 
-type Opcoes = { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown };
+type Opcoes = {
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  body?: unknown;
+  /**
+   * Quem do staff está por trás do pedido (X-Staff-Email / X-Staff-Nome, ver
+   * App\Services\Auditoria\StaffDoBackoffice no backend). O nome vai com
+   * encodeURIComponent: o fetch do Node não manda "André" num cabeçalho.
+   */
+  staff?: { email: string; nome?: string };
+};
 
 export async function laravelAdminRequest<T>(endpoint: string, opts: Opcoes = {}): Promise<T> {
   return (await laravelAdminRequestComMeta<T>(endpoint, opts)).data;
@@ -40,7 +49,11 @@ export async function laravelAdminRequestComMeta<T, M = Record<string, unknown>>
   const json = await httpRequest<{ data: T; metaData?: Partial<M> }>(BASE, endpoint, {
     method: opts.method ?? "GET",
     body: opts.body,
-    headers: { Authorization: `Bearer ${TOKEN}` },
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      ...(opts.staff ? { "X-Staff-Email": opts.staff.email } : {}),
+      ...(opts.staff?.nome ? { "X-Staff-Nome": encodeURIComponent(opts.staff.nome) } : {}),
+    },
   });
 
   return { data: json.data, metaData: json.metaData };

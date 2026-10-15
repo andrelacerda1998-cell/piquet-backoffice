@@ -193,3 +193,20 @@ export async function abrirTicketDoPedido(
     throw new Error("Abrir tickets precisa do Supabase configurado.");
   }).then((r) => r.data);
 }
+
+/* ------------------------- Conversa (só em disputas) ------------------------- */
+
+import type { EstadoDaConversa, MensagemDaConversa } from "@/lib/conversaEmDisputa";
+
+/** Os casos abertos do pedido e quem já leu a conversa (nunca o conteúdo). */
+export async function getEstadoDaConversa(servicoId: string): Promise<EstadoDaConversa> {
+  return apiGet<EstadoDaConversa>(`/services/${servicoId}/conversa`, () => ({ ligado: false, casos: [], mensagens: 0, leituras: [] }))
+    .then((r) => r.data);
+}
+
+/** Lê a conversa para um caso, com o motivo. Fica registado em nome de quem lê. */
+export async function lerConversa(servicoId: string, caso: string, motivo: string): Promise<MensagemDaConversa[]> {
+  return apiPost<{ mensagens: MensagemDaConversa[] }>(`/services/${servicoId}/conversa`, { caso, motivo }, () => {
+    throw new Error("Ler a conversa precisa da ligação ao Laravel.");
+  }).then((r) => r.data.mensagens);
+}

@@ -12,7 +12,7 @@ import type { StaffContext } from "./handler";
  */
 export type AcaoDaEquipa =
   | "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento" | "fechar_pedido" | "desistir_e_devolver"
-  | "declarar_falta" | "cancelar_pedido";
+  | "declarar_falta" | "cancelar_pedido" | "ler_conversa";
 export type Entidade = "cliente" | "tecnico" | "pagamento" | "pedido";
 
 export interface RegistoDeAcao {
