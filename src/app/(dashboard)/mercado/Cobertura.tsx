@@ -79,7 +79,8 @@ export default function Cobertura() {
     à parte: os dois podem chegar em alturas diferentes.
   */
   const pelasCidades = (technicianCoverage?.open ?? []).some((z) => z.nas_cidades !== undefined);
-  const ofertaPelasCidades = (coverage ?? []).some((z) => z.oferta_cidades !== undefined);
+  const ofertaPelasCidades = (coverage?.cidades ?? []).some((z) => z.oferta_cidades !== undefined);
+  const foraDasCidades = coverage?.foraDasCidades ?? 0;
   const semCidades = technicianCoverage?.sem_cidades;
 
   // As zonas com menos gente primeiro; as que não dá para medir no fim.
@@ -94,14 +95,14 @@ export default function Cobertura() {
   // NÃO significa que não haja técnicos na zona, significa que não está
   // medido. Pelas cidades escolhidas há sempre medida, e isto não se aplica.
   const coberturaPorMedir = useMemo(() => {
-    const zonas = coverage ?? [];
+    const zonas = coverage?.cidades ?? [];
     return !ofertaPelasCidades && zonas.length > 0 && zonas.every((z) => z.oferta === 0);
   }, [coverage, ofertaPelasCidades]);
   // Onde falta gente: primeiro onde não há ninguém, depois onde não se sabe
   // (cidade fora do catálogo), depois onde há mais procura do que técnicos.
   const zonasEmFalta = useMemo(() => {
     const ordem = (z: ProcuraEOferta) => (porMedir(z.contagem) ? 1 : ofertaDe(z) === 0 ? 0 : 2);
-    return [...(coverage ?? [])]
+    return [...(coverage?.cidades ?? [])]
       .filter((z) => z.procura > 0 && (porMedir(z.contagem) || ofertaDe(z) === 0 || z.procura > ofertaDe(z)))
       .sort((a, b) => ordem(a) - ordem(b) || b.procura - a.procura)
       .slice(0, 8);
@@ -230,7 +231,7 @@ export default function Cobertura() {
               const oferta = ofertaDe(z);
               const semMedida = porMedir(z.contagem);
               return (
-                <Barra key={z.name} nome={z.name}
+                <Barra key={`${z.name}·${z.district ?? ""}`} nome={z.name}
                   valor={<>
                     {z.procura} pedido{z.procura === 1 ? "" : "s"}
                     {semMedida ? " · por medir" : !coberturaPorMedir && ` · ${oferta} técnico${oferta === 1 ? "" : "s"}`}
@@ -247,6 +248,12 @@ export default function Cobertura() {
                       : undefined} />
               );
             })}
+            {foraDasCidades > 0 && (
+              <p className="text-xs text-text-muted">
+                Cada pedido conta na cidade onde fica a morada. {foraDasCidades} pedido{foraDasCidades === 1 ? " fica" : "s ficam"} fora
+                de todas as cidades do catálogo e não {foraDasCidades === 1 ? "entra" : "entram"} nesta lista.
+              </p>
+            )}
           </Painel>
 
           {/* Onde abrir a seguir — candidatas por interesse declarado. */}

@@ -16,10 +16,20 @@ const TOKEN = process.env.LARAVEL_ADMIN_API_TOKEN ?? "";
 /** `true` quando a API de admin do Laravel está configurada. */
 export const LARAVEL_ADMIN_ENABLED = BASE.length > 0 && TOKEN.length > 0;
 
-export async function laravelAdminRequest<T>(
+type Opcoes = { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown };
+
+export async function laravelAdminRequest<T>(endpoint: string, opts: Opcoes = {}): Promise<T> {
+  return (await laravelAdminRequestComMeta<T>(endpoint, opts)).data;
+}
+
+/**
+ * O mesmo, com o `metaData` da resposta: o Laravel põe lá o que não cabe na
+ * lista sem lhe mudar a forma (ex.: os pedidos fora das cidades da Cobertura).
+ */
+export async function laravelAdminRequestComMeta<T, M = Record<string, unknown>>(
   endpoint: string,
-  opts: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown } = {}
-): Promise<T> {
+  opts: Opcoes = {}
+): Promise<{ data: T; metaData: Partial<M> | undefined }> {
   if (!LARAVEL_ADMIN_ENABLED) {
     throw new ApiError(
       "API de admin do Laravel não configurada (LARAVEL_ADMIN_API_URL / LARAVEL_ADMIN_API_TOKEN).",
@@ -27,11 +37,11 @@ export async function laravelAdminRequest<T>(
     );
   }
 
-  const json = await httpRequest<{ data: T; metaData?: unknown }>(BASE, endpoint, {
+  const json = await httpRequest<{ data: T; metaData?: Partial<M> }>(BASE, endpoint, {
     method: opts.method ?? "GET",
     body: opts.body,
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
 
-  return json.data;
+  return { data: json.data, metaData: json.metaData };
 }
