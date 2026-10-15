@@ -3,7 +3,7 @@ import {
   deLisboa, partesLisboa, inicioDoDiaLisboa, fimDoDiaLisboa,
   inicioDoMesLisboa, inicioDoMesSeguinteLisboa,
   inicioDoTrimestreLisboa, inicioDoTrimestreSeguinteLisboa,
-  inicioDoAnoLisboa, mesesNoIntervalo,
+  inicioDoAnoLisboa, mesesNoIntervalo, mesmoMomentoNoMesAnteriorLisboa,
 } from "./periodo";
 
 describe("fronteiras em Europe/Lisbon", () => {
@@ -82,5 +82,22 @@ describe("mesesNoIntervalo", () => {
   it("intervalo invertido ou nulo não devolve negativo", () => {
     expect(mesesNoIntervalo(new Date("2026-08-19"), new Date("2026-08-19"))).toBe(0);
     expect(mesesNoIntervalo(new Date("2026-08-19"), new Date("2026-01-01"))).toBe(0);
+  });
+});
+
+describe("mesmoMomentoNoMesAnteriorLisboa", () => {
+  it("a 15/10 às 10:56 compara com 15/09 às 10:56", () => {
+    const agora = deLisboa(2026, 9, 15, 10, 56);
+    expect(mesmoMomentoNoMesAnteriorLisboa(agora).toISOString()).toBe(deLisboa(2026, 8, 15, 10, 56).toISOString());
+  });
+
+  it("num mês anterior mais curto pára no fim dele: 31/03 compara com fevereiro inteiro", () => {
+    const agora = deLisboa(2026, 2, 31, 12, 0);
+    expect(mesmoMomentoNoMesAnteriorLisboa(agora).toISOString()).toBe(deLisboa(2026, 2, 1).toISOString());
+  });
+
+  it("no dia 1 à meia-noite compara com o dia 1 do mês anterior à meia-noite", () => {
+    const agora = deLisboa(2026, 9, 1);
+    expect(mesmoMomentoNoMesAnteriorLisboa(agora).toISOString()).toBe(deLisboa(2026, 8, 1).toISOString());
   });
 });

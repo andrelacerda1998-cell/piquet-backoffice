@@ -512,14 +512,16 @@ function FinancePageInner() {
               {/* GMV: o cobrado no Payshop (ver api/_lib/gmv.ts) — o mesmo da
                   Visão Geral e de todo o Financeiro. */}
               {(() => {
-                const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0);
-                const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0);
+                // A seta compara com os mesmos dias do mês passado (o mês corrente ainda vai a meio).
+                const comparar = gmvData?.prevMonthToDate ?? gmvData?.prevMonth;
+                const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, comparar?.gmv ?? 0);
+                const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, comparar?.commission ?? 0);
                 return (
                   <StatGroup title="Negócio do mês" cols={4}>
-                    <Stat label="GMV do mês" value={formatCurrency(gmvMes.value)}>
+                    <Stat label="GMV do mês" value={formatCurrency(gmvMes.value)} info="A seta compara com os mesmos dias do mês passado.">
                       {gmvMes.changePercent !== 0 && <TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />}
                     </Stat>
-                    <Stat label="Comissão Piquet do mês" value={formatCurrency(comissaoMes.value)}>
+                    <Stat label="Comissão Piquet do mês" value={formatCurrency(comissaoMes.value)} info="A seta compara com os mesmos dias do mês passado.">
                       {comissaoMes.changePercent !== 0 && <TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />}
                     </Stat>
                     {/*

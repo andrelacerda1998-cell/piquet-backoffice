@@ -57,9 +57,11 @@ function OverviewPageInner() {
   if (loading && !gmvData) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
-  // GMV e comissão: o cobrado no Payshop (ver api/_lib/gmv.ts).
-  const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, gmvData?.prevMonth.gmv ?? 0, false);
-  const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, gmvData?.prevMonth.commission ?? 0, false);
+  // GMV e comissão: o cobrado no Payshop (ver api/_lib/gmv.ts). A seta compara
+  // com os mesmos dias do mês passado: o mês corrente ainda vai a meio.
+  const comparar = gmvData?.prevMonthToDate ?? gmvData?.prevMonth;
+  const gmvMes = buildMetricValue(gmvData?.month.gmv ?? 0, comparar?.gmv ?? 0, false);
+  const comissaoMes = buildMetricValue(gmvData?.month.commission ?? 0, comparar?.commission ?? 0, false);
 
   /*
     Resultado do mês = comissão da Piquet no mês − custos imputados ao mês.
@@ -165,14 +167,14 @@ function OverviewPageInner() {
                   )}
                   <Stat
                     label="GMV"
-                    info="Tudo o que o Payshop cobrou este mês (pagamentos de 10 € ou mais; abaixo são testes)."
+                    info="Tudo o que o Payshop cobrou este mês (pagamentos de 10 € ou mais; abaixo são testes). A seta compara com os mesmos dias do mês passado."
                     value={formatCurrency(gmvMes.value)}
                   >
                     <TrendIndicator value={gmvMes.changePercent} trend={gmvMes.trend} />
                   </Stat>
                   <Stat
                     label="Comissão Piquet"
-                    info="A parte do GMV que fica para a Piquet (25%)."
+                    info="A parte do GMV que fica para a Piquet (25%). A seta compara com os mesmos dias do mês passado."
                     value={formatCurrency(comissaoMes.value)}
                   >
                     <TrendIndicator value={comissaoMes.changePercent} trend={comissaoMes.trend} />

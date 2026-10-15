@@ -87,6 +87,8 @@ export const GET = withStaff(async (_req, { staff }) => {
         id: String(p.id), cliente: p.cliente, tipo: p.tipo, cidade: p.cidade,
         nivel: p.alerta!.nivel, motivo: p.alerta!.motivo, desde: p.criado_em,
         estadoDesde: p.estado_desde ?? null,
+        // Só os que estão à procura de técnico têm prazo (o fim dos convites).
+        prazo: "prazo" in p ? p.prazo : null,
       })),
     pedidosPerdidos: (aoVivo?.perdidos ?? []).map((p) => ({
       id: String(p.id), cliente: p.cliente, tipo: p.tipo, cidade: p.cidade,
@@ -96,7 +98,9 @@ export const GET = withStaff(async (_req, { staff }) => {
       servicoId: String(f.service_id),
       tecnico: f.vendor?.name ?? null,
       cliente: f.customer?.name ?? null,
-      marcadoPara: f.scheduled_day ? [f.scheduled_day, f.scheduled_time?.slice(0, 5)].filter(Boolean).join(" ") : null,
+      // O instante, em Lisboa, e não "2026-10-15 09:00": o alerta escreve-o
+      // como "hoje às 09:00", e o Safari não lê aquele formato como data.
+      marcadoPara: inicioMarcado(f.scheduled_day, f.scheduled_time),
     })),
     faltasIminentes: (faltas?.avisos ?? []).flatMap((f) => {
       const comecaEm = inicioMarcado(f.scheduled_day, f.scheduled_time);

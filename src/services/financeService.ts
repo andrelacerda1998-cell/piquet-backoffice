@@ -226,7 +226,13 @@ export async function getUnitEconomics(): Promise<UnitEconomics> {
 export interface GmvPeriod { gmv: number; commission: number }
 export interface GmvData {
   month: GmvPeriod;
+  /** O mês anterior inteiro. */
   prevMonth: GmvPeriod;
+  /**
+   * Os mesmos dias do mês anterior (até ao mesmo momento): é com este que o
+   * mês corrente, ainda a meio, se compara. Opcional: a rota antiga não o manda.
+   */
+  prevMonthToDate?: GmvPeriod;
   prevYearSame: GmvPeriod;
   year: GmvPeriod;
 }
@@ -235,7 +241,7 @@ export interface GmvData {
 export async function getFinanceGmv(): Promise<GmvData> {
   const zero = { gmv: 0, commission: 0 };
   return apiGet<GmvData>("/finance/gmv", () => ({
-    month: zero, prevMonth: zero, prevYearSame: zero, year: zero,
+    month: zero, prevMonth: zero, prevMonthToDate: zero, prevYearSame: zero, year: zero,
   })).then((r) => r.data);
 }
 

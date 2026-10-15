@@ -327,6 +327,12 @@ export interface DashboardAlert {
    * (Financeiro, Marketing) e fora da fila "Precisa de ti".
    */
   lembrete?: boolean;
+  /**
+   * Até quando ainda dá para agir (ISO): a hora a que o serviço começa, o fim
+   * dos convites. Dentro da mesma urgência, o prazo mais curto vem primeiro
+   * (ver src/lib/ordemDosAlertas.ts).
+   */
+  prazo?: string;
 }
 
 export interface MarketingCampaign {

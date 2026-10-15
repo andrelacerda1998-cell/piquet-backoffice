@@ -36,8 +36,8 @@ import { destinoDoAlerta as destino } from "@/lib/alertLinks";
  * por muito tempo que leve.
  */
 const GRUPOS: Array<{ p: AlertPriority; titulo: string; nota: string }> = [
-  { p: "critica", titulo: "Resolver hoje", nota: "Parado há demasiado tempo, ou com prazo legal ultrapassado" },
-  { p: "alta", titulo: "Tratar esta semana", nota: "Está à nossa espera" },
+  { p: "critica", titulo: "Resolver hoje", nota: "Prazo a acabar, parado há demasiado tempo, ou prazo legal ultrapassado" },
+  { p: "alta", titulo: "Tratar hoje", nota: "Está à nossa espera" },
   { p: "media", titulo: "A acompanhar", nota: "Depende de terceiros ou não bloqueia nada" },
   { p: "baixa", titulo: "Informativo", nota: "" },
 ];

@@ -1,4 +1,5 @@
 import type { DashboardAlert, AlertPriority, Permission } from "@/types";
+import { ordenarAlertas } from "@/lib/ordemDosAlertas";
 
 /**
  * Regras que transformam o estado real do negócio em alertas.
@@ -57,13 +58,15 @@ export interface SinaisDoNegocio {
     nivel: "critico" | "atencao" | "info"; motivo: string; desde: string | null;
     /** Quando o pedido entrou no estado em que está (o backend novo manda-o). */
     estadoDesde?: string | null;
+    /** Até quando correm os convites (os pedidos à procura de técnico). */
+    prazo?: string | null;
   }>;
   /** Pedidos que acabaram sem ser servidos, com o desfecho. */
   pedidosPerdidos?: Array<{
     id: string; cliente: string | null; tipo: string | null; cidade: string | null;
     desfecho: string; criadoEm: string | null;
   }>;
-  /** Serviços marcados em que o técnico não marcou "a caminho". */
+  /** Serviços marcados em que o técnico não marcou "a caminho". `marcadoPara`: o instante (ISO). */
   faltasProvaveis?: Array<{ servicoId: string; tecnico: string | null; cliente: string | null; marcadoPara: string | null }>;
   /** Lotes de pagamento a técnicos criados e à espera de outra pessoa. */
   lotesPorAprovar?: Array<{ id: string; total: number; criadoEm: string; criadoPor: string | null }>;
@@ -150,6 +153,22 @@ export const DONOS: Record<string, Permission[]> = {
   mercado: ["view_services", "view_technicians"],
 };
 
+/**
+ * "hoje às 09:00", "ontem às 18:30", "13/10 às 09:00", em Lisboa. Chegava
+ * "2026-10-15 09:00" tal e qual, que nem se lê bem nem o Safari sabe ler como
+ * data.
+ */
+export function quandoEmLisboa(iso: string, agoraMs: number): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const dia = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Lisbon" });
+  const hora = new Date(t).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
+  if (dia(t) === dia(agoraMs)) return `hoje às ${hora}`;
+  if (dia(t) === dia(agoraMs - 86_400_000)) return `ontem às ${hora}`;
+  const [, mes, d] = dia(t).split("-");
+  return `${d}/${mes} às ${hora}`;
+}
+
 /** "8 min", "3 h", "2 dias". */
 function duracao(ms: number): string {
   const min = Math.max(1, Math.round(ms / 60_000));
@@ -195,7 +214,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
     id: string, type: DashboardAlert["type"], priority: AlertPriority,
     title: string, description: string, recommendedAction: string,
     createdAt: string, entityType?: string, entityId?: string,
-    extra: { donos?: Permission[]; lembrete?: boolean } = {},
+    extra: { donos?: Permission[]; lembrete?: boolean; prazo?: string } = {},
   ): DashboardAlert => ({
     id, type, priority, title, description, createdAt,
     status: "novo", recommendedAction, entityType, entityId, ...extra,
@@ -250,7 +269,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       [p.cliente, p.tipo, p.cidade].filter(Boolean).join(" · ") || "Pedido sem detalhe",
       m.accao,
       p.estadoDesde ?? p.desde ?? new Date(agoraMs).toISOString(), "pedido", p.id,
-      { donos: p.motivo === "pagamento_por_capturar" ? DONOS.cobranca : DONOS.operacao },
+      { donos: p.motivo === "pagamento_por_capturar" ? DONOS.cobranca : DONOS.operacao, prazo: p.prazo ?? undefined },
     ));
   }
 
@@ -271,17 +290,20 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
   }
 
   // --- Faltas ---------------------------------------------------------------
-  // A começar já e o técnico ainda não saiu: ainda dá para ligar e salvar.
+  // A começar já e o técnico ainda não saiu: crítica, porque a janela para
+  // ligar e salvar é de minutos. O prazo é a hora de início, e põe-na à frente
+  // da fila (ver ordemDosAlertas). Era "alta" e ordenava-se pela data, que está
+  // no futuro: ia parar ao fim, fora do "Precisa de ti" (simulação de 15/10).
   for (const f of s.faltasIminentes ?? []) {
     const hora = new Date(f.comecaEm).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" });
     alertas.push(novo(
       `falta-iminente-${f.servicoId}`,
       "operacional",
-      "alta",
+      "critica",
       `Pedido #${f.servicoId} começa às ${hora} e o técnico ainda não saiu`,
       `${f.tecnico ?? "O técnico"} não marcou "a caminho"${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
       "Ligar ao técnico para confirmar que vai.",
-      f.comecaEm, "pedido", f.servicoId, { donos: DONOS.operacao },
+      f.comecaEm, "pedido", f.servicoId, { donos: DONOS.operacao, prazo: f.comecaEm },
     ));
   }
   // Já passou da hora e não começou: crítica, há um cliente em casa à espera.
@@ -291,9 +313,11 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
       "operacional",
       "critica",
       `Possível falta no pedido #${f.servicoId}`,
-      `${f.tecnico ?? "O técnico"} ainda não começou${f.marcadoPara ? ` (estava marcado para ${f.marcadoPara})` : ""}${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
+      `${f.tecnico ?? "O técnico"} ainda não começou${f.marcadoPara ? ` (estava marcado para ${quandoEmLisboa(f.marcadoPara, agoraMs)})` : ""}${f.cliente ? ` · cliente ${f.cliente}` : ""}.`,
       "Ligar ao técnico; se não aparecer, dar como falta em Técnicos › Qualidade › Faltas.",
-      f.marcadoPara ?? new Date(agoraMs).toISOString(), "pedido", f.servicoId, { donos: DONOS.operacao },
+      // O prazo é a hora marcada, que já passou: vem à frente de tudo o resto.
+      f.marcadoPara ?? new Date(agoraMs).toISOString(), "pedido", f.servicoId,
+      { donos: DONOS.operacao, prazo: f.marcadoPara ?? undefined },
     ));
   }
 
@@ -391,13 +415,17 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
 
   // --- Fila de KYC ---------------------------------------------------------
   // Só o que espera há mais de um dia (quando se sabe a data); senão, a fila toda.
+  // A bola é NOSSA: um técnico com documentos por aprovar não pode trabalhar.
+  // Por isso o que espera há mais de 24 h é "alta" (Tratar hoje), seja um ou
+  // sejam dez. Estava em "A acompanhar · depende de terceiros", que é o
+  // contrário (15/10/2026). Sem datas, só a fila grande sobe.
   const antigos = s.documentosAntigos;
   if (antigos ? antigos.quantos > 0 : s.documentosPendentes >= LIMITES.documentosPendentes) {
     const n = antigos ? antigos.quantos : s.documentosPendentes;
     alertas.push(novo(
       "kyc-fila",
       "equipa",
-      s.documentosPendentes >= LIMITES.documentosPendentesAlta ? "alta" : "media",
+      antigos || s.documentosPendentes >= LIMITES.documentosPendentesAlta ? "alta" : "media",
       antigos
         ? `${plural(n, "documento de técnico", "documentos de técnicos")} à espera há mais de 24 h`
         : `${plural(n, "documento de técnico", "documentos de técnicos")} por aprovar`,
@@ -463,9 +491,7 @@ export function gerarAlertas(s: SinaisDoNegocio, agoraMs: number): DashboardAler
     ));
   }
 
-  // Mais urgente primeiro; dentro da mesma urgência, o mais antigo à frente —
-  // é o que está à espera há mais tempo.
-  const ordem: Record<AlertPriority, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
-  return alertas.sort((a, b) =>
-    ordem[a.priority] - ordem[b.priority] || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  // Mais urgente primeiro; dentro da mesma urgência, o prazo mais curto e
+  // depois o mais antigo (ver ordemDosAlertas).
+  return ordenarAlertas(alertas);
 }

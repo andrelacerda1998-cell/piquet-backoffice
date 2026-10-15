@@ -1,6 +1,6 @@
 import { apiOk, withStaff } from "../../_lib/handler";
 import { gmvDe, lerPagamentos } from "../../_lib/gmv";
-import { inicioDoAnoLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa } from "@/lib/periodo";
+import { inicioDoAnoLisboa, inicioDoMesLisboa, inicioDoMesSeguinteLisboa, mesmoMomentoNoMesAnteriorLisboa } from "@/lib/periodo";
 
 /**
  * GET /api/finance/gmv — GMV e comissão do mês e do ano, com o período
@@ -15,6 +15,12 @@ export const GET = withStaff(async () => {
 
   const inicioMes = inicioDoMesLisboa(agora);
   const inicioMesAnterior = inicioDoMesLisboa(new Date(inicioMes.getTime() - 1));
+  /*
+    Os mesmos dias do mês passado: o mês corrente vai a meio, e compará-lo com
+    o mês anterior INTEIRO dava uma seta vermelha a meio de um mês melhor do
+    que o anterior (−46% a 15/10, na simulação de 15/10/2026).
+  */
+  const mesmoMomentoMesAnterior = mesmoMomentoNoMesAnteriorLisboa(agora);
   const inicioAno = inicioDoAnoLisboa(agora);
   // Homólogo: de 1 de janeiro do ano passado até este mesmo dia, há um ano.
   const haUmAno = new Date(agora);
@@ -23,6 +29,7 @@ export const GET = withStaff(async () => {
   return apiOk({
     month: gmvDe(pagamentos, inicioMes, inicioDoMesSeguinteLisboa(agora)),
     prevMonth: gmvDe(pagamentos, inicioMesAnterior, inicioMes),
+    prevMonthToDate: gmvDe(pagamentos, inicioMesAnterior, mesmoMomentoMesAnterior),
     year: gmvDe(pagamentos, inicioAno),
     prevYearSame: gmvDe(pagamentos, inicioDoAnoLisboa(haUmAno), haUmAno),
   });
