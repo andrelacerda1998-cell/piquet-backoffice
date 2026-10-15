@@ -403,7 +403,9 @@ export async function getTopVendors(limit = 10) {
 /**
  * Procura vs oferta por cidade, as 20 com mais pedidos.
  *
- * - `procura`: pedidos de serviço reais na cidade.
+ * - `procura`: pedidos de serviço reais na cidade. Desde o backend#192 cada
+ *   pedido conta na cidade do catálogo onde fica a morada, e as localidades
+ *   ("Turcifal") deixam de aparecer como se fossem cidades.
  * - `oferta`: quem a marcou no questionário antigo da app, que parou no tempo.
  * - `oferta_cidades`, `podem_trabalhar`, `contagem`: quem recebe um pedido no
  *   centro da cidade, pelas cidades escolhidas na app (ver lib/pelasCidades).
@@ -411,6 +413,7 @@ export async function getTopVendors(limit = 10) {
  */
 export interface ProcuraEOferta {
   name: string;
+  district?: string | null;
   procura: number;
   oferta: number;
   ratio: number;
@@ -419,8 +422,18 @@ export interface ProcuraEOferta {
   contagem?: ContagemPelasCidades;
 }
 
+/**
+ * A procura por cidade e os pedidos que não ficam em cidade nenhuma do
+ * catálogo (morada longe de todas): não entram na lista, mas não se escondem.
+ * `foraDasCidades` é null antes do backend#192.
+ */
+export interface ProcuraPorCidade {
+  cidades: ProcuraEOferta[];
+  foraDasCidades: number | null;
+}
+
 export async function getVendorCoverage() {
-  return apiGet<ProcuraEOferta[]>("/technicians/coverage", () => []).then((r) => r.data);
+  return apiGet<ProcuraPorCidade>("/technicians/coverage", () => ({ cidades: [], foraDasCidades: null })).then((r) => r.data);
 }
 
 /**
