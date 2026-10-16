@@ -15,14 +15,17 @@ export const mockState: {
   authError: boolean;
   /** O que se inseriu, por tabela (para os testes verem o que ficou gravado). */
   inserts: Array<{ table: string; row: unknown }>;
-} = { tables: {}, user: { id: "staff-1", email: "ana@piquet.pt" }, authError: false, inserts: [] };
+  /** O que se mandou atualizar, por tabela. */
+  updates: Array<{ table: string; row: unknown }>;
+} = { tables: {}, user: { id: "staff-1", email: "ana@piquet.pt" }, authError: false, inserts: [], updates: [] };
 
 function builder(result: Result, table = ""): any {
   const b: any = {};
-  for (const m of ["select", "eq", "neq", "in", "or", "ilike", "like", "gte", "lte", "gt", "lt", "order", "range", "limit", "update", "upsert", "delete"]) {
+  for (const m of ["select", "eq", "neq", "in", "or", "ilike", "like", "gte", "lte", "gt", "lt", "order", "range", "limit", "upsert", "delete"]) {
     b[m] = () => b;
   }
   b.insert = (row: unknown) => { mockState.inserts.push({ table, row }); return b; };
+  b.update = (row: unknown) => { mockState.updates.push({ table, row }); return b; };
   b.single = () => Promise.resolve(result);
   b.then = (res: any, rej: any) => Promise.resolve(result).then(res, rej);
   return b;
@@ -56,4 +59,5 @@ export function resetMock() {
   mockState.user = { id: "staff-1", email: "rodrigo@piquet.pt" };
   mockState.authError = false;
   mockState.inserts = [];
+  mockState.updates = [];
 }
