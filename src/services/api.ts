@@ -115,6 +115,8 @@ interface RequestOptions<T> {
  */
 const LIVE_EXACT = new Set<string>([
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  "/marketing/push-campaigns/publico", // a quantas pessoas chega (antes de ligar)
+  "/marketing/push-campaigns/traduzir", // rascunho do inglês
   // Pedidos personalizados reais (serviços com is_custom no Laravel, PR #83).
   "/custom-requests",
   // Fase 1 — Serviços/Reservas
@@ -313,6 +315,8 @@ const REAL_DATA = new Set<string>([
   */
   "/services/counts",
   "/marketing/push-campaigns", // campanhas de push reais (Laravel)
+  "/marketing/push-campaigns/publico", // a quantas pessoas chega (antes de ligar)
+  "/marketing/push-campaigns/traduzir", // rascunho do inglês
   // Pedidos personalizados: serviços com is_custom no Laravel (PR #83).
   // Antes disto o ecrã caía num fallback com seis pedidos escritos à mão.
   "/custom-requests",
@@ -507,6 +511,7 @@ export const REAL_PATTERNS: ReadonlyArray<RegExp> = [
   /^\/(services|customers|technicians)\/\d+\/notas$/, // notas internas (Supabase)
   /^\/services\/\d+\/tickets$/, // tickets reais de Suporte
   /^\/services\/\d+\/conversa$/, // conversa cliente-técnico, só em disputas
+  /^\/marketing\/push-campaigns\/\d+\/publico$/, // público de uma campanha (Laravel)
   /^\/finance\/faturas-por-emitir\/\d+\/emitir$/, // "Emitir agora" (backend#176)
 ];
 
@@ -593,6 +598,8 @@ export const LIVE_PATTERNS: ReadonlyArray<RegExp> = [
   // Só ids emp_ (não apanha /employees/dashboard, /simulate, etc., que têm rotas próprias)
   /^\/employees\/emp_[^/]+$/, // editar/desativar colaborador
   /^\/marketing\/push-campaigns\/[^/]+\/active$/, // ligar/desligar campanha
+  /^\/marketing\/push-campaigns\/\d+$/, // editar/apagar um rascunho
+  /^\/marketing\/push-campaigns\/\d+\/publico$/, // a quantas pessoas chega uma campanha gravada
   /^\/marketing\/leads\/[^/]+\/messages$/, // ler/enviar mensagens de WhatsApp da lead
   /^\/marketing\/leads\/[^/]+\/timeline$/, // cronologia do pedido
   /^\/marketing\/leads\/[^/]+$/, // mudar estado de lead no CRM

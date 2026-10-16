@@ -211,6 +211,7 @@ export async function mudarEstadoGoogleUI(resourceName: string, estado: "ENABLED
 /* --- Campanhas de push (Laravel: NotificationCampaign) ------------------- */
 
 import type { PushCampaign as PushCampaignDTO } from "@/app/api/marketing/push-campaigns/route";
+import type { DadosDaCampanha, PublicoDaCampanha as PublicoDaCampanhaPush } from "@/lib/campanhasPush";
 export type { PushCampaign, PushCampaignStats } from "@/app/api/marketing/push-campaigns/route";
 
 /**
@@ -228,11 +229,45 @@ export async function getPushCampaigns(): Promise<{ items: PushCampaignDTO[]; to
   ).then((r) => ({ items: r.data.items ?? [], total: r.data.meta?.total ?? 0 }));
 }
 
-/** Liga ou desliga uma campanha. Criar continua no Filament. */
-export async function setPushCampaignActive(id: number, active: boolean): Promise<void> {
-  await apiPut(`/marketing/push-campaigns/${id}/active`, { active }, () => {
-    throw new Error("As campanhas de push ainda não estão ligadas.");
-  });
+/**
+ * Liga ou desliga uma campanha. Ligar pede o motivo e leva o número de pessoas
+ * que o ecrã mostrou, para ficar no histórico da equipa.
+ */
+export async function setPushCampaignActive(id: number, active: boolean, extra: { motivo?: string; pessoas?: number } = {}): Promise<void> {
+  await apiPut(`/marketing/push-campaigns/${id}/active`, { active, ...extra }, semLaravel);
+}
+
+const semLaravel = () => {
+  throw new Error("As campanhas de push precisam da ligação ao Laravel.");
+};
+
+/** Guarda uma campanha nova como rascunho: fica desligada (src/lib/campanhasPush.ts). */
+export async function criarCampanhaPush(dados: DadosDaCampanha): Promise<PushCampaignDTO> {
+  return apiPost<PushCampaignDTO>("/marketing/push-campaigns", dados, semLaravel).then((r) => r.data);
+}
+
+/** Corrige um rascunho (só enquanto está desligado e nunca foi enviado). */
+export async function editarCampanhaPush(id: number, dados: DadosDaCampanha): Promise<PushCampaignDTO> {
+  return apiPut<PushCampaignDTO>(`/marketing/push-campaigns/${id}`, dados, semLaravel).then((r) => r.data);
+}
+
+export async function apagarCampanhaPush(id: number): Promise<void> {
+  await apiDelete(`/marketing/push-campaigns/${id}`, semLaravel);
+}
+
+/** A quantas pessoas chega um público (o formulário ainda por gravar). */
+export async function contarPublicoPush(publico: PublicoDaCampanhaPush): Promise<number> {
+  return apiPost<{ pessoas: number }>("/marketing/push-campaigns/publico", publico, semLaravel).then((r) => r.data.pessoas);
+}
+
+/** A quantas pessoas chega uma campanha gravada (antes de a ligar). */
+export async function publicoDaCampanhaPush(id: number): Promise<number> {
+  return apiGet<{ pessoas: number }>(`/marketing/push-campaigns/${id}/publico`, semLaravel).then((r) => r.data.pessoas);
+}
+
+/** Um rascunho do inglês a partir do português. */
+export async function traduzirCampanhaPush(title: string, body: string): Promise<{ title: string; body: string }> {
+  return apiPost<{ title: string; body: string }>("/marketing/push-campaigns/traduzir", { title, body }, semLaravel).then((r) => r.data);
 }
 
 /* ------------------------------- Vouchers -------------------------------- */

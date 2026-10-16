@@ -12,8 +12,8 @@ import type { StaffContext } from "./handler";
  */
 export type AcaoDaEquipa =
   | "bloquear_cliente" | "suspender_tecnico" | "reembolsar_pagamento" | "fechar_pedido" | "desistir_e_devolver"
-  | "declarar_falta" | "cancelar_pedido" | "ler_conversa";
-export type Entidade = "cliente" | "tecnico" | "pagamento" | "pedido";
+  | "declarar_falta" | "cancelar_pedido" | "ler_conversa" | "ligar_campanha_push" | "desligar_campanha_push";
+export type Entidade = "cliente" | "tecnico" | "pagamento" | "pedido" | "campanha";
 
 export interface RegistoDeAcao {
   id: string;
